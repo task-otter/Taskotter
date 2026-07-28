@@ -73,13 +73,13 @@ func TestBuildPRBody(t *testing.T) {
 	plan := &syncer.Plan{
 		Requested: map[string]syncer.ModuleRecord{
 			taskESLint: {
-				SourceModule:      "eslint-pnpm-fnm",
+				SourceModule:      "eslint/node/fnm/pnpm",
 				DestinationModule: taskESLint,
 				Path:              "taskfiles/eslint",
 			},
 		},
 		Dependencies: []syncer.ModuleRecord{
-			{SourceModule: "pnpm-fnm", DestinationModule: "pnpm", Path: "taskfiles/pnpm"},
+			{SourceModule: "pnpm/fnm", DestinationModule: "pnpm", Path: "taskfiles/pnpm"},
 		},
 		ManagedFiles:     nil,
 		ModuleContents:   nil,
@@ -103,7 +103,7 @@ func TestBuildPRBody(t *testing.T) {
 		ResolvedCommit:   "abc",
 		DefaultBranch:    "main",
 	}))
-	if !strings.Contains(body, "eslint-pnpm-fnm") {
+	if !strings.Contains(body, "eslint/node/fnm/pnpm") {
 		t.Fatalf("missing module info: %s", body)
 	}
 }

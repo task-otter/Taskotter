@@ -1,11 +1,14 @@
 package syncer
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
+	"syscall"
 
+	"github.com/mostafakhairy0305-dot/TaskOtter/internal/config"
 	"github.com/mostafakhairy0305-dot/TaskOtter/internal/pathutil"
 	"github.com/mostafakhairy0305-dot/TaskOtter/internal/yamlfmt"
 	"gopkg.in/yaml.v3"
@@ -70,7 +73,10 @@ func buildStagedFiles(plan *Plan, syncInput SyncInput) ([]stagedFile, error) {
 func ApplyPlan(plan *Plan, syncInput SyncInput) error {
 	workspace := syncInput.Config.Workspace
 
-	stagingParent := pathutil.WorkspacePath(workspace, ".taskotter/staging")
+	stagingParent := pathutil.WorkspacePath(
+		workspace,
+		pathutil.JoinRelative(syncInput.Config.TargetFolder, ".taskotter/staging"),
+	)
 
 	err := os.MkdirAll(stagingParent, dirModePerm)
 	if err != nil {
@@ -117,7 +123,12 @@ func ApplyPlan(plan *Plan, syncInput SyncInput) error {
 		}
 	}
 
-	return removeObsolete(plan, workspace)
+	err = removeObsolete(plan, workspace)
+	if err != nil {
+		return err
+	}
+
+	return cleanupLegacyMetadata(workspace, syncInput.Config.MetadataPath())
 }
 
 func validateGeneratedYAML(staged []stagedFile, rootPath string) error {
@@ -205,5 +216,42 @@ func cleanupOldTarget(plan *Plan, workspace string) error {
 		return fmt.Errorf("remove old lock file: %w", err)
 	}
 
+	oldMetadataRel := pathutil.JoinRelative(plan.OldTargetFolder, ".taskotter/metadata.yml")
+	oldMetadata := pathutil.WorkspacePath(workspace, oldMetadataRel)
+
+	err = os.Remove(oldMetadata)
+	if err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("remove old metadata file: %w", err)
+	}
+
+	err = os.Remove(filepath.Dir(oldMetadata))
+	if err != nil && !os.IsNotExist(err) && !errorsIsDirectoryNotEmpty(err) {
+		return fmt.Errorf("remove old metadata directory: %w", err)
+	}
+
 	return nil
+}
+
+func cleanupLegacyMetadata(workspace, metadataPath string) error {
+	if metadataPath == config.LegacyMetadataPath {
+		return nil
+	}
+
+	legacy := pathutil.WorkspacePath(workspace, config.LegacyMetadataPath)
+
+	err := os.Remove(legacy)
+	if err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("remove legacy metadata: %w", err)
+	}
+
+	err = os.Remove(pathutil.WorkspacePath(workspace, ".taskotter"))
+	if err != nil && !os.IsNotExist(err) && !errorsIsDirectoryNotEmpty(err) {
+		return fmt.Errorf("remove legacy metadata directory: %w", err)
+	}
+
+	return nil
+}
+
+func errorsIsDirectoryNotEmpty(err error) bool {
+	return err != nil && (errors.Is(err, syscall.ENOTEMPTY) || errors.Is(err, syscall.EEXIST))
 }

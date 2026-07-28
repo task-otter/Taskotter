@@ -11,9 +11,9 @@ silent: true
 
 includes:
   corepack:
-    taskfile: ../corepack-fnm/Taskfile.yml
+    taskfile: ../../corepack/fnm/Taskfile.yml
   fnm:
-    taskfile: ../fnm/Taskfile.yml
+    taskfile: ../../fnm/Taskfile.yml
 
 vars:
   FNM_INSTALL_DIR: "$HOME/.local/share/fnm"

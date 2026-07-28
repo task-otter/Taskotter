@@ -1,4 +1,4 @@
-# ESLint Taskfile (pnpm-fnm) Public Tasks
+# ESLint Taskfile (node/fnm/pnpm) Public Tasks
 
 ## What is this Taskfile?
 
@@ -6,7 +6,7 @@ This Taskfile wraps ESLint for JavaScript and TypeScript projects. It installs
 ESLint as a local dev dependency, runs cached checks by default, supports strict
 CI mode.
 
-This variant uses the `pnpm-fnm` stack (`pnpm-fnm`) package manager.
+This variant uses the `node/fnm/pnpm` stack.
 
 
 ## Setup
@@ -14,9 +14,9 @@ This variant uses the `pnpm-fnm` stack (`pnpm-fnm`) package manager.
 ```yaml
 includes:
   pnpm:
-    taskfile: taskfiles/pnpm-fnm/Taskfile.yml
+    taskfile: taskfiles/pnpm/Taskfile.yml
   eslint:
-    taskfile: taskfiles/eslint-pnpm-fnm/Taskfile.yml
+    taskfile: taskfiles/eslint/Taskfile.yml
 ```
 
 ## Public Tasks

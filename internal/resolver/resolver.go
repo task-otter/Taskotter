@@ -74,12 +74,12 @@ func Resolve(
 	packageManager config.PackageManager,
 	versionManager config.VersionManager,
 ) (Resolution, error) {
-	if _, ok := catalog[task]; ok {
-		return Resolution{LogicalTask: task, SourceModule: task}, nil
-	}
-
 	nodeVariants := findVariants(task, catalog)
 	if len(nodeVariants) == 0 {
+		if _, ok := catalog[task]; ok {
+			return Resolution{LogicalTask: task, SourceModule: task}, nil
+		}
+
 		return Resolution{}, &ResolveError{
 			LogicalTask:  task,
 			Attempted:    "",

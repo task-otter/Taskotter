@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/mostafakhairy0305-dot/TaskOtter/internal/app"
@@ -103,6 +104,26 @@ func TestBuildPlanInitialSync(t *testing.T) {
 
 	if !plan.Changed {
 		t.Fatal("expected changes on initial sync")
+	}
+
+	rootText := string(plan.RootTaskfile)
+	for _, want := range []string{
+		"task: go:lint",
+		"task: eslint:lint",
+		"task: go:lint:fix",
+		"task: eslint:lint:fix",
+	} {
+		if !strings.Contains(rootText, want) {
+			t.Fatalf("expected %q in root Taskfile:\n%s", want, rootText)
+		}
+	}
+
+	if strings.Contains(rootText, "task: pnpm:lint") {
+		t.Fatalf("dependency-only module should not contribute root tasks:\n%s", rootText)
+	}
+
+	if !slices.Contains(plan.Lock.GeneratedRootTasks, "lint") {
+		t.Fatalf("expected generated root tasks in lock, got %#v", plan.Lock.GeneratedRootTasks)
 	}
 }
 

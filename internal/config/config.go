@@ -18,6 +18,8 @@ const (
 	DefaultTargetFolder = "taskfiles"
 	// StoreRepository is the GitHub repository that hosts TaskOtter store modules.
 	StoreRepository = "mostafakhairy0305-dot/TaskOtter-store"
+	// LegacyMetadataPath is the pre-migration workspace-relative metadata path.
+	LegacyMetadataPath = ".taskotter/metadata.yml"
 )
 
 var unsafeStoreVersion = regexp.MustCompile(`(?i)(^refs/|\.\./|/|\\|\^|~|\^{commit})`)
@@ -439,5 +441,5 @@ func (c *Config) LockFilePath() string {
 
 // MetadataPath returns the workspace-relative path to TaskOtter metadata.
 func (c *Config) MetadataPath() string {
-	return ".taskotter/metadata.yml"
+	return pathutil.JoinRelative(c.TargetFolder, ".taskotter/metadata.yml")
 }

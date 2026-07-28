@@ -15,7 +15,7 @@ func TestBuildSourceModule(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if got != "eslint-pnpm-fnm" {
+	if got != "eslint/node/fnm/pnpm" {
 		t.Fatalf("got %q", got)
 	}
 
@@ -24,7 +24,7 @@ func TestBuildSourceModule(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if got != "eslint-bun" {
+	if got != "eslint/bun" {
 		t.Fatalf("got %q", got)
 	}
 }
@@ -32,7 +32,7 @@ func TestBuildSourceModule(t *testing.T) {
 func TestIsNodeToolVariant(t *testing.T) {
 	t.Parallel()
 
-	if !variants.IsNodeToolVariant("eslint-pnpm-fnm", "eslint") {
+	if !variants.IsNodeToolVariant("eslint/node/fnm/pnpm", "eslint") {
 		t.Fatal("expected variant")
 	}
 
@@ -44,7 +44,7 @@ func TestIsNodeToolVariant(t *testing.T) {
 func TestStripOneSuffix(t *testing.T) {
 	t.Parallel()
 
-	got, ok := variants.StripOneSuffix("eslint-pnpm-fnm")
+	got, ok := variants.StripOneSuffix("eslint/node/fnm/pnpm")
 	if !ok || got != "eslint" {
 		t.Fatalf("got %q ok=%t", got, ok)
 	}

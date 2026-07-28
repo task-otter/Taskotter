@@ -34,12 +34,16 @@ lock_file: taskfiles/.taskotter-lock.yml
 configuration_hash: abc
 `)
 
-	err = os.MkdirAll(filepath.Join(workspace, ".taskotter"), 0o755)
+	err = os.MkdirAll(filepath.Join(workspace, config.DefaultTargetFolder, ".taskotter"), 0o755)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = os.WriteFile(filepath.Join(workspace, ".taskotter/metadata.yml"), meta, 0o644)
+	err = os.WriteFile(
+		filepath.Join(workspace, config.DefaultTargetFolder, ".taskotter/metadata.yml"),
+		meta,
+		0o644,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -91,13 +95,13 @@ func TestBuildPlanCorruptMetadataFails(t *testing.T) {
 	workspace := t.TempDir()
 	writeRootTaskfile(t, workspace)
 
-	err := os.MkdirAll(filepath.Join(workspace, ".taskotter"), 0o755)
+	err := os.MkdirAll(filepath.Join(workspace, config.DefaultTargetFolder, ".taskotter"), 0o755)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	err = os.WriteFile(
-		filepath.Join(workspace, ".taskotter/metadata.yml"),
+		filepath.Join(workspace, config.DefaultTargetFolder, ".taskotter/metadata.yml"),
 		[]byte("{{not yaml"),
 		0o644,
 	)
@@ -278,12 +282,12 @@ func writeMinimalLock(t *testing.T, workspace, targetFolder string, files []sync
 			"\nlock_file: " + targetFolder + "/.taskotter-lock.yml\nconfiguration_hash: x\n",
 	)
 
-	err = os.MkdirAll(filepath.Join(workspace, ".taskotter"), 0o755)
+	err = os.MkdirAll(filepath.Join(workspace, targetFolder, ".taskotter"), 0o755)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = os.WriteFile(filepath.Join(workspace, ".taskotter/metadata.yml"), meta, 0o644)
+	err = os.WriteFile(filepath.Join(workspace, targetFolder, ".taskotter/metadata.yml"), meta, 0o644)
 	if err != nil {
 		t.Fatal(err)
 	}

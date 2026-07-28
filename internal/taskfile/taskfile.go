@@ -155,12 +155,21 @@ func findMappingValue(mapNode *yaml.Node, key string) *yaml.Node {
 
 // RootUpdateInput carries data for updating the root Taskfile includes section.
 type RootUpdateInput struct {
-	Tasks           []string
-	TargetFolder    string
-	RootTaskfileDir string
-	DestByTask      map[string]string
-	ManagedTasks    []string
-	ModuleTaskfiles map[string][]byte
+	Tasks            []string
+	TargetFolder     string
+	RootTaskfileDir  string
+	DestByTask       map[string]string
+	ManagedTasks     []string
+	ModuleTaskfiles  map[string][]byte
+	GeneratedTasks   []GeneratedRootTask
+	ManagedRootTasks []string
+}
+
+// GeneratedRootTask describes a TaskOtter-managed root task that fans out to
+// matching tasks in synced module includes.
+type GeneratedRootTask struct {
+	Name    string
+	Modules []string
 }
 
 // moduleIncludePath returns the include taskfile path for a synced module,
@@ -196,13 +205,29 @@ func UpdateRootTaskfile(content []byte, input RootUpdateInput) ([]byte, error) {
 	}
 
 	root := node.Content[0]
+	moduleVars, err := moduleVarsByTask(input)
+	if err != nil {
+		return nil, err
+	}
+
+	sharedVars := sharedModuleVarNames(input.Tasks, moduleVars)
+
+	err = upsertRootSharedVars(root, input.Tasks, moduleVars, sharedVars)
+	if err != nil {
+		return nil, err
+	}
 
 	includesNode, existing, err := prepareIncludesNode(root, input)
 	if err != nil {
 		return nil, err
 	}
 
-	err = upsertManagedIncludes(includesNode, input, existing)
+	err = upsertManagedIncludes(includesNode, input, existing, moduleVars, sharedVars)
+	if err != nil {
+		return nil, err
+	}
+
+	err = updateGeneratedRootTasks(root, input)
 	if err != nil {
 		return nil, err
 	}
@@ -274,6 +299,8 @@ func upsertManagedIncludes(
 	includesNode *yaml.Node,
 	input RootUpdateInput,
 	existing map[string]*yaml.Node,
+	moduleVarsByTask map[string]*yaml.Node,
+	sharedVars map[string]struct{},
 ) error {
 	for _, task := range input.Tasks {
 		dest, ok := input.DestByTask[task]
@@ -283,10 +310,7 @@ func upsertManagedIncludes(
 
 		path := moduleIncludePath(input.RootTaskfileDir, input.TargetFolder, dest)
 
-		moduleVars, err := extractVarsNode(input.ModuleTaskfiles[task])
-		if err != nil && !errors.Is(err, errNoModuleVars) {
-			return err
-		}
+		moduleVars := moduleVarsByTask[task]
 
 		if entry, ok := existing[task]; ok {
 			if !isManagedInclude(entry, path, input.ManagedTasks, task) {
@@ -299,12 +323,12 @@ func upsertManagedIncludes(
 			}
 
 			setIncludePath(entry, path)
-			mergeIncludeVars(entry, moduleVars)
+			mergeIncludeVars(entry, moduleVars, sharedVars)
 
 			continue
 		}
 
-		entry := newIncludeEntry(path, moduleVars)
+		entry := newIncludeEntry(path, moduleVars, sharedVars)
 		appendMappingPair(includesNode, yamlScalar(task), entry)
 	}
 
@@ -364,14 +388,121 @@ func extractVarsNode(content []byte) (*yaml.Node, error) {
 	return cloneYAMLNode(varsNode), nil
 }
 
-func mergeIncludeVars(entry *yaml.Node, moduleVars *yaml.Node) {
+func moduleVarsByTask(input RootUpdateInput) (map[string]*yaml.Node, error) {
+	out := make(map[string]*yaml.Node, len(input.Tasks))
+	for _, task := range input.Tasks {
+		moduleVars, err := extractVarsNode(input.ModuleTaskfiles[task])
+		if err != nil {
+			if errors.Is(err, errNoModuleVars) {
+				continue
+			}
+
+			return nil, err
+		}
+
+		out[task] = moduleVars
+	}
+
+	return out, nil
+}
+
+func sharedModuleVarNames(
+	tasks []string,
+	moduleVarsByTask map[string]*yaml.Node,
+) map[string]struct{} {
+	counts := make(map[string]int)
+	for _, task := range tasks {
+		varsNode := moduleVarsByTask[task]
+		if varsNode == nil || varsNode.Kind != yaml.MappingNode {
+			continue
+		}
+
+		seen := make(map[string]struct{})
+		for idx := 0; idx < len(varsNode.Content); idx += yamlMappingPairKeyValue {
+			seen[varsNode.Content[idx].Value] = struct{}{}
+		}
+
+		for key := range seen {
+			counts[key]++
+		}
+	}
+
+	shared := make(map[string]struct{})
+	for key, count := range counts {
+		if count >= 2 {
+			shared[key] = struct{}{}
+		}
+	}
+
+	return shared
+}
+
+func upsertRootSharedVars(
+	root *yaml.Node,
+	tasks []string,
+	moduleVarsByTask map[string]*yaml.Node,
+	sharedVars map[string]struct{},
+) error {
+	if len(sharedVars) == 0 {
+		return nil
+	}
+
+	rootVars := findMappingValue(root, "vars")
+	if rootVars == nil {
+		rootVars = newYAMLMappingNode()
+		appendMappingPair(root, yamlScalar("vars"), rootVars)
+	}
+
+	if rootVars.Kind != yaml.MappingNode {
+		return &RewriteError{Message: "root Taskfile vars must be a mapping"}
+	}
+
+	existing := mappingKeys(rootVars)
+	for _, key := range sortedKeys(sharedVars) {
+		if _, ok := existing[key]; ok {
+			continue
+		}
+
+		value := firstVarValue(tasks, moduleVarsByTask, key)
+		if value == nil {
+			continue
+		}
+
+		appendMappingPair(rootVars, yamlScalar(key), value)
+	}
+
+	return nil
+}
+
+func firstVarValue(
+	tasks []string,
+	moduleVarsByTask map[string]*yaml.Node,
+	key string,
+) *yaml.Node {
+	for _, task := range tasks {
+		varsNode := moduleVarsByTask[task]
+		if varsNode == nil || varsNode.Kind != yaml.MappingNode {
+			continue
+		}
+
+		for idx := 0; idx < len(varsNode.Content); idx += yamlMappingPairKeyValue {
+			if varsNode.Content[idx].Value == key {
+				return cloneYAMLNode(varsNode.Content[idx+1])
+			}
+		}
+	}
+
+	return nil
+}
+
+func mergeIncludeVars(entry *yaml.Node, moduleVars *yaml.Node, sharedVars map[string]struct{}) {
 	if moduleVars == nil || moduleVars.Kind != yaml.MappingNode {
 		return
 	}
 
 	existingVars := findMappingValue(entry, "vars")
 	if existingVars == nil {
-		appendMappingPair(entry, yamlScalar("vars"), moduleVars)
+		appendMappingPair(entry, yamlScalar("vars"), includeVarsNode(moduleVars, sharedVars))
 
 		return
 	}
@@ -387,6 +518,12 @@ func mergeIncludeVars(entry *yaml.Node, moduleVars *yaml.Node) {
 
 	for idx := 0; idx < len(moduleVars.Content); idx += yamlMappingPairKeyValue {
 		key := moduleVars.Content[idx].Value
+		if _, shared := sharedVars[key]; shared {
+			setMappingValue(existingVars, key, rootVarReference(key))
+
+			continue
+		}
+
 		if _, ok := existingKeys[key]; ok {
 			continue
 		}
@@ -397,6 +534,25 @@ func mergeIncludeVars(entry *yaml.Node, moduleVars *yaml.Node) {
 			cloneYAMLNode(moduleVars.Content[idx+1]),
 		)
 	}
+}
+
+func includeVarsNode(moduleVars *yaml.Node, sharedVars map[string]struct{}) *yaml.Node {
+	out := newYAMLMappingNode()
+	for idx := 0; idx < len(moduleVars.Content); idx += yamlMappingPairKeyValue {
+		key := moduleVars.Content[idx].Value
+		value := cloneYAMLNode(moduleVars.Content[idx+1])
+		if _, shared := sharedVars[key]; shared {
+			value = rootVarReference(key)
+		}
+
+		appendMappingPair(out, cloneYAMLNode(moduleVars.Content[idx]), value)
+	}
+
+	return out
+}
+
+func rootVarReference(key string) *yaml.Node {
+	return yamlScalar("{{." + key + "}}")
 }
 
 func cloneYAMLNode(node *yaml.Node) *yaml.Node {
@@ -419,13 +575,69 @@ func cloneYAMLNode(node *yaml.Node) *yaml.Node {
 	return out.Content[0]
 }
 
-func newIncludeEntry(path string, moduleVars *yaml.Node) *yaml.Node {
+func newIncludeEntry(path string, moduleVars *yaml.Node, sharedVars map[string]struct{}) *yaml.Node {
 	entry := newYAMLMappingNode()
 	appendMappingPair(entry, yamlScalar("taskfile"), yamlScalar(path))
 
 	if moduleVars != nil {
-		appendMappingPair(entry, yamlScalar("vars"), moduleVars)
+		appendMappingPair(entry, yamlScalar("vars"), includeVarsNode(moduleVars, sharedVars))
 	}
+
+	return entry
+}
+
+func updateGeneratedRootTasks(root *yaml.Node, input RootUpdateInput) error {
+	if len(input.GeneratedTasks) == 0 && len(input.ManagedRootTasks) == 0 {
+		return nil
+	}
+
+	tasksNode := findMappingValue(root, "tasks")
+	if tasksNode == nil {
+		tasksNode = newYAMLMappingNode()
+		appendMappingPair(root, yamlScalar("tasks"), tasksNode)
+	}
+
+	if tasksNode.Kind != yaml.MappingNode {
+		return &RewriteError{Message: "root Taskfile tasks must be a mapping"}
+	}
+
+	generatedSet := make(map[string]struct{}, len(input.GeneratedTasks))
+	for _, generated := range input.GeneratedTasks {
+		generatedSet[generated.Name] = struct{}{}
+	}
+
+	for _, old := range input.ManagedRootTasks {
+		if _, stillGenerated := generatedSet[old]; stillGenerated {
+			continue
+		}
+
+		deleteMappingKey(tasksNode, old)
+	}
+
+	for _, generated := range input.GeneratedTasks {
+		deleteMappingKey(tasksNode, generated.Name)
+		appendMappingPair(tasksNode, yamlScalar(generated.Name), newGeneratedTaskEntry(generated))
+	}
+
+	return nil
+}
+
+func newGeneratedTaskEntry(generated GeneratedRootTask) *yaml.Node {
+	entry := newYAMLMappingNode()
+	appendMappingPair(
+		entry,
+		yamlScalar("desc"),
+		yamlScalar("Run "+generated.Name+" for synced TaskOtter modules"),
+	)
+
+	cmds := &yaml.Node{Kind: yaml.SequenceNode}
+	for _, module := range generated.Modules {
+		cmd := newYAMLMappingNode()
+		appendMappingPair(cmd, yamlScalar("task"), yamlScalar(module+":"+generated.Name))
+		cmds.Content = append(cmds.Content, cmd)
+	}
+
+	appendMappingPair(entry, yamlScalar("cmds"), cmds)
 
 	return entry
 }
@@ -466,6 +678,38 @@ func yamlScalar(value string) *yaml.Node {
 
 func appendMappingPair(mapNode *yaml.Node, key, value *yaml.Node) {
 	mapNode.Content = append(mapNode.Content, key, value)
+}
+
+func mappingKeys(mapNode *yaml.Node) map[string]struct{} {
+	keys := make(map[string]struct{}, len(mapNode.Content)/yamlMappingPairKeyValue)
+	for idx := 0; idx < len(mapNode.Content); idx += yamlMappingPairKeyValue {
+		keys[mapNode.Content[idx].Value] = struct{}{}
+	}
+
+	return keys
+}
+
+func setMappingValue(mapNode *yaml.Node, key string, value *yaml.Node) {
+	for idx := 0; idx < len(mapNode.Content); idx += yamlMappingPairKeyValue {
+		if mapNode.Content[idx].Value == key {
+			mapNode.Content[idx+1] = value
+
+			return
+		}
+	}
+
+	appendMappingPair(mapNode, yamlScalar(key), value)
+}
+
+func sortedKeys(m map[string]struct{}) []string {
+	keys := make([]string, 0, len(m))
+	for key := range m {
+		keys = append(keys, key)
+	}
+
+	slices.Sort(keys)
+
+	return keys
 }
 
 func deleteMappingKey(mapNode *yaml.Node, key string) {

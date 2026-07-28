@@ -11,7 +11,7 @@ silent: true
 
 includes:
   pnpm:
-    taskfile: ../pnpm-fnm/Taskfile.yml
+    taskfile: ../../../../pnpm/fnm/Taskfile.yml
 
 vars:
   TARGETS: ""

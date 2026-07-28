@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
+	"sort"
 
 	"github.com/mostafakhairy0305-dot/TaskOtter/internal/config"
 	"github.com/mostafakhairy0305-dot/TaskOtter/internal/pathutil"
@@ -49,6 +51,18 @@ func loadPreviousState(workspace string, cfg *config.Config) (*LockFile, *Metada
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return nil, nil, "", err
 	}
+	if oldMeta == nil && cfg.MetadataPath() != config.LegacyMetadataPath {
+		oldMeta, err = LoadMetadata(workspace, config.LegacyMetadataPath)
+		if err != nil && !errors.Is(err, os.ErrNotExist) {
+			return nil, nil, "", err
+		}
+	}
+	if oldMeta == nil {
+		oldMeta, err = discoverPreviousMetadata(workspace, cfg.MetadataPath())
+		if err != nil {
+			return nil, nil, "", err
+		}
+	}
 
 	oldLockPath := cfg.LockFilePath()
 	oldTarget := ""
@@ -71,4 +85,54 @@ func loadPreviousState(workspace string, cfg *config.Config) (*LockFile, *Metada
 	}
 
 	return oldLock, oldMeta, oldTarget, nil
+}
+
+func discoverPreviousMetadata(workspace, currentMetadataPath string) (*Metadata, error) {
+	var candidates []string
+
+	err := filepath.WalkDir(workspace, func(abs string, entry os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+
+		if entry.IsDir() {
+			if entry.Name() == ".git" {
+				return filepath.SkipDir
+			}
+
+			return nil
+		}
+
+		rel, relErr := filepath.Rel(workspace, abs)
+		if relErr != nil {
+			return relErr
+		}
+
+		rel = filepath.ToSlash(rel)
+		if rel == currentMetadataPath || filepath.ToSlash(rel) == config.LegacyMetadataPath {
+			return nil
+		}
+
+		if filepath.Base(rel) == "metadata.yml" &&
+			filepath.Base(filepath.Dir(rel)) == ".taskotter" {
+			candidates = append(candidates, rel)
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("discover previous metadata: %w", err)
+	}
+
+	sort.Strings(candidates)
+	for _, candidate := range candidates {
+		meta, loadErr := LoadMetadata(workspace, candidate)
+		if loadErr != nil {
+			return nil, loadErr
+		}
+
+		return meta, nil
+	}
+
+	return nil, nil
 }

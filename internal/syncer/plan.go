@@ -39,12 +39,16 @@ func BuildPlan(syncInput SyncInput) (*Plan, error) {
 		return nil, err
 	}
 
-	rootBytes, rootExisted, newRoot, err := planRootTaskfile(syncInput, oldLock, moduleContents)
+	rootBytes, rootExisted, newRoot, generatedRootTasks, err := planRootTaskfile(
+		syncInput,
+		oldLock,
+		moduleContents,
+	)
 	if err != nil {
 		return nil, err
 	}
 
-	lock := buildLock(syncInput, plannedFiles)
+	lock := buildLock(syncInput, plannedFiles, generatedRootTasks)
 	meta := Metadata{
 		TargetFolder:      syncInput.Config.TargetFolder,
 		LockFile:          syncInput.Config.LockFilePath(),
@@ -84,9 +88,9 @@ func planRootTaskfile(
 	syncInput SyncInput,
 	oldLock *LockFile,
 	moduleContents map[string]map[string]FileEntry,
-) ([]byte, bool, []byte, error) {
+) ([]byte, bool, []byte, []taskfile.GeneratedRootTask, error) {
 	if !syncInput.Config.SyncRoot {
-		return nil, false, nil, nil
+		return nil, false, nil, nil, nil
 	}
 
 	rootBytes, rootExisted, err := readRootTaskfile(
@@ -94,15 +98,20 @@ func planRootTaskfile(
 		syncInput.Config.RootTaskfile,
 	)
 	if err != nil {
-		return nil, false, nil, err
+		return nil, false, nil, nil, err
 	}
 
-	newRoot, err := buildRootTaskfile(syncInput, oldLock, moduleContents, rootBytes)
+	newRoot, generatedRootTasks, err := buildRootTaskfile(
+		syncInput,
+		oldLock,
+		moduleContents,
+		rootBytes,
+	)
 	if err != nil {
-		return nil, false, nil, err
+		return nil, false, nil, nil, err
 	}
 
-	return rootBytes, rootExisted, newRoot, nil
+	return rootBytes, rootExisted, newRoot, generatedRootTasks, nil
 }
 
 func readRootTaskfile(workspace, rootPath string) ([]byte, bool, error) {
@@ -123,10 +132,12 @@ func buildRootTaskfile(
 	oldLock *LockFile,
 	moduleContents map[string]map[string]FileEntry,
 	rootBytes []byte,
-) ([]byte, error) {
+) ([]byte, []taskfile.GeneratedRootTask, error) {
 	managedTasks := syncInput.Config.Tasks
+	managedRootTasks := []string(nil)
 	if oldLock != nil {
 		managedTasks = oldLock.Configuration.Tasks
+		managedRootTasks = oldLock.GeneratedRootTasks
 	}
 
 	moduleTaskfiles := make(map[string][]byte, len(syncInput.Requested))
@@ -141,19 +152,32 @@ func buildRootTaskfile(
 		}
 	}
 
-	newRoot, err := taskfile.UpdateRootTaskfile(rootBytes, taskfile.RootUpdateInput{
-		Tasks:           syncInput.Config.Tasks,
-		TargetFolder:    syncInput.Config.TargetFolder,
-		RootTaskfileDir: path.Dir(syncInput.Config.RootTaskfile),
-		DestByTask:      syncInput.DestByTask,
-		ManagedTasks:    managedTasks,
-		ModuleTaskfiles: moduleTaskfiles,
-	})
+	storeMetadata, err := loadStoreTaskMetadata(syncInput.Snapshot)
 	if err != nil {
-		return nil, fmt.Errorf("update root Taskfile.yml: %w", err)
+		return nil, nil, err
 	}
 
-	return newRoot, nil
+	generatedRootTasks := buildGeneratedRootTasks(
+		syncInput.Config.Tasks,
+		syncInput.Requested,
+		storeMetadata,
+	)
+
+	newRoot, err := taskfile.UpdateRootTaskfile(rootBytes, taskfile.RootUpdateInput{
+		Tasks:            syncInput.Config.Tasks,
+		TargetFolder:     syncInput.Config.TargetFolder,
+		RootTaskfileDir:  path.Dir(syncInput.Config.RootTaskfile),
+		DestByTask:       syncInput.DestByTask,
+		ManagedTasks:     managedTasks,
+		ModuleTaskfiles:  moduleTaskfiles,
+		GeneratedTasks:   generatedRootTasks,
+		ManagedRootTasks: managedRootTasks,
+	})
+	if err != nil {
+		return nil, nil, fmt.Errorf("update root Taskfile.yml: %w", err)
+	}
+
+	return newRoot, generatedRootTasks, nil
 }
 
 func finalizePlanDiff(
@@ -186,7 +210,7 @@ func finalizePlanDiff(
 	plan.Updated = updated
 	plan.Removed = removed
 	plan.Changed = len(added) > 0 || len(updated) > 0 || len(removed) > 0
-	plan.StagePaths = buildStagePaths(plan, metadataPath, syncRoot)
+	plan.StagePaths = buildStagePaths(plan, workspace, metadataPath, syncRoot)
 
 	return plan, nil
 }
@@ -376,7 +400,11 @@ func collectModuleFile(
 	return nil
 }
 
-func buildLock(syncInput SyncInput, files []ManagedFile) LockFile {
+func buildLock(
+	syncInput SyncInput,
+	files []ManagedFile,
+	generatedRootTasks []taskfile.GeneratedRootTask,
+) LockFile {
 	var lock LockFile
 
 	lock.Source.Repository = config.StoreRepository
@@ -392,7 +420,19 @@ func buildLock(syncInput SyncInput, files []ManagedFile) LockFile {
 	lock.Configuration.SyncRoot = syncInput.Config.SyncRoot
 	lock.ResolvedModules.Requested = orderedRequested(syncInput.Requested)
 	lock.ResolvedModules.Dependencies = append([]ModuleRecord{}, syncInput.Dependencies...)
+	lock.GeneratedRootTasks = generatedRootTaskNames(generatedRootTasks)
 	lock.ManagedFiles = files
 
 	return lock
+}
+
+func generatedRootTaskNames(generated []taskfile.GeneratedRootTask) []string {
+	names := make([]string, 0, len(generated))
+	for _, task := range generated {
+		names = append(names, task.Name)
+	}
+
+	sort.Strings(names)
+
+	return names
 }

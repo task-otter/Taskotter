@@ -9,6 +9,7 @@ import (
 	"os"
 	"sort"
 
+	"github.com/mostafakhairy0305-dot/TaskOtter/internal/config"
 	"github.com/mostafakhairy0305-dot/TaskOtter/internal/pathutil"
 	"gopkg.in/yaml.v3"
 )
@@ -190,7 +191,7 @@ func diffMetadataFile(
 	return added, append(updated, metadataPath), nil
 }
 
-func buildStagePaths(plan *Plan, metadataPath string, syncRoot bool) []string {
+func buildStagePaths(plan *Plan, workspace, metadataPath string, syncRoot bool) []string {
 	paths := make(map[string]struct{})
 	for _, managed := range plan.ManagedFiles {
 		paths[managed.Path] = struct{}{}
@@ -206,6 +207,9 @@ func buildStagePaths(plan *Plan, metadataPath string, syncRoot bool) []string {
 
 	paths[plan.Metadata.LockFile] = struct{}{}
 	paths[metadataPath] = struct{}{}
+	if metadataPath != config.LegacyMetadataPath && relativePathExists(workspace, config.LegacyMetadataPath) {
+		paths[config.LegacyMetadataPath] = struct{}{}
+	}
 
 	if plan.OldLock != nil && plan.OldTargetFolder != "" &&
 		plan.OldTargetFolder != plan.Metadata.TargetFolder {
@@ -217,6 +221,11 @@ func buildStagePaths(plan *Plan, metadataPath string, syncRoot bool) []string {
 
 		oldLockPath := pathutil.JoinRelative(plan.OldTargetFolder, ".taskotter-lock.yml")
 		paths[oldLockPath] = struct{}{}
+
+		oldMetadataPath := pathutil.JoinRelative(plan.OldTargetFolder, ".taskotter/metadata.yml")
+		if relativePathExists(workspace, oldMetadataPath) {
+			paths[oldMetadataPath] = struct{}{}
+		}
 	}
 
 	out := make([]string, 0, len(paths))
@@ -227,4 +236,10 @@ func buildStagePaths(plan *Plan, metadataPath string, syncRoot bool) []string {
 	sort.Strings(out)
 
 	return out
+}
+
+func relativePathExists(workspace, rel string) bool {
+	_, err := os.Stat(pathutil.WorkspacePath(workspace, rel))
+
+	return err == nil
 }

@@ -87,12 +87,12 @@ func TestLocalSnapshotLoadsFixture(t *testing.T) {
 		t.Fatal("expected go module in catalog")
 	}
 
-	if len(snap.Deps["eslint-pnpm-fnm"]) != 1 {
-		t.Fatalf("unexpected deps: %#v", snap.Deps["eslint-pnpm-fnm"])
+	if len(snap.Deps["eslint/node/fnm/pnpm"]) != 1 {
+		t.Fatalf("unexpected deps: %#v", snap.Deps["eslint/node/fnm/pnpm"])
 	}
 
-	// internal/ holds no files of its own, so it is a namespace whose children
-	// are catalogued under their full namespaced name.
+	// internal/ has no Taskfile.yml of its own, so it is a namespace whose
+	// children are catalogued under their full namespaced name.
 	if _, ok := snap.Catalog["internal/skipfiles"]; !ok {
 		t.Fatalf("expected namespaced module in catalog: %#v", snap.Catalog)
 	}

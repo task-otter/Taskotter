@@ -11,10 +11,10 @@ Sync pull requests target the branch that invoked TaskOtter. For pull-request wo
 ## Features
 
 - Validates all inputs before modifying files
-- Resolves logical task names to store variants (`eslint` + `pnpm` + `fnm` → `eslint-pnpm-fnm`)
+- Resolves logical task names to store variants (`eslint` + `pnpm` + `fnm` → `eslint/node/fnm/pnpm`)
 - Recursively resolves dependencies from `.deps.yml`, including namespaced support modules (`internal/skipfiles` → `taskfiles/internal/skipfiles`)
 - Supports latest default branch or a pinned store Git tag
-- Normalizes destination directories (`eslint-pnpm-fnm` → `taskfiles/eslint`)
+- Normalizes destination directories (`eslint/node/fnm/pnpm` → `taskfiles/eslint`)
 - Rewrites internal Taskfile dependency includes to normalized paths
 - Tracks managed files in `<target-folder>/.taskotter-lock.yml`
 - Creates or updates a deterministic PR branch `taskotter/sync-<configuration-hash>`
@@ -203,6 +203,8 @@ jobs:
 
 With the default `sync-root: true`, TaskOtter creates a root `Taskfile.yml` when one is missing, then adds managed `includes` entries for synced modules. If a root Taskfile already exists, TaskOtter updates only its managed includes and leaves other content unchanged. Set `sync-root: false` to synchronize modules and TaskOtter state without reading, creating, or modifying the root `Taskfile.yml`.
 
+When synced modules share exported task names in store metadata, TaskOtter also generates root tasks that fan out to those modules. For example, syncing `go` and `eslint` can generate root `lint`, `lint:fix`, `install`, and `version` tasks that call `go:lint`, `eslint:lint`, and so on. Shared module variables are promoted to editable root `vars`, while include-level vars reference those root values.
+
 ## Behavior
 
 ### Module resolution
@@ -217,16 +219,16 @@ With the default `sync-root: true`, TaskOtter creates a root `Taskfile.yml` when
 Modules copy to `<target-folder>/<normalized-name>/`:
 
 ```text
-taskfiles/eslint/Taskfile.yml      ← eslint-pnpm-fnm
-taskfiles/pnpm/Taskfile.yml        ← pnpm-fnm
-taskfiles/corepack/Taskfile.yml    ← corepack-fnm
+taskfiles/eslint/Taskfile.yml      ← eslint/node/fnm/pnpm
+taskfiles/pnpm/Taskfile.yml        ← pnpm/fnm
+taskfiles/corepack/Taskfile.yml    ← corepack/fnm
 taskfiles/fnm/Taskfile.yml         ← fnm
 ```
 
 ### Lock file and metadata
 
 - Lock file: `<target-folder>/.taskotter-lock.yml`
-- Root metadata: `.taskotter/metadata.yml` (target folder migration)
+- Metadata: `<target-folder>/.taskotter/metadata.yml`
 
 ### Pull requests
 

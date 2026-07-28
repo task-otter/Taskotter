@@ -35,8 +35,11 @@ func TestResolveNodeVariants(t *testing.T) {
 	t.Parallel()
 
 	cat := catalog(
-		"eslint-npm-fnm", "eslint-npm-nvm", "eslint-yarn-fnm", "eslint-yarn-nvm",
-		"eslint-pnpm-fnm", "eslint-pnpm-nvm", "eslint-bun",
+		"eslint",
+		"eslint/node/fnm/npm", "eslint/node/nvm/npm",
+		"eslint/node/fnm/yarn", "eslint/node/nvm/yarn",
+		"eslint/node/fnm/pnpm", "eslint/node/nvm/pnpm",
+		"eslint/bun",
 	)
 
 	cases := []struct {
@@ -44,13 +47,13 @@ func TestResolveNodeVariants(t *testing.T) {
 		vm   config.VersionManager
 		want string
 	}{
-		{config.PMNPM, config.VMFnm, "eslint-npm-fnm"},
-		{config.PMNPM, config.VMNvm, "eslint-npm-nvm"},
-		{config.PMYarn, config.VMFnm, "eslint-yarn-fnm"},
-		{config.PMYarn, config.VMNvm, "eslint-yarn-nvm"},
-		{config.PMPnpm, config.VMFnm, "eslint-pnpm-fnm"},
-		{config.PMPnpm, config.VMNvm, "eslint-pnpm-nvm"},
-		{config.PMBun, "", "eslint-bun"},
+		{config.PMNPM, config.VMFnm, "eslint/node/fnm/npm"},
+		{config.PMNPM, config.VMNvm, "eslint/node/nvm/npm"},
+		{config.PMYarn, config.VMFnm, "eslint/node/fnm/yarn"},
+		{config.PMYarn, config.VMNvm, "eslint/node/nvm/yarn"},
+		{config.PMPnpm, config.VMFnm, "eslint/node/fnm/pnpm"},
+		{config.PMPnpm, config.VMNvm, "eslint/node/nvm/pnpm"},
+		{config.PMBun, "", "eslint/bun"},
 	}
 	for _, testCase := range cases {
 		res, err := resolver.Resolve("eslint", cat, testCase.pm, testCase.vm)
@@ -67,7 +70,7 @@ func TestResolveNodeVariants(t *testing.T) {
 func TestNodeTaskRequiresPackageManager(t *testing.T) {
 	t.Parallel()
 
-	cat := catalog("eslint-bun")
+	cat := catalog("eslint/bun")
 
 	_, err := resolver.Resolve("eslint", cat, "", "")
 	if err == nil {
@@ -82,7 +85,7 @@ func TestNodeTaskRequiresPackageManager(t *testing.T) {
 func TestNpmRequiresVersionManager(t *testing.T) {
 	t.Parallel()
 
-	cat := catalog("eslint-npm-fnm")
+	cat := catalog("eslint/node/fnm/npm")
 
 	_, err := resolver.Resolve("eslint", cat, config.PMNPM, "")
 	if err == nil {
@@ -97,7 +100,7 @@ func TestNpmRequiresVersionManager(t *testing.T) {
 func TestMissingTaskCloseMatches(t *testing.T) {
 	t.Parallel()
 
-	cat := catalog("eslint-bun", "eslint-npm-fnm")
+	cat := catalog("eslint/bun", "eslint/node/fnm/npm")
 
 	_, err := resolver.Resolve("eslit", cat, config.PMBun, "")
 	if err == nil {

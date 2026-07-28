@@ -19,14 +19,14 @@ func TestRewriteIncludes(t *testing.T) {
 	input := []byte(`version: "3"
 includes:
   pnpm:
-    taskfile: ../pnpm-fnm/Taskfile.yml
+    taskfile: ../../../../pnpm/fnm/Taskfile.yml
 tasks:
   lint:
     cmds:
-      - echo ../pnpm-fnm/Taskfile.yml
+      - echo ../../../../pnpm/fnm/Taskfile.yml
 `)
 	sourceToDest := map[string]string{
-		"pnpm-fnm": "pnpm",
+		"pnpm/fnm": "pnpm",
 	}
 
 	out, err := taskfile.RewriteIncludes(input, sourceToDest)
@@ -35,11 +35,11 @@ tasks:
 	}
 
 	text := string(out)
-	if !strings.Contains(text, "../pnpm/Taskfile.yml") {
+	if !strings.Contains(text, "../../../../pnpm/Taskfile.yml") {
 		t.Fatalf("include not rewritten: %s", text)
 	}
 
-	if !strings.Contains(text, "../pnpm-fnm/Taskfile.yml") {
+	if !strings.Contains(text, "../../../../pnpm/fnm/Taskfile.yml") {
 		t.Fatalf("command string should remain unchanged: %s", text)
 	}
 }
@@ -221,6 +221,75 @@ tasks:
 	}
 }
 
+func TestUpdateRootTaskfileGeneratedTasksAndSharedVars(t *testing.T) {
+	t.Parallel()
+
+	root := []byte(`version: "3"
+vars:
+  VERSION: 1.2.3
+includes:
+  custom:
+    taskfile: custom/Taskfile.yml
+tasks:
+  lint:
+    cmds:
+      - echo user lint
+  test:
+    cmds:
+      - echo previously generated
+  custom:
+    cmds:
+      - echo custom
+`)
+	out, err := taskfile.UpdateRootTaskfile(root, taskfile.RootUpdateInput{
+		Tasks:           []string{"go", taskESLint},
+		TargetFolder:    targetFolderTaskfiles,
+		RootTaskfileDir: "",
+		DestByTask:      map[string]string{"go": "go", taskESLint: taskESLint},
+		ManagedTasks:    []string{"go", taskESLint},
+		ModuleTaskfiles: map[string][]byte{
+			"go": []byte(`version: "3"
+vars:
+  VERSION: ""
+  GO_VERSION: ""
+`),
+			taskESLint: []byte(`version: "3"
+vars:
+  VERSION: latest
+  CONFIG: ""
+`),
+		},
+		GeneratedTasks: []taskfile.GeneratedRootTask{
+			{Name: "lint", Modules: []string{"go", taskESLint}},
+		},
+		ManagedRootTasks: []string{"test"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	text := string(out)
+	for _, want := range []string{
+		"VERSION: 1.2.3",
+		"VERSION: '{{.VERSION}}'",
+		"GO_VERSION: \"\"",
+		"CONFIG: \"\"",
+		"task: go:lint",
+		"task: eslint:lint",
+		"echo custom",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("expected %q in root Taskfile:\n%s", want, text)
+		}
+	}
+
+	for _, notWant := range []string{"echo user lint", "previously generated"} {
+		if strings.Contains(text, notWant) {
+			t.Fatalf("did not expect %q in root Taskfile:\n%s", notWant, text)
+		}
+	}
+}
+
 func TestManagedIncludeDifferentPathConflict(t *testing.T) {
 	t.Parallel()
 
@@ -293,19 +362,19 @@ includes:
 func TestRewriteUsesRealStoreSnippet(t *testing.T) {
 	t.Parallel()
 
-	data, err := os.ReadFile("../../tests/fixtures/store/taskfiles/eslint-pnpm-fnm/Taskfile.yml")
+	data, err := os.ReadFile("../../tests/fixtures/store/taskfiles/eslint/node/fnm/pnpm/Taskfile.yml")
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	out, err := taskfile.RewriteIncludes(data, map[string]string{
-		"pnpm-fnm": "pnpm",
+		"pnpm/fnm": "pnpm",
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if !strings.Contains(string(out), "../pnpm/Taskfile.yml") {
+	if !strings.Contains(string(out), "../../../../pnpm/Taskfile.yml") {
 		t.Fatalf("rewrite failed: %s", out)
 	}
 }

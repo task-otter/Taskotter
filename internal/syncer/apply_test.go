@@ -83,9 +83,52 @@ func TestApplyPlanWritesFiles(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = os.Stat(filepath.Join(workspace, ".taskotter/metadata.yml"))
+	_, err = os.Stat(filepath.Join(workspace, cfg.MetadataPath()))
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestApplyPlanMigratesLegacyMetadataPath(t *testing.T) {
+	t.Parallel()
+
+	workspace := t.TempDir()
+	writeRootTaskfile(t, workspace)
+
+	err := os.MkdirAll(filepath.Join(workspace, ".taskotter"), 0o755)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = os.WriteFile(
+		filepath.Join(workspace, config.LegacyMetadataPath),
+		[]byte("target_folder: taskfiles\nlock_file: taskfiles/.taskotter-lock.yml\n"),
+		0o644,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := testConfig(workspace, func(cfg *config.Config) {
+		cfg.Tasks = []string{"go"}
+		cfg.IncludesDoc = true
+	})
+
+	syncInput, plan := preparePlan(t, workspace, cfg)
+
+	err = runApplyPlan(t, plan, syncInput)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = os.Stat(filepath.Join(workspace, cfg.MetadataPath()))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = os.Stat(filepath.Join(workspace, config.LegacyMetadataPath))
+	if !os.IsNotExist(err) {
+		t.Fatalf("legacy metadata should be removed, stat returned: %v", err)
 	}
 }
 
@@ -273,7 +316,7 @@ func TestApplyPlanWriteOrder(t *testing.T) {
 
 	var order []string
 
-	stagingMarker := filepath.Join(".taskotter", "staging")
+	stagingMarker := filepath.Join(config.DefaultTargetFolder, ".taskotter", "staging")
 
 	withCopyFileHook(t, func(path string, entry syncer.FileEntry) error {
 		if strings.Contains(path, stagingMarker) {

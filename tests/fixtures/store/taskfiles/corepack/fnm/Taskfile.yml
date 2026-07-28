@@ -11,7 +11,7 @@ silent: true
 
 includes:
   fnm:
-    taskfile: ../fnm/Taskfile.yml
+    taskfile: ../../fnm/Taskfile.yml
 
 vars:
   FNM_INSTALL_DIR: "$HOME/.local/share/fnm"

@@ -45,7 +45,8 @@ type LockFile struct {
 		Requested    orderedRequested `yaml:"requested"`
 		Dependencies []ModuleRecord   `yaml:"dependencies"`
 	} `yaml:"resolved_modules"` //nolint:tagliatelle // lock file on-disk format
-	ManagedFiles []ManagedFile `yaml:"managed_files"` //nolint:tagliatelle // lock file on-disk format
+	GeneratedRootTasks []string      `yaml:"generated_root_tasks,omitempty"` //nolint:tagliatelle // lock file on-disk format
+	ManagedFiles       []ManagedFile `yaml:"managed_files"`                  //nolint:tagliatelle // lock file on-disk format
 }
 
 // Metadata points to the active lock file and configuration hash.

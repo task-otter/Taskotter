@@ -178,13 +178,13 @@ func TestStageForceAddsGitignoredMetadata(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = os.MkdirAll(filepath.Join(cloneDir, ".taskotter"), 0o755)
+	err = os.MkdirAll(filepath.Join(cloneDir, "taskfiles/.taskotter"), 0o755)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	err = os.WriteFile(
-		filepath.Join(cloneDir, ".taskotter/metadata.yml"),
+		filepath.Join(cloneDir, "taskfiles/.taskotter/metadata.yml"),
 		[]byte("target_folder: taskfiles\n"),
 		0o644,
 	)
@@ -202,13 +202,13 @@ func TestStageForceAddsGitignoredMetadata(t *testing.T) {
 
 	client := git.NewClient(cloneDir)
 
-	err = client.Stage(context.Background(), []string{".taskotter/metadata.yml"})
+	err = client.Stage(context.Background(), []string{"taskfiles/.taskotter/metadata.yml"})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	out := runGit(t, cloneDir, "status", "--porcelain")
-	if !strings.Contains(out, ".taskotter/metadata.yml") {
+	if !strings.Contains(out, "taskfiles/.taskotter/metadata.yml") {
 		t.Fatalf("expected staged metadata, got status:\n%s", out)
 	}
 }

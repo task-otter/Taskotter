@@ -4,7 +4,9 @@ package variants
 import (
 	"errors"
 	"fmt"
+	"path"
 	"slices"
+	"strings"
 
 	"github.com/mostafakhairy0305-dot/TaskOtter/internal/config"
 )
@@ -16,15 +18,23 @@ var (
 
 func nodeToolSuffixes() []string {
 	return []string{
-		"npm-fnm", "npm-nvm",
-		"yarn-fnm", "yarn-nvm",
-		"pnpm-fnm", "pnpm-nvm",
+		"node/fnm/npm", "node/fnm/yarn", "node/fnm/pnpm",
+		"node/nvm/npm", "node/nvm/yarn", "node/nvm/pnpm",
 		"bun",
 	}
 }
 
 func stripSuffixes() []string {
 	return []string{
+		"/node/fnm/npm",
+		"/node/fnm/yarn",
+		"/node/fnm/pnpm",
+		"/node/nvm/npm",
+		"/node/nvm/yarn",
+		"/node/nvm/pnpm",
+		"/bun",
+		"/fnm",
+		"/nvm",
 		"-npm-fnm",
 		"-npm-nvm",
 		"-yarn-fnm",
@@ -39,7 +49,7 @@ func stripSuffixes() []string {
 
 // IsNodeToolVariant reports whether moduleName is a Node variant of logicalTask.
 func IsNodeToolVariant(moduleName, logicalTask string) bool {
-	prefix := logicalTask + "-"
+	prefix := logicalTask + "/"
 	if len(moduleName) <= len(prefix) {
 		return false
 	}
@@ -48,7 +58,7 @@ func IsNodeToolVariant(moduleName, logicalTask string) bool {
 		return false
 	}
 
-	suffix := moduleName[len(prefix):]
+	suffix := strings.TrimPrefix(moduleName[len(prefix):], "/")
 
 	return slices.Contains(nodeToolSuffixes(), suffix)
 }
@@ -61,13 +71,13 @@ func BuildSourceModule(
 ) (string, error) {
 	switch packageManager {
 	case config.PMBun:
-		return task + "-bun", nil
+		return path.Join(task, string(packageManager)), nil
 	case config.PMNPM, config.PMYarn, config.PMPnpm:
 		if versionManager == "" {
 			return "", fmt.Errorf("%w %q", errVersionManagerRequired, packageManager)
 		}
 
-		return fmt.Sprintf("%s-%s-%s", task, packageManager, versionManager), nil
+		return path.Join(task, "node", string(versionManager), string(packageManager)), nil
 	default:
 		return "", fmt.Errorf("%w %q", errInvalidPackageManager, packageManager)
 	}

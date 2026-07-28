@@ -7,9 +7,9 @@ import (
 )
 
 const (
-	modESLintPnpmFnm = "eslint-pnpm-fnm"
-	modPnpmFnm       = "pnpm-fnm"
-	modCorepackFnm   = "corepack-fnm"
+	modESLintPnpmFnm = "eslint/node/fnm/pnpm"
+	modPnpmFnm       = "pnpm/fnm"
+	modCorepackFnm   = "corepack/fnm"
 	modFnm           = "fnm"
 )
 

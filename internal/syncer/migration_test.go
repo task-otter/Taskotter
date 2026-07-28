@@ -122,7 +122,7 @@ func TestPrefixSafetyPreservesUnrelatedPaths(t *testing.T) {
 func TestPackageManagerSwitchSameDestination(t *testing.T) {
 	t.Parallel()
 
-	for _, mod := range []string{"eslint-pnpm-fnm", "eslint-npm-fnm"} {
+	for _, mod := range []string{"eslint/node/fnm/pnpm", "eslint/node/fnm/npm"} {
 		t.Run(mod, func(t *testing.T) {
 			t.Parallel()
 

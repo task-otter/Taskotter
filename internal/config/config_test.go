@@ -87,6 +87,14 @@ func TestLoadFromEnvDefaults(t *testing.T) {
 		t.Fatalf("RootTaskfile = %q, want taskfiles/Taskfile.yml", cfg.RootTaskfile)
 	}
 
+	if cfg.LockFilePath() != "taskfiles/.taskotter-lock.yml" {
+		t.Fatalf("LockFilePath = %q, want taskfiles/.taskotter-lock.yml", cfg.LockFilePath())
+	}
+
+	if cfg.MetadataPath() != "taskfiles/.taskotter/metadata.yml" {
+		t.Fatalf("MetadataPath = %q, want taskfiles/.taskotter/metadata.yml", cfg.MetadataPath())
+	}
+
 	if !cfg.IncludesDoc {
 		t.Fatal("IncludesDoc should default to true")
 	}

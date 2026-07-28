@@ -13,3 +13,4 @@
 .DS_Store
 .gocache
 coverage.out
+junit.xml

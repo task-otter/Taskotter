@@ -13,6 +13,7 @@ configuration:
     - actionlint
     - zizmor
     - adrs
+    - hadolint
   node_package_manager: bun
   node_version_manager: ""
   includes_doc: true
@@ -31,6 +32,10 @@ resolved_modules:
       source_module: go
       destination_module: go
       path: taskfiles/go
+    hadolint:
+      source_module: hadolint
+      destination_module: hadolint
+      path: taskfiles/hadolint
     yamllint:
       source_module: yamllint
       destination_module: yamllint
@@ -97,6 +102,16 @@ managed_files:
     source_path: taskfiles/go/Taskfile.yml
     path: taskfiles/go/Taskfile.yml
     sha256: 9bce8395d557749f509625f8594d06129912390cd1920aa5e1b1f380d29b89d9
+  - source_module: hadolint
+    destination_module: hadolint
+    source_path: taskfiles/hadolint/README.md
+    path: taskfiles/hadolint/README.md
+    sha256: 18c5abb85f82db78f054d21cd0575180dbdcb3d5aca185d28c570686c0beb1c0
+  - source_module: hadolint
+    destination_module: hadolint
+    source_path: taskfiles/hadolint/Taskfile.yml
+    path: taskfiles/hadolint/Taskfile.yml
+    sha256: 7ad71afedfefc097027dff4d501b1884ee21eae598ffacc6427fcc6e0461e703
   - source_module: internal/skipfiles
     destination_module: internal/skipfiles
     source_path: taskfiles/internal/skipfiles/Taskfile.yml

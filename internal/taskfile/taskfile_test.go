@@ -104,6 +104,10 @@ vars:
 	}
 
 	text := string(out)
+	if !strings.Contains(text, `version: "3.5"`) {
+		t.Fatalf("expected root Taskfile version 3.5: %s", text)
+	}
+
 	if !strings.Contains(text, "taskfiles/go/Taskfile.yml") {
 		t.Fatalf("missing go include: %s", text)
 	}
@@ -139,6 +143,33 @@ func TestUpdateRootTaskfileFolderRelativeIncludes(t *testing.T) {
 
 	if strings.Contains(text, "taskfiles/go/Taskfile.yml") {
 		t.Fatalf("include should not repeat the target folder: %s", text)
+	}
+}
+
+func TestUpdateRootTaskfileUpdatesVersion(t *testing.T) {
+	t.Parallel()
+
+	root := []byte(`version: "3"
+includes:
+  custom:
+    taskfile: custom/Taskfile.yml
+`)
+
+	out, err := taskfile.UpdateRootTaskfile(root, taskfile.RootUpdateInput{
+		Tasks:           []string{"go"},
+		TargetFolder:    targetFolderTaskfiles,
+		RootTaskfileDir: "",
+		DestByTask:      map[string]string{"go": "go"},
+		ManagedTasks:    nil,
+		ModuleTaskfiles: nil,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	text := string(out)
+	if !strings.Contains(text, `version: "3.5"`) {
+		t.Fatalf("expected root Taskfile version 3.5: %s", text)
 	}
 }
 

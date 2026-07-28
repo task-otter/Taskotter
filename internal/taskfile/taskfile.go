@@ -13,7 +13,8 @@ import (
 )
 
 const (
-	rootTemplate            = "---\nversion: \"3\"\n"
+	rootTaskfileVersion     = "3.5"
+	rootTemplate            = "---\nversion: \"" + rootTaskfileVersion + "\"\n"
 	yamlMappingPairKeyValue = 2
 )
 
@@ -205,6 +206,8 @@ func UpdateRootTaskfile(content []byte, input RootUpdateInput) ([]byte, error) {
 	}
 
 	root := node.Content[0]
+	setRootTaskfileVersion(root)
+
 	moduleVars, err := moduleVarsByTask(input)
 	if err != nil {
 		return nil, err
@@ -699,6 +702,17 @@ func setMappingValue(mapNode *yaml.Node, key string, value *yaml.Node) {
 	}
 
 	appendMappingPair(mapNode, yamlScalar(key), value)
+}
+
+func setRootTaskfileVersion(root *yaml.Node) {
+	setMappingValue(root, "version", taskfileVersionScalar(rootTaskfileVersion))
+}
+
+func taskfileVersionScalar(value string) *yaml.Node {
+	node := yamlScalar(value)
+	node.Style = yaml.DoubleQuotedStyle
+
+	return node
 }
 
 func sortedKeys(m map[string]struct{}) []string {

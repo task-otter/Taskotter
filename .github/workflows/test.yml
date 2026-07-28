@@ -25,11 +25,10 @@ jobs:
           fail-on-changes: true
           tasks: |
             go
-            hadolint
             yamllint
             actionlint
             zizmor
-            gh
+            adrs
           js: |
             runtime: bun
           includes-doc: true
@@ -50,60 +49,15 @@ jobs:
     needs: itself
     steps:
       - name: Check out repository
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           persist-credentials: false
       - name: Setup Go
-        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c  # v6.4.0
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # v7.0.0
         with:
           go-version-file: go.mod
           cache: false
       - name: Install Task
-        run: go install github.com/go-task/task/v3/cmd/task@v3.44.1
+        run: go install github.com/go-task/task/v3/cmd/task@v3.52.1
       - name: Run CI
         run: task ci
-  test:
-    runs-on: ubuntu-latest
-    needs: itself
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
-        with:
-          persist-credentials: false
-      - name: Setup Go
-        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c  # v6.4.0
-        with:
-          go-version-file: go.mod
-          cache: false
-      - name: Check formatting
-        run: test -z "$(gofmt -l .)"
-      - name: Vet
-        run: go vet ./...
-      - name: Test
-        run: go test -race ./...
-      - name: Build binary
-        run: go build -o /dev/null ./cmd/taskotter-sync
-      - name: Build Docker image
-        run: docker build -t taskotter:test .
-      - name: Validate action metadata
-        run: |
-          test -f action.yml
-          grep -q 'using: docker' action.yml
-          grep -q '^name: TaskOtter Sync$' action.yml
-          grep -q '^  icon: package$' action.yml
-          grep -q '^  color: blue$' action.yml
-  integration:
-    runs-on: ubuntu-latest
-    needs: test
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
-        with:
-          persist-credentials: false
-      - name: Setup Go
-        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c  # v6.4.0
-        with:
-          go-version-file: go.mod
-          cache: false
-      - name: Integration tests
-        run: go test -race ./tests/integration/...

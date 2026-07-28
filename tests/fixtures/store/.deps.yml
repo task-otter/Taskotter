@@ -1,7 +1,0 @@
----
-go: [internal/skipfiles]
-internal/skipfiles: []
-eslint/node/fnm/pnpm: [pnpm/fnm]
-pnpm/fnm: [corepack/fnm, fnm]
-corepack/fnm: [fnm]
-fnm: []

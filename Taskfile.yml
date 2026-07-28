@@ -1,0 +1,17 @@
+---
+version: "3.5"
+
+includes:
+  taskotter:
+    taskfile: taskfiles/Taskfile.yml
+tasks:
+  ci:
+    desc: Run CI checks
+    cmds:
+      - task: taskotter:lint
+
+  ci:fix:
+    desc: Run CI fixs
+    cmds:
+      - task: taskotter:lint:fix
+      - task: taskotter:go:fmt

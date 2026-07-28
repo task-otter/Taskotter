@@ -1,5 +1,0 @@
----
-schema: taskotter.dev/taskfile-metadata/v1
-module: go
-taskfile: Taskfile.yml
-exported_tasks: [install, lint, lint:fix, version]

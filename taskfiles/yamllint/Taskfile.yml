@@ -1,5 +1,5 @@
 ---
-version: "3"
+version: "3.5"
 output:
   group:
     begin: "::group::{{.TASK}}"
@@ -44,8 +44,6 @@ tasks:
     summary: |
       Remove yamllint via uv tool uninstall on all platforms.
       The uv-managed isolated environment is cleaned up automatically.
-    aliases:
-      - uninstall
     prompt:
       - This will remove yamllint from this machine.
       - Continue?

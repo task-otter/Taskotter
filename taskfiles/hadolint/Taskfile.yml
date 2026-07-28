@@ -1,5 +1,5 @@
 ---
-version: "3"
+version: "3.5"
 output:
   group:
     begin: "::group::{{.TASK}}"
@@ -43,8 +43,6 @@ tasks:
       macOS uses Homebrew to uninstall hadolint.
       Linux removes hadolint via apt-get or dnf.
       Windows uses Scoop to uninstall hadolint.
-    aliases:
-      - uninstall
     prompt:
       - This will remove hadolint from this machine.
       - Continue?

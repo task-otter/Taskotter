@@ -37,13 +37,16 @@ includes:
             gobin="${gopath:-$HOME/go}/bin"
           fi
           printf '%s' "$gobin"
+      # Written next to the project's golangci-lint config so relative paths inside
+      # the merged copy keep resolving. Overwritten on every run, never deleted.
+      GO_INTERNAL_SKIP_CONFIG: ".golangci-taskotter-skip.yml"
   hadolint:
     taskfile: hadolint/Taskfile.yml
     vars:
       HADOLINT_LINT_SKIP_PATTERN: ""
-      CONFIG: ""
+      CONFIG: '{{.CONFIG}}'
       DOCKERFILE: "Dockerfile"
-      EXTRA_ARGS: ""
+      EXTRA_ARGS: '{{.EXTRA_ARGS}}'
       HADOLINT_VERSION: "2.14.0"
   yamllint:
     taskfile: yamllint/Taskfile.yml
@@ -51,8 +54,8 @@ includes:
       YAMLLINT_LINT_SKIP_PATTERN: ""
       UV_LOAD: 'export PATH="$HOME/.local/bin:$PATH"'
       TARGETS: "."
-      CONFIG: ""
-      EXTRA_ARGS: ""
+      CONFIG: '{{.CONFIG}}'
+      EXTRA_ARGS: '{{.EXTRA_ARGS}}'
       YAMLLINT_VERSION: ""
       YAMLFIX_VERSION: ""
   actionlint:
@@ -80,3 +83,66 @@ includes:
       DATA: "{}"
       PAT_TOKEN: ""
       VERSION: ""
+vars:
+  CONFIG: ""
+  EXTRA_ARGS: ""
+tasks:
+  install:
+    desc: Run install for synced TaskOtter modules
+    cmds:
+      - task: go:install
+      - task: hadolint:install
+      - task: yamllint:install
+      - task: actionlint:install
+      - task: zizmor:install
+      - task: gh:install
+  install:undo:
+    desc: Run install:undo for synced TaskOtter modules
+    cmds:
+      - task: go:install:undo
+      - task: hadolint:install:undo
+      - task: yamllint:install:undo
+      - task: actionlint:install:undo
+      - task: zizmor:install:undo
+      - task: gh:install:undo
+  lint:
+    desc: Run lint for synced TaskOtter modules
+    cmds:
+      - task: go:lint
+      - task: hadolint:lint
+      - task: yamllint:lint
+      - task: actionlint:lint
+      - task: zizmor:lint
+  lint:fix:
+    desc: Run lint:fix for synced TaskOtter modules
+    cmds:
+      - task: go:lint:fix
+      - task: yamllint:lint:fix
+  upgrade:
+    desc: Run upgrade for synced TaskOtter modules
+    cmds:
+      - task: go:upgrade
+      - task: hadolint:upgrade
+      - task: yamllint:upgrade
+      - task: actionlint:upgrade
+      - task: zizmor:upgrade
+      - task: gh:upgrade
+  verify:
+    desc: Run verify for synced TaskOtter modules
+    cmds:
+      - task: go:verify
+      - task: gh:verify
+  version:
+    desc: Run version for synced TaskOtter modules
+    cmds:
+      - task: go:version
+      - task: hadolint:version
+      - task: yamllint:version
+      - task: actionlint:version
+      - task: zizmor:version
+      - task: gh:version
+  which:
+    desc: Run which for synced TaskOtter modules
+    cmds:
+      - task: go:which
+      - task: gh:which

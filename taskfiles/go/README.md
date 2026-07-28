@@ -85,11 +85,18 @@ task go:lint GO_LINT_SKIP_PATTERN="**/generated/**"
 task go:lint:fix GO_LINT_SKIP_PATTERN="**/mocks/*.go"
 ```
 
-The skip pattern is added to a temporary overlay of the existing
+The `config:skip` task translates the pattern into a
+`linters.exclusions.paths` regex and merges it into a copy of the existing
 golangci-lint YAML or JSON configuration, so project-specific settings remain
-active. govulncheck and gosec operate on packages rather than individual
-files, so any package containing a matching file is omitted from those checks.
-Use `GO_FMT_SKIP_PATTERN` as well when the same files should be excluded from
+active. The copy is written as `.golangci-taskotter-skip.yml` next to your
+golangci-lint config, and `golangci-lint:lint` and `lint:fix` run it first. It
+is rewritten on every run and is not deleted afterwards, so **add
+`.golangci-taskotter-skip.yml` to your `.gitignore`**; running `config:skip`
+with no skip pattern set deletes it.
+
+govulncheck and gosec operate on packages rather than individual files, so any
+package containing a matching file is omitted from those checks. Use
+`GO_FMT_SKIP_PATTERN` as well when the same files should be excluded from
 formatting.
 
 Auto-fix lint issues that supported tools can rewrite:
@@ -206,6 +213,7 @@ installer to run even when the executable already exists.
 | `install:gosec`             | Install gosec into the global Go bin                   | `GLOBAL_GO_BIN`, `GOSEC_VERSION` |
 | `lint`                      | Run all Go lint and security checks                    | `GO_LINT_SKIP_PATTERN` |
 | `lint:fix`                  | Auto-fix Go lint and formatting issues                 | `GO_LINT_SKIP_PATTERN`, `GO_FMT_SKIP_PATTERN` |
+| `config:skip`               | Write the golangci-lint skip-pattern config overlay     | `GO_LINT_SKIP_PATTERN` |
 | `golangci-lint:lint`        | Lint all Go packages with golangci-lint                | `GO_LINT_SKIP_PATTERN` |
 | `golangci-lint:lint:fix`    | Auto-fix Go lint issues with golangci-lint             | `GO_LINT_SKIP_PATTERN` |
 | `golangci-lint:fmt`         | Format Go files with golangci-lint formatters         | `GO_FMT_SKIP_PATTERN` |

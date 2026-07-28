@@ -1,5 +1,5 @@
 ---
-version: "3"
+version: "3.5"
 output:
   group:
     begin: "::group::{{.TASK}}"
@@ -116,8 +116,6 @@ tasks:
     summary: |
       Remove the zizmor binary from /usr/local/bin on macOS and Linux, or
       from %USERPROFILE%\bin on Windows.
-    aliases:
-      - uninstall
     prompt:
       - This will remove zizmor from this machine.
       - Continue?

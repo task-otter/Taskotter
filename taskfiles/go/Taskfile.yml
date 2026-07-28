@@ -23,6 +23,7 @@ vars:
   GOSEC_VERSION: ""
   GO_FMT_SKIP_PATTERN: ""
   GO_LINT_SKIP_PATTERN: ""
+  GO_JUNIT_REPORT: ""
   # Written next to the project's golangci-lint config so relative paths inside
   # the merged copy keep resolving. Overwritten on every run, never deleted.
   GO_INTERNAL_SKIP_CONFIG: ".golangci-taskotter-skip.yml"
@@ -120,6 +121,17 @@ tasks:
     status:
       - >-
         test -x "{{.GLOBAL_GO_BIN}}/gosec" && { test -z "{{.GOSEC_VERSION}}" || test "{{.GOSEC_VERSION}}" = "latest" || go version -m "{{.GLOBAL_GO_BIN}}/gosec" | awk -v want="{{.GOSEC_VERSION}}" '$1 == "mod" && $3 == want { found = 1 } END { exit !found }'; }
+  install:go-junit-report:
+    run: once
+    desc: Install go-junit-report globally
+    summary: Install go-junit-report v2.1.0 into the global Go bin.
+    deps:
+      - install
+    cmds:
+      - GOBIN="{{.GLOBAL_GO_BIN}}" go install github.com/jstemmer/go-junit-report/v2@v2.1.0
+    status:
+      - >-
+        test -x "{{.GLOBAL_GO_BIN}}/go-junit-report" && go version -m "{{.GLOBAL_GO_BIN}}/go-junit-report" | awk -v want="v2.1.0" '$1 == "mod" && $3 == want { found = 1 } END { exit !found }'
   fmt:
     run: once
     desc: Format Go files with golangci-lint formatters
@@ -987,6 +999,22 @@ tasks:
       `task go:test -- -race -run TestName ./internal/...`.
     cmds:
       - go test {{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}./...{{end}}
+  test:junit:
+    run: once
+    dir: "{{.USER_WORKING_DIR}}"
+    desc: Run Go unit tests and write a JUnit XML report
+    summary: |
+      Run `go test -v` against all Go packages by default, stream test output
+      to stdout, and write a JUnit XML report to GO_JUNIT_REPORT (default
+      junit.xml). Pass CLI arguments after -- to override the default ./...
+      target or add flags.
+    deps:
+      - install:go-junit-report
+    vars:
+      GO_JUNIT_REPORT_OUT: '{{if .GO_JUNIT_REPORT}}{{.GO_JUNIT_REPORT}}{{else}}junit.xml{{end}}'
+    cmds:
+      - >-
+        go test -v 2>&1 {{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}./...{{end}} | "{{.GLOBAL_GO_BIN}}/go-junit-report" -set-exit-code -iocopy -out "{{.GO_JUNIT_REPORT_OUT}}"
   bench:
     run: once
     dir: "{{.USER_WORKING_DIR}}"

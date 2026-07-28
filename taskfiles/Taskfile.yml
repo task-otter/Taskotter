@@ -43,6 +43,7 @@ includes:
             gobin="${gopath:-$HOME/go}/bin"
           fi
           printf '%s' "$gobin"
+      GO_JUNIT_REPORT: ""
   yamllint:
     taskfile: yamllint/Taskfile.yml
     vars:

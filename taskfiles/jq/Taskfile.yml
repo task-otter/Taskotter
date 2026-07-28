@@ -1,5 +1,5 @@
 ---
-version: "3"
+version: "3.5"
 output:
   group:
     begin: "::group::{{.TASK}}"
@@ -37,8 +37,6 @@ tasks:
       macOS uses Homebrew to uninstall jq.
       Linux removes jq via apt-get or dnf.
       Windows uses Scoop to uninstall jq.
-    aliases:
-      - uninstall
     prompt:
       - This will remove jq from this machine.
       - Continue?

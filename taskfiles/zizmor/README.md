@@ -1,6 +1,6 @@
 # zizmor
 
-A [TaskOtter](https://github.com/task-otter/Taskotter) module for [zizmor](https://github.com/woodruffw/zizmor) — a security auditor for GitHub Actions workflow files.
+A [TaskOtter](https://github.com/task-otter/store) module for [zizmor](https://github.com/woodruffw/zizmor) — a security auditor for GitHub Actions workflow files.
 
 ## What is this Taskfile?
 

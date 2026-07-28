@@ -3,7 +3,7 @@ source:
   repository: task-otter/Taskotter-store
   requested_version: ""
   source_ref: refs/heads/main
-  resolved_commit: 28025c708d1d1badc13e6a11e6432a565298ea7b
+  resolved_commit: 95571b9e1f87b59861ff5558498f967261104c6d
   default_branch: main
 configuration:
   target_folder: taskfiles
@@ -54,17 +54,26 @@ resolved_modules:
     - source_module: uv
       destination_module: uv
       path: taskfiles/uv
+generated_root_tasks:
+  - install
+  - install:undo
+  - lint
+  - lint:fix
+  - upgrade
+  - verify
+  - version
+  - which
 managed_files:
   - source_module: actionlint
     destination_module: actionlint
     source_path: taskfiles/actionlint/README.md
     path: taskfiles/actionlint/README.md
-    sha256: 406fc0f5013fb6c4f85419263079583ee33aa3c24406f8a7a84f93b74521411c
+    sha256: e678c9ff24fa7396c8a4fc1b726597380509b957f6c6a7d1151552e9fd967a77
   - source_module: actionlint
     destination_module: actionlint
     source_path: taskfiles/actionlint/Taskfile.yml
     path: taskfiles/actionlint/Taskfile.yml
-    sha256: d63e5f2ffe97b706c6ab8618388d4e889a920e8e9ef670bb998766f4fe8a8d32
+    sha256: 4b6991789a967fe5d562bbda7d04b4fc35ed70448f68c33d8f30c3084a15a9c6
   - source_module: gh
     destination_module: gh
     source_path: taskfiles/gh/README.md
@@ -74,17 +83,17 @@ managed_files:
     destination_module: gh
     source_path: taskfiles/gh/Taskfile.yml
     path: taskfiles/gh/Taskfile.yml
-    sha256: 4fd080d4d7ad5d64ff6373130d1cd8dbf76935c4c37ac55764ac2084dfff09b5
+    sha256: 23ff7e6d394cdb9041df9dfde091a6a6d17b6f79c3c05326edf7d8c50b2f472d
   - source_module: go
     destination_module: go
     source_path: taskfiles/go/README.md
     path: taskfiles/go/README.md
-    sha256: 7f361919cbbc186987c4bb722df5125c52baf3e010d4991a89b73e4b159f5785
+    sha256: f94f0723bf47f22e6030f9a4c91e87aeb43929c7b52f45b16c981dc5565c7239
   - source_module: go
     destination_module: go
     source_path: taskfiles/go/Taskfile.yml
     path: taskfiles/go/Taskfile.yml
-    sha256: e348522154239e57d386f8c876a09cd6cd6002e1a00f12c7a947b20b48c3085c
+    sha256: 9bce8395d557749f509625f8594d06129912390cd1920aa5e1b1f380d29b89d9
   - source_module: hadolint
     destination_module: hadolint
     source_path: taskfiles/hadolint/README.md
@@ -94,12 +103,12 @@ managed_files:
     destination_module: hadolint
     source_path: taskfiles/hadolint/Taskfile.yml
     path: taskfiles/hadolint/Taskfile.yml
-    sha256: 7d7a37f3b6e4f3b6542c01f9979cbdd82309d9ae30238ebfaa1a1f97ee19b95b
+    sha256: 7ad71afedfefc097027dff4d501b1884ee21eae598ffacc6427fcc6e0461e703
   - source_module: internal/skipfiles
     destination_module: internal/skipfiles
     source_path: taskfiles/internal/skipfiles/Taskfile.yml
     path: taskfiles/internal/skipfiles/Taskfile.yml
-    sha256: 02eaf23c4c7687ef7f4bf2e5c9b4194ce4519da90c35ee1dcdcc1c0c016ad938
+    sha256: 67b7d75af8670b74a9c5be3dfa8659b96b4823c699bb1fc3013d5bf1e3b3365b
   - source_module: jq
     destination_module: jq
     source_path: taskfiles/jq/README.md
@@ -109,7 +118,7 @@ managed_files:
     destination_module: jq
     source_path: taskfiles/jq/Taskfile.yml
     path: taskfiles/jq/Taskfile.yml
-    sha256: d60b4f9d9390e36fb71a8b784b33974923253381a5b3599e85d5eea7b1cb3709
+    sha256: e45627ba18ffb3dada4400f433cee92add9e6d992e591f1af694fead38ffb402
   - source_module: uv
     destination_module: uv
     source_path: taskfiles/uv/README.md
@@ -119,7 +128,7 @@ managed_files:
     destination_module: uv
     source_path: taskfiles/uv/Taskfile.yml
     path: taskfiles/uv/Taskfile.yml
-    sha256: 79553eff015f6c1e96856504e0bb430a50c41a815d4133a1b60db233f4b034b7
+    sha256: 166c0a1f7f712fdd94bf32f77d1cabc6133143e93ff6090ba7ae726231c48bb3
   - source_module: yamllint
     destination_module: yamllint
     source_path: taskfiles/yamllint/README.md
@@ -129,14 +138,14 @@ managed_files:
     destination_module: yamllint
     source_path: taskfiles/yamllint/Taskfile.yml
     path: taskfiles/yamllint/Taskfile.yml
-    sha256: 347661dc34273cfd0b37104daeaf18a21f13a04e8a8ff965fc70e497c3123ee7
+    sha256: 6fe1bd32d96c8a5bcbd1fae907332a6ddbee75d3906737e3c437606dfa1077ee
   - source_module: zizmor
     destination_module: zizmor
     source_path: taskfiles/zizmor/README.md
     path: taskfiles/zizmor/README.md
-    sha256: ceaea35cb480d35a74d2fd42d568ca3aeab729d1fd3c57c177f65d246b534b8d
+    sha256: 69ab60e14fdda75b0eac0d5ae7232721082977cf5780df866f22753fe0b0e89e
   - source_module: zizmor
     destination_module: zizmor
     source_path: taskfiles/zizmor/Taskfile.yml
     path: taskfiles/zizmor/Taskfile.yml
-    sha256: 4f2cf135b817c8e5a6b1f6a8bb03fc88434546edccde033e2840910dfb53fd01
+    sha256: 15de0a19108d0bcbb7c0066733839d7ae9704cd09c84347d4da5518f49fc301d

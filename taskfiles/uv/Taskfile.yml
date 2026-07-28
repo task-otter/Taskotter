@@ -1,5 +1,5 @@
 ---
-version: "3"
+version: "3.5"
 output:
   group:
     begin: "::group::{{.TASK}}"
@@ -44,8 +44,6 @@ tasks:
     summary: |
       Remove uv via uv self uninstall on all platforms.
       This removes the uv binary and cleans up the installation directory.
-    aliases:
-      - uninstall
     prompt:
       - This will remove uv from this machine.
       - Continue?

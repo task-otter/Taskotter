@@ -1,5 +1,5 @@
 ---
-version: "3"
+version: "3.5"
 output:
   group:
     begin: "::group::{{.TASK}}"
@@ -48,8 +48,6 @@ tasks:
       using the matching uninstall method.
       On macOS uses Homebrew. On Windows tries winget, then Chocolatey, then
       Scoop. On Linux detects apt, dnf, yum, pacman, zypper, snap, or brew.
-    aliases:
-      - uninstall
     prompt:
       - This will remove the GitHub CLI from this machine.
       - Continue?

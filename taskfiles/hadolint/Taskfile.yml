@@ -1,0 +1,289 @@
+---
+version: "3.5"
+output:
+  group:
+    begin: "::group::{{.TASK}}"
+    end: "::endgroup::"
+    error_only: false
+silent: true
+includes:
+  skipfiles:
+    taskfile: ../internal/skipfiles/Taskfile.yml
+    internal: true
+vars:
+  HADOLINT_LINT_SKIP_PATTERN: ""
+  CONFIG: ""
+  DOCKERFILE: "Dockerfile"
+  EXTRA_ARGS: ""
+  HADOLINT_VERSION: "2.14.0"
+tasks:
+  default:
+    run: once
+    desc: Show available hadolint automation tasks
+    summary: Display the list of available hadolint-related tasks defined in this Taskfile.
+    cmds:
+      - task --list
+  install:
+    run: once
+    desc: Install hadolint on the current operating system
+    summary: |
+      Install hadolint for the current platform if it is not already available.
+      macOS uses Homebrew to install hadolint.
+      Linux uses apt-get or dnf depending on the package manager present.
+      Windows uses Scoop to install hadolint.
+    cmds:
+      - task: _install:macos
+      - task: _install:linux
+      - task: _install:windows
+  install:undo:
+    run: once
+    desc: Remove hadolint from the current operating system
+    summary: |
+      Remove hadolint for the current platform.
+      macOS uses Homebrew to uninstall hadolint.
+      Linux removes hadolint via apt-get or dnf.
+      Windows uses Scoop to uninstall hadolint.
+    prompt:
+      - This will remove hadolint from this machine.
+      - Continue?
+    cmds:
+      - task: _install:undo:macos
+      - task: _install:undo:linux
+      - task: _install:undo:windows
+  upgrade:
+    run: once
+    desc: Upgrade hadolint to the latest release
+    summary: |
+      Upgrade hadolint to the latest available release.
+      macOS uses brew upgrade hadolint.
+      Linux upgrades hadolint via apt-get or dnf.
+      Windows uses scoop update hadolint.
+    cmds:
+      - task: _upgrade:macos
+      - task: _upgrade:linux
+      - task: _upgrade:windows
+  lint:
+    run: once
+    desc: Lint a Dockerfile with hadolint (DOCKERFILE=path)
+    summary: |
+      Run hadolint against DOCKERFILE (default: Dockerfile). Pass CONFIG to
+      use a custom config file via --config, and EXTRA_ARGS for additional
+      flags such as --ignore or --format. Pass CLI arguments after -- to
+      override targets and options; HADOLINT_LINT_SKIP_PATTERN remains active.
+      Auto-installs hadolint if missing.
+    dir: "{{.USER_WORKING_DIR}}"
+    deps:
+      - install
+    cmds:
+      - cmd: |
+          skip_pattern='{{if .HADOLINT_LINT_SKIP_PATTERN_OVERRIDE}}{{.HADOLINT_LINT_SKIP_PATTERN_OVERRIDE}}
+          {{- else}}{{.HADOLINT_LINT_SKIP_PATTERN}}{{end}}'
+          dockerfile='{{if .DOCKERFILE_OVERRIDE}}{{.DOCKERFILE_OVERRIDE}}
+          {{- else}}{{.DOCKERFILE}}{{end}}'
+          if [ -z "$skip_pattern" ]; then
+            hadolint \
+              {{if .CLI_ARGS}}{{.CLI_ARGS}} \
+              {{else}}{{if .CONFIG_OVERRIDE}}--config "{{.CONFIG_OVERRIDE}}"
+              {{- else if .CONFIG}}--config "{{.CONFIG}}"{{end}} \
+              "$dockerfile" {{if .EXTRA_ARGS_OVERRIDE}}{{.EXTRA_ARGS_OVERRIDE}}
+              {{- else}}{{.EXTRA_ARGS}}{{end}}{{end}} \
+              && echo "✅ hadolint passed" || { echo "❌ hadolint failed"; exit 1; }
+            exit
+          fi
+          if [ -z "$(
+            printf '%s\000' "$dockerfile" |
+              task --silent --taskfile "{{.TASKFILE_DIR}}/../internal/skipfiles/Taskfile.yml" \
+                filter "SKIPFILES_PATTERN=$skip_pattern" |
+              tr -d '\0'
+          )" ]; then
+            echo "✅ hadolint passed (Dockerfile skipped)"
+            exit 0
+          fi
+          hadolint \
+            {{if .CONFIG_OVERRIDE}}--config "{{.CONFIG_OVERRIDE}}"{{else if .CONFIG}}--config "{{.CONFIG}}"{{end}} \
+            "$dockerfile" {{if .EXTRA_ARGS_OVERRIDE}}{{.EXTRA_ARGS_OVERRIDE}}
+            {{- else}}{{.EXTRA_ARGS}}{{end}} {{.CLI_ARGS}} \
+            && echo "✅ hadolint passed" || { echo "❌ hadolint failed"; exit 1; }
+        platforms: [linux, darwin]
+      - cmd: >-
+          powershell -NoProfile -ExecutionPolicy Bypass -Command "$skipPattern='{{if .HADOLINT_LINT_SKIP_PATTERN_OVERRIDE}}{{.HADOLINT_LINT_SKIP_PATTERN_OVERRIDE}} {{- else}}{{.HADOLINT_LINT_SKIP_PATTERN}}{{end}}'; $dockerfile='{{if .DOCKERFILE_OVERRIDE}}{{.DOCKERFILE_OVERRIDE}} {{- else}}{{.DOCKERFILE}}{{end}}'; if (-not $skipPattern) {
+
+            hadolint {{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}
+              {{if .CONFIG_OVERRIDE}}--config '{{.CONFIG_OVERRIDE}}'{{else if .CONFIG}}--config '{{.CONFIG}}'{{end}}
+              $dockerfile {{if .EXTRA_ARGS_OVERRIDE}}{{.EXTRA_ARGS_OVERRIDE}}
+              {{- else}}{{.EXTRA_ARGS}}{{end}}{{end}};
+            exit $LASTEXITCODE
+          }; $paths=@(
+
+            $dockerfile |
+            task --silent --taskfile '{{.TASKFILE_DIR}}/../internal/skipfiles/Taskfile.yml'
+              filter ('SKIPFILES_PATTERN=' + $skipPattern)
+          ); if (-not $paths) { Write-Host 'Dockerfile skipped'; exit 0 }; hadolint
+
+            {{if .CONFIG_OVERRIDE}}--config '{{.CONFIG_OVERRIDE}}'{{else if .CONFIG}}--config '{{.CONFIG}}'{{end}}
+            $dockerfile {{if .EXTRA_ARGS_OVERRIDE}}{{.EXTRA_ARGS_OVERRIDE}}
+            {{- else}}{{.EXTRA_ARGS}}{{end}} {{.CLI_ARGS}};
+          exit $LASTEXITCODE"
+        platforms: [windows]
+  version:
+    run: once
+    desc: Show the installed hadolint version
+    summary: Print the active hadolint version via hadolint --version. Auto-installs hadolint if missing.
+    deps:
+      - install
+    cmds:
+      - hadolint --version
+  _install:macos:
+    run: once
+    internal: true
+    platforms: [darwin]
+    set: [errexit, nounset, pipefail]
+    status:
+      - >-
+        command -v hadolint >/dev/null 2>&1 && hadolint --version | grep -Fq "{{.HADOLINT_VERSION}}"
+    preconditions:
+      - sh: command -v brew >/dev/null 2>&1
+        msg: Homebrew is required to install hadolint on macOS. Install it from https://brew.sh and re-run this task.
+    cmds:
+      - echo 'Installing hadolint via Homebrew...'
+      - brew install hadolint
+      - echo 'hadolint installed.'
+  _install:linux:
+    run: once
+    internal: true
+    platforms: [linux]
+    set: [errexit, nounset, pipefail]
+    vars:
+      HADOLINT_UNAME_ARCH:
+        sh: uname -m
+      HADOLINT_ASSET_ARCH: >-
+        {{if or (eq .HADOLINT_UNAME_ARCH "x86_64") (eq .HADOLINT_UNAME_ARCH "amd64")}}x86_64 {{- else if or (eq .HADOLINT_UNAME_ARCH "aarch64") (eq .HADOLINT_UNAME_ARCH "arm64")}}arm64 {{- else}}{{.HADOLINT_UNAME_ARCH}}{{end}}
+    status:
+      - >-
+        command -v hadolint >/dev/null 2>&1 && hadolint --version | grep -Fq "{{.HADOLINT_VERSION}}"
+    preconditions:
+      - sh: command -v curl >/dev/null 2>&1
+        msg: curl is required to download hadolint.
+      - sh: command -v install >/dev/null 2>&1
+        msg: install is required to place the hadolint binary.
+      - sh: >-
+          [ "{{.HADOLINT_ASSET_ARCH}}" = "x86_64" ] || [ "{{.HADOLINT_ASSET_ARCH}}" = "arm64" ]
+        msg: Unsupported Linux architecture. Only x86_64 and arm64 are supported.
+    cmds:
+      - echo 'Installing hadolint v{{.HADOLINT_VERSION}} for Linux...'
+      - >-
+        download_url="https://github.com/hadolint/hadolint/releases/download/v{{.HADOLINT_VERSION}}"; download_url="${download_url}/hadolint-linux-{{.HADOLINT_ASSET_ARCH}}"; curl -fsSL -o /tmp/taskotter-hadolint "$download_url"
+      - cmd: install -m 0755 /tmp/taskotter-hadolint /usr/local/bin/hadolint
+        if: '[ "$(id -u)" -eq 0 ]'
+      - cmd: sudo install -m 0755 /tmp/taskotter-hadolint /usr/local/bin/hadolint
+        if: '[ "$(id -u)" -ne 0 ]'
+      - rm -f /tmp/taskotter-hadolint
+      - echo 'hadolint installed.'
+  _install:windows:
+    run: once
+    internal: true
+    platforms: [windows]
+    status:
+      - >-
+        powershell -NoProfile -ExecutionPolicy Bypass -Command "$hadolint = Get-Command hadolint -ErrorAction SilentlyContinue; if ($hadolint -and ((& $hadolint.Source --version) -like '*{{.HADOLINT_VERSION}}*')) { exit 0 }; exit 1"
+    preconditions:
+      - sh: >-
+          powershell -NoProfile -ExecutionPolicy Bypass -Command "if (Get-Command scoop -ErrorAction SilentlyContinue) { exit 0 } else { exit 1 }"
+        msg: Scoop is required to install hadolint on Windows. Install it from https://scoop.sh and re-run this task.
+    cmds:
+      - echo Installing hadolint via Scoop...
+      - powershell -NoProfile -ExecutionPolicy Bypass -Command "scoop install hadolint"
+      - echo hadolint installed. Restart your terminal if hadolint is not found.
+  _install:undo:macos:
+    run: once
+    internal: true
+    platforms: [darwin]
+    set: [errexit, nounset, pipefail]
+    status:
+      - "! command -v hadolint >/dev/null 2>&1"
+    preconditions:
+      - sh: command -v brew >/dev/null 2>&1
+        msg: Homebrew is required to remove hadolint on macOS.
+    cmds:
+      - echo 'Removing hadolint via Homebrew...'
+      - brew uninstall hadolint
+      - echo 'hadolint removed.'
+  _install:undo:linux:
+    run: once
+    internal: true
+    platforms: [linux]
+    set: [errexit, nounset, pipefail]
+    status:
+      - "! command -v hadolint >/dev/null 2>&1"
+    preconditions:
+      - sh: 'test "$(id -u)" -eq 0 || command -v sudo >/dev/null 2>&1'
+        msg: sudo is required to remove hadolint when not running as root.
+    cmds:
+      - echo 'Removing hadolint...'
+      - cmd: rm -f /usr/local/bin/hadolint
+        if: '[ "$(id -u)" -eq 0 ]'
+      - cmd: sudo rm -f /usr/local/bin/hadolint
+        if: '[ "$(id -u)" -ne 0 ]'
+      - echo 'hadolint removed.'
+  _install:undo:windows:
+    run: once
+    internal: true
+    platforms: [windows]
+    status:
+      - >-
+        powershell -NoProfile -ExecutionPolicy Bypass -Command "if (Get-Command hadolint -ErrorAction SilentlyContinue) { exit 1 } else { exit 0 }"
+    cmds:
+      - echo Removing hadolint via Scoop...
+      - powershell -NoProfile -ExecutionPolicy Bypass -Command "scoop uninstall hadolint"
+      - echo hadolint removed.
+  _upgrade:macos:
+    run: once
+    internal: true
+    platforms: [darwin]
+    set: [errexit, nounset, pipefail]
+    preconditions:
+      - sh: command -v brew >/dev/null 2>&1
+        msg: Homebrew is required to upgrade hadolint on macOS.
+    cmds:
+      - echo 'Upgrading hadolint via Homebrew...'
+      - cmd: brew upgrade hadolint
+        if: brew list hadolint >/dev/null 2>&1
+      - cmd: brew install hadolint
+        if: "! brew list hadolint >/dev/null 2>&1"
+      - echo 'hadolint upgraded.'
+  _upgrade:linux:
+    run: once
+    internal: true
+    platforms: [linux]
+    set: [errexit, nounset, pipefail]
+    vars:
+      HADOLINT_UNAME_ARCH:
+        sh: uname -m
+      HADOLINT_ASSET_ARCH: >-
+        {{if or (eq .HADOLINT_UNAME_ARCH "x86_64") (eq .HADOLINT_UNAME_ARCH "amd64")}}x86_64 {{- else if or (eq .HADOLINT_UNAME_ARCH "aarch64") (eq .HADOLINT_UNAME_ARCH "arm64")}}arm64 {{- else}}{{.HADOLINT_UNAME_ARCH}}{{end}}
+    preconditions:
+      - sh: command -v curl >/dev/null 2>&1
+        msg: curl is required to download hadolint.
+      - sh: command -v install >/dev/null 2>&1
+        msg: install is required to place the hadolint binary.
+      - sh: >-
+          [ "{{.HADOLINT_ASSET_ARCH}}" = "x86_64" ] || [ "{{.HADOLINT_ASSET_ARCH}}" = "arm64" ]
+        msg: Unsupported Linux architecture. Only x86_64 and arm64 are supported.
+    cmds:
+      - echo 'Upgrading hadolint to v{{.HADOLINT_VERSION}}...'
+      - >-
+        download_url="https://github.com/hadolint/hadolint/releases/download/v{{.HADOLINT_VERSION}}"; download_url="${download_url}/hadolint-linux-{{.HADOLINT_ASSET_ARCH}}"; curl -fsSL -o /tmp/taskotter-hadolint "$download_url"
+      - cmd: install -m 0755 /tmp/taskotter-hadolint /usr/local/bin/hadolint
+        if: '[ "$(id -u)" -eq 0 ]'
+      - cmd: sudo install -m 0755 /tmp/taskotter-hadolint /usr/local/bin/hadolint
+        if: '[ "$(id -u)" -ne 0 ]'
+      - rm -f /tmp/taskotter-hadolint
+      - echo 'hadolint upgraded.'
+  _upgrade:windows:
+    run: once
+    internal: true
+    platforms: [windows]
+    cmds:
+      - echo Upgrading hadolint via Scoop...
+      - powershell -NoProfile -ExecutionPolicy Bypass -Command "scoop update hadolint"
+      - echo hadolint upgraded. Restart your terminal if prompted.

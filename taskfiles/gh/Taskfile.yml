@@ -1,0 +1,2011 @@
+---
+version: "3.5"
+output:
+  group:
+    begin: "::group::{{.TASK}}"
+    end: "::endgroup::"
+    error_only: false
+silent: true
+includes:
+  jq: ../jq/Taskfile.yml
+vars:
+  VISIBILITY: "public"
+  BASE: "main"
+  MERGE_METHOD: "merge"
+  CLONE_DIR: "."
+  DOWNLOAD_DIR: "."
+  DATA: "{}"
+  PAT_TOKEN: ""
+  VERSION: ""
+env:
+  GH_TOKEN: "{{.PAT_TOKEN}}"
+tasks:
+  default:
+    run: once
+    desc: Show available GitHub CLI automation tasks
+    summary: Display the list of available gh-related tasks defined in this Taskfile.
+    cmds:
+      - task --list
+  install:
+    run: once
+    desc: Install the GitHub CLI on the current operating system
+    summary: |
+      Detect the current OS and available package managers, then install gh
+      using the best available method.
+      Pass VERSION=x.y.z to pin a specific release; exact availability
+      depends on what the detected package manager/repository carries.
+      On macOS, prefers Homebrew.
+      On Windows, prefers winget, then Chocolatey, then Scoop.
+      On Linux, detects apt, dnf, yum, pacman, zypper, snap, or brew.
+    cmds:
+      - task: _install:auto:unix
+      - task: _install:auto:windows
+  install:undo:
+    run: once
+    desc: Remove the GitHub CLI from the current operating system
+    summary: |
+      Detect the current OS and available package managers, then remove gh
+      using the matching uninstall method.
+      On macOS uses Homebrew. On Windows tries winget, then Chocolatey, then
+      Scoop. On Linux detects apt, dnf, yum, pacman, zypper, snap, or brew.
+    prompt:
+      - This will remove the GitHub CLI from this machine.
+      - Continue?
+    cmds:
+      - task: _uninstall:auto:unix
+      - task: _uninstall:auto:windows
+  upgrade:
+    run: once
+    desc: Upgrade the GitHub CLI to the latest version on the current OS
+    summary: |
+      Auto-detect the OS and package manager used to install gh, then upgrade
+      to the latest release. On macOS uses brew upgrade. On Windows uses winget
+      upgrade. On Linux uses the detected package manager.
+    deps:
+      - install
+    cmds:
+      - task: _upgrade:auto:unix
+      - task: _upgrade:auto:windows
+  version:
+    run: once
+    desc: Show the installed GitHub CLI version
+    summary: Print the installed gh version string via `gh --version`.
+    deps:
+      - install
+    cmds:
+      - task: _version:unix
+      - task: _version:windows
+  doctor:
+    run: once
+    desc: Run the GitHub CLI self-diagnostic check
+    summary: |
+      Run `gh doctor` to check your gh configuration, authentication,
+      and network connectivity to GitHub.
+    deps:
+      - install
+    cmds:
+      - task: _doctor:unix
+      - task: _doctor:windows
+  which:
+    run: once
+    desc: Show the path to the GitHub CLI binary
+    summary: Print the filesystem path of the gh binary resolved from PATH.
+    deps:
+      - install
+    cmds:
+      - task: _which:unix
+      - task: _which:windows
+  verify:
+    run: once
+    desc: Verify the GitHub CLI installation and authentication status
+    summary: |
+      Check that gh is installed, confirm `gh --version` runs cleanly,
+      and report the current authentication status via `gh auth status`.
+      Prints a clear message if the user is not yet authenticated.
+    deps:
+      - install
+    cmds:
+      - task: _verify:unix
+      - task: _verify:windows
+  help:
+    run: once
+    desc: Show the GitHub CLI built-in help
+    summary: Display the built-in gh help output via `gh help`.
+    deps:
+      - install
+    cmds:
+      - gh help
+  auth:login:
+    run: once
+    desc: Authenticate with GitHub interactively
+    summary: |
+      Start an interactive GitHub authentication flow via `gh auth login`.
+      Prompts for hostname, protocol, and authentication method.
+      This task is interactive and requires a terminal.
+    deps:
+      - install
+    cmds:
+      - gh auth login
+  auth:login:web:
+    run: once
+    desc: Authenticate with GitHub using the web browser
+    summary: |
+      Authenticate with GitHub by opening a browser window for OAuth.
+      Uses `gh auth login --web`. This task is interactive.
+    deps:
+      - install
+    cmds:
+      - gh auth login --web
+  auth:login:ssh:
+    run: once
+    desc: Authenticate with GitHub using SSH protocol
+    summary: |
+      Authenticate with GitHub using the SSH git protocol.
+      Uses `gh auth login --git-protocol ssh`. This task is interactive.
+    deps:
+      - install
+    cmds:
+      - gh auth login --git-protocol ssh
+  auth:status:
+    run: once
+    desc: Show the current GitHub authentication status
+    summary: |
+      Display the current GitHub authentication status for all configured
+      hosts via `gh auth status`.
+    deps:
+      - install
+    cmds:
+      - gh auth status
+  auth:refresh:
+    run: once
+    desc: Refresh the GitHub CLI authentication token
+    summary: |
+      Refresh the stored GitHub CLI credentials to extend their validity
+      via `gh auth refresh`. This task is interactive.
+    deps:
+      - install
+    cmds:
+      - gh auth refresh
+  auth:logout:
+    run: once
+    desc: Log out from GitHub and remove stored credentials
+    summary: |
+      Remove locally stored GitHub credentials via `gh auth logout`.
+      You will need to re-authenticate with `task auth:login` afterwards.
+    deps:
+      - install
+    cmds:
+      - gh auth logout
+  auth:setup-git:
+    run: once
+    desc: Configure git to use the GitHub CLI as a credential helper
+    summary: |
+      Configure git to delegate GitHub authentication to gh via
+      `gh auth setup-git`. This enables seamless HTTPS git operations.
+    deps:
+      - install
+    cmds:
+      - gh auth setup-git
+  repo:view:
+    run: once
+    desc: View a GitHub repository in the terminal or browser
+    summary: |
+      View repository details in the terminal. If REPO is set, views that
+      specific repository (with optional OWNER prefix). Otherwise views the
+      repository in the current working directory.
+      Example: OWNER=github REPO=cli
+    deps:
+      - install
+    cmds:
+      - gh repo view {{if .OWNER}}{{.OWNER}}/{{end}}{{.REPO}}
+  repo:create:
+    run: once
+    desc: Create a new GitHub repository
+    summary: |
+      Create a new GitHub repository. Requires REPO to be set.
+      VISIBILITY defaults to "public". Set DESCRIPTION for an optional description.
+      Example: REPO=my-project VISIBILITY=private DESCRIPTION="My project"
+    requires:
+      vars:
+        - REPO
+    deps:
+      - install
+    cmds:
+      - >-
+        gh repo create {{if .OWNER}}{{.OWNER}}/{{end}}{{.REPO}} --{{default "public" .VISIBILITY}} {{if .DESCRIPTION}}--description "{{.DESCRIPTION}}"{{end}}
+  repo:clone:
+    run: once
+    desc: Clone a GitHub repository to the local machine
+    summary: |
+      Clone a GitHub repository. Requires REPO to be set.
+      Set OWNER to clone from a specific user or organisation.
+      Set CLONE_DIR to specify the destination directory (defaults to ".").
+      Set PAT_TOKEN to access private repositories not owned by you — the
+      token is embedded directly in the HTTPS clone URL for reliable CI auth.
+      Requires OWNER when PAT_TOKEN is set.
+      Example: OWNER=github REPO=cli CLONE_DIR=~/src/gh
+      Private: OWNER=myorg REPO=private-repo PAT_TOKEN=ghp_xxx
+    requires:
+      vars:
+        - REPO
+    deps:
+      - install
+    cmds:
+      - task: _repo:clone:unix
+      - task: _repo:clone:windows
+  repo:fork:
+    run: once
+    desc: Fork a GitHub repository to your account
+    summary: |
+      Fork a GitHub repository. If REPO is set, forks that specific repo;
+      otherwise forks the repository in the current working directory.
+      Set PAT_TOKEN to fork private repositories not owned by you.
+      Example: OWNER=github REPO=cli
+      Private: OWNER=myorg REPO=private-repo PAT_TOKEN=ghp_xxx
+    deps:
+      - install
+    cmds:
+      - gh repo fork {{if .OWNER}}{{.OWNER}}/{{end}}{{.REPO}} --clone
+  repo:list:
+    run: once
+    desc: List GitHub repositories for the authenticated user or an owner
+    summary: |
+      List repositories for the authenticated user. Set OWNER to list
+      repositories for a specific user or organisation instead.
+      Example: OWNER=github
+    deps:
+      - install
+    cmds:
+      - gh repo list {{.OWNER}}
+  repo:sync:
+    run: once
+    desc: Sync the current repository branch with the upstream source
+    summary: |
+      Sync the current branch with its upstream source via `gh repo sync`.
+      Optionally set BRANCH to sync a specific branch.
+      Example: BRANCH=main
+    deps:
+      - install
+    cmds:
+      - gh repo sync {{if .BRANCH}}--branch {{.BRANCH}}{{end}}
+  repo:archive:
+    run: once
+    desc: Archive a GitHub repository
+    summary: |
+      Archive a GitHub repository, making it read-only. Requires REPO.
+      Set OWNER to target a specific user or organisation.
+      Example: OWNER=myorg REPO=legacy-project
+    requires:
+      vars:
+        - REPO
+    deps:
+      - install
+    cmds:
+      - gh repo archive {{if .OWNER}}{{.OWNER}}/{{end}}{{.REPO}} --yes
+  repo:delete:danger:
+    run: once
+    desc: Permanently delete a GitHub repository
+    summary: |
+      Permanently delete a GitHub repository. Requires REPO.
+      All code, issues, pull requests, and history will be lost.
+      This action is irreversible.
+      Example: OWNER=myorg REPO=old-project
+    requires:
+      vars:
+        - REPO
+    prompt:
+      - "This will permanently delete the repository {{if .OWNER}}{{.OWNER}}/{{end}}{{.REPO}}."
+      - All code, issues, pull requests, and history will be permanently lost.
+      - This action cannot be undone. Are you sure you want to continue?
+    deps:
+      - install
+    cmds:
+      - gh repo delete {{if .OWNER}}{{.OWNER}}/{{end}}{{.REPO}} --yes
+  pr:list:
+    run: once
+    desc: List open pull requests in the current repository
+    summary: List open pull requests for the current repository via `gh pr list`.
+    deps:
+      - install
+    cmds:
+      - gh pr list
+  pr:status:
+    run: once
+    desc: Show pull request status for the current branch
+    summary: Display the status of pull requests related to the current branch via `gh pr status`.
+    deps:
+      - install
+    cmds:
+      - gh pr status
+  pr:view:
+    run: once
+    desc: View a pull request in the terminal or browser
+    summary: |
+      View the pull request for the current branch, or the PR specified by
+      PR_NUMBER. Example: PR_NUMBER=42
+    deps:
+      - install
+    cmds:
+      - gh pr view {{.PR_NUMBER}}
+  pr:create:
+    run: once
+    desc: Create a new pull request for the current branch
+    summary: |
+      Create a pull request interactively. Optionally set PR_TITLE, PR_BODY,
+      BASE (default: main), and HEAD to pre-fill fields.
+      Example: PR_TITLE="Add feature" BASE=main
+    deps:
+      - install
+    cmds:
+      - >-
+        gh pr create {{if .PR_TITLE}}--title "{{.PR_TITLE}}"{{end}} {{if .PR_BODY}}--body "{{.PR_BODY}}"{{end}} {{if .BASE}}--base {{.BASE}}{{end}} {{if .HEAD}}--head {{.HEAD}}{{end}}
+  pr:checkout:
+    run: once
+    desc: Check out a pull request branch locally
+    summary: |
+      Check out the branch for the pull request specified by PR_NUMBER.
+      Requires PR_NUMBER. Example: PR_NUMBER=42
+    requires:
+      vars:
+        - PR_NUMBER
+    deps:
+      - install
+    cmds:
+      - gh pr checkout {{.PR_NUMBER}}
+  pr:diff:
+    run: once
+    desc: Show the diff for a pull request
+    summary: |
+      Show the diff for the current branch's PR, or for PR_NUMBER.
+      Example: PR_NUMBER=42
+    deps:
+      - install
+    cmds:
+      - gh pr diff {{.PR_NUMBER}}
+  pr:review:
+    run: once
+    desc: Add a review to a pull request
+    summary: |
+      Open an interactive review for the current branch's PR, or for PR_NUMBER.
+      Example: PR_NUMBER=42
+    deps:
+      - install
+    cmds:
+      - gh pr review {{.PR_NUMBER}}
+  pr:merge:
+    run: once
+    desc: Merge a pull request
+    summary: |
+      Merge the pull request specified by PR_NUMBER. MERGE_METHOD controls
+      the merge strategy: merge (default), squash, or rebase.
+      Requires PR_NUMBER. Example: PR_NUMBER=42 MERGE_METHOD=squash
+    requires:
+      vars:
+        - PR_NUMBER
+    deps:
+      - install
+    cmds:
+      - gh pr merge {{.PR_NUMBER}} --{{default "merge" .MERGE_METHOD}}
+  pr:close:
+    run: once
+    desc: Close a pull request without merging
+    summary: |
+      Close the pull request specified by PR_NUMBER without merging.
+      Requires PR_NUMBER. Example: PR_NUMBER=42
+    requires:
+      vars:
+        - PR_NUMBER
+    deps:
+      - install
+    cmds:
+      - gh pr close {{.PR_NUMBER}}
+  pr:ready:
+    run: once
+    desc: Mark a draft pull request as ready for review
+    summary: |
+      Convert a draft PR to ready-for-review state.
+      Optionally set PR_NUMBER; otherwise uses the current branch's PR.
+      Example: PR_NUMBER=42
+    deps:
+      - install
+    cmds:
+      - gh pr ready {{.PR_NUMBER}}
+  pr:comment:
+    run: once
+    desc: Add a comment to a pull request
+    summary: |
+      Post a comment on the pull request specified by PR_NUMBER.
+      Requires PR_NUMBER and PR_BODY. Example: PR_NUMBER=42 PR_BODY="LGTM!"
+    requires:
+      vars:
+        - PR_NUMBER
+        - PR_BODY
+    deps:
+      - install
+    cmds:
+      - gh pr comment {{.PR_NUMBER}} --body "{{.PR_BODY}}"
+  issue:list:
+    run: once
+    desc: List open issues in the current repository
+    summary: List open issues for the current repository via `gh issue list`.
+    deps:
+      - install
+    cmds:
+      - gh issue list
+  issue:view:
+    run: once
+    desc: View an issue in the terminal or browser
+    summary: |
+      View the issue specified by ISSUE_NUMBER.
+      Requires ISSUE_NUMBER. Example: ISSUE_NUMBER=10
+    requires:
+      vars:
+        - ISSUE_NUMBER
+    deps:
+      - install
+    cmds:
+      - gh issue view {{.ISSUE_NUMBER}}
+  issue:create:
+    run: once
+    desc: Create a new issue in the current repository
+    summary: |
+      Create an issue interactively. Optionally set ISSUE_TITLE and ISSUE_BODY
+      to pre-fill fields. Example: ISSUE_TITLE="Bug report" ISSUE_BODY="..."
+    deps:
+      - install
+    cmds:
+      - >-
+        gh issue create {{if .ISSUE_TITLE}}--title "{{.ISSUE_TITLE}}"{{end}} {{if .ISSUE_BODY}}--body "{{.ISSUE_BODY}}"{{end}}
+  issue:comment:
+    run: once
+    desc: Add a comment to an issue
+    summary: |
+      Post a comment on the issue specified by ISSUE_NUMBER.
+      Requires ISSUE_NUMBER and ISSUE_BODY.
+      Example: ISSUE_NUMBER=10 ISSUE_BODY="Thanks for the report!"
+    requires:
+      vars:
+        - ISSUE_NUMBER
+        - ISSUE_BODY
+    deps:
+      - install
+    cmds:
+      - gh issue comment {{.ISSUE_NUMBER}} --body "{{.ISSUE_BODY}}"
+  issue:close:
+    run: once
+    desc: Close an issue
+    summary: |
+      Close the issue specified by ISSUE_NUMBER.
+      Requires ISSUE_NUMBER. Example: ISSUE_NUMBER=10
+    requires:
+      vars:
+        - ISSUE_NUMBER
+    deps:
+      - install
+    cmds:
+      - gh issue close {{.ISSUE_NUMBER}}
+  issue:reopen:
+    run: once
+    desc: Reopen a previously closed issue
+    summary: |
+      Reopen the issue specified by ISSUE_NUMBER.
+      Requires ISSUE_NUMBER. Example: ISSUE_NUMBER=10
+    requires:
+      vars:
+        - ISSUE_NUMBER
+    deps:
+      - install
+    cmds:
+      - gh issue reopen {{.ISSUE_NUMBER}}
+  issue:assign:
+    run: once
+    desc: Assign a GitHub user to an issue
+    summary: |
+      Assign ASSIGNEE to the issue specified by ISSUE_NUMBER.
+      Requires ISSUE_NUMBER and ASSIGNEE.
+      Example: ISSUE_NUMBER=10 ASSIGNEE=octocat
+    requires:
+      vars:
+        - ISSUE_NUMBER
+        - ASSIGNEE
+    deps:
+      - install
+    cmds:
+      - gh issue edit {{.ISSUE_NUMBER}} --add-assignee {{.ASSIGNEE}}
+  issue:label:
+    run: once
+    desc: Add a label to an issue
+    summary: |
+      Add LABEL to the issue specified by ISSUE_NUMBER.
+      Requires ISSUE_NUMBER and LABEL.
+      Example: ISSUE_NUMBER=10 LABEL=bug
+    requires:
+      vars:
+        - ISSUE_NUMBER
+        - LABEL
+    deps:
+      - install
+    cmds:
+      - gh issue edit {{.ISSUE_NUMBER}} --add-label {{.LABEL}}
+  workflow:list:
+    run: once
+    desc: List GitHub Actions workflows in the current repository
+    summary: List all available workflows via `gh workflow list`.
+    deps:
+      - install
+    cmds:
+      - gh workflow list
+  workflow:view:
+    run: once
+    desc: View a GitHub Actions workflow
+    summary: |
+      View the workflow specified by WORKFLOW (name or file).
+      Example: WORKFLOW=ci.yml
+    requires:
+      vars:
+        - WORKFLOW
+    deps:
+      - install
+    cmds:
+      - gh workflow view {{.WORKFLOW}}
+  workflow:run:
+    run: once
+    desc: Trigger a GitHub Actions workflow dispatch event
+    summary: |
+      Manually trigger the workflow specified by WORKFLOW. Optionally set
+      BRANCH to run on a specific branch (defaults to the default branch).
+      Requires WORKFLOW. Example: WORKFLOW=deploy.yml BRANCH=main
+    requires:
+      vars:
+        - WORKFLOW
+    deps:
+      - install
+    cmds:
+      - gh workflow run {{.WORKFLOW}} {{if .BRANCH}}--ref {{.BRANCH}}{{end}}
+  workflow:watch:
+    run: once
+    desc: Watch a GitHub Actions workflow run in real time
+    summary: |
+      Watch the most recent run of WORKFLOW until it completes.
+      Requires WORKFLOW. Example: WORKFLOW=ci.yml
+    requires:
+      vars:
+        - WORKFLOW
+    deps:
+      - install
+      - jq:install
+    cmds:
+      - task: _workflow:watch:unix
+      - task: _workflow:watch:windows
+  run:list:
+    run: once
+    desc: List recent GitHub Actions runs in the current repository
+    summary: List recent workflow runs via `gh run list`.
+    deps:
+      - install
+    cmds:
+      - gh run list
+  run:view:
+    run: once
+    desc: View a specific GitHub Actions workflow run
+    summary: |
+      View the run specified by RUN_ID.
+      Requires RUN_ID. Example: RUN_ID=1234567890
+    requires:
+      vars:
+        - RUN_ID
+    deps:
+      - install
+    cmds:
+      - gh run view {{.RUN_ID}}
+  run:logs:
+    run: once
+    desc: View logs for a GitHub Actions workflow run
+    summary: |
+      Print the logs for the run specified by RUN_ID.
+      Requires RUN_ID. Example: RUN_ID=1234567890
+    requires:
+      vars:
+        - RUN_ID
+    deps:
+      - install
+    cmds:
+      - gh run view {{.RUN_ID}} --log
+  run:rerun:
+    run: once
+    desc: Re-run a GitHub Actions workflow run
+    summary: |
+      Re-run the workflow run specified by RUN_ID.
+      Requires RUN_ID. Example: RUN_ID=1234567890
+    requires:
+      vars:
+        - RUN_ID
+    deps:
+      - install
+    cmds:
+      - gh run rerun {{.RUN_ID}}
+  run:cancel:
+    run: once
+    desc: Cancel a running GitHub Actions workflow run
+    summary: |
+      Cancel the workflow run specified by RUN_ID.
+      Requires RUN_ID. Example: RUN_ID=1234567890
+    requires:
+      vars:
+        - RUN_ID
+    deps:
+      - install
+    cmds:
+      - gh run cancel {{.RUN_ID}}
+  release:list:
+    run: once
+    desc: List releases in the current repository
+    summary: |
+      List all releases. Set OWNER and REPO to target a repo not owned by you
+      (requires PAT_TOKEN with repo scope).
+      Example: OWNER=hashicorp REPO=terraform PAT_TOKEN=ghp_...
+    deps:
+      - install
+    cmds:
+      - gh release list {{if .OWNER}}--repo {{.OWNER}}/{{.REPO}}{{end}}
+  release:view:
+    run: once
+    desc: View a GitHub release
+    summary: |
+      View the release specified by TAG. If TAG is unset, views the latest
+      release. Set OWNER and REPO to target a repo not owned by you.
+      Example: TAG=v1.0.0 OWNER=hashicorp REPO=terraform
+    deps:
+      - install
+    cmds:
+      - gh release view {{.TAG}} {{if .OWNER}}--repo {{.OWNER}}/{{.REPO}}{{end}}
+  release:create:
+    run: once
+    desc: Create a new GitHub release
+    summary: |
+      Create a release for the tag specified by TAG.
+      Optionally set TITLE for the release title and NOTES for release notes.
+      Set OWNER and REPO to create a release on a repo not owned by you
+      (requires PAT_TOKEN with repo scope).
+      Example: TAG=v1.0.0 TITLE="v1.0.0" NOTES="Bug fixes."
+    requires:
+      vars:
+        - TAG
+    deps:
+      - install
+    cmds:
+      - >-
+        gh release create {{.TAG}} {{if .OWNER}}--repo {{.OWNER}}/{{.REPO}}{{end}} {{if .TITLE}}--title "{{.TITLE}}"{{end}} {{if .NOTES}}--notes "{{.NOTES}}"{{end}}
+  release:upload:
+    run: once
+    desc: Upload an asset to an existing GitHub release
+    summary: |
+      Upload ASSET to the release identified by TAG.
+      Set OWNER and REPO to target a repo not owned by you
+      (requires PAT_TOKEN with repo scope).
+      Example: TAG=v1.0.0 ASSET=./dist/app.tar.gz
+    requires:
+      vars:
+        - TAG
+        - ASSET
+    deps:
+      - install
+    cmds:
+      - gh release upload {{.TAG}} {{.ASSET}} {{if .OWNER}}--repo {{.OWNER}}/{{.REPO}}{{end}}
+  release:download:
+    run: once
+    desc: Download assets from a GitHub release
+    summary: |
+      Download release assets for the tag specified by TAG into DOWNLOAD_DIR.
+      If TAG is unset, downloads assets from the latest release.
+      Set OWNER and REPO to download from a repo not owned by you
+      (requires PAT_TOKEN with repo scope for private repos).
+      Example: TAG=v1.0.0 OWNER=hashicorp REPO=terraform DOWNLOAD_DIR=./dist
+    deps:
+      - install
+    cmds:
+      - >-
+        gh release download {{.TAG}} {{if .OWNER}}--repo {{.OWNER}}/{{.REPO}}{{end}} {{if ne .DOWNLOAD_DIR "."}}--dir {{.DOWNLOAD_DIR}}{{end}}
+  release:download:all:
+    run: once
+    desc: Download assets from all releases in a repository
+    summary: |
+      Iterates every release tag and downloads its assets into DOWNLOAD_DIR/<tag>/.
+      Set OWNER and REPO to target a repo not owned by you
+      (requires PAT_TOKEN with repo scope for private repos).
+      Example: OWNER=hashicorp REPO=terraform DOWNLOAD_DIR=./releases
+    deps:
+      - install
+      - jq:install
+    cmds:
+      - task: _release:download:all:unix
+      - task: _release:download:all:windows
+  _release:download:all:unix:
+    run: once
+    internal: true
+    desc: Download all release assets on macOS/Linux
+    platforms: [linux, darwin]
+    set: [errexit, nounset, pipefail]
+    cmds:
+      - |
+        REPO_FLAG="{{if .OWNER}}--repo {{.OWNER}}/{{.REPO}}{{end}}"
+        BASE_DIR="{{.DOWNLOAD_DIR}}"
+        for tag in $(gh release list $REPO_FLAG --json tagName --jq '.[].tagName'); do
+          dest="${BASE_DIR}/${tag}"
+          mkdir -p "$dest"
+          gh release download "$tag" $REPO_FLAG --dir "$dest" || true
+        done
+  _release:download:all:windows:
+    run: once
+    internal: true
+    desc: Download all release assets on Windows
+    platforms: [windows]
+    cmds:
+      - >-
+        powershell -NoProfile -ExecutionPolicy Bypass -Command "$repoFlag = '{{if .OWNER}}--repo {{.OWNER}}/{{.REPO}}{{end}}'; $baseDir = '{{.DOWNLOAD_DIR}}'; $tags = gh release list $repoFlag --json tagName --jq '.[].tagName'; foreach ($tag in $tags) {
+
+          $dest = Join-Path $baseDir $tag;
+          New-Item -ItemType Directory -Force -Path $dest | Out-Null;
+          gh release download $tag $repoFlag --dir $dest
+        }"
+  release:delete:danger:
+    run: once
+    desc: Permanently delete a GitHub release
+    summary: |
+      Delete the release identified by TAG. The git tag is preserved;
+      only the GitHub release record is removed.
+      Set OWNER and REPO to target a repo not owned by you
+      (requires PAT_TOKEN with delete_repo scope).
+      Example: TAG=v0.1.0-beta
+    requires:
+      vars:
+        - TAG
+    prompt:
+      - "This will permanently delete the GitHub release for tag {{.TAG}}."
+      - The git tag itself will be preserved, but the release record will be gone.
+      - Are you sure you want to continue?
+    deps:
+      - install
+    cmds:
+      - gh release delete {{.TAG}} --yes {{if .OWNER}}--repo {{.OWNER}}/{{.REPO}}{{end}}
+  secret:list:
+    run: once
+    desc: List GitHub Actions secrets for the current repository
+    summary: |
+      List the names of GitHub Actions secrets. Values are never shown.
+      Optionally set ENVIRONMENT to list secrets for a specific environment.
+      Example: ENVIRONMENT=production
+    deps:
+      - install
+    cmds:
+      - gh secret list {{if .ENVIRONMENT}}--env {{.ENVIRONMENT}}{{end}}
+  secret:set:
+    run: once
+    desc: Create or update a GitHub Actions secret
+    summary: |
+      Set a secret named SECRET_NAME to SECRET_VALUE. The value is piped
+      via stdin to avoid exposure in the process list.
+      Optionally set ENVIRONMENT to target a specific environment.
+      Requires SECRET_NAME and SECRET_VALUE.
+      Example: SECRET_NAME=MY_TOKEN SECRET_VALUE=abc123
+    requires:
+      vars:
+        - SECRET_NAME
+        - SECRET_VALUE
+    deps:
+      - install
+    cmds:
+      - task: _secret:set:unix
+      - task: _secret:set:windows
+  secret:delete:danger:
+    run: once
+    desc: Permanently delete a GitHub Actions secret
+    summary: |
+      Delete the secret named SECRET_NAME. This action is irreversible.
+      Optionally set ENVIRONMENT to target a specific environment.
+      Requires SECRET_NAME. Example: SECRET_NAME=MY_TOKEN
+    requires:
+      vars:
+        - SECRET_NAME
+    prompt:
+      - "This will permanently delete the secret {{.SECRET_NAME}}."
+      - Any workflows depending on this secret will break until it is re-created.
+      - Are you sure you want to continue?
+    deps:
+      - install
+    cmds:
+      - gh secret delete {{.SECRET_NAME}} {{if .ENVIRONMENT}}--env {{.ENVIRONMENT}}{{end}}
+  variable:list:
+    run: once
+    desc: List GitHub Actions variables for the current repository
+    summary: |
+      List GitHub Actions variables (non-secret configuration values).
+      Optionally set ENVIRONMENT to list variables for a specific environment.
+      Example: ENVIRONMENT=staging
+    deps:
+      - install
+    cmds:
+      - gh variable list {{if .ENVIRONMENT}}--env {{.ENVIRONMENT}}{{end}}
+  variable:set:
+    run: once
+    desc: Create or update a GitHub Actions variable
+    summary: |
+      Set a variable named VARIABLE_NAME to VARIABLE_VALUE.
+      Optionally set ENVIRONMENT to target a specific environment.
+      Requires VARIABLE_NAME and VARIABLE_VALUE.
+      Example: VARIABLE_NAME=APP_ENV VARIABLE_VALUE=production
+    requires:
+      vars:
+        - VARIABLE_NAME
+        - VARIABLE_VALUE
+    deps:
+      - install
+    cmds:
+      - >-
+        gh variable set {{.VARIABLE_NAME}} --body "{{.VARIABLE_VALUE}}" {{if .ENVIRONMENT}}--env {{.ENVIRONMENT}}{{end}}
+  variable:delete:danger:
+    run: once
+    desc: Permanently delete a GitHub Actions variable
+    summary: |
+      Delete the variable named VARIABLE_NAME. This action is irreversible.
+      Optionally set ENVIRONMENT to target a specific environment.
+      Requires VARIABLE_NAME. Example: VARIABLE_NAME=APP_ENV
+    requires:
+      vars:
+        - VARIABLE_NAME
+    prompt:
+      - "This will permanently delete the variable {{.VARIABLE_NAME}}."
+      - Are you sure you want to continue?
+    deps:
+      - install
+    cmds:
+      - gh variable delete {{.VARIABLE_NAME}} {{if .ENVIRONMENT}}--env {{.ENVIRONMENT}}{{end}}
+  gist:list:
+    run: once
+    desc: List gists for the authenticated GitHub user
+    summary: List all gists belonging to the authenticated user via `gh gist list`.
+    deps:
+      - install
+    cmds:
+      - gh gist list
+  gist:view:
+    run: once
+    desc: View a GitHub gist
+    summary: |
+      View the gist specified by GIST_ID.
+      Requires GIST_ID. Example: GIST_ID=abc1234567890abcdef
+    requires:
+      vars:
+        - GIST_ID
+    deps:
+      - install
+    cmds:
+      - gh gist view {{.GIST_ID}}
+  gist:create:
+    run: once
+    desc: Create a new GitHub gist from a file
+    summary: |
+      Create a new gist from the file specified by FILE.
+      Set DESCRIPTION for an optional gist description.
+      Requires FILE. Example: FILE=./script.sh DESCRIPTION="Useful script"
+    requires:
+      vars:
+        - FILE
+    deps:
+      - install
+    cmds:
+      - gh gist create {{.FILE}} {{if .DESCRIPTION}}--desc "{{.DESCRIPTION}}"{{end}}
+  gist:delete:danger:
+    run: once
+    desc: Permanently delete a GitHub gist
+    summary: |
+      Delete the gist specified by GIST_ID. This action is irreversible.
+      Requires GIST_ID. Example: GIST_ID=abc1234567890abcdef
+    requires:
+      vars:
+        - GIST_ID
+    prompt:
+      - "This will permanently delete gist {{.GIST_ID}}."
+      - This action cannot be undone. Are you sure you want to continue?
+    deps:
+      - install
+    cmds:
+      - gh gist delete {{.GIST_ID}}
+  api:get:
+    run: once
+    desc: Make an authenticated GET request to the GitHub API
+    summary: |
+      Make a GET request to the GitHub REST API ENDPOINT via `gh api`.
+      Requires ENDPOINT. Example: ENDPOINT=/repos/github/cli/releases/latest
+    requires:
+      vars:
+        - ENDPOINT
+    deps:
+      - install
+    cmds:
+      - gh api {{.ENDPOINT}}
+  api:post:
+    run: once
+    desc: Make an authenticated POST request to the GitHub API
+    summary: |
+      Make a POST request to the GitHub REST API ENDPOINT with DATA as the
+      request body. Requires ENDPOINT.
+      Example: ENDPOINT=/repos/github/cli/issues DATA='{"title":"Bug"}'
+    requires:
+      vars:
+        - ENDPOINT
+    deps:
+      - install
+    cmds:
+      - task: _api:post:unix
+      - task: _api:post:windows
+  api:patch:
+    run: once
+    desc: Make an authenticated PATCH request to the GitHub API
+    summary: |
+      Make a PATCH request to the GitHub REST API ENDPOINT with DATA as the
+      request body. Requires ENDPOINT.
+      Example: ENDPOINT=/repos/github/cli/issues/1 DATA='{"state":"closed"}'
+    requires:
+      vars:
+        - ENDPOINT
+    deps:
+      - install
+    cmds:
+      - task: _api:patch:unix
+      - task: _api:patch:windows
+  api:delete:danger:
+    run: once
+    desc: Make an authenticated DELETE request to the GitHub API
+    summary: |
+      Make a DELETE request to the GitHub REST API ENDPOINT. This is a
+      destructive operation and requires explicit confirmation.
+      Requires ENDPOINT. Example: ENDPOINT=/repos/github/cli/releases/1
+    requires:
+      vars:
+        - ENDPOINT
+    prompt:
+      - "This will send a DELETE request to the GitHub API: {{.ENDPOINT}}"
+      - This may permanently remove resources. Are you sure you want to continue?
+    deps:
+      - install
+    cmds:
+      - gh api --method DELETE {{.ENDPOINT}}
+  extension:list:
+    run: once
+    desc: List installed GitHub CLI extensions
+    summary: List all locally installed gh extensions via `gh extension list`.
+    deps:
+      - install
+    cmds:
+      - gh extension list
+  extension:install:
+    run: once
+    desc: Install a GitHub CLI extension
+    summary: |
+      Install the gh extension specified by EXTENSION.
+      Requires EXTENSION. Example: EXTENSION=github/gh-copilot
+    requires:
+      vars:
+        - EXTENSION
+    deps:
+      - install
+    cmds:
+      - gh extension install {{.EXTENSION}}
+  extension:upgrade:
+    run: once
+    desc: Upgrade a GitHub CLI extension to the latest version
+    summary: |
+      Upgrade the gh extension specified by EXTENSION. Use EXTENSION=--all
+      to upgrade all installed extensions.
+      Example: EXTENSION=github/gh-copilot
+    requires:
+      vars:
+        - EXTENSION
+    deps:
+      - install
+    cmds:
+      - gh extension upgrade {{.EXTENSION}}
+  extension:remove:
+    run: once
+    desc: Remove an installed GitHub CLI extension
+    summary: |
+      Remove the gh extension specified by EXTENSION.
+      Requires EXTENSION. Example: EXTENSION=github/gh-copilot
+    requires:
+      vars:
+        - EXTENSION
+    deps:
+      - install
+    cmds:
+      - gh extension remove {{.EXTENSION}}
+  config:list:
+    run: once
+    desc: List all GitHub CLI configuration values
+    summary: Display all current gh configuration settings via `gh config list`.
+    deps:
+      - install
+    cmds:
+      - gh config list
+  config:get:
+    run: once
+    desc: Get a GitHub CLI configuration value
+    summary: |
+      Get the value of the configuration key specified by CONFIG_KEY.
+      Requires CONFIG_KEY. Example: CONFIG_KEY=editor
+    requires:
+      vars:
+        - CONFIG_KEY
+    deps:
+      - install
+    cmds:
+      - gh config get {{.CONFIG_KEY}}
+  config:set:
+    run: once
+    desc: Set a GitHub CLI configuration value
+    summary: |
+      Set the configuration key CONFIG_KEY to CONFIG_VALUE.
+      Requires CONFIG_KEY and CONFIG_VALUE.
+      Example: CONFIG_KEY=editor CONFIG_VALUE=vim
+    requires:
+      vars:
+        - CONFIG_KEY
+        - CONFIG_VALUE
+    deps:
+      - install
+    cmds:
+      - gh config set {{.CONFIG_KEY}} {{.CONFIG_VALUE}}
+  ssh-key:list:
+    run: once
+    desc: List SSH keys associated with the GitHub account
+    summary: List all SSH keys for the authenticated GitHub user via `gh ssh-key list`.
+    deps:
+      - install
+    cmds:
+      - gh ssh-key list
+  ssh-key:add:
+    run: once
+    desc: Add an SSH public key to the GitHub account
+    summary: |
+      Add the SSH public key at SSH_KEY_FILE to the authenticated GitHub account.
+      Set SSH_KEY_TITLE for an optional display name.
+      Requires SSH_KEY_FILE. Example: SSH_KEY_FILE=~/.ssh/id_ed25519.pub SSH_KEY_TITLE="laptop"
+    requires:
+      vars:
+        - SSH_KEY_FILE
+    deps:
+      - install
+    cmds:
+      - gh ssh-key add {{.SSH_KEY_FILE}} {{if .SSH_KEY_TITLE}}--title "{{.SSH_KEY_TITLE}}"{{end}}
+  ssh-key:delete:danger:
+    run: once
+    desc: Permanently delete an SSH key from the GitHub account
+    summary: |
+      Delete the SSH key identified by SSH_KEY_ID from the authenticated
+      GitHub account. This action is irreversible.
+      Requires SSH_KEY_ID. Example: SSH_KEY_ID=12345678
+    requires:
+      vars:
+        - SSH_KEY_ID
+    prompt:
+      - "This will permanently delete SSH key {{.SSH_KEY_ID}} from your GitHub account."
+      - Are you sure you want to continue?
+    deps:
+      - install
+    cmds:
+      - gh ssh-key delete {{.SSH_KEY_ID}} --yes
+  alias:list:
+    run: once
+    desc: List all GitHub CLI command aliases
+    summary: List all configured gh command aliases via `gh alias list`.
+    deps:
+      - install
+    cmds:
+      - gh alias list
+  alias:set:
+    run: once
+    desc: Create or update a GitHub CLI command alias
+    summary: |
+      Create a gh command alias named ALIAS_NAME that expands to ALIAS_COMMAND.
+      Requires ALIAS_NAME and ALIAS_COMMAND.
+      Example: ALIAS_NAME=prc ALIAS_COMMAND="pr create --fill"
+    requires:
+      vars:
+        - ALIAS_NAME
+        - ALIAS_COMMAND
+    deps:
+      - install
+    cmds:
+      - task: _alias:set:unix
+      - task: _alias:set:windows
+  alias:delete:
+    run: once
+    desc: Delete a GitHub CLI command alias
+    summary: |
+      Remove the gh command alias named ALIAS_NAME.
+      Requires ALIAS_NAME. Example: ALIAS_NAME=prc
+    requires:
+      vars:
+        - ALIAS_NAME
+    deps:
+      - install
+    cmds:
+      - gh alias delete {{.ALIAS_NAME}}
+  project:list:
+    run: once
+    desc: List GitHub Projects for a user or organisation
+    summary: |
+      List GitHub Projects for the authenticated user. Set OWNER to list
+      projects for a specific user or organisation.
+      Example: OWNER=myorg
+    deps:
+      - install
+    cmds:
+      - gh project list {{if .OWNER}}--owner {{.OWNER}}{{end}}
+  project:view:
+    run: once
+    desc: View a GitHub Project
+    summary: |
+      View the project specified by PROJECT_NUMBER. Set OWNER to target
+      a specific user or organisation.
+      Requires PROJECT_NUMBER. Example: PROJECT_NUMBER=1 OWNER=myorg
+    requires:
+      vars:
+        - PROJECT_NUMBER
+    deps:
+      - install
+    cmds:
+      - gh project view {{.PROJECT_NUMBER}} {{if .OWNER}}--owner {{.OWNER}}{{end}}
+  project:create:
+    run: once
+    desc: Create a new GitHub Project
+    summary: |
+      Create a new GitHub Project titled PROJECT_TITLE. Set OWNER to create
+      under a specific user or organisation.
+      Requires PROJECT_TITLE. Example: PROJECT_TITLE="Q3 Roadmap" OWNER=myorg
+    requires:
+      vars:
+        - PROJECT_TITLE
+    deps:
+      - install
+    cmds:
+      - gh project create --title "{{.PROJECT_TITLE}}" {{if .OWNER}}--owner {{.OWNER}}{{end}}
+  open:
+    run: once
+    desc: Open the current repository in the browser
+    summary: Open the current repository's GitHub page in the default web browser.
+    deps:
+      - install
+    cmds:
+      - gh repo view --web
+  browse:
+    run: once
+    desc: Browse the current repository on GitHub in the browser
+    summary: |
+      Open the current branch of the repository in the default web browser
+      via `gh browse`.
+    deps:
+      - install
+    cmds:
+      - gh browse
+  search:repos:
+    run: once
+    desc: Search for GitHub repositories
+    summary: |
+      Search GitHub repositories using the query in QUERY.
+      Requires QUERY. Example: QUERY="cli tool language:go"
+    requires:
+      vars:
+        - QUERY
+    deps:
+      - install
+    cmds:
+      - gh search repos "{{.QUERY}}"
+  search:issues:
+    run: once
+    desc: Search for GitHub issues
+    summary: |
+      Search GitHub issues using the query in QUERY.
+      Requires QUERY. Example: QUERY="is:open label:bug"
+    requires:
+      vars:
+        - QUERY
+    deps:
+      - install
+    cmds:
+      - gh search issues "{{.QUERY}}"
+  search:prs:
+    run: once
+    desc: Search for GitHub pull requests
+    summary: |
+      Search GitHub pull requests using the query in QUERY.
+      Requires QUERY. Example: QUERY="is:open review-requested:@me"
+    requires:
+      vars:
+        - QUERY
+    deps:
+      - install
+    cmds:
+      - gh search prs "{{.QUERY}}"
+  _repo:clone:unix:
+    run: once
+    internal: true
+    desc: Clone a repository on macOS or Linux
+    summary: |
+      When PAT_TOKEN is set, embeds the token in the HTTPS URL for reliable
+      authentication against private repos not owned by the caller.
+      Falls back to gh repo clone when PAT_TOKEN is absent.
+    platforms: [linux, darwin]
+    set: [errexit, nounset, pipefail]
+    env:
+      GH_PAT: "{{.PAT_TOKEN}}"
+    cmds:
+      - |
+        TARGET="{{if .OWNER}}{{.OWNER}}/{{end}}{{.REPO}}"
+        DEST="{{if ne .CLONE_DIR "."}}{{.CLONE_DIR}}{{end}}"
+        if [ -n "$GH_PAT" ]; then
+          git clone "https://${GH_PAT}@github.com/${TARGET}.git"${DEST:+ "$DEST"}
+        else
+          gh repo clone "$TARGET"${DEST:+ "$DEST"}
+        fi
+  _repo:clone:windows:
+    run: once
+    internal: true
+    desc: Clone a repository on Windows
+    summary: |
+      When PAT_TOKEN is set, embeds the token in the HTTPS URL for reliable
+      authentication against private repos not owned by the caller.
+      Falls back to gh repo clone when PAT_TOKEN is absent.
+    platforms: [windows]
+    env:
+      GH_PAT: "{{.PAT_TOKEN}}"
+    cmds:
+      - >-
+        powershell -NoProfile -ExecutionPolicy Bypass -Command "$target = '{{if .OWNER}}{{.OWNER}}/{{end}}{{.REPO}}'; $dest = '{{if ne .CLONE_DIR "."}}{{.CLONE_DIR}}{{end}}'; $args = @($dest) | Where-Object { $_ }; if ($env:GH_PAT) { git clone \"https://$env:GH_PAT@github.com/$target.git\" @args } else { gh repo clone $target @args }"
+  _api:post:unix:
+    run: once
+    internal: true
+    desc: POST to the GitHub API on macOS or Linux by piping DATA via stdin
+    summary: Pipe DATA to gh api --method POST via printf on macOS or Linux.
+    platforms: [linux, darwin]
+    set: [errexit, nounset, pipefail]
+    env:
+      GH_DATA: "{{.DATA}}"
+    cmds:
+      - printf '%s' "$GH_DATA" | gh api --method POST {{.ENDPOINT}} --input -
+  _api:post:windows:
+    run: once
+    internal: true
+    desc: POST to the GitHub API on Windows by piping DATA via stdin
+    summary: Pipe DATA to gh api --method POST via PowerShell on Windows.
+    platforms: [windows]
+    env:
+      GH_DATA: "{{.DATA}}"
+    cmds:
+      - >-
+        powershell -NoProfile -ExecutionPolicy Bypass -Command "$env:GH_DATA | gh api --method POST {{.ENDPOINT}} --input -"
+  _api:patch:unix:
+    run: once
+    internal: true
+    desc: PATCH the GitHub API on macOS or Linux by piping DATA via stdin
+    summary: Pipe DATA to gh api --method PATCH via printf on macOS or Linux.
+    platforms: [linux, darwin]
+    set: [errexit, nounset, pipefail]
+    env:
+      GH_DATA: "{{.DATA}}"
+    cmds:
+      - printf '%s' "$GH_DATA" | gh api --method PATCH {{.ENDPOINT}} --input -
+  _api:patch:windows:
+    run: once
+    internal: true
+    desc: PATCH the GitHub API on Windows by piping DATA via stdin
+    summary: Pipe DATA to gh api --method PATCH via PowerShell on Windows.
+    platforms: [windows]
+    env:
+      GH_DATA: "{{.DATA}}"
+    cmds:
+      - >-
+        powershell -NoProfile -ExecutionPolicy Bypass -Command "$env:GH_DATA | gh api --method PATCH {{.ENDPOINT}} --input -"
+  _alias:set:unix:
+    run: once
+    internal: true
+    desc: Set a gh alias on macOS or Linux using single-quoted expansion
+    summary: Run gh alias set with single-quote wrapping on macOS or Linux.
+    platforms: [linux, darwin]
+    set: [errexit, nounset, pipefail]
+    cmds:
+      - gh alias set {{.ALIAS_NAME}} '{{.ALIAS_COMMAND}}'
+  _alias:set:windows:
+    run: once
+    internal: true
+    desc: Set a gh alias on Windows using double-quoted expansion
+    summary: Run gh alias set with double-quote wrapping on Windows.
+    platforms: [windows]
+    cmds:
+      - gh alias set {{.ALIAS_NAME}} "{{.ALIAS_COMMAND}}"
+  _workflow:watch:unix:
+    run: once
+    internal: true
+    desc: Watch the latest run of a workflow on macOS or Linux
+    summary: Resolve the most recent run ID via command substitution, then watch it.
+    platforms: [linux, darwin]
+    set: [errexit, nounset, pipefail]
+    cmds:
+      - gh run watch $(gh run list --workflow {{.WORKFLOW}} --limit 1 --json databaseId --jq '.[0].databaseId')
+  _workflow:watch:windows:
+    run: once
+    internal: true
+    desc: Watch the latest run of a workflow on Windows
+    summary: Resolve the most recent run ID via PowerShell, then watch it.
+    platforms: [windows]
+    cmds:
+      - >-
+        powershell -NoProfile -ExecutionPolicy Bypass -Command "$runId = (gh run list --workflow {{.WORKFLOW}} --limit 1 --json databaseId | ConvertFrom-Json)[0].databaseId; gh run watch $runId"
+  _install:auto:unix:
+    run: once
+    internal: true
+    desc: Auto-detect package manager and install gh on macOS or Linux
+    summary: |
+      Check whether gh is already installed. If not, detect the OS and
+      available package managers, then install gh using the best method.
+      On macOS prefers Homebrew. On Linux checks apt, dnf, yum, pacman,
+      zypper, snap, brew in order and uses the first one found.
+    platforms: [linux, darwin]
+    set: [errexit, nounset, pipefail]
+    status:
+      - >-
+        command -v gh >/dev/null 2>&1 && { [ -z "{{.VERSION}}" ] || gh --version | grep -Fqx "gh version {{.VERSION}}"; }
+    cmds:
+      - |
+        VERSION="{{.VERSION}}"
+        OS="$(uname -s)"
+        if [ "$OS" = "Darwin" ]; then
+          if command -v brew >/dev/null 2>&1; then
+            echo 'macOS detected. Installing gh via Homebrew...'
+            brew install "gh${VERSION:+@$VERSION}"
+          else
+            echo 'ERROR: Homebrew is required to install gh on macOS.'
+            echo 'Install Homebrew from https://brew.sh and then re-run: task install'
+            exit 1
+          fi
+        elif [ "$OS" = "Linux" ]; then
+          if command -v apt-get >/dev/null 2>&1; then
+            echo 'Debian/Ubuntu detected. Installing gh via apt...'
+            sudo apt-get update
+            sudo apt-get install -y wget
+            sudo mkdir -p -m 755 /etc/apt/keyrings
+            wget -qO- https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+              | sudo tee /etc/apt/keyrings/githubcli-archive-keyring.gpg > /dev/null
+            sudo chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg
+            _key="signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg"
+            echo "deb [arch=$(dpkg --print-architecture) $_key] https://cli.github.com/packages stable main" \
+              | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+            sudo apt-get update
+            sudo apt-get install -y "gh${VERSION:+=$VERSION}"
+          elif command -v dnf >/dev/null 2>&1; then
+            echo 'Fedora/RHEL detected. Installing gh via dnf...'
+            sudo dnf install -y 'dnf-command(config-manager)'
+            sudo dnf config-manager --add-repo https://cli.github.com/packages/rpm/gh-cli.repo
+            sudo dnf install -y "gh${VERSION:+-$VERSION}" --repo gh-cli
+          elif command -v yum >/dev/null 2>&1; then
+            echo 'CentOS/RHEL detected. Installing gh via yum...'
+            sudo yum-config-manager --add-repo https://cli.github.com/packages/rpm/gh-cli.repo
+            sudo yum install -y "gh${VERSION:+-$VERSION}"
+          elif command -v pacman >/dev/null 2>&1; then
+            echo 'Arch Linux detected. Installing gh via pacman...'
+            sudo pacman -S --noconfirm github-cli
+          elif command -v zypper >/dev/null 2>&1; then
+            echo 'openSUSE detected. Installing gh via zypper...'
+            sudo zypper addrepo https://cli.github.com/packages/rpm/gh-cli.repo
+            sudo zypper ref
+            sudo zypper install -y "gh${VERSION:+-$VERSION}"
+          elif command -v snap >/dev/null 2>&1; then
+            echo 'snap detected. Installing gh via snap...'
+            sudo snap install gh
+          elif command -v brew >/dev/null 2>&1; then
+            echo 'Homebrew detected. Installing gh via brew...'
+            brew install "gh${VERSION:+@$VERSION}"
+          else
+            echo 'ERROR: No supported package manager detected.'
+            echo 'See https://cli.github.com/manual/installation'
+            exit 1
+          fi
+        else
+          echo "ERROR: Unsupported OS: $OS"
+          echo 'See https://cli.github.com/manual/installation'
+          exit 1
+        fi
+  _install:auto:windows:
+    run: once
+    internal: true
+    desc: Auto-detect package manager and install gh on Windows
+    summary: |
+      Check whether gh is already installed on Windows. If not, detect
+      available package managers (winget, choco, scoop) and install gh
+      using the first one found. Prefers winget, then Chocolatey, then Scoop.
+    platforms: [windows]
+    status:
+      - >-
+        powershell -NoProfile -ExecutionPolicy Bypass -Command "$gh = Get-Command gh -ErrorAction SilentlyContinue; if (-not $gh) { exit 1 }; $requested = '{{.VERSION}}'; if ([string]::IsNullOrWhiteSpace($requested) -or ((& $gh.Source --version) -match ('(?m)^gh version ' + [regex]::Escape($requested) + '$'))) { exit 0 }; exit 1"
+    cmds:
+      - >-
+        powershell -NoProfile -ExecutionPolicy Bypass -Command "$v = '{{.VERSION}}'; if (Get-Command winget -ErrorAction SilentlyContinue) { Write-Host 'winget detected. Installing gh via winget...'; winget install --id GitHub.cli $(if ($v) { '--version', $v }) --accept-source-agreements --accept-package-agreements } elseif (Get-Command choco -ErrorAction SilentlyContinue) { Write-Host 'Chocolatey detected. Installing gh via choco...'; choco install gh -y $(if ($v) { '--version', $v }) } elseif (Get-Command scoop -ErrorAction SilentlyContinue) { Write-Host 'Scoop detected. Installing gh via scoop...'; scoop install $(if ($v) { \"gh@$v\" } else { 'gh' }) } else { $err = 'ERROR: No supported package manager detected (winget, choco, scoop).' + ' See https://cli.github.com/manual/installation'; Write-Error $err; exit 1 }"
+  _install:macos:brew:
+    run: once
+    internal: true
+    desc: Install gh on macOS using Homebrew
+    summary: Run `brew install gh` on macOS. Skipped if gh is already installed.
+    platforms: [darwin]
+    set: [errexit, nounset, pipefail]
+    status:
+      - >-
+        command -v gh >/dev/null 2>&1 && { [ -z "{{.VERSION}}" ] || gh --version | grep -Fqx "gh version {{.VERSION}}"; }
+    preconditions:
+      - sh: command -v brew >/dev/null 2>&1
+        msg: "Homebrew is required. Install it from https://brew.sh"
+    cmds:
+      - echo 'Installing gh via Homebrew...'
+      - brew install gh
+      - echo 'gh installed successfully.'
+  _install:windows:winget:
+    run: once
+    internal: true
+    desc: Install gh on Windows using winget
+    summary: Run `winget install --id GitHub.cli` on Windows. Skipped if gh is already installed.
+    platforms: [windows]
+    status:
+      - >-
+        powershell -NoProfile -ExecutionPolicy Bypass -Command "$gh = Get-Command gh -ErrorAction SilentlyContinue; $requested = '{{.VERSION}}'; if ($gh -and ([string]::IsNullOrWhiteSpace($requested) -or ((& $gh.Source --version) -match ('(?m)^gh version ' + [regex]::Escape($requested) + '$')))) { exit 0 }; exit 1"
+    preconditions:
+      - sh: >-
+          powershell -NoProfile -ExecutionPolicy Bypass -Command "if (Get-Command winget -ErrorAction SilentlyContinue) { exit 0 } else { exit 1 }"
+        msg: "winget is required. Update Windows or install App Installer from the Microsoft Store."
+    cmds:
+      - echo Installing gh via winget...
+      - winget install --id GitHub.cli --accept-source-agreements --accept-package-agreements
+      - echo gh installed successfully. Restart your terminal if gh is not in PATH.
+  _install:windows:choco:
+    run: once
+    internal: true
+    desc: Install gh on Windows using Chocolatey
+    summary: Run `choco install gh` on Windows. Skipped if gh is already installed.
+    platforms: [windows]
+    status:
+      - >-
+        powershell -NoProfile -ExecutionPolicy Bypass -Command "$gh = Get-Command gh -ErrorAction SilentlyContinue; $requested = '{{.VERSION}}'; if ($gh -and ([string]::IsNullOrWhiteSpace($requested) -or ((& $gh.Source --version) -match ('(?m)^gh version ' + [regex]::Escape($requested) + '$')))) { exit 0 }; exit 1"
+    preconditions:
+      - sh: >-
+          powershell -NoProfile -ExecutionPolicy Bypass -Command "if (Get-Command choco -ErrorAction SilentlyContinue) { exit 0 } else { exit 1 }"
+        msg: "Chocolatey is required. Install it from https://chocolatey.org"
+    cmds:
+      - echo Installing gh via Chocolatey...
+      - choco install gh -y
+      - echo gh installed successfully.
+  _install:windows:scoop:
+    run: once
+    internal: true
+    desc: Install gh on Windows using Scoop
+    summary: Run `scoop install gh` on Windows. Skipped if gh is already installed.
+    platforms: [windows]
+    status:
+      - >-
+        powershell -NoProfile -ExecutionPolicy Bypass -Command "$gh = Get-Command gh -ErrorAction SilentlyContinue; $requested = '{{.VERSION}}'; if ($gh -and ([string]::IsNullOrWhiteSpace($requested) -or ((& $gh.Source --version) -match ('(?m)^gh version ' + [regex]::Escape($requested) + '$')))) { exit 0 }; exit 1"
+    preconditions:
+      - sh: >-
+          powershell -NoProfile -ExecutionPolicy Bypass -Command "if (Get-Command scoop -ErrorAction SilentlyContinue) { exit 0 } else { exit 1 }"
+        msg: "Scoop is required. Install it from https://scoop.sh"
+    cmds:
+      - echo Installing gh via Scoop...
+      - scoop install gh
+      - echo gh installed successfully.
+  _install:linux:apt:
+    run: once
+    internal: true
+    desc: Install gh on Debian or Ubuntu using apt
+    summary: |
+      Add the official GitHub apt repository and GPG key, then install gh.
+      Skipped if gh is already installed. Requires sudo.
+    platforms: [linux]
+    set: [errexit, nounset, pipefail]
+    status:
+      - >-
+        command -v gh >/dev/null 2>&1 && { [ -z "{{.VERSION}}" ] || gh --version | grep -Fqx "gh version {{.VERSION}}"; }
+    preconditions:
+      - sh: command -v apt-get >/dev/null 2>&1
+        msg: "apt-get is required. This task supports Debian/Ubuntu-based systems only."
+    cmds:
+      - echo 'Installing gh via apt...'
+      - sudo apt-get update
+      - sudo apt-get install -y wget
+      - sudo mkdir -p -m 755 /etc/apt/keyrings
+      - >-
+        wget -qO- https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo tee /etc/apt/keyrings/githubcli-archive-keyring.gpg > /dev/null
+      - sudo chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg
+      - >-
+        _key="signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg"; echo "deb [arch=$(dpkg --print-architecture) $_key] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+      - sudo apt-get update
+      - sudo apt-get install -y gh
+      - echo 'gh installed successfully.'
+  _install:linux:dnf:
+    run: once
+    internal: true
+    desc: Install gh on Fedora or RHEL using dnf
+    summary: |
+      Add the official GitHub rpm repository and install gh via dnf.
+      Skipped if gh is already installed. Requires sudo.
+    platforms: [linux]
+    set: [errexit, nounset, pipefail]
+    status:
+      - >-
+        command -v gh >/dev/null 2>&1 && { [ -z "{{.VERSION}}" ] || gh --version | grep -Fqx "gh version {{.VERSION}}"; }
+    preconditions:
+      - sh: command -v dnf >/dev/null 2>&1
+        msg: "dnf is required. This task supports Fedora/RHEL-based systems only."
+    cmds:
+      - echo 'Installing gh via dnf...'
+      - sudo dnf install -y 'dnf-command(config-manager)'
+      - sudo dnf config-manager --add-repo https://cli.github.com/packages/rpm/gh-cli.repo
+      - sudo dnf install -y gh --repo gh-cli
+      - echo 'gh installed successfully.'
+  _install:linux:yum:
+    run: once
+    internal: true
+    desc: Install gh on CentOS or RHEL using yum
+    summary: |
+      Add the official GitHub rpm repository and install gh via yum.
+      Skipped if gh is already installed. Requires sudo.
+    platforms: [linux]
+    set: [errexit, nounset, pipefail]
+    status:
+      - >-
+        command -v gh >/dev/null 2>&1 && { [ -z "{{.VERSION}}" ] || gh --version | grep -Fqx "gh version {{.VERSION}}"; }
+    preconditions:
+      - sh: command -v yum >/dev/null 2>&1
+        msg: "yum is required. This task supports CentOS/RHEL-based systems only."
+    cmds:
+      - echo 'Installing gh via yum...'
+      - sudo yum-config-manager --add-repo https://cli.github.com/packages/rpm/gh-cli.repo
+      - sudo yum install -y gh
+      - echo 'gh installed successfully.'
+  _install:linux:pacman:
+    run: once
+    internal: true
+    desc: Install gh on Arch Linux using pacman
+    summary: |
+      Install gh via `sudo pacman -S github-cli`.
+      Skipped if gh is already installed. Requires sudo.
+    platforms: [linux]
+    set: [errexit, nounset, pipefail]
+    status:
+      - >-
+        command -v gh >/dev/null 2>&1 && { [ -z "{{.VERSION}}" ] || gh --version | grep -Fqx "gh version {{.VERSION}}"; }
+    preconditions:
+      - sh: command -v pacman >/dev/null 2>&1
+        msg: "pacman is required. This task supports Arch Linux only."
+    cmds:
+      - echo 'Installing gh via pacman...'
+      - sudo pacman -S --noconfirm github-cli
+      - echo 'gh installed successfully.'
+  _install:linux:zypper:
+    run: once
+    internal: true
+    desc: Install gh on openSUSE using zypper
+    summary: |
+      Add the official GitHub rpm repository and install gh via zypper.
+      Skipped if gh is already installed. Requires sudo.
+    platforms: [linux]
+    set: [errexit, nounset, pipefail]
+    status:
+      - >-
+        command -v gh >/dev/null 2>&1 && { [ -z "{{.VERSION}}" ] || gh --version | grep -Fqx "gh version {{.VERSION}}"; }
+    preconditions:
+      - sh: command -v zypper >/dev/null 2>&1
+        msg: "zypper is required. This task supports openSUSE only."
+    cmds:
+      - echo 'Installing gh via zypper...'
+      - sudo zypper addrepo https://cli.github.com/packages/rpm/gh-cli.repo
+      - sudo zypper ref
+      - sudo zypper install -y gh
+      - echo 'gh installed successfully.'
+  _install:linux:snap:
+    run: once
+    internal: true
+    desc: Install gh on Linux using snap
+    summary: |
+      Install gh via `sudo snap install gh`.
+      Skipped if gh is already installed. Requires snapd.
+    platforms: [linux]
+    set: [errexit, nounset, pipefail]
+    status:
+      - >-
+        command -v gh >/dev/null 2>&1 && { [ -z "{{.VERSION}}" ] || gh --version | grep -Fqx "gh version {{.VERSION}}"; }
+    preconditions:
+      - sh: command -v snap >/dev/null 2>&1
+        msg: "snapd is required. Install it for your distribution and try again."
+    cmds:
+      - echo 'Installing gh via snap...'
+      - sudo snap install gh
+      - echo 'gh installed successfully.'
+  _install:linux:brew:
+    run: once
+    internal: true
+    desc: Install gh on Linux using Homebrew
+    summary: |
+      Install gh via `brew install gh` on Linux.
+      Skipped if gh is already installed. Requires Homebrew for Linux.
+    platforms: [linux]
+    set: [errexit, nounset, pipefail]
+    status:
+      - >-
+        command -v gh >/dev/null 2>&1 && { [ -z "{{.VERSION}}" ] || gh --version | grep -Fqx "gh version {{.VERSION}}"; }
+    preconditions:
+      - sh: command -v brew >/dev/null 2>&1
+        msg: "Homebrew is required. Install it from https://brew.sh"
+    cmds:
+      - echo 'Installing gh via Homebrew on Linux...'
+      - brew install gh
+      - echo 'gh installed successfully.'
+  _upgrade:auto:unix:
+    run: once
+    internal: true
+    desc: Auto-detect package manager and upgrade gh on macOS or Linux
+    summary: |
+      Detect the OS and available package manager, then upgrade gh to the
+      latest version. On macOS uses brew. On Linux checks apt, dnf, snap,
+      and brew in order and uses the first one found.
+    platforms: [linux, darwin]
+    set: [errexit, nounset, pipefail]
+    cmds:
+      - |
+        OS="$(uname -s)"
+        if [ "$OS" = "Darwin" ]; then
+          brew upgrade gh
+        elif [ "$OS" = "Linux" ]; then
+          if command -v apt-get >/dev/null 2>&1; then
+            sudo apt-get install --only-upgrade -y gh
+          elif command -v dnf >/dev/null 2>&1; then
+            sudo dnf upgrade -y gh
+          elif command -v snap >/dev/null 2>&1 && snap list gh >/dev/null 2>&1; then
+            sudo snap refresh gh
+          elif command -v brew >/dev/null 2>&1; then
+            brew upgrade gh
+          else
+            echo 'ERROR: Could not detect a supported package manager for upgrade.'
+            echo 'See https://cli.github.com/manual/installation'
+            exit 1
+          fi
+        fi
+  _upgrade:auto:windows:
+    run: once
+    internal: true
+    desc: Auto-detect package manager and upgrade gh on Windows
+    summary: |
+      Detect available package managers on Windows and upgrade gh to the latest
+      version. Prefers winget, then Chocolatey, then Scoop.
+    platforms: [windows]
+    cmds:
+      - >-
+        powershell -NoProfile -ExecutionPolicy Bypass -Command "if (Get-Command winget -ErrorAction SilentlyContinue) { winget upgrade --id GitHub.cli --accept-source-agreements --accept-package-agreements } elseif (Get-Command choco -ErrorAction SilentlyContinue) { choco upgrade gh -y } elseif (Get-Command scoop -ErrorAction SilentlyContinue) { scoop update gh } else { Write-Error 'ERROR: No supported package manager detected for upgrade.'; exit 1 }"
+  _upgrade:macos:brew:
+    run: once
+    internal: true
+    desc: Upgrade gh on macOS using Homebrew
+    summary: Run `brew upgrade gh` on macOS.
+    platforms: [darwin]
+    set: [errexit, nounset, pipefail]
+    preconditions:
+      - sh: command -v brew >/dev/null 2>&1
+        msg: "Homebrew is required. Install it from https://brew.sh"
+    cmds:
+      - echo 'Upgrading gh via Homebrew...'
+      - brew upgrade gh
+  _upgrade:windows:winget:
+    run: once
+    internal: true
+    desc: Upgrade gh on Windows using winget
+    summary: Run `winget upgrade --id GitHub.cli` on Windows.
+    platforms: [windows]
+    preconditions:
+      - sh: >-
+          powershell -NoProfile -ExecutionPolicy Bypass -Command "if (Get-Command winget -ErrorAction SilentlyContinue) { exit 0 } else { exit 1 }"
+        msg: "winget is required."
+    cmds:
+      - echo Upgrading gh via winget...
+      - winget upgrade --id GitHub.cli --accept-source-agreements --accept-package-agreements
+  _upgrade:windows:choco:
+    run: once
+    internal: true
+    desc: Upgrade gh on Windows using Chocolatey
+    summary: Run `choco upgrade gh` on Windows.
+    platforms: [windows]
+    preconditions:
+      - sh: >-
+          powershell -NoProfile -ExecutionPolicy Bypass -Command "if (Get-Command choco -ErrorAction SilentlyContinue) { exit 0 } else { exit 1 }"
+        msg: "Chocolatey is required."
+    cmds:
+      - echo Upgrading gh via Chocolatey...
+      - choco upgrade gh -y
+  _upgrade:windows:scoop:
+    run: once
+    internal: true
+    desc: Upgrade gh on Windows using Scoop
+    summary: Run `scoop update gh` on Windows.
+    platforms: [windows]
+    preconditions:
+      - sh: >-
+          powershell -NoProfile -ExecutionPolicy Bypass -Command "if (Get-Command scoop -ErrorAction SilentlyContinue) { exit 0 } else { exit 1 }"
+        msg: "Scoop is required."
+    cmds:
+      - echo Upgrading gh via Scoop...
+      - scoop update gh
+  _upgrade:linux:apt:
+    run: once
+    internal: true
+    desc: Upgrade gh on Debian or Ubuntu using apt
+    summary: Run `sudo apt-get install --only-upgrade gh` to upgrade gh on Debian/Ubuntu.
+    platforms: [linux]
+    set: [errexit, nounset, pipefail]
+    preconditions:
+      - sh: command -v apt-get >/dev/null 2>&1
+        msg: "apt-get is required."
+    cmds:
+      - echo 'Upgrading gh via apt...'
+      - sudo apt-get install --only-upgrade -y gh
+  _upgrade:linux:dnf:
+    run: once
+    internal: true
+    desc: Upgrade gh on Fedora or RHEL using dnf
+    summary: Run `sudo dnf upgrade gh` to upgrade gh on Fedora/RHEL.
+    platforms: [linux]
+    set: [errexit, nounset, pipefail]
+    preconditions:
+      - sh: command -v dnf >/dev/null 2>&1
+        msg: "dnf is required."
+    cmds:
+      - echo 'Upgrading gh via dnf...'
+      - sudo dnf upgrade -y gh
+  _upgrade:linux:snap:
+    run: once
+    internal: true
+    desc: Upgrade gh on Linux using snap
+    summary: Run `sudo snap refresh gh` to upgrade gh via snap.
+    platforms: [linux]
+    set: [errexit, nounset, pipefail]
+    preconditions:
+      - sh: command -v snap >/dev/null 2>&1
+        msg: "snapd is required."
+    cmds:
+      - echo 'Upgrading gh via snap...'
+      - sudo snap refresh gh
+  _uninstall:auto:unix:
+    run: once
+    internal: true
+    desc: Auto-detect package manager and uninstall gh on macOS or Linux
+    summary: |
+      Detect the OS and available package managers, then remove gh using the
+      matching uninstall command. On macOS uses Homebrew. On Linux checks
+      apt, dnf, yum, pacman, zypper, snap, and brew in order.
+    platforms: [linux, darwin]
+    set: [errexit, nounset, pipefail]
+    status:
+      - "! command -v gh >/dev/null 2>&1"
+    cmds:
+      - |
+        OS="$(uname -s)"
+        if [ "$OS" = "Darwin" ]; then
+          if command -v brew >/dev/null 2>&1; then
+            echo 'Removing gh via Homebrew...'
+            brew uninstall gh
+          else
+            echo 'ERROR: Homebrew is required to remove gh on macOS.'
+            exit 1
+          fi
+        elif [ "$OS" = "Linux" ]; then
+          if command -v apt-get >/dev/null 2>&1; then
+            echo 'Removing gh via apt...'
+            sudo apt-get remove -y gh
+          elif command -v dnf >/dev/null 2>&1; then
+            echo 'Removing gh via dnf...'
+            sudo dnf remove -y gh
+          elif command -v yum >/dev/null 2>&1; then
+            echo 'Removing gh via yum...'
+            sudo yum remove -y gh
+          elif command -v pacman >/dev/null 2>&1; then
+            echo 'Removing gh via pacman...'
+            sudo pacman -R --noconfirm github-cli
+          elif command -v zypper >/dev/null 2>&1; then
+            echo 'Removing gh via zypper...'
+            sudo zypper remove -y gh
+          elif command -v snap >/dev/null 2>&1; then
+            echo 'Removing gh via snap...'
+            sudo snap remove gh
+          elif command -v brew >/dev/null 2>&1; then
+            echo 'Removing gh via Homebrew...'
+            brew uninstall gh
+          else
+            echo 'ERROR: No supported package manager detected.'
+            exit 1
+          fi
+        else
+          echo "ERROR: Unsupported OS: $OS"
+          exit 1
+        fi
+        echo 'gh removed.'
+  _uninstall:auto:windows:
+    run: once
+    internal: true
+    desc: Auto-detect package manager and uninstall gh on Windows
+    summary: |
+      Detect available package managers on Windows and remove gh using the
+      matching uninstall command. Prefers winget, then Chocolatey, then Scoop.
+    platforms: [windows]
+    status:
+      - >-
+        powershell -NoProfile -ExecutionPolicy Bypass -Command "if (Get-Command gh -ErrorAction SilentlyContinue) { exit 1 } else { exit 0 }"
+    cmds:
+      - >-
+        powershell -NoProfile -ExecutionPolicy Bypass -Command "if (Get-Command winget -ErrorAction SilentlyContinue) { Write-Host 'winget detected. Removing gh via winget...'; winget uninstall --id GitHub.cli } elseif (Get-Command choco -ErrorAction SilentlyContinue) { Write-Host 'Chocolatey detected. Removing gh via choco...'; choco uninstall gh -y } elseif (Get-Command scoop -ErrorAction SilentlyContinue) { Write-Host 'Scoop detected. Removing gh via scoop...'; scoop uninstall gh } else { Write-Error 'ERROR: No supported package manager detected (winget, choco, scoop).'; exit 1 }"
+  _uninstall:macos:brew:
+    run: once
+    internal: true
+    desc: Uninstall gh on macOS using Homebrew
+    summary: Run `brew uninstall gh` on macOS.
+    platforms: [darwin]
+    set: [errexit, nounset, pipefail]
+    preconditions:
+      - sh: command -v brew >/dev/null 2>&1
+        msg: "Homebrew is required."
+    cmds:
+      - echo 'Uninstalling gh via Homebrew...'
+      - brew uninstall gh
+      - echo 'gh uninstalled.'
+  _uninstall:windows:winget:
+    run: once
+    internal: true
+    desc: Uninstall gh on Windows using winget
+    summary: Run `winget uninstall --id GitHub.cli` on Windows.
+    platforms: [windows]
+    preconditions:
+      - sh: >-
+          powershell -NoProfile -ExecutionPolicy Bypass -Command "if (Get-Command winget -ErrorAction SilentlyContinue) { exit 0 } else { exit 1 }"
+        msg: "winget is required."
+    cmds:
+      - echo Uninstalling gh via winget...
+      - winget uninstall --id GitHub.cli
+      - echo gh uninstalled.
+  _uninstall:windows:choco:
+    run: once
+    internal: true
+    desc: Uninstall gh on Windows using Chocolatey
+    summary: Run `choco uninstall gh` on Windows.
+    platforms: [windows]
+    preconditions:
+      - sh: >-
+          powershell -NoProfile -ExecutionPolicy Bypass -Command "if (Get-Command choco -ErrorAction SilentlyContinue) { exit 0 } else { exit 1 }"
+        msg: "Chocolatey is required."
+    cmds:
+      - echo Uninstalling gh via Chocolatey...
+      - choco uninstall gh -y
+      - echo gh uninstalled.
+  _uninstall:windows:scoop:
+    run: once
+    internal: true
+    desc: Uninstall gh on Windows using Scoop
+    summary: Run `scoop uninstall gh` on Windows.
+    platforms: [windows]
+    preconditions:
+      - sh: >-
+          powershell -NoProfile -ExecutionPolicy Bypass -Command "if (Get-Command scoop -ErrorAction SilentlyContinue) { exit 0 } else { exit 1 }"
+        msg: "Scoop is required."
+    cmds:
+      - echo Uninstalling gh via Scoop...
+      - scoop uninstall gh
+      - echo gh uninstalled.
+  _version:unix:
+    run: once
+    internal: true
+    desc: Show the gh version on macOS or Linux
+    summary: Print the installed gh version string on macOS or Linux.
+    platforms: [linux, darwin]
+    set: [errexit, nounset, pipefail]
+    cmds:
+      - gh --version
+  _version:windows:
+    run: once
+    internal: true
+    desc: Show the gh version on Windows
+    summary: Print the installed gh version string on Windows.
+    platforms: [windows]
+    cmds:
+      - gh --version
+  _doctor:unix:
+    run: once
+    internal: true
+    desc: Run gh doctor on macOS or Linux
+    summary: Run `gh doctor` to check configuration, auth, and connectivity on macOS or Linux.
+    platforms: [linux, darwin]
+    set: [errexit, nounset, pipefail]
+    cmds:
+      - gh doctor
+  _doctor:windows:
+    run: once
+    internal: true
+    desc: Run gh doctor on Windows
+    summary: Run `gh doctor` to check configuration, auth, and connectivity on Windows.
+    platforms: [windows]
+    cmds:
+      - gh doctor
+  _which:unix:
+    run: once
+    internal: true
+    desc: Show the path to the gh binary on macOS or Linux
+    summary: Print the filesystem path of the gh binary on macOS or Linux.
+    platforms: [linux, darwin]
+    set: [errexit, nounset, pipefail]
+    cmds:
+      - command -v gh
+  _which:windows:
+    run: once
+    internal: true
+    desc: Show the path to the gh binary on Windows
+    summary: Print the filesystem path of the gh binary on Windows.
+    platforms: [windows]
+    cmds:
+      - powershell -NoProfile -ExecutionPolicy Bypass -Command "(Get-Command gh).Source"
+  _verify:unix:
+    run: once
+    internal: true
+    desc: Verify gh installation and auth status on macOS or Linux
+    summary: |
+      Confirm gh is installed and gh --version works, then report the current
+      authentication status. Prints a clear message if not authenticated.
+    platforms: [linux, darwin]
+    set: [errexit, nounset, pipefail]
+    cmds:
+      - |
+        echo '=== gh binary ==='
+        command -v gh
+        echo ''
+        echo '=== gh version ==='
+        gh --version
+        echo ''
+        echo '=== gh auth status ==='
+        gh auth status || echo 'Not authenticated. Run: task auth:login'
+  _verify:windows:
+    run: once
+    internal: true
+    desc: Verify gh installation and auth status on Windows
+    summary: |
+      Confirm gh is installed and gh --version works on Windows, then report
+      the current authentication status.
+    platforms: [windows]
+    cmds:
+      - >-
+        powershell -NoProfile -ExecutionPolicy Bypass -Command "Write-Host '=== gh binary ==='; (Get-Command gh).Source; Write-Host ''; Write-Host '=== gh version ==='; gh --version; Write-Host ''; Write-Host '=== gh auth status ==='; try { gh auth status } catch { Write-Host 'Not authenticated. Run: task auth:login' }"
+  _secret:set:unix:
+    run: once
+    internal: true
+    desc: Set a GitHub Actions secret on macOS or Linux via stdin
+    summary: |
+      Pipe the secret value via stdin to avoid exposure in the process list.
+      Reads SECRET_VALUE from the task environment.
+    platforms: [linux, darwin]
+    set: [errexit, nounset, pipefail]
+    env:
+      GH_SECRET_VALUE: "{{.SECRET_VALUE}}"
+    cmds:
+      - >-
+        printf '%s' "$GH_SECRET_VALUE" | gh secret set {{.SECRET_NAME}} --body - {{if .ENVIRONMENT}}--env {{.ENVIRONMENT}}{{end}}
+  _secret:set:windows:
+    run: once
+    internal: true
+    desc: Set a GitHub Actions secret on Windows via stdin
+    summary: |
+      Pipe the secret value via PowerShell stdin to avoid exposure in the
+      process list. Reads SECRET_VALUE from the task environment.
+    platforms: [windows]
+    env:
+      GH_SECRET_VALUE: "{{.SECRET_VALUE}}"
+    cmds:
+      - >-
+        powershell -NoProfile -ExecutionPolicy Bypass -Command "$env:GH_SECRET_VALUE | gh secret set {{.SECRET_NAME}} --body - {{if .ENVIRONMENT}}--env {{.ENVIRONMENT}}{{end}}"

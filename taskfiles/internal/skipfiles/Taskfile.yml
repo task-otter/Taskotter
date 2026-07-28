@@ -1,0 +1,363 @@
+---
+version: "3.5"
+silent: true
+vars:
+  UNIX_GLOB_HELPERS: |
+    glob_to_regex() {
+      local glob="${1//\\//}" regex='^' char next
+      local index=0 length=${#glob}
+
+      while ((index < length)); do
+        char="${glob:index:1}"
+        next="${glob:index+1:1}"
+
+        case "$char" in
+          '*')
+            if [[ "$next" == '*' ]]; then
+              if [[ "${glob:index+2:1}" == '/' ]]; then
+                regex+='(.*/)?'
+                ((index += 3))
+                continue
+              fi
+              regex+='.*'
+              ((index += 2))
+              continue
+            fi
+            regex+='[^/]*'
+            ;;
+          '?') regex+='[^/]' ;;
+          '.'|'+'|'('|')'|'['|']'|'{'|'}'|'^'|'$'|'|') regex+="\\$char" ;;
+          '\\') regex+='/' ;;
+          *) regex+="$char" ;;
+        esac
+        ((index += 1))
+      done
+
+      printf '%s$' "$regex"
+    }
+
+    normalize_path() {
+      local path="${1//\\//}"
+      local working_dir="${2%/}"
+
+      path="${path#./}"
+      if [[ "$path" == "$working_dir/"* ]]; then
+        path="${path#"$working_dir/"}"
+      fi
+      printf '%s' "$path"
+    }
+  POWERSHELL_GLOB_HELPERS: |
+    function ConvertTo-SkipfilesRegex([string]$Pattern) {
+      $normalizedPattern = $Pattern.Replace("\", "/")
+      $builder = [System.Text.StringBuilder]::new("^")
+
+      for ($index = 0; $index -lt $normalizedPattern.Length; $index++) {
+        $character = $normalizedPattern[$index]
+        if ($character -eq "*") {
+          if (($index + 1) -lt $normalizedPattern.Length -and $normalizedPattern[$index + 1] -eq "*") {
+            if (($index + 2) -lt $normalizedPattern.Length -and $normalizedPattern[$index + 2] -eq "/") {
+              [void]$builder.Append("(?:.*/)?")
+              $index += 2
+            } else {
+              [void]$builder.Append(".*")
+              $index += 1
+            }
+          } else {
+            [void]$builder.Append("[^/]*")
+          }
+        } elseif ($character -eq "?") {
+          [void]$builder.Append("[^/]")
+        } else {
+          [void]$builder.Append([regex]::Escape([string]$character))
+        }
+      }
+
+      [void]$builder.Append("$")
+      return $builder.ToString()
+    }
+
+    function ConvertTo-SkipfilesRelativePath([string]$Path, [string]$WorkingDirectory) {
+      $normalized = $Path.Replace("\", "/")
+      if ($normalized.StartsWith("./")) {
+        $normalized = $normalized.Substring(2)
+      }
+      if ($normalized.StartsWith($WorkingDirectory + "/", [System.StringComparison]::OrdinalIgnoreCase)) {
+        $normalized = $normalized.Substring($WorkingDirectory.Length + 1)
+      }
+      return $normalized
+    }
+tasks:
+  filter:
+    desc: Filter stdin paths by SKIPFILES_PATTERN.
+    dir: "{{.USER_WORKING_DIR}}"
+    vars:
+      SKIPFILES_PATTERN: '{{default "" .SKIPFILES_PATTERN}}'
+      SKIPFILES_MATCHING: '{{default "false" .SKIPFILES_MATCHING}}'
+    cmds:
+      - task: _filter:empty
+        vars:
+          SKIPFILES_MATCHING: "{{.SKIPFILES_MATCHING}}"
+        if: '{{eq .SKIPFILES_PATTERN ""}}'
+      - task: _filter:unix
+        vars:
+          SKIPFILES_PATTERN: "{{.SKIPFILES_PATTERN}}"
+          SKIPFILES_MATCHING: "{{.SKIPFILES_MATCHING}}"
+        if: '{{ne .SKIPFILES_PATTERN ""}}'
+      - task: _filter:windows
+        vars:
+          SKIPFILES_PATTERN: "{{.SKIPFILES_PATTERN}}"
+          SKIPFILES_MATCHING: "{{.SKIPFILES_MATCHING}}"
+        if: '{{ne .SKIPFILES_PATTERN ""}}'
+  go-packages:
+    desc: Print Go import paths whose files do not match SKIPFILES_PATTERN.
+    dir: "{{.USER_WORKING_DIR}}"
+    vars:
+      SKIPFILES_PATTERN: '{{default "" .SKIPFILES_PATTERN}}'
+      SKIPFILES_GO_TARGETS: '{{default "./..." .SKIPFILES_GO_TARGETS}}'
+    cmds:
+      - task: _go-packages:all
+        vars:
+          SKIPFILES_GO_TARGETS: "{{.SKIPFILES_GO_TARGETS}}"
+        if: '{{eq .SKIPFILES_PATTERN ""}}'
+      - task: _go-packages:unix
+        vars:
+          SKIPFILES_PATTERN: "{{.SKIPFILES_PATTERN}}"
+          SKIPFILES_GO_TARGETS: "{{.SKIPFILES_GO_TARGETS}}"
+        if: '{{ne .SKIPFILES_PATTERN ""}}'
+      - task: _go-packages:windows
+        vars:
+          SKIPFILES_PATTERN: "{{.SKIPFILES_PATTERN}}"
+          SKIPFILES_GO_TARGETS: "{{.SKIPFILES_GO_TARGETS}}"
+        if: '{{ne .SKIPFILES_PATTERN ""}}'
+  _filter:empty:
+    internal: true
+    dir: "{{.USER_WORKING_DIR}}"
+    env:
+      SKIPFILES_MATCHING: "{{.SKIPFILES_MATCHING}}"
+    cmds:
+      - cmd: |
+          if [[ "$SKIPFILES_MATCHING" == "true" ]]; then
+            cat >/dev/null
+          else
+            cat
+          fi
+        platforms: [linux, darwin]
+      - cmd: |
+          powershell -NoProfile -ExecutionPolicy Bypass -Command '
+            $matching = $env:SKIPFILES_MATCHING -eq "true"
+            $inputText = [Console]::In.ReadToEnd()
+            if ($matching) { exit 0 }
+
+            foreach ($item in ($inputText -split "`r?`n")) {
+              if (-not [string]::IsNullOrWhiteSpace($item)) {
+                [Console]::Out.WriteLine($item)
+              }
+            }
+          '
+        platforms: [windows]
+  _filter:unix:
+    internal: true
+    dir: "{{.USER_WORKING_DIR}}"
+    platforms: [linux, darwin]
+    set: [errexit, nounset, pipefail]
+    env:
+      SKIPFILES_PATTERN: "{{.SKIPFILES_PATTERN}}"
+      SKIPFILES_MATCHING: "{{.SKIPFILES_MATCHING}}"
+    cmd: |
+      {{.UNIX_GLOB_HELPERS}}
+
+      pattern="$SKIPFILES_PATTERN"
+      regex="$(glob_to_regex "$pattern")"
+      working_dir="$(pwd -P)"
+      matching=false
+      [[ "$SKIPFILES_MATCHING" == "true" ]] && matching=true
+
+      # Task runs commands through mvdan/sh, whose read builtin has no -d flag,
+      # so translate the NUL stream into lines before iterating over it.
+      while IFS= read -r path; do
+        [[ -n "$path" ]] || continue
+
+        normalized="$(normalize_path "$path" "$working_dir")"
+        is_match=false
+        if [[ "$normalized" =~ $regex ]]; then
+          is_match=true
+        fi
+        if [[ "$matching" == "$is_match" ]]; then
+          printf '%s\0' "$path"
+        fi
+      done < <(tr '\0' '\n')
+  _filter:windows:
+    internal: true
+    dir: "{{.USER_WORKING_DIR}}"
+    platforms: [windows]
+    env:
+      SKIPFILES_PATTERN: "{{.SKIPFILES_PATTERN}}"
+      SKIPFILES_MATCHING: "{{.SKIPFILES_MATCHING}}"
+    cmd: |
+      powershell -NoProfile -ExecutionPolicy Bypass -Command '
+        $ErrorActionPreference = "Stop"
+        Set-StrictMode -Version Latest
+        {{.POWERSHELL_GLOB_HELPERS}}
+
+        $pattern = [string]$env:SKIPFILES_PATTERN
+        $matching = $env:SKIPFILES_MATCHING -eq "true"
+        $matcher = [regex]::new((ConvertTo-SkipfilesRegex $pattern))
+        $workingDirectory = (Get-Location).Path.Replace("\", "/").TrimEnd("/")
+        $inputText = [Console]::In.ReadToEnd()
+
+        foreach ($item in ($inputText -split "`r?`n")) {
+          if ([string]::IsNullOrWhiteSpace($item)) { continue }
+
+          $normalized = ConvertTo-SkipfilesRelativePath $item $workingDirectory
+          $isMatch = $matcher.IsMatch($normalized)
+          if ($matching -eq $isMatch) {
+            [Console]::Out.WriteLine($item)
+          }
+        }
+      '
+  _go-packages:all:
+    internal: true
+    dir: "{{.USER_WORKING_DIR}}"
+    env:
+      SKIPFILES_GO_TARGETS: "{{.SKIPFILES_GO_TARGETS}}"
+    cmds:
+      - cmd: |
+          set -euo pipefail
+          command -v go >/dev/null 2>&1 || {
+            printf '%s\n' 'The go executable is required by go-packages.' >&2
+            exit 1
+          }
+
+          targets="${SKIPFILES_GO_TARGETS:-./...}"
+          # Intentional word splitting preserves the public interface.
+          # shellcheck disable=SC2086
+          go list $targets | while IFS= read -r import_path; do
+            printf '%s\0' "$import_path"
+          done
+        platforms: [linux, darwin]
+      - cmd: |
+          powershell -NoProfile -ExecutionPolicy Bypass -Command '
+            $ErrorActionPreference = "Stop"
+            if (-not (Get-Command go -ErrorAction SilentlyContinue)) {
+              throw "The go executable is required by go-packages."
+            }
+
+            $targets = @(([string]$env:SKIPFILES_GO_TARGETS).Split(
+              " ", [System.StringSplitOptions]::RemoveEmptyEntries
+            ))
+            if ($targets.Count -eq 0) { $targets = @("./...") }
+
+            & go list @targets
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          '
+        platforms: [windows]
+  _go-packages:unix:
+    internal: true
+    dir: "{{.USER_WORKING_DIR}}"
+    platforms: [linux, darwin]
+    set: [errexit, nounset, pipefail]
+    env:
+      SKIPFILES_PATTERN: "{{.SKIPFILES_PATTERN}}"
+      SKIPFILES_GO_TARGETS: "{{.SKIPFILES_GO_TARGETS}}"
+    preconditions:
+      - sh: command -v go >/dev/null 2>&1
+        msg: The go executable is required by go-packages.
+    cmd: |
+      {{.UNIX_GLOB_HELPERS}}
+
+      pattern="$SKIPFILES_PATTERN"
+      targets="${SKIPFILES_GO_TARGETS:-./...}"
+      regex="$(glob_to_regex "$pattern")"
+      working_dir="$(pwd -P)"
+
+      open='{'
+      open="${open}{"
+      close='}'
+      close="${close}}"
+      tab="${open}\"\\t\"${close}"
+      go_template="${open}.ImportPath${close}${tab}"
+      for field in GoFiles CgoFiles TestGoFiles XTestGoFiles; do
+        go_template+="${open}range .${field}${close}"
+        go_template+="${open}\$.Dir${close}/${open}.${close}${tab}"
+        go_template+="${open}end${close}"
+      done
+
+      # Intentional word splitting preserves the public interface.
+      # shellcheck disable=SC2086
+      go list -f "$go_template" $targets |
+        while IFS=$'\t' read -r -a fields; do
+          ((${#fields[@]} > 0)) || continue
+
+          import_path="${fields[0]}"
+          matched=false
+          for path in "${fields[@]:1}"; do
+            normalized="$(normalize_path "$path" "$working_dir")"
+            if [[ "$normalized" =~ $regex ]]; then
+              matched=true
+              break
+            fi
+          done
+
+          if [[ "$matched" == false ]]; then
+            printf '%s\0' "$import_path"
+          fi
+        done
+  _go-packages:windows:
+    internal: true
+    dir: "{{.USER_WORKING_DIR}}"
+    platforms: [windows]
+    env:
+      SKIPFILES_PATTERN: "{{.SKIPFILES_PATTERN}}"
+      SKIPFILES_GO_TARGETS: "{{.SKIPFILES_GO_TARGETS}}"
+    cmd: |
+      powershell -NoProfile -ExecutionPolicy Bypass -Command '
+        $ErrorActionPreference = "Stop"
+        Set-StrictMode -Version Latest
+        {{.POWERSHELL_GLOB_HELPERS}}
+
+        if (-not (Get-Command go -ErrorAction SilentlyContinue)) {
+          throw "The go executable is required by go-packages."
+        }
+
+        $pattern = [string]$env:SKIPFILES_PATTERN
+        $targets = @(([string]$env:SKIPFILES_GO_TARGETS).Split(
+          " ", [System.StringSplitOptions]::RemoveEmptyEntries
+        ))
+        if ($targets.Count -eq 0) { $targets = @("./...") }
+
+        $matcher = [regex]::new((ConvertTo-SkipfilesRegex $pattern))
+        $open = [string][char]123 + [char]123
+        $close = [string][char]125 + [char]125
+        $quote = [string][char]34
+        $tab = $open + $quote + "\t" + $quote + $close
+        $goTemplate = $open + ".ImportPath" + $close + $tab
+        foreach ($field in @("GoFiles", "CgoFiles", "TestGoFiles", "XTestGoFiles")) {
+          $goTemplate += $open + "range ." + $field + $close
+          $goTemplate += $open + "$.Dir" + $close + "/" + $open + "." + $close + $tab
+          $goTemplate += $open + "end" + $close
+        }
+
+        $workingDirectory = (Get-Location).Path.Replace("\", "/").TrimEnd("/")
+        $rows = @(& go list -f $goTemplate @targets)
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+        foreach ($row in $rows) {
+          $fields = @($row.Split("`t", [System.StringSplitOptions]::RemoveEmptyEntries))
+          if ($fields.Count -eq 0) { continue }
+
+          $matched = $false
+          if ($fields.Count -gt 1) {
+            foreach ($path in $fields[1..($fields.Count - 1)]) {
+              $normalized = ConvertTo-SkipfilesRelativePath $path $workingDirectory
+              if ($matcher.IsMatch($normalized)) {
+                $matched = $true
+                break
+              }
+            }
+          }
+
+          if (-not $matched) {
+            [Console]::Out.WriteLine($fields[0])
+          }
+        }
+      '

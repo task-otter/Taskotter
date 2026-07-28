@@ -62,3 +62,14 @@ jobs:
         run: go install github.com/go-task/task/v3/cmd/task@v3.52.0
       - name: Run CI
         run: task ci
+      - name: Run tests with coverage
+        run: task taskotter:go:coverage
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v7
+        with:
+          files: ./coverage.out
+          flags: unittests
+          name: go-coverage
+          disable_search: false
+          fail_ci_if_error: true
+          verbose: true

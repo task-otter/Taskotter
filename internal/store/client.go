@@ -352,9 +352,7 @@ func (c *Client) getJSON(ctx context.Context, path string, payload any) error {
 }
 
 func (c *Client) getDefaultBranch(ctx context.Context) (string, error) {
-	var payload struct {
-		DefaultBranch string `json:"default_branch"`
-	}
+	payload := make(map[string]json.RawMessage)
 
 	path := fmt.Sprintf("/repos/%s/%s", storeOwner, storeRepo)
 
@@ -363,7 +361,13 @@ func (c *Client) getDefaultBranch(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("fetch store repository metadata: %w", err)
 	}
 
-	defaultBranch := payload.DefaultBranch
+	var defaultBranch string
+
+	err = json.Unmarshal(payload["default_branch"], &defaultBranch)
+	if err != nil {
+		return "", fmt.Errorf("decode default branch: %w", err)
+	}
+
 	if defaultBranch == "" {
 		return "", errDefaultBranchEmpty
 	}

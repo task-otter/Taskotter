@@ -68,11 +68,28 @@ jobs:
       - name: Run tests with coverage
         run: task taskotter:go:coverage
       - name: Upload coverage to Codecov
+        if: ${{ !cancelled() }}
         uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
         with:
           use_oidc: true
           files: ./coverage.out
+          report_type: coverage
+          name: coverage
           disable_search: false
           flags: unittests
+          fail_ci_if_error: true
+          verbose: true
+      - name: Run tests with junit
+        run: task taskotter:go:test:junit
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
+        with:
+          use_oidc: true
+          report_type: test_results
+          files: ./junit.xml
+          disable_search: false
+          flags: unittests
+          name: go-test-results
           fail_ci_if_error: true
           verbose: true

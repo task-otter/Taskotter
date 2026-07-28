@@ -104,6 +104,47 @@ func buildTarGzWithMode(t *testing.T, name string, content []byte, mode int64) [
 	return buf.Bytes()
 }
 
+func buildTarGzWithHeaders(t *testing.T, headers []*tar.Header) []byte {
+	t.Helper()
+
+	var buf bytes.Buffer
+	gzipWriter := gzip.NewWriter(&buf)
+	tarWriter := tar.NewWriter(gzipWriter)
+
+	for _, header := range headers {
+		if err := tarWriter.WriteHeader(header); err != nil {
+			t.Fatal(err)
+		}
+
+		if header.Typeflag == tar.TypeReg && header.Size > 0 {
+			chunk := bytes.Repeat([]byte("x"), 32*1024)
+			remaining := header.Size
+			for remaining > 0 {
+				writeSize := int64(len(chunk))
+				if remaining < writeSize {
+					writeSize = remaining
+				}
+
+				if _, err := tarWriter.Write(chunk[:writeSize]); err != nil {
+					t.Fatal(err)
+				}
+
+				remaining -= writeSize
+			}
+		}
+	}
+
+	if err := tarWriter.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := gzipWriter.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	return buf.Bytes()
+}
+
 func TestExtractStripsSetuidMode(t *testing.T) {
 	t.Parallel()
 
@@ -158,6 +199,80 @@ func TestExtractValidArchive(t *testing.T) {
 	_, err = os.Stat(filepath.Join(dest, "taskfiles/go/Taskfile.yml"))
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestRejectInvalidGzip(t *testing.T) {
+	t.Parallel()
+
+	_, err := archive.ExtractTarGz(strings.NewReader("not gzip"), t.TempDir())
+	if err == nil {
+		t.Fatal("expected invalid gzip error")
+	}
+}
+
+func TestExtractDirectoryEntry(t *testing.T) {
+	t.Parallel()
+
+	data := buildTarGzWithHeaders(t, []*tar.Header{
+		{Name: "repo-main/", Mode: 0o755, Typeflag: tar.TypeDir},
+		{Name: "repo-main/taskfiles", Mode: 0o755, Typeflag: tar.TypeDir},
+		regularTarHeader("repo-main/taskfiles/go/Taskfile.yml", int64(len("version: \"3\"\n"))),
+	})
+	dest := t.TempDir()
+
+	_, err := archive.ExtractTarGz(bytes.NewReader(data), dest)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	info, err := os.Stat(filepath.Join(dest, "taskfiles"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !info.IsDir() {
+		t.Fatal("taskfiles should be a directory")
+	}
+}
+
+func TestRejectBackslashPath(t *testing.T) {
+	t.Parallel()
+
+	data := buildTarGz(t, map[string][]byte{
+		`repo-main\taskfiles\go\Taskfile.yml`: []byte("nope"),
+	})
+	dest := t.TempDir()
+
+	_, err := archive.ExtractTarGz(bytes.NewReader(data), dest)
+	if err == nil {
+		t.Fatal("expected backslash path rejection")
+	}
+}
+
+func TestRejectUnsupportedEntryType(t *testing.T) {
+	t.Parallel()
+
+	data := buildTarGzWithHeaders(t, []*tar.Header{
+		{Name: "repo-main/device", Mode: 0o644, Typeflag: tar.TypeChar},
+	})
+
+	_, err := archive.ExtractTarGz(bytes.NewReader(data), t.TempDir())
+	if err == nil {
+		t.Fatal("expected unsupported entry type error")
+	}
+}
+
+func TestRejectFileLargerThanLimit(t *testing.T) {
+	t.Parallel()
+
+	data := buildTarGzWithHeaders(t, []*tar.Header{
+		regularTarHeader("repo-main/huge.bin", archive.MaxFileBytes+1),
+	})
+
+	_, err := archive.ExtractTarGz(bytes.NewReader(data), t.TempDir())
+	if err == nil {
+		t.Fatal("expected file size limit error")
 	}
 }
 

@@ -1,0 +1,5 @@
+---
+go: []
+pnpm/fnm: []
+eslint/node/fnm/pnpm: [pnpm/fnm]
+internal/skipfiles: []

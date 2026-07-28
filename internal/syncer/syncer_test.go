@@ -63,7 +63,6 @@ func TestBuildPlanInitialSync(t *testing.T) {
 
 	workspace := t.TempDir()
 	writeRootTaskfile(t, workspace)
-	snap := fixtureStore(t)
 
 	cfg := testConfig(workspace, func(cfg *config.Config) {
 		cfg.Tasks = []string{testModuleEslint, "go"}
@@ -72,35 +71,7 @@ func TestBuildPlanInitialSync(t *testing.T) {
 		cfg.IncludesDoc = true
 	})
 
-	resolutions, err := resolver.ResolveAll(
-		cfg.Tasks,
-		snap.Catalog,
-		cfg.NodePackageManager,
-		cfg.NodeVersionManager,
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	sources := make([]string, 0, len(resolutions))
-	for _, res := range resolutions {
-		sources = append(sources, res.SourceModule)
-	}
-
-	depSources, err := dependency.ResolveTransitive(sources, snap.Deps)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	syncInput, err := app.PrepareSyncInput(cfg, snap, resolutions, depSources)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	plan, err := syncer.BuildPlan(syncInput)
-	if err != nil {
-		t.Fatal(err)
-	}
+	_, plan := preparePlan(t, workspace, cfg)
 
 	if !plan.Changed {
 		t.Fatal("expected changes on initial sync")
@@ -122,8 +93,13 @@ func TestBuildPlanInitialSync(t *testing.T) {
 		t.Fatalf("dependency-only module should not contribute root tasks:\n%s", rootText)
 	}
 
-	if !slices.Contains(plan.Lock.GeneratedRootTasks, "lint") {
-		t.Fatalf("expected generated root tasks in lock, got %#v", plan.Lock.GeneratedRootTasks)
+	wantGenerated := []string{"install", "lint", "lint:fix", "version"}
+	if !slices.Equal(plan.Lock.GeneratedRootTasks, wantGenerated) {
+		t.Fatalf(
+			"generated root tasks = %#v, want %#v",
+			plan.Lock.GeneratedRootTasks,
+			wantGenerated,
+		)
 	}
 }
 

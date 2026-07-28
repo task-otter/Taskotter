@@ -22,8 +22,8 @@ import (
 )
 
 const (
-	storeOwner = "mostafakhairy0305-dot"
-	storeRepo  = "TaskOtter-store"
+	storeOwner = "task-otter"
+	storeRepo  = "store"
 
 	httpClientTimeout = 60 * time.Second
 )
@@ -352,9 +352,7 @@ func (c *Client) getJSON(ctx context.Context, path string, payload any) error {
 }
 
 func (c *Client) getDefaultBranch(ctx context.Context) (string, error) {
-	var payload struct {
-		DefaultBranch string `json:"default_branch"` //nolint:tagliatelle // GitHub REST API uses snake_case
-	}
+	payload := make(map[string]string)
 
 	path := fmt.Sprintf("/repos/%s/%s", storeOwner, storeRepo)
 
@@ -363,11 +361,12 @@ func (c *Client) getDefaultBranch(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("fetch store repository metadata: %w", err)
 	}
 
-	if payload.DefaultBranch == "" {
+	defaultBranch := payload["default_branch"]
+	if defaultBranch == "" {
 		return "", errDefaultBranchEmpty
 	}
 
-	return payload.DefaultBranch, nil
+	return defaultBranch, nil
 }
 
 func (c *Client) resolveBranchHead(ctx context.Context, branch string) (string, error) {

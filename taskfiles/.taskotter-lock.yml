@@ -1,21 +1,15 @@
 ---
 source:
   repository: task-otter/Taskotter-store
-  requested_version: ""
+  requested_version: ''
   source_ref: refs/heads/main
   resolved_commit: 95571b9e1f87b59861ff5558498f967261104c6d
   default_branch: main
 configuration:
   target_folder: taskfiles
-  tasks:
-    - go
-    - yamllint
-    - actionlint
-    - zizmor
-    - adrs
-    - hadolint
+  tasks: [go, yamllint, actionlint, zizmor, adrs, hadolint]
   node_package_manager: bun
-  node_version_manager: ""
+  node_version_manager: ''
   includes_doc: true
   sync_root: true
 resolved_modules:

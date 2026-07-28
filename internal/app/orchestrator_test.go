@@ -385,6 +385,6 @@ func TestNewOrchestratorInvalidRepository(t *testing.T) {
 }
 
 var (
-	_ git.GitOps  = (*mockGitOps)(nil)
-	_ gh.PRClient = (*mockPR)(nil)
+	_ git.Operations = (*mockGitOps)(nil)
+	_ gh.PRClient    = (*mockPR)(nil)
 )

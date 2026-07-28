@@ -17,12 +17,12 @@ import (
 func lockContentChanged(old *LockFile, newLock *LockFile) (bool, error) {
 	oldNorm, err := marshalLockForCompare(old)
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("normalize old lock file: %w", err)
 	}
 
 	newNorm, err := marshalLockForCompare(newLock)
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("normalize new lock file: %w", err)
 	}
 
 	return !bytes.Equal(oldNorm, newNorm), nil
@@ -69,7 +69,7 @@ func diffFiles(
 
 	added, updated, err := diffManagedFilePaths(current, workspace)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, fmt.Errorf("diff managed files: %w", err)
 	}
 
 	if syncRoot {
@@ -86,12 +86,12 @@ func diffFiles(
 
 	added, updated, err = diffLockFile(plan, workspace, lockPath, added, updated)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, fmt.Errorf("diff lock file: %w", err)
 	}
 
 	added, updated, err = diffMetadataFile(workspace, metadataPath, plannedMeta, added, updated)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, fmt.Errorf("diff metadata file: %w", err)
 	}
 
 	sort.Strings(added)
@@ -206,11 +206,22 @@ func buildStagePaths(plan *Plan, workspace, metadataPath string, syncRoot bool) 
 	}
 
 	paths[plan.Metadata.LockFile] = struct{}{}
+
+	addMetadataStagePaths(paths, workspace, metadataPath)
+	addOldTargetStagePaths(paths, plan, workspace)
+
+	return sortedStagePaths(paths)
+}
+
+func addMetadataStagePaths(paths map[string]struct{}, workspace, metadataPath string) {
 	paths[metadataPath] = struct{}{}
-	if metadataPath != config.LegacyMetadataPath && relativePathExists(workspace, config.LegacyMetadataPath) {
+	if metadataPath != config.LegacyMetadataPath &&
+		relativePathExists(workspace, config.LegacyMetadataPath) {
 		paths[config.LegacyMetadataPath] = struct{}{}
 	}
+}
 
+func addOldTargetStagePaths(paths map[string]struct{}, plan *Plan, workspace string) {
 	if plan.OldLock != nil && plan.OldTargetFolder != "" &&
 		plan.OldTargetFolder != plan.Metadata.TargetFolder {
 		for _, managed := range plan.OldLock.ManagedFiles {
@@ -227,10 +238,12 @@ func buildStagePaths(plan *Plan, workspace, metadataPath string, syncRoot bool) 
 			paths[oldMetadataPath] = struct{}{}
 		}
 	}
+}
 
+func sortedStagePaths(paths map[string]struct{}) []string {
 	out := make([]string, 0, len(paths))
-	for p := range paths {
-		out = append(out, p)
+	for relPath := range paths {
+		out = append(out, relPath)
 	}
 
 	sort.Strings(out)

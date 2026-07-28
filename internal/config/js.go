@@ -23,9 +23,9 @@ const (
 )
 
 type jsInput struct {
-	Runtime        string `yaml:"runtime"`
-	PackageManager string `yaml:"package-manager"` //nolint:tagliatelle // action js input uses kebab-case keys
-	VersionManager string `yaml:"version-manager"` //nolint:tagliatelle // action js input uses kebab-case keys
+	Runtime        string
+	PackageManager string
+	VersionManager string
 }
 
 type jsConfig struct {
@@ -37,12 +37,14 @@ type jsConfig struct {
 func parseJS(raw string) (*jsConfig, error) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
-		return nil, nil //nolint:nilnil // empty js input means no JS runtime configuration
+		return &jsConfig{
+			Runtime:            "",
+			NodePackageManager: "",
+			NodeVersionManager: "",
+		}, nil
 	}
 
-	var yamlInput jsInput
-
-	err := yaml.Unmarshal([]byte(raw), &yamlInput)
+	yamlInput, err := parseJSInput(raw)
 	if err != nil {
 		return nil, &ValidationError{
 			Field:   "js",
@@ -66,6 +68,21 @@ func parseJS(raw string) (*jsConfig, error) {
 			Message: fmt.Sprintf("invalid value %q: allowed values are bun or nodejs", runtime),
 		}
 	}
+}
+
+func parseJSInput(raw string) (jsInput, error) {
+	fields := make(map[string]string)
+
+	err := yaml.Unmarshal([]byte(raw), &fields)
+	if err != nil {
+		return jsInput{}, fmt.Errorf("parse js input: %w", err)
+	}
+
+	return jsInput{
+		Runtime:        fields["runtime"],
+		PackageManager: fields["package-manager"],
+		VersionManager: fields["version-manager"],
+	}, nil
 }
 
 func parseJSBun(yamlInput jsInput) (*jsConfig, error) {

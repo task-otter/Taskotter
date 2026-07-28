@@ -1,0 +1,9 @@
+---
+version: "3"
+tasks:
+  install:
+    cmds:
+      - pnpm install
+  version:
+    cmds:
+      - pnpm --version

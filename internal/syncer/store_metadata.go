@@ -13,14 +13,33 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-const storeMetadataFileName = "metadata.yml"
+const (
+	storeMetadataFileName          = "metadata.yml"
+	minModulesForGeneratedRootTask = 2
+)
 
 type storeTaskMetadata struct {
-	Schema        string   `yaml:"schema"`
-	Module        string   `yaml:"module"`
-	Taskfile      string   `yaml:"taskfile"`
-	ExportedTasks []string `yaml:"exported_tasks"` //nolint:tagliatelle // store metadata uses snake_case
-	Variants      []string `yaml:"variants"`
+	Schema        string
+	Module        string
+	Taskfile      string
+	ExportedTasks []string
+	Variants      []string
+}
+
+func (meta *storeTaskMetadata) UnmarshalYAML(value *yaml.Node) error {
+	fields, err := yamlFields(value)
+	if err != nil {
+		return fmt.Errorf("decode store task metadata: %w", err)
+	}
+
+	return decodeYAMLFields(
+		fields,
+		yamlDecodeTarget{key: yamlKeySchema, out: &meta.Schema},
+		yamlDecodeTarget{key: yamlKeyModule, out: &meta.Module},
+		yamlDecodeTarget{key: yamlKeyTaskfile, out: &meta.Taskfile},
+		yamlDecodeTarget{key: yamlKeyExportedTasks, out: &meta.ExportedTasks},
+		yamlDecodeTarget{key: yamlKeyVariants, out: &meta.Variants},
+	)
 }
 
 func loadStoreTaskMetadata(snapshot *store.Snapshot) (map[string]storeTaskMetadata, error) {
@@ -29,7 +48,7 @@ func loadStoreTaskMetadata(snapshot *store.Snapshot) (map[string]storeTaskMetada
 
 	err := filepath.WalkDir(root, func(abs string, entry fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
-			return walkErr
+			return fmt.Errorf("walk %q: %w", abs, walkErr)
 		}
 
 		if entry.IsDir() || entry.Name() != storeMetadataFileName {
@@ -42,12 +61,14 @@ func loadStoreTaskMetadata(snapshot *store.Snapshot) (map[string]storeTaskMetada
 		}
 
 		module := filepath.ToSlash(relDir)
+
 		data, err := pathutil.ReadRelativeFile(filepath.Dir(abs), storeMetadataFileName)
 		if err != nil {
 			return fmt.Errorf("read metadata for %q: %w", module, err)
 		}
 
 		var meta storeTaskMetadata
+
 		err = yaml.Unmarshal(data, &meta)
 		if err != nil {
 			return fmt.Errorf("parse metadata for %q: %w", module, err)
@@ -73,7 +94,7 @@ func resolveStoreTaskMetadata(
 	metadata map[string]storeTaskMetadata,
 ) (storeTaskMetadata, bool) {
 	for current := sourceModule; current != ""; {
-		if meta, ok := metadata[current]; ok {
+		if meta, foundMeta := metadata[current]; foundMeta {
 			return meta, true
 		}
 
@@ -85,13 +106,20 @@ func resolveStoreTaskMetadata(
 		current = parent
 	}
 
-	return storeTaskMetadata{}, false
+	return storeTaskMetadata{
+		Schema:        "",
+		Module:        "",
+		Taskfile:      "",
+		ExportedTasks: nil,
+		Variants:      nil,
+	}, false
 }
 
 func commonStoreTaskNames(metadata map[string]storeTaskMetadata) map[string]struct{} {
 	counts := make(map[string]int)
 	for _, meta := range metadata {
 		seen := make(map[string]struct{})
+
 		for _, task := range meta.ExportedTasks {
 			if task == "" {
 				continue
@@ -106,8 +134,9 @@ func commonStoreTaskNames(metadata map[string]storeTaskMetadata) map[string]stru
 	}
 
 	common := make(map[string]struct{})
+
 	for task, count := range counts {
-		if count >= 2 {
+		if count >= minModulesForGeneratedRootTask {
 			common[task] = struct{}{}
 		}
 	}
@@ -124,8 +153,8 @@ func buildGeneratedRootTasks(
 	modulesByTask := make(map[string][]string)
 
 	for _, logicalTask := range requested {
-		record, ok := requestedRecords[logicalTask]
-		if !ok {
+		record, foundRecord := requestedRecords[logicalTask]
+		if !foundRecord {
 			continue
 		}
 
@@ -145,7 +174,7 @@ func buildGeneratedRootTasks(
 
 	names := make([]string, 0, len(modulesByTask))
 	for name, modules := range modulesByTask {
-		if len(modules) >= 2 {
+		if len(modules) >= minModulesForGeneratedRootTask {
 			names = append(names, name)
 		}
 	}

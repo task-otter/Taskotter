@@ -7,7 +7,10 @@ import (
 	"github.com/task-otter/Taskotter/internal/normalizer"
 )
 
-const destESLint = "eslint"
+const (
+	destCorepack = "corepack"
+	destESLint   = "eslint"
+)
 
 func TestNormalizeExamples(t *testing.T) {
 	t.Parallel()
@@ -23,8 +26,8 @@ func TestNormalizeExamples(t *testing.T) {
 		"pnpm/fnm":             "pnpm",
 		"npm/nvm":              "npm",
 		"yarn/fnm":             "yarn",
-		"corepack/fnm":         "corepack",
-		"corepack/nvm":         "corepack",
+		"corepack/fnm":         destCorepack,
+		"corepack/nvm":         destCorepack,
 		"eslint-pnpm-fnm":      destESLint,
 		"eslint-pnpm-nvm":      destESLint,
 		"eslint-npm-fnm":       destESLint,
@@ -35,8 +38,8 @@ func TestNormalizeExamples(t *testing.T) {
 		"pnpm-fnm":             "pnpm",
 		"npm-nvm":              "npm",
 		"yarn-fnm":             "yarn",
-		"corepack-fnm":         "corepack",
-		"corepack-nvm":         "corepack",
+		"corepack-fnm":         destCorepack,
+		"corepack-nvm":         destCorepack,
 		"fnm":                  "fnm",
 		"nvm":                  "nvm",
 		"bun":                  "bun",
@@ -67,6 +70,24 @@ func TestLongestSuffixFirst(t *testing.T) {
 	}
 }
 
+func TestNormalizeRejectsEmptySource(t *testing.T) {
+	t.Parallel()
+
+	_, err := normalizer.Normalize("")
+	if err == nil {
+		t.Fatal("expected empty source error")
+	}
+}
+
+func TestBuildDestinationMapPropagatesNormalizeError(t *testing.T) {
+	t.Parallel()
+
+	_, err := normalizer.BuildDestinationMap([]string{""})
+	if err == nil {
+		t.Fatal("expected normalize error")
+	}
+}
+
 func TestDestinationCollision(t *testing.T) {
 	t.Parallel()
 
@@ -77,5 +98,22 @@ func TestDestinationCollision(t *testing.T) {
 
 	if !strings.Contains(err.Error(), "Destination collision") {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestBuildDestinationMapSortsSources(t *testing.T) {
+	t.Parallel()
+
+	mapping, err := normalizer.BuildDestinationMap([]string{"go", "eslint/node/fnm/pnpm"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got := normalizer.SortedSources(mapping)
+	want := []string{"eslint/node/fnm/pnpm", "go"}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("SortedSources() = %#v, want %#v", got, want)
+		}
 	}
 }

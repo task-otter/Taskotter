@@ -1,7 +1,6 @@
 package syncer_test
 
 import (
-	"sync"
 	"testing"
 
 	"github.com/task-otter/Taskotter/internal/config"
@@ -14,31 +13,23 @@ const (
 	testReadmeName   = "README.md"
 )
 
-//nolint:gochecknoglobals // serializes applyPlan hook mutations across parallel tests
-var applyPlanTestMu sync.Mutex
-
 func runApplyPlan(t *testing.T, plan *syncer.Plan, syncInput syncer.SyncInput) error {
 	t.Helper()
-
-	applyPlanTestMu.Lock()
-	defer applyPlanTestMu.Unlock()
 
 	return syncer.ApplyPlan(plan, syncInput)
 }
 
 func withCopyFileHook(
 	t *testing.T,
+	plan *syncer.Plan,
 	hook func(path string, entry syncer.FileEntry) error,
 	run func(),
 ) {
 	t.Helper()
 
-	applyPlanTestMu.Lock()
-	syncer.SetCopyFileToHookForTest(hook)
-	t.Cleanup(func() {
-		syncer.ClearCopyFileToHookForTest()
-		applyPlanTestMu.Unlock()
-	})
+	syncer.SetCopyFileToHookForTest(plan, hook)
+	t.Cleanup(func() { syncer.SetCopyFileToHookForTest(plan, nil) })
+
 	run()
 }
 

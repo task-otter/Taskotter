@@ -13,29 +13,36 @@ import (
 
 const runTimeout = 15 * time.Minute
 
+var (
+	loadConfig         = config.LoadFromEnv
+	runApp             = app.Run
+	writeActionOutputs = app.WriteActionOutputs
+	exitProcess        = os.Exit
+)
+
 func main() {
-	os.Exit(run())
+	exitProcess(run())
 }
 
 func run() int {
 	ctx, cancel := context.WithTimeout(context.Background(), runTimeout)
 	defer cancel()
 
-	cfg, err := config.LoadFromEnv()
+	cfg, err := loadConfig()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "::error::%v\n", err)
 
 		return 1
 	}
 
-	result, err := app.Run(ctx, cfg)
+	result, err := runApp(ctx, cfg)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "::error::%v\n", err)
 
 		return 1
 	}
 
-	err = app.WriteActionOutputs(cfg, result)
+	err = writeActionOutputs(cfg, result)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "::error::write outputs: %v\n", err)
 

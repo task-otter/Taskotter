@@ -11,7 +11,15 @@ import (
 const (
 	targetFolderTaskfiles = "taskfiles"
 	taskESLint            = "eslint"
+	storeESLintTaskfile   = "../../tests/fixtures/store/taskfiles/eslint/node/fnm/pnpm/Taskfile.yml"
 )
+
+func rootUpdateInput(input taskfile.RootUpdateInput) taskfile.RootUpdateInput {
+	input.GeneratedTasks = append([]taskfile.GeneratedRootTask{}, input.GeneratedTasks...)
+	input.ManagedRootTasks = append([]string{}, input.ManagedRootTasks...)
+
+	return input
+}
 
 func TestRewriteIncludes(t *testing.T) {
 	t.Parallel()
@@ -85,20 +93,25 @@ includes:
 func TestUpdateRootTaskfileFromTemplate(t *testing.T) {
 	t.Parallel()
 
-	out, err := taskfile.UpdateRootTaskfile(taskfile.NewRootTemplate(), taskfile.RootUpdateInput{
-		Tasks:           []string{"go"},
-		TargetFolder:    targetFolderTaskfiles,
-		RootTaskfileDir: "",
-		DestByTask:      map[string]string{"go": "go"},
-		ManagedTasks:    nil,
-		ModuleTaskfiles: map[string][]byte{
-			"go": []byte(`version: "3"
+	out, err := taskfile.UpdateRootTaskfile(
+		taskfile.NewRootTemplate(),
+		rootUpdateInput(taskfile.RootUpdateInput{
+			Tasks:           []string{"go"},
+			TargetFolder:    targetFolderTaskfiles,
+			RootTaskfileDir: "",
+			DestByTask:      map[string]string{"go": "go"},
+			ManagedTasks:    nil,
+			ModuleTaskfiles: map[string][]byte{
+				"go": []byte(`version: "3"
 vars:
   GO_VERSION: ""
   GO_CMD_UNIX: /usr/local/go/bin/go
 `),
-		},
-	})
+			},
+			GeneratedTasks:   nil,
+			ManagedRootTasks: nil,
+		}),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -124,14 +137,19 @@ vars:
 func TestUpdateRootTaskfileFolderRelativeIncludes(t *testing.T) {
 	t.Parallel()
 
-	out, err := taskfile.UpdateRootTaskfile(taskfile.NewRootTemplate(), taskfile.RootUpdateInput{
-		Tasks:           []string{"go"},
-		TargetFolder:    targetFolderTaskfiles,
-		RootTaskfileDir: targetFolderTaskfiles,
-		DestByTask:      map[string]string{"go": "go"},
-		ManagedTasks:    nil,
-		ModuleTaskfiles: nil,
-	})
+	out, err := taskfile.UpdateRootTaskfile(
+		taskfile.NewRootTemplate(),
+		rootUpdateInput(taskfile.RootUpdateInput{
+			Tasks:            []string{"go"},
+			TargetFolder:     targetFolderTaskfiles,
+			RootTaskfileDir:  targetFolderTaskfiles,
+			DestByTask:       map[string]string{"go": "go"},
+			ManagedTasks:     nil,
+			ModuleTaskfiles:  nil,
+			GeneratedTasks:   nil,
+			ManagedRootTasks: nil,
+		}),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -155,14 +173,16 @@ includes:
     taskfile: custom/Taskfile.yml
 `)
 
-	out, err := taskfile.UpdateRootTaskfile(root, taskfile.RootUpdateInput{
-		Tasks:           []string{"go"},
-		TargetFolder:    targetFolderTaskfiles,
-		RootTaskfileDir: "",
-		DestByTask:      map[string]string{"go": "go"},
-		ManagedTasks:    nil,
-		ModuleTaskfiles: nil,
-	})
+	out, err := taskfile.UpdateRootTaskfile(root, rootUpdateInput(taskfile.RootUpdateInput{
+		Tasks:            []string{"go"},
+		TargetFolder:     targetFolderTaskfiles,
+		RootTaskfileDir:  "",
+		DestByTask:       map[string]string{"go": "go"},
+		ManagedTasks:     nil,
+		ModuleTaskfiles:  nil,
+		GeneratedTasks:   nil,
+		ManagedRootTasks: nil,
+	}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -189,7 +209,7 @@ vars:
   GO_CMD_UNIX: /usr/local/go/bin/go
 `)
 
-	out, err := taskfile.UpdateRootTaskfile(root, taskfile.RootUpdateInput{
+	out, err := taskfile.UpdateRootTaskfile(root, rootUpdateInput(taskfile.RootUpdateInput{
 		Tasks:           []string{"go"},
 		TargetFolder:    targetFolderTaskfiles,
 		RootTaskfileDir: "",
@@ -198,7 +218,9 @@ vars:
 		ModuleTaskfiles: map[string][]byte{
 			"go": module,
 		},
-	})
+		GeneratedTasks:   nil,
+		ManagedRootTasks: nil,
+	}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -226,14 +248,16 @@ tasks:
       - echo hi
 `)
 
-	out, err := taskfile.UpdateRootTaskfile(root, taskfile.RootUpdateInput{
-		Tasks:           []string{"go", taskESLint},
-		TargetFolder:    targetFolderTaskfiles,
-		RootTaskfileDir: "",
-		DestByTask:      map[string]string{"go": "go", taskESLint: taskESLint},
-		ManagedTasks:    []string{},
-		ModuleTaskfiles: nil,
-	})
+	out, err := taskfile.UpdateRootTaskfile(root, rootUpdateInput(taskfile.RootUpdateInput{
+		Tasks:            []string{"go", taskESLint},
+		TargetFolder:     targetFolderTaskfiles,
+		RootTaskfileDir:  "",
+		DestByTask:       map[string]string{"go": "go", taskESLint: taskESLint},
+		ManagedTasks:     []string{},
+		ModuleTaskfiles:  nil,
+		GeneratedTasks:   nil,
+		ManagedRootTasks: nil,
+	}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -255,46 +279,21 @@ tasks:
 func TestUpdateRootTaskfileGeneratedTasksAndSharedVars(t *testing.T) {
 	t.Parallel()
 
-	root := []byte(`version: "3"
-vars:
-  VERSION: 1.2.3
-includes:
-  custom:
-    taskfile: custom/Taskfile.yml
-tasks:
-  lint:
-    cmds:
-      - echo user lint
-  test:
-    cmds:
-      - echo previously generated
-  custom:
-    cmds:
-      - echo custom
-`)
-	out, err := taskfile.UpdateRootTaskfile(root, taskfile.RootUpdateInput{
-		Tasks:           []string{"go", taskESLint},
-		TargetFolder:    targetFolderTaskfiles,
-		RootTaskfileDir: "",
-		DestByTask:      map[string]string{"go": "go", taskESLint: taskESLint},
-		ManagedTasks:    []string{"go", taskESLint},
-		ModuleTaskfiles: map[string][]byte{
-			"go": []byte(`version: "3"
-vars:
-  VERSION: ""
-  GO_VERSION: ""
-`),
-			taskESLint: []byte(`version: "3"
-vars:
-  VERSION: latest
-  CONFIG: ""
-`),
-		},
-		GeneratedTasks: []taskfile.GeneratedRootTask{
-			{Name: "lint", Modules: []string{"go", taskESLint}},
-		},
-		ManagedRootTasks: []string{"test"},
-	})
+	out, err := taskfile.UpdateRootTaskfile(
+		sharedVarsRootFixture(),
+		rootUpdateInput(taskfile.RootUpdateInput{
+			Tasks:           []string{"go", taskESLint},
+			TargetFolder:    targetFolderTaskfiles,
+			RootTaskfileDir: "",
+			DestByTask:      map[string]string{"go": "go", taskESLint: taskESLint},
+			ManagedTasks:    []string{"go", taskESLint},
+			ModuleTaskfiles: sharedVarsModuleTaskfiles(),
+			GeneratedTasks: []taskfile.GeneratedRootTask{
+				{Name: "lint", Modules: []string{"go", taskESLint}},
+			},
+			ManagedRootTasks: []string{"test"},
+		}),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -321,6 +320,41 @@ vars:
 	}
 }
 
+func sharedVarsRootFixture() []byte {
+	return []byte(`version: "3"
+vars:
+  VERSION: 1.2.3
+includes:
+  custom:
+    taskfile: custom/Taskfile.yml
+tasks:
+  lint:
+    cmds:
+      - echo user lint
+  test:
+    cmds:
+      - echo previously generated
+  custom:
+    cmds:
+      - echo custom
+`)
+}
+
+func sharedVarsModuleTaskfiles() map[string][]byte {
+	return map[string][]byte{
+		"go": []byte(`version: "3"
+vars:
+  VERSION: ""
+  GO_VERSION: ""
+`),
+		taskESLint: []byte(`version: "3"
+vars:
+  VERSION: latest
+  CONFIG: ""
+`),
+	}
+}
+
 func TestManagedIncludeDifferentPathConflict(t *testing.T) {
 	t.Parallel()
 
@@ -334,14 +368,16 @@ tasks:
       - echo hi
 `)
 
-	_, err := taskfile.UpdateRootTaskfile(root, taskfile.RootUpdateInput{
-		Tasks:           []string{taskESLint},
-		TargetFolder:    targetFolderTaskfiles,
-		RootTaskfileDir: "",
-		DestByTask:      map[string]string{taskESLint: taskESLint},
-		ManagedTasks:    []string{taskESLint},
-		ModuleTaskfiles: nil,
-	})
+	_, err := taskfile.UpdateRootTaskfile(root, rootUpdateInput(taskfile.RootUpdateInput{
+		Tasks:            []string{taskESLint},
+		TargetFolder:     targetFolderTaskfiles,
+		RootTaskfileDir:  "",
+		DestByTask:       map[string]string{taskESLint: taskESLint},
+		ManagedTasks:     []string{taskESLint},
+		ModuleTaskfiles:  nil,
+		GeneratedTasks:   nil,
+		ManagedRootTasks: nil,
+	}))
 	if err == nil {
 		t.Fatal("expected conflict when alias path differs from managed path")
 	}
@@ -356,14 +392,16 @@ includes:
     taskfile: legacy/go/Taskfile.yml
 `)
 
-	_, err := taskfile.UpdateRootTaskfile(root, taskfile.RootUpdateInput{
-		Tasks:           []string{"go"},
-		TargetFolder:    targetFolderTaskfiles,
-		RootTaskfileDir: "",
-		DestByTask:      map[string]string{"go": "go"},
-		ManagedTasks:    []string{},
-		ModuleTaskfiles: nil,
-	})
+	_, err := taskfile.UpdateRootTaskfile(root, rootUpdateInput(taskfile.RootUpdateInput{
+		Tasks:            []string{"go"},
+		TargetFolder:     targetFolderTaskfiles,
+		RootTaskfileDir:  "",
+		DestByTask:       map[string]string{"go": "go"},
+		ManagedTasks:     []string{},
+		ModuleTaskfiles:  nil,
+		GeneratedTasks:   nil,
+		ManagedRootTasks: nil,
+	}))
 	if err == nil {
 		t.Fatal("expected alias conflict")
 	}
@@ -377,14 +415,16 @@ includes:
   go: legacy/go/Taskfile.yml
 `)
 
-	_, err := taskfile.UpdateRootTaskfile(root, taskfile.RootUpdateInput{
-		Tasks:           []string{"go"},
-		TargetFolder:    targetFolderTaskfiles,
-		RootTaskfileDir: "",
-		DestByTask:      map[string]string{"go": "go"},
-		ManagedTasks:    []string{},
-		ModuleTaskfiles: nil,
-	})
+	_, err := taskfile.UpdateRootTaskfile(root, rootUpdateInput(taskfile.RootUpdateInput{
+		Tasks:            []string{"go"},
+		TargetFolder:     targetFolderTaskfiles,
+		RootTaskfileDir:  "",
+		DestByTask:       map[string]string{"go": "go"},
+		ManagedTasks:     []string{},
+		ModuleTaskfiles:  nil,
+		GeneratedTasks:   nil,
+		ManagedRootTasks: nil,
+	}))
 	if err == nil {
 		t.Fatal("expected scalar include path conflict")
 	}
@@ -393,7 +433,7 @@ includes:
 func TestRewriteUsesRealStoreSnippet(t *testing.T) {
 	t.Parallel()
 
-	data, err := os.ReadFile("../../tests/fixtures/store/taskfiles/eslint/node/fnm/pnpm/Taskfile.yml")
+	data, err := os.ReadFile(storeESLintTaskfile)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -29,7 +29,7 @@ type StoreClient interface {
 type Orchestrator struct {
 	Logger      *logging.Logger
 	StoreClient StoreClient
-	GitOps      git.GitOps
+	GitOps      git.Operations
 	PRClient    gh.PRClient
 }
 

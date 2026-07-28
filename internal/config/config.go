@@ -17,7 +17,7 @@ const (
 	// DefaultTargetFolder is the workspace-relative directory where synced taskfiles are written.
 	DefaultTargetFolder = "taskfiles"
 	// StoreRepository is the GitHub repository that hosts TaskOtter store modules.
-	StoreRepository = "task-otter/Taskotter-store"
+	StoreRepository = "task-otter/store"
 	// LegacyMetadataPath is the pre-migration workspace-relative metadata path.
 	LegacyMetadataPath = ".taskotter/metadata.yml"
 )
@@ -116,13 +116,13 @@ type Config struct {
 }
 
 type hashPayload struct {
-	Tasks              []string `json:"tasks"`
-	NodePackageManager string   `json:"node_package_manager"` //nolint:tagliatelle // hash payload matches lock file keys
-	NodeVersionManager string   `json:"node_version_manager"` //nolint:tagliatelle // hash payload matches lock file keys
-	TargetFolder       string   `json:"target_folder"`        //nolint:tagliatelle // hash payload matches lock file keys
-	StoreVersion       string   `json:"store_version"`        //nolint:tagliatelle // hash payload matches lock file keys
-	IncludesDoc        bool     `json:"includes_doc"`         //nolint:tagliatelle // hash payload matches lock file keys
-	SyncRoot           bool     `json:"sync_root"`            //nolint:tagliatelle // hash payload matches lock file keys
+	Tasks              []string
+	NodePackageManager string
+	NodeVersionManager string
+	TargetFolder       string
+	StoreVersion       string
+	IncludesDoc        bool
+	SyncRoot           bool
 }
 
 // LoadFromEnv reads and validates TaskOtter configuration from GitHub Actions environment variables.
@@ -423,7 +423,15 @@ func validateStoreVersion(version string) error {
 }
 
 func computeConfigurationHash(payload hashPayload) (string, string) {
-	data, err := json.Marshal(payload)
+	data, err := json.Marshal(map[string]any{
+		"tasks":                payload.Tasks,
+		"node_package_manager": payload.NodePackageManager,
+		"node_version_manager": payload.NodeVersionManager,
+		"target_folder":        payload.TargetFolder,
+		"store_version":        payload.StoreVersion,
+		"includes_doc":         payload.IncludesDoc,
+		"sync_root":            payload.SyncRoot,
+	})
 	if err != nil {
 		data = []byte("{}")
 	}

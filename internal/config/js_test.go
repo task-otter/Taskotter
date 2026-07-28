@@ -66,6 +66,18 @@ func TestParseJSBunRejectsVersionManager(t *testing.T) {
 	}
 }
 
+func TestParseJSBunRejectsPackageManager(t *testing.T) {
+	dir := t.TempDir()
+	env := baseEnv(dir)
+	env["INPUT_JS"] = "runtime: bun\npackage-manager: pnpm\n"
+	setEnv(t, env)
+
+	_, err := config.LoadFromEnv()
+	if err == nil {
+		t.Fatal("expected validation error")
+	}
+}
+
 func TestParseJSNodeJSRejectsBunPackageManager(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
@@ -93,5 +105,57 @@ func TestParseJSEmpty(t *testing.T) {
 
 	if cfg.NodePackageManager != "" {
 		t.Fatalf("NodePackageManager = %q, want empty", cfg.NodePackageManager)
+	}
+}
+
+func TestParseJSDefaultsRuntimeToNodeJS(t *testing.T) {
+	dir := t.TempDir()
+	env := baseEnv(dir)
+	env["INPUT_JS"] = "package-manager: yarn\nversion-manager: nvm\n"
+	setEnv(t, env)
+
+	cfg, err := config.LoadFromEnv()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if cfg.JSRuntime != config.JSRuntimeNodeJS {
+		t.Fatalf("JSRuntime = %q, want nodejs", cfg.JSRuntime)
+	}
+}
+
+func TestParseJSRejectsInvalidYAML(t *testing.T) {
+	dir := t.TempDir()
+	env := baseEnv(dir)
+	env["INPUT_JS"] = ":"
+	setEnv(t, env)
+
+	_, err := config.LoadFromEnv()
+	if err == nil {
+		t.Fatal("expected invalid YAML error")
+	}
+}
+
+func TestParseJSRejectsInvalidRuntime(t *testing.T) {
+	dir := t.TempDir()
+	env := baseEnv(dir)
+	env["INPUT_JS"] = "runtime: deno\n"
+	setEnv(t, env)
+
+	_, err := config.LoadFromEnv()
+	if err == nil {
+		t.Fatal("expected invalid runtime error")
+	}
+}
+
+func TestParseJSRejectsInvalidVersionManager(t *testing.T) {
+	dir := t.TempDir()
+	env := baseEnv(dir)
+	env["INPUT_JS"] = "runtime: nodejs\nversion-manager: volta\n"
+	setEnv(t, env)
+
+	_, err := config.LoadFromEnv()
+	if err == nil {
+		t.Fatal("expected invalid version manager error")
 	}
 }

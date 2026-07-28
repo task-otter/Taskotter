@@ -287,7 +287,11 @@ func writeMinimalLock(t *testing.T, workspace, targetFolder string, files []sync
 		t.Fatal(err)
 	}
 
-	err = os.WriteFile(filepath.Join(workspace, targetFolder, ".taskotter/metadata.yml"), meta, 0o644)
+	err = os.WriteFile(
+		filepath.Join(workspace, targetFolder, ".taskotter/metadata.yml"),
+		meta,
+		0o644,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}

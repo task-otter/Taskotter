@@ -71,6 +71,7 @@ func BuildPlan(syncInput SyncInput) (*Plan, error) {
 		OldLock:          oldLock,
 		OldTargetFolder:  oldTarget,
 		StagePaths:       nil,
+		copyFileTo:       nil,
 	}
 
 	return finalizePlanDiff(
@@ -135,6 +136,7 @@ func buildRootTaskfile(
 ) ([]byte, []taskfile.GeneratedRootTask, error) {
 	managedTasks := syncInput.Config.Tasks
 	managedRootTasks := []string(nil)
+
 	if oldLock != nil {
 		managedTasks = oldLock.Configuration.Tasks
 		managedRootTasks = oldLock.GeneratedRootTasks
@@ -246,7 +248,10 @@ func planManagedFiles(
 		_, err := os.Stat(sourceDir)
 		if err != nil {
 			return nil, nil, &SyncError{
-				Message: fmt.Sprintf("source module directory %q does not exist", mod.SourceModule),
+				Message: fmt.Sprintf(
+					"source module directory %q does not exist",
+					mod.SourceModule,
+				),
 			}
 		}
 
@@ -268,17 +273,7 @@ func planManagedFiles(
 		}
 
 		moduleContents[mod.SourceModule] = contents
-
-		for rel, entry := range contents {
-			sum := sha256.Sum256(entry.Data)
-			planned = append(planned, ManagedFile{
-				SourceModule:      mod.SourceModule,
-				DestinationModule: mod.DestinationModule,
-				SourcePath:        pathutil.JoinRelative("taskfiles", mod.SourceModule, rel),
-				Path:              pathutil.JoinRelative(destDirRel, rel),
-				SHA256:            hex.EncodeToString(sum[:]),
-			})
-		}
+		planned = appendManagedFiles(planned, mod, destDirRel, contents)
 	}
 
 	sort.Slice(planned, func(i, j int) bool {
@@ -290,6 +285,26 @@ func planManagedFiles(
 	})
 
 	return planned, moduleContents, nil
+}
+
+func appendManagedFiles(
+	planned []ManagedFile,
+	mod ModuleRecord,
+	destDirRel string,
+	contents map[string]FileEntry,
+) []ManagedFile {
+	for rel, entry := range contents {
+		sum := sha256.Sum256(entry.Data)
+		planned = append(planned, ManagedFile{
+			SourceModule:      mod.SourceModule,
+			DestinationModule: mod.DestinationModule,
+			SourcePath:        pathutil.JoinRelative("taskfiles", mod.SourceModule, rel),
+			Path:              pathutil.JoinRelative(destDirRel, rel),
+			SHA256:            hex.EncodeToString(sum[:]),
+		})
+	}
+
+	return planned
 }
 
 func validateDestination(destDirAbs string, mod ModuleRecord, oldLock *LockFile) error {
@@ -341,7 +356,7 @@ func CollectModuleFiles(
 
 	err := filepath.WalkDir(sourceDir, func(path string, entry os.DirEntry, walkErr error) error {
 		if walkErr != nil {
-			return walkErr
+			return fmt.Errorf("walk %q: %w", path, walkErr)
 		}
 
 		if entry.IsDir() {

@@ -2,6 +2,7 @@ package git_test
 
 import (
 	"context"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -15,7 +16,9 @@ const testMainBranch = "main"
 
 type mockGitOps struct {
 	branchExists bool
+	branchErr    error
 	lastMessage  string
+	messageErr   error
 }
 
 func (mockGitOps *mockGitOps) EnsureSafeDirectory(context.Context) error { return nil }
@@ -28,10 +31,18 @@ func (mockGitOps *mockGitOps) HasUnrelatedChanges(
 }
 func (mockGitOps *mockGitOps) CheckoutBranch(context.Context, string, bool) error { return nil }
 func (mockGitOps *mockGitOps) BranchExists(context.Context, string) (bool, error) {
+	if mockGitOps.branchErr != nil {
+		return false, mockGitOps.branchErr
+	}
+
 	return mockGitOps.branchExists, nil
 }
 
 func (mockGitOps *mockGitOps) LastCommitMessage(context.Context, string) (string, error) {
+	if mockGitOps.messageErr != nil {
+		return "", mockGitOps.messageErr
+	}
+
 	return mockGitOps.lastMessage, nil
 }
 func (mockGitOps *mockGitOps) Stage(context.Context, []string) error    { return nil }
@@ -213,6 +224,110 @@ func TestStageForceAddsGitignoredMetadata(t *testing.T) {
 	}
 }
 
+func TestClientGitWorkflowMethods(t *testing.T) {
+	t.Parallel()
+
+	cloneDir := setupRemoteRepo(t)
+	client := git.NewClient(cloneDir)
+	ctx := context.Background()
+
+	if err := client.EnsureSafeDirectory(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := git.WriteLocalIdentity(ctx, client); err != nil {
+		t.Fatal(err)
+	}
+
+	if !git.IsGitRepo(cloneDir) {
+		t.Fatal("expected temp checkout to be a git repo")
+	}
+
+	if git.IsGitRepo(t.TempDir()) {
+		t.Fatal("plain temp dir is not a git repo")
+	}
+
+	if err := client.CheckoutBranch(ctx, "feature/test", true); err != nil {
+		t.Fatal(err)
+	}
+
+	exists, err := client.BranchExists(ctx, "feature/test")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !exists {
+		t.Fatal("expected created branch to exist")
+	}
+
+	exists, err = client.BranchExists(ctx, "missing-branch")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if exists {
+		t.Fatal("missing branch should not exist")
+	}
+
+	if msg, err := client.LastCommitMessage(ctx, testMainBranch); err != nil || msg != "init" {
+		t.Fatalf("LastCommitMessage() = %q, %v; want init, nil", msg, err)
+	}
+
+	if err := client.Commit(ctx, "nothing to commit"); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := client.Push(ctx, "feature/test", true); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestHasUnrelatedChanges(t *testing.T) {
+	t.Parallel()
+
+	cloneDir := setupRemoteRepo(t)
+	client := git.NewClient(cloneDir)
+
+	err := os.MkdirAll(filepath.Join(cloneDir, "taskfiles", "go"), 0o755)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = os.WriteFile(filepath.Join(cloneDir, "taskfiles", "go", "Taskfile.yml"), []byte("version: '3'\n"), 0o644)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	unrelated, err := client.HasUnrelatedChanges(
+		context.Background(),
+		git.AllowedPathSet([]string{"taskfiles"}),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if unrelated {
+		t.Fatal("changes under allowed folder should not be unrelated")
+	}
+
+	err = os.WriteFile(filepath.Join(cloneDir, "notes.txt"), []byte("local\n"), 0o644)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	unrelated, err = client.HasUnrelatedChanges(
+		context.Background(),
+		git.AllowedPathSet([]string{"taskfiles"}),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !unrelated {
+		t.Fatal("change outside allowed paths should be unrelated")
+	}
+}
+
 func TestEnsureBranchOwnedAllowsNewBranch(t *testing.T) {
 	t.Parallel()
 
@@ -246,6 +361,28 @@ func TestEnsureBranchOwnedRejectsForeignBranch(t *testing.T) {
 	}
 }
 
+func TestEnsureBranchOwnedWrapsOperationErrors(t *testing.T) {
+	t.Parallel()
+
+	err := git.EnsureBranchOwned(
+		context.Background(),
+		&mockGitOps{branchErr: errors.New("branch check failed")},
+		"taskotter/sync-abc",
+	)
+	if err == nil || !strings.Contains(err.Error(), "check branch exists") {
+		t.Fatalf("expected branch exists wrapper, got %v", err)
+	}
+
+	err = git.EnsureBranchOwned(
+		context.Background(),
+		&mockGitOps{branchExists: true, messageErr: errors.New("log failed")},
+		"taskotter/sync-abc",
+	)
+	if err == nil || !strings.Contains(err.Error(), "read last commit message") {
+		t.Fatalf("expected last message wrapper, got %v", err)
+	}
+}
+
 func TestValidateGitRefAcceptsSyncBranch(t *testing.T) {
 	t.Parallel()
 
@@ -258,9 +395,11 @@ func TestValidateGitRefAcceptsSyncBranch(t *testing.T) {
 func TestValidateGitRefRejectsInvalid(t *testing.T) {
 	t.Parallel()
 
+	longRef := strings.Repeat("a", 256)
 	cases := []string{
 		"",
 		"-main",
+		longRef,
 		"branch with spaces",
 		"branch;rm -rf /",
 	}

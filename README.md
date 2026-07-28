@@ -4,7 +4,7 @@
 
 # TaskOtter
 
-Docker-based GitHub Action that synchronizes task modules from the [TaskOtter store](https://github.com/task-otter/Taskotter-store) into your repository, resolves transitive dependencies, normalizes destination folder names, optionally updates your root `Taskfile.yml`, and opens or updates a deterministic pull request when changes exist.
+Docker-based GitHub Action that synchronizes task modules from the [TaskOtter store](https://github.com/task-otter/store) into your repository, resolves transitive dependencies, normalizes destination folder names, optionally updates your root `Taskfile.yml`, and opens or updates a deterministic pull request when changes exist.
 
 Sync pull requests target the branch that invoked TaskOtter. For pull-request workflows, they target that workflow's base branch.
 

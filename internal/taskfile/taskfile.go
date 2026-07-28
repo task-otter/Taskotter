@@ -16,6 +16,7 @@ const (
 	rootTaskfileVersion     = "3.5"
 	rootTemplate            = "---\nversion: \"" + rootTaskfileVersion + "\"\n"
 	yamlMappingPairKeyValue = 2
+	minSharedVarTasks       = 2
 )
 
 var errNoModuleVars = errors.New("module Taskfile has no vars")
@@ -414,6 +415,7 @@ func sharedModuleVarNames(
 	moduleVarsByTask map[string]*yaml.Node,
 ) map[string]struct{} {
 	counts := make(map[string]int)
+
 	for _, task := range tasks {
 		varsNode := moduleVarsByTask[task]
 		if varsNode == nil || varsNode.Kind != yaml.MappingNode {
@@ -431,8 +433,9 @@ func sharedModuleVarNames(
 	}
 
 	shared := make(map[string]struct{})
+
 	for key, count := range counts {
-		if count >= 2 {
+		if count >= minSharedVarTasks {
 			shared[key] = struct{}{}
 		}
 	}
@@ -541,8 +544,10 @@ func mergeIncludeVars(entry *yaml.Node, moduleVars *yaml.Node, sharedVars map[st
 
 func includeVarsNode(moduleVars *yaml.Node, sharedVars map[string]struct{}) *yaml.Node {
 	out := newYAMLMappingNode()
+
 	for idx := 0; idx < len(moduleVars.Content); idx += yamlMappingPairKeyValue {
 		key := moduleVars.Content[idx].Value
+
 		value := cloneYAMLNode(moduleVars.Content[idx+1])
 		if _, shared := sharedVars[key]; shared {
 			value = rootVarReference(key)
@@ -578,7 +583,11 @@ func cloneYAMLNode(node *yaml.Node) *yaml.Node {
 	return out.Content[0]
 }
 
-func newIncludeEntry(path string, moduleVars *yaml.Node, sharedVars map[string]struct{}) *yaml.Node {
+func newIncludeEntry(
+	path string,
+	moduleVars *yaml.Node,
+	sharedVars map[string]struct{},
+) *yaml.Node {
 	entry := newYAMLMappingNode()
 	appendMappingPair(entry, yamlScalar("taskfile"), yamlScalar(path))
 
@@ -633,7 +642,8 @@ func newGeneratedTaskEntry(generated GeneratedRootTask) *yaml.Node {
 		yamlScalar("Run "+generated.Name+" for synced TaskOtter modules"),
 	)
 
-	cmds := &yaml.Node{Kind: yaml.SequenceNode}
+	cmds := newYAMLSequenceNode()
+
 	for _, module := range generated.Modules {
 		cmd := newYAMLMappingNode()
 		appendMappingPair(cmd, yamlScalar("task"), yamlScalar(module+":"+generated.Name))
@@ -648,6 +658,23 @@ func newGeneratedTaskEntry(generated GeneratedRootTask) *yaml.Node {
 func newYAMLMappingNode() *yaml.Node {
 	return &yaml.Node{
 		Kind:        yaml.MappingNode,
+		Style:       0,
+		Tag:         "",
+		Value:       "",
+		Anchor:      "",
+		Alias:       nil,
+		Content:     nil,
+		HeadComment: "",
+		LineComment: "",
+		FootComment: "",
+		Line:        0,
+		Column:      0,
+	}
+}
+
+func newYAMLSequenceNode() *yaml.Node {
+	return &yaml.Node{
+		Kind:        yaml.SequenceNode,
 		Style:       0,
 		Tag:         "",
 		Value:       "",

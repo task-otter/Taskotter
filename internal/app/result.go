@@ -3,6 +3,7 @@ package app
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"sort"
 	"strconv"
@@ -33,9 +34,23 @@ type Result struct {
 
 // ResolvedTask is the JSON representation of a resolved task module mapping.
 type ResolvedTask struct {
-	SourceModule      string `json:"source_module"`      //nolint:tagliatelle // GitHub Actions output uses snake_case keys
-	DestinationModule string `json:"destination_module"` //nolint:tagliatelle // GitHub Actions output uses snake_case keys
-	Path              string `json:"path"`
+	SourceModule      string
+	DestinationModule string
+	Path              string
+}
+
+// MarshalJSON encodes a resolved task using the GitHub Actions output keys.
+func (t ResolvedTask) MarshalJSON() ([]byte, error) {
+	data, err := json.Marshal(map[string]string{
+		"source_module":      t.SourceModule,
+		"destination_module": t.DestinationModule,
+		"path":               t.Path,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("marshal resolved task: %w", err)
+	}
+
+	return data, nil
 }
 
 func buildResolvedTasksJSON(requested map[string]syncer.ModuleRecord) (string, error) {
@@ -151,6 +166,11 @@ func SyncRequired(result *Result) bool {
 
 // ReportSyncRequired writes GitHub Actions annotations when a sync pull request must be merged.
 func ReportSyncRequired(result *Result) {
+	ReportSyncRequiredTo(os.Stderr, result)
+}
+
+// ReportSyncRequiredTo writes sync-required GitHub Actions annotations to writer.
+func ReportSyncRequiredTo(writer io.Writer, result *Result) {
 	var summary string
 
 	if result.PullRequestURL != "" {
@@ -165,12 +185,12 @@ func ReportSyncRequired(result *Result) {
 	}
 
 	_, _ = fmt.Fprintf(
-		os.Stderr,
+		writer,
 		"::error title=TaskOtter sync required::%s"+syncRequiredErrorSuffix,
 		summary,
 	)
 	_, _ = fmt.Fprintln(
-		os.Stderr,
+		writer,
 		"::notice title=What happened::TaskOtter compared managed files with the store and found drift. "+
 			"This job fails intentionally until the sync PR is merged.",
 	)

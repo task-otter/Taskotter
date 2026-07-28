@@ -1,0 +1,6 @@
+---
+schema: taskotter.store/v1
+module: pnpm/fnm
+taskfile: Taskfile.yml
+exported_tasks: [install, version]
+variants: [package-manager:pnpm, version-manager:fnm]

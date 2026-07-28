@@ -2,18 +2,15 @@ package app_test
 
 import (
 	"bytes"
-	"io"
 	"os"
+	"path/filepath"
 	"strings"
-	"sync"
 	"testing"
 
 	"github.com/task-otter/Taskotter/internal/app"
+	"github.com/task-otter/Taskotter/internal/config"
 	"github.com/task-otter/Taskotter/internal/store"
 )
-
-//nolint:gochecknoglobals // serializes stderr capture across parallel tests
-var stderrCaptureMu sync.Mutex
 
 func emptyRefInfo() store.RefInfo {
 	return store.RefInfo{
@@ -23,38 +20,6 @@ func emptyRefInfo() store.RefInfo {
 		ResolvedCommit:   "",
 		DefaultBranch:    "",
 	}
-}
-
-func captureStderr(t *testing.T, runFn func()) string {
-	t.Helper()
-
-	stderrCaptureMu.Lock()
-	defer stderrCaptureMu.Unlock()
-
-	old := os.Stderr
-
-	reader, writer, err := os.Pipe()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	os.Stderr = writer
-
-	runFn()
-
-	_ = writer.Close()
-	os.Stderr = old
-
-	var buf bytes.Buffer
-
-	_, err = io.Copy(&buf, reader)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	_ = reader.Close()
-
-	return buf.String()
 }
 
 func TestReportSyncRequiredWithPullRequest(t *testing.T) {
@@ -74,19 +39,36 @@ func TestReportSyncRequiredWithPullRequest(t *testing.T) {
 		Ref:                  emptyRefInfo(),
 	}
 
-	out := captureStderr(t, func() {
-		app.ReportSyncRequired(result)
-	})
-	if !strings.Contains(out, "::error title=TaskOtter sync required::") {
-		t.Fatalf("missing error annotation: %s", out)
+	var out bytes.Buffer
+
+	app.ReportSyncRequiredTo(&out, result)
+
+	if !strings.Contains(out.String(), "::error title=TaskOtter sync required::") {
+		t.Fatalf("missing error annotation: %s", out.String())
 	}
 
-	if !strings.Contains(out, "TaskOtter opened sync PR #42: https://example.com/pull/42") {
-		t.Fatalf("missing PR summary: %s", out)
+	if !strings.Contains(
+		out.String(),
+		"TaskOtter opened sync PR #42: https://example.com/pull/42",
+	) {
+		t.Fatalf("missing PR summary: %s", out.String())
 	}
 
-	if !strings.Contains(out, "::notice title=What happened::") {
-		t.Fatalf("missing notice annotation: %s", out)
+	if !strings.Contains(out.String(), "::notice title=What happened::") {
+		t.Fatalf("missing notice annotation: %s", out.String())
+	}
+}
+
+func TestReportSyncRequiredWithUnknownPullRequestNumber(t *testing.T) {
+	t.Parallel()
+
+	result := &app.Result{Changed: true, PullRequestURL: "https://example.com/pull/42"}
+
+	var out bytes.Buffer
+	app.ReportSyncRequiredTo(&out, result)
+
+	if !strings.Contains(out.String(), "sync PR #unknown") {
+		t.Fatalf("missing unknown PR number fallback: %s", out.String())
 	}
 }
 
@@ -107,11 +89,12 @@ func TestReportSyncRequiredWithoutPullRequest(t *testing.T) {
 		Ref:                  emptyRefInfo(),
 	}
 
-	out := captureStderr(t, func() {
-		app.ReportSyncRequired(result)
-	})
-	if !strings.Contains(out, "did not return a pull request URL") {
-		t.Fatalf("missing fallback summary: %s", out)
+	var out bytes.Buffer
+
+	app.ReportSyncRequiredTo(&out, result)
+
+	if !strings.Contains(out.String(), "did not return a pull request URL") {
+		t.Fatalf("missing fallback summary: %s", out.String())
 	}
 }
 
@@ -150,5 +133,53 @@ func TestSyncRequired(t *testing.T) {
 	}
 	if app.SyncRequired(unchanged) {
 		t.Fatal("expected unchanged result not to require sync")
+	}
+}
+
+func TestWriteActionOutputsToFile(t *testing.T) {
+	t.Parallel()
+
+	outputPath := filepath.Join(t.TempDir(), "github-output")
+	cfg := &config.Config{GitHubOutput: outputPath}
+	result := &app.Result{
+		Changed:              true,
+		StoreVersion:         "v1.2.3",
+		SourceRef:            "refs/tags/v1.2.3",
+		SourceSHA:            "abc123",
+		TargetFolder:         "taskfiles",
+		ResolvedTasksJSON:    "{}",
+		ResolvedDependencies: "[]",
+		PullRequestNumber:    "42",
+		PullRequestURL:       "https://example.com/pull/42",
+	}
+
+	err := app.WriteActionOutputs(cfg, result)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	data, err := os.ReadFile(outputPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, want := range []string{
+		"changed=true\n",
+		"source-sha=abc123\n",
+		"pull-request-number=42\n",
+	} {
+		if !strings.Contains(string(data), want) {
+			t.Fatalf("output missing %q: %s", want, data)
+		}
+	}
+}
+
+func TestWriteActionOutputsWrapsFileError(t *testing.T) {
+	t.Parallel()
+
+	cfg := &config.Config{GitHubOutput: filepath.Join(t.TempDir(), "missing", "output")}
+	err := app.WriteActionOutputs(cfg, &app.Result{})
+	if err == nil {
+		t.Fatal("expected write output error")
 	}
 }

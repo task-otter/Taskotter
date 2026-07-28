@@ -279,7 +279,7 @@ func TestApplyPlanPromoteBeforeDelete(t *testing.T) {
 
 	var promoted int
 
-	withCopyFileHook(t, func(path string, entry syncer.FileEntry) error {
+	withCopyFileHook(t, plan, func(path string, entry syncer.FileEntry) error {
 		if strings.Contains(path, filepath.Join(".taskotter", "staging")) {
 			return writeFileEntry(path, entry)
 		}
@@ -318,7 +318,7 @@ func TestApplyPlanWriteOrder(t *testing.T) {
 
 	stagingMarker := filepath.Join(config.DefaultTargetFolder, ".taskotter", "staging")
 
-	withCopyFileHook(t, func(path string, entry syncer.FileEntry) error {
+	withCopyFileHook(t, plan, func(path string, entry syncer.FileEntry) error {
 		if strings.Contains(path, stagingMarker) {
 			return writeFileEntry(path, entry)
 		}

@@ -152,6 +152,37 @@ func TestRootTaskfileMustBeYAML(t *testing.T) {
 	}
 }
 
+func TestValidationErrorWithoutField(t *testing.T) {
+	t.Parallel()
+
+	err := (&config.ValidationError{Message: "bad input"}).Error()
+	if err != "bad input" {
+		t.Fatalf("Error() = %q", err)
+	}
+}
+
+func TestMissingRuntimeInputs(t *testing.T) {
+	dir := t.TempDir()
+
+	env := baseEnv(dir)
+	env["GITHUB_WORKSPACE"] = ""
+	setEnv(t, env)
+
+	_, err := config.LoadFromEnv()
+	if err == nil {
+		t.Fatal("expected missing workspace error")
+	}
+
+	env = baseEnv(dir)
+	env["INPUT_GITHUB_TOKEN"] = ""
+	setEnv(t, env)
+
+	_, err = config.LoadFromEnv()
+	if err == nil {
+		t.Fatal("expected missing token error")
+	}
+}
+
 func TestLoadFromEnvGitHubTokenFallback(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
@@ -345,6 +376,22 @@ func TestUnsafeStoreVersion(t *testing.T) {
 	_, err := config.LoadFromEnv()
 	if err == nil {
 		t.Fatal("expected unsafe store-version error")
+	}
+}
+
+func TestStoreVersionAllowsSafeTag(t *testing.T) {
+	dir := t.TempDir()
+	env := baseEnv(dir)
+	env["INPUT_STORE_VERSION"] = "v1.2.3"
+	setEnv(t, env)
+
+	cfg, err := config.LoadFromEnv()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if cfg.StoreVersion != "v1.2.3" {
+		t.Fatalf("StoreVersion = %q", cfg.StoreVersion)
 	}
 }
 

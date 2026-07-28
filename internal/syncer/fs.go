@@ -6,31 +6,13 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
-	"sync"
 
 	"github.com/task-otter/Taskotter/internal/pathutil"
 )
 
-// CopyFileToHook replaces copyFileTo during tests when non-nil.
-//
-//nolint:gochecknoglobals // test hook
-var CopyFileToHook func(path string, entry FileEntry) error
-
-//nolint:gochecknoglobals // protects CopyFileToHook reads during concurrent copyFileTo calls
-var copyFileHookMu sync.RWMutex
-
-// SetCopyFileToHookForTest installs a test hook. Pair with ClearCopyFileToHookForTest in t.Cleanup.
-func SetCopyFileToHookForTest(hook func(path string, entry FileEntry) error) {
-	copyFileHookMu.Lock()
-	CopyFileToHook = hook
-	copyFileHookMu.Unlock()
-}
-
-// ClearCopyFileToHookForTest removes the test hook installed by SetCopyFileToHookForTest.
-func ClearCopyFileToHookForTest() {
-	copyFileHookMu.Lock()
-	CopyFileToHook = nil
-	copyFileHookMu.Unlock()
+// SetCopyFileToHookForTest installs a copy hook on plan for tests.
+func SetCopyFileToHookForTest(plan *Plan, hook func(string, FileEntry) error) {
+	plan.copyFileTo = hook
 }
 
 func writeFileAtomic(path string, data []byte, mode os.FileMode) error {
@@ -82,16 +64,6 @@ func writeFileAtomic(path string, data []byte, mode os.FileMode) error {
 }
 
 func copyFileTo(path string, entry FileEntry) error {
-	copyFileHookMu.RLock()
-
-	hook := CopyFileToHook
-
-	copyFileHookMu.RUnlock()
-
-	if hook != nil {
-		return hook(path, entry)
-	}
-
 	return writeFileAtomic(path, entry.Data, entry.Mode)
 }
 

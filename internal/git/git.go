@@ -22,7 +22,7 @@ const (
 	commitUserName  = "TaskOtter"
 	commitUserEmail = "taskotter@users.noreply.github.com"
 
-	gitStatusPathOffset = 4
+	gitStatusPathOffset = 3
 )
 
 var (
@@ -78,10 +78,8 @@ func ValidateStagePath(workspace, path string) error {
 	return nil
 }
 
-// GitOps abstracts git commands against a workspace checkout.
-//
-//nolint:revive // GitOps is the established interface name across TaskOtter.
-type GitOps interface {
+// Operations abstracts git commands against a workspace checkout.
+type Operations interface {
 	EnsureSafeDirectory(ctx context.Context) error
 	HasUnrelatedChanges(ctx context.Context, allowed map[string]struct{}) (bool, error)
 	CheckoutBranch(ctx context.Context, branch string, create bool) error
@@ -421,7 +419,7 @@ func AllowedPathSet(paths []string) map[string]struct{} {
 }
 
 // WriteLocalIdentity configures commit author metadata for sync commits.
-func WriteLocalIdentity(ctx context.Context, ops GitOps) error {
+func WriteLocalIdentity(ctx context.Context, ops Operations) error {
 	_ = ctx
 	_ = ops
 	// Commit identity is applied per command via -c; config files are not writable
@@ -437,7 +435,7 @@ func IsGitRepo(workspace string) bool {
 }
 
 // EnsureBranchOwned allows new sync branches and rejects foreign branch reuse.
-func EnsureBranchOwned(ctx context.Context, ops GitOps, branch string) error {
+func EnsureBranchOwned(ctx context.Context, ops Operations, branch string) error {
 	exists, err := ops.BranchExists(ctx, branch)
 	if err != nil {
 		return fmt.Errorf("check branch exists: %w", err)

@@ -1,6 +1,7 @@
 package dependency_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/task-otter/Taskotter/internal/dependency"
@@ -68,6 +69,10 @@ func TestMissingDependency(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected missing dependency error")
 	}
+
+	if !strings.Contains(err.Error(), `module "eslint/node/fnm/pnpm" depends on missing module "missing-mod"`) {
+		t.Fatalf("unexpected error: %v", err)
+	}
 }
 
 func TestDependencyCycle(t *testing.T) {
@@ -82,5 +87,18 @@ func TestDependencyCycle(t *testing.T) {
 	_, err := dependency.ResolveTransitive([]string{"a"}, depMap)
 	if err == nil {
 		t.Fatal("expected cycle error")
+	}
+
+	if !strings.Contains(err.Error(), "a -> b -> c -> a") {
+		t.Fatalf("cycle error = %v", err)
+	}
+}
+
+func TestRequestedModuleMissingFromDependencyFile(t *testing.T) {
+	t.Parallel()
+
+	_, err := dependency.ResolveTransitive([]string{"missing"}, deps())
+	if err == nil {
+		t.Fatal("expected missing requested module error")
 	}
 }

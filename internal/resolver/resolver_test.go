@@ -31,6 +31,33 @@ func TestResolveNonNodeTask(t *testing.T) {
 	}
 }
 
+func TestResolveAll(t *testing.T) {
+	t.Parallel()
+
+	resolutions, err := resolver.ResolveAll(
+		[]string{"go", "prettier"},
+		catalog("go", "prettier"),
+		"",
+		"",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(resolutions) != 2 {
+		t.Fatalf("ResolveAll() returned %d resolutions", len(resolutions))
+	}
+}
+
+func TestResolveAllStopsOnError(t *testing.T) {
+	t.Parallel()
+
+	_, err := resolver.ResolveAll([]string{"go", "missing"}, catalog("go"), "", "")
+	if err == nil {
+		t.Fatal("expected ResolveAll error")
+	}
+}
+
 func TestResolveNodeVariants(t *testing.T) {
 	t.Parallel()
 
@@ -97,6 +124,35 @@ func TestNpmRequiresVersionManager(t *testing.T) {
 	}
 }
 
+func TestNodeAttemptedSourceMissing(t *testing.T) {
+	t.Parallel()
+
+	cat := catalog("eslint/node/fnm/npm")
+
+	_, err := resolver.Resolve("eslint", cat, config.PMPnpm, config.VMFnm)
+	if err == nil {
+		t.Fatal("expected missing attempted source error")
+	}
+
+	if !strings.Contains(err.Error(), `attempted source module "eslint/node/fnm/pnpm"`) {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestResolveInvalidPackageManager(t *testing.T) {
+	t.Parallel()
+
+	_, err := resolver.Resolve(
+		"eslint",
+		catalog("eslint/node/fnm/npm"),
+		config.PackageManager("deno"),
+		"",
+	)
+	if err == nil {
+		t.Fatal("expected invalid package manager error")
+	}
+}
+
 func TestMissingTaskCloseMatches(t *testing.T) {
 	t.Parallel()
 
@@ -121,5 +177,18 @@ func TestMissingTaskCloseMatches(t *testing.T) {
 
 	if len(resolveErr.CloseMatches) == 0 {
 		t.Fatal("expected close matches")
+	}
+}
+
+func TestMissingTaskWithoutCloseMatches(t *testing.T) {
+	t.Parallel()
+
+	_, err := resolver.Resolve("zzz", catalog("go"), "", "")
+	if err == nil {
+		t.Fatal("expected missing task error")
+	}
+
+	if strings.Contains(err.Error(), "close matches") {
+		t.Fatalf("unexpected close matches: %v", err)
 	}
 }

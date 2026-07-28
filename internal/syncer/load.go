@@ -12,6 +12,8 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+var errPreviousMetadataNotFound = errors.New("previous metadata not found")
+
 // LoadMetadata reads TaskOtter metadata from rel under workspace.
 func LoadMetadata(workspace, rel string) (*Metadata, error) {
 	data, err := pathutil.ReadRelativeFile(workspace, rel)
@@ -47,23 +49,57 @@ func LoadLock(workspace, rel string) (*LockFile, error) {
 }
 
 func loadPreviousState(workspace string, cfg *config.Config) (*LockFile, *Metadata, string, error) {
-	oldMeta, err := LoadMetadata(workspace, cfg.MetadataPath())
-	if err != nil && !errors.Is(err, os.ErrNotExist) {
+	oldMeta, err := loadCurrentMetadata(workspace, cfg)
+	if errors.Is(err, errPreviousMetadataNotFound) {
+		oldMeta = nil
+	} else if err != nil {
 		return nil, nil, "", err
 	}
-	if oldMeta == nil && cfg.MetadataPath() != config.LegacyMetadataPath {
-		oldMeta, err = LoadMetadata(workspace, config.LegacyMetadataPath)
-		if err != nil && !errors.Is(err, os.ErrNotExist) {
-			return nil, nil, "", err
-		}
+
+	oldLock, oldTarget, err := loadPreviousLock(workspace, cfg, oldMeta)
+	if err != nil {
+		return nil, nil, "", err
 	}
-	if oldMeta == nil {
-		oldMeta, err = discoverPreviousMetadata(workspace, cfg.MetadataPath())
-		if err != nil {
-			return nil, nil, "", err
+
+	return oldLock, oldMeta, oldTarget, nil
+}
+
+func loadCurrentMetadata(workspace string, cfg *config.Config) (*Metadata, error) {
+	meta, found, err := loadMetadataIfExists(workspace, cfg.MetadataPath())
+	if err != nil || found {
+		return meta, err
+	}
+
+	if cfg.MetadataPath() != config.LegacyMetadataPath {
+		meta, found, err = loadMetadataIfExists(workspace, config.LegacyMetadataPath)
+		if err != nil || found {
+			return meta, err
 		}
 	}
 
+	meta, err = discoverPreviousMetadata(workspace, cfg.MetadataPath())
+
+	return meta, err
+}
+
+func loadMetadataIfExists(workspace, metadataPath string) (*Metadata, bool, error) {
+	meta, err := LoadMetadata(workspace, metadataPath)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, false, nil
+	}
+
+	if err != nil {
+		return nil, false, err
+	}
+
+	return meta, true, nil
+}
+
+func loadPreviousLock(
+	workspace string,
+	cfg *config.Config,
+	oldMeta *Metadata,
+) (*LockFile, string, error) {
 	oldLockPath := cfg.LockFilePath()
 	oldTarget := ""
 
@@ -77,14 +113,14 @@ func loadPreviousState(workspace string, cfg *config.Config) (*LockFile, *Metada
 
 	oldLock, err := LoadLock(workspace, oldLockPath)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
-		return nil, nil, "", err
+		return nil, "", err
 	}
 
 	if oldLock != nil && oldTarget == "" {
 		oldTarget = oldLock.Configuration.TargetFolder
 	}
 
-	return oldLock, oldMeta, oldTarget, nil
+	return oldLock, oldTarget, nil
 }
 
 func discoverPreviousMetadata(workspace, currentMetadataPath string) (*Metadata, error) {
@@ -92,29 +128,15 @@ func discoverPreviousMetadata(workspace, currentMetadataPath string) (*Metadata,
 
 	err := filepath.WalkDir(workspace, func(abs string, entry os.DirEntry, walkErr error) error {
 		if walkErr != nil {
-			return walkErr
+			return fmt.Errorf("walk %q: %w", abs, walkErr)
 		}
 
-		if entry.IsDir() {
-			if entry.Name() == ".git" {
-				return filepath.SkipDir
-			}
-
-			return nil
+		rel, candidate, err := previousMetadataCandidate(workspace, currentMetadataPath, abs, entry)
+		if err != nil {
+			return err
 		}
 
-		rel, relErr := filepath.Rel(workspace, abs)
-		if relErr != nil {
-			return relErr
-		}
-
-		rel = filepath.ToSlash(rel)
-		if rel == currentMetadataPath || filepath.ToSlash(rel) == config.LegacyMetadataPath {
-			return nil
-		}
-
-		if filepath.Base(rel) == "metadata.yml" &&
-			filepath.Base(filepath.Dir(rel)) == ".taskotter" {
+		if candidate {
 			candidates = append(candidates, rel)
 		}
 
@@ -125,14 +147,45 @@ func discoverPreviousMetadata(workspace, currentMetadataPath string) (*Metadata,
 	}
 
 	sort.Strings(candidates)
-	for _, candidate := range candidates {
-		meta, loadErr := LoadMetadata(workspace, candidate)
-		if loadErr != nil {
-			return nil, loadErr
-		}
 
-		return meta, nil
+	if len(candidates) == 0 {
+		return nil, errPreviousMetadataNotFound
 	}
 
-	return nil, nil
+	meta, err := LoadMetadata(workspace, candidates[0])
+	if err != nil {
+		return nil, fmt.Errorf("load previous metadata %q: %w", candidates[0], err)
+	}
+
+	return meta, nil
+}
+
+func previousMetadataCandidate(
+	workspace, currentMetadataPath, abs string,
+	entry os.DirEntry,
+) (string, bool, error) {
+	if entry.IsDir() {
+		if entry.Name() == ".git" {
+			return "", false, filepath.SkipDir
+		}
+
+		return "", false, nil
+	}
+
+	rel, err := filepath.Rel(workspace, abs)
+	if err != nil {
+		return "", false, fmt.Errorf("relative metadata path for %q: %w", abs, err)
+	}
+
+	rel = filepath.ToSlash(rel)
+	if rel == currentMetadataPath || rel == config.LegacyMetadataPath {
+		return "", false, nil
+	}
+
+	return rel, isTaskOtterMetadataPath(rel), nil
+}
+
+func isTaskOtterMetadataPath(rel string) bool {
+	return filepath.Base(rel) == "metadata.yml" &&
+		filepath.Base(filepath.Dir(rel)) == ".taskotter"
 }

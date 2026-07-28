@@ -1,0 +1,17 @@
+---
+version: "3"
+vars:
+  GO_VERSION: "1.26.5"
+tasks:
+  install:
+    cmds:
+      - go mod download
+  lint:
+    cmds:
+      - go vet ./...
+  lint:fix:
+    cmds:
+      - gofmt -w .
+  version:
+    cmds:
+      - go version

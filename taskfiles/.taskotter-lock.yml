@@ -1,6 +1,6 @@
 ---
 source:
-  repository: mostafakhairy0305-dot/TaskOtter-store
+  repository: task-otter/Taskotter-store
   requested_version: ""
   source_ref: refs/heads/main
   resolved_commit: 28025c708d1d1badc13e6a11e6432a565298ea7b

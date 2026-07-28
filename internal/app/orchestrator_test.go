@@ -6,11 +6,11 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/mostafakhairy0305-dot/TaskOtter/internal/app"
-	"github.com/mostafakhairy0305-dot/TaskOtter/internal/config"
-	"github.com/mostafakhairy0305-dot/TaskOtter/internal/git"
-	gh "github.com/mostafakhairy0305-dot/TaskOtter/internal/github"
-	"github.com/mostafakhairy0305-dot/TaskOtter/internal/store"
+	"github.com/task-otter/Taskotter/internal/app"
+	"github.com/task-otter/Taskotter/internal/config"
+	"github.com/task-otter/Taskotter/internal/git"
+	gh "github.com/task-otter/Taskotter/internal/github"
+	"github.com/task-otter/Taskotter/internal/store"
 )
 
 const (

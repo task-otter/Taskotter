@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/mostafakhairy0305-dot/TaskOtter/internal/syncer"
+	"github.com/task-otter/Taskotter/internal/syncer"
 )
 
 func TestLoadMetadataCorruptFails(t *testing.T) {

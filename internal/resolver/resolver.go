@@ -6,8 +6,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/mostafakhairy0305-dot/TaskOtter/internal/config"
-	"github.com/mostafakhairy0305-dot/TaskOtter/internal/variants"
+	"github.com/task-otter/Taskotter/internal/config"
+	"github.com/task-otter/Taskotter/internal/variants"
 )
 
 const (

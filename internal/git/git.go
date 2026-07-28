@@ -12,7 +12,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/mostafakhairy0305-dot/TaskOtter/internal/pathutil"
+	"github.com/task-otter/Taskotter/internal/pathutil"
 )
 
 const (

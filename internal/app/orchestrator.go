@@ -7,14 +7,14 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/mostafakhairy0305-dot/TaskOtter/internal/config"
-	"github.com/mostafakhairy0305-dot/TaskOtter/internal/dependency"
-	"github.com/mostafakhairy0305-dot/TaskOtter/internal/git"
-	gh "github.com/mostafakhairy0305-dot/TaskOtter/internal/github"
-	"github.com/mostafakhairy0305-dot/TaskOtter/internal/logging"
-	"github.com/mostafakhairy0305-dot/TaskOtter/internal/resolver"
-	"github.com/mostafakhairy0305-dot/TaskOtter/internal/store"
-	"github.com/mostafakhairy0305-dot/TaskOtter/internal/syncer"
+	"github.com/task-otter/Taskotter/internal/config"
+	"github.com/task-otter/Taskotter/internal/dependency"
+	"github.com/task-otter/Taskotter/internal/git"
+	gh "github.com/task-otter/Taskotter/internal/github"
+	"github.com/task-otter/Taskotter/internal/logging"
+	"github.com/task-otter/Taskotter/internal/resolver"
+	"github.com/task-otter/Taskotter/internal/store"
+	"github.com/task-otter/Taskotter/internal/syncer"
 )
 
 var errUnrelatedChanges = errors.New("unrelated uncommitted changes detected in workspace")

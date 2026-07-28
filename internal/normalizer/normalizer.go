@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/mostafakhairy0305-dot/TaskOtter/internal/variants"
+	"github.com/task-otter/Taskotter/internal/variants"
 )
 
 var errEmptyNormalizedName = errors.New("normalized name is empty")

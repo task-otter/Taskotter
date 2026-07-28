@@ -4,7 +4,7 @@
 
 # TaskOtter
 
-Docker-based GitHub Action that synchronizes task modules from the [TaskOtter store](https://github.com/mostafakhairy0305-dot/TaskOtter-store) into your repository, resolves transitive dependencies, normalizes destination folder names, optionally updates your root `Taskfile.yml`, and opens or updates a deterministic pull request when changes exist.
+Docker-based GitHub Action that synchronizes task modules from the [TaskOtter store](https://github.com/task-otter/Taskotter-store) into your repository, resolves transitive dependencies, normalizes destination folder names, optionally updates your root `Taskfile.yml`, and opens or updates a deterministic pull request when changes exist.
 
 Sync pull requests target the branch that invoked TaskOtter. For pull-request workflows, they target that workflow's base branch.
 
@@ -103,7 +103,7 @@ jobs:
 
       - name: TaskOtter
         id: taskotter
-        uses: mostafakhairy0305-dot/TaskOtter@v1
+        uses: task-otter/Taskotter@v1
         with:
           github-token: ${{ github.token }}
           tasks: |
@@ -136,7 +136,7 @@ jobs:
           fetch-depth: 0
 
       - name: TaskOtter
-        uses: mostafakhairy0305-dot/TaskOtter@v1
+        uses: task-otter/Taskotter@v1
         with:
           github-token: ${{ github.token }}
           fail-on-changes: true
@@ -155,7 +155,7 @@ jobs:
 ### Pinned store tag
 
 ```yaml
-- uses: mostafakhairy0305-dot/TaskOtter@v1
+- uses: task-otter/Taskotter@v1
   with:
     github-token: ${{ github.token }}
     store-version: v1.4.0
@@ -173,7 +173,7 @@ jobs:
 ### Bun runtime
 
 ```yaml
-- uses: mostafakhairy0305-dot/TaskOtter@v1
+- uses: task-otter/Taskotter@v1
   with:
     github-token: ${{ github.token }}
     tasks: |
@@ -188,7 +188,7 @@ jobs:
 ### Non-Node tasks only
 
 ```yaml
-- uses: mostafakhairy0305-dot/TaskOtter@v1
+- uses: task-otter/Taskotter@v1
   with:
     github-token: ${{ github.token }}
     target-folder: build/taskfiles

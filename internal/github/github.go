@@ -10,10 +10,10 @@ import (
 	"time"
 
 	"github.com/google/go-github/v69/github"
-	"github.com/mostafakhairy0305-dot/TaskOtter/internal/config"
-	"github.com/mostafakhairy0305-dot/TaskOtter/internal/repo"
-	"github.com/mostafakhairy0305-dot/TaskOtter/internal/store"
-	"github.com/mostafakhairy0305-dot/TaskOtter/internal/syncer"
+	"github.com/task-otter/Taskotter/internal/config"
+	"github.com/task-otter/Taskotter/internal/repo"
+	"github.com/task-otter/Taskotter/internal/store"
+	"github.com/task-otter/Taskotter/internal/syncer"
 	"golang.org/x/oauth2"
 )
 

@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mostafakhairy0305-dot/TaskOtter/internal/normalizer"
+	"github.com/task-otter/Taskotter/internal/normalizer"
 )
 
 const destESLint = "eslint"

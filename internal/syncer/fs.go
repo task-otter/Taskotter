@@ -8,7 +8,7 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/mostafakhairy0305-dot/TaskOtter/internal/pathutil"
+	"github.com/task-otter/Taskotter/internal/pathutil"
 )
 
 // CopyFileToHook replaces copyFileTo during tests when non-nil.

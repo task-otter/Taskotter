@@ -8,9 +8,9 @@ import (
 	"sort"
 	"syscall"
 
-	"github.com/mostafakhairy0305-dot/TaskOtter/internal/config"
-	"github.com/mostafakhairy0305-dot/TaskOtter/internal/pathutil"
-	"github.com/mostafakhairy0305-dot/TaskOtter/internal/yamlfmt"
+	"github.com/task-otter/Taskotter/internal/config"
+	"github.com/task-otter/Taskotter/internal/pathutil"
+	"github.com/task-otter/Taskotter/internal/yamlfmt"
 	"gopkg.in/yaml.v3"
 )
 

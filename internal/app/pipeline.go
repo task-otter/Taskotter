@@ -3,12 +3,12 @@ package app
 import (
 	"fmt"
 
-	"github.com/mostafakhairy0305-dot/TaskOtter/internal/config"
-	"github.com/mostafakhairy0305-dot/TaskOtter/internal/normalizer"
-	"github.com/mostafakhairy0305-dot/TaskOtter/internal/pathutil"
-	"github.com/mostafakhairy0305-dot/TaskOtter/internal/resolver"
-	"github.com/mostafakhairy0305-dot/TaskOtter/internal/store"
-	"github.com/mostafakhairy0305-dot/TaskOtter/internal/syncer"
+	"github.com/task-otter/Taskotter/internal/config"
+	"github.com/task-otter/Taskotter/internal/normalizer"
+	"github.com/task-otter/Taskotter/internal/pathutil"
+	"github.com/task-otter/Taskotter/internal/resolver"
+	"github.com/task-otter/Taskotter/internal/store"
+	"github.com/task-otter/Taskotter/internal/syncer"
 )
 
 // PrepareSyncInput maps resolved modules and dependencies into syncer input records.

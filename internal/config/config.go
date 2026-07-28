@@ -10,14 +10,14 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/mostafakhairy0305-dot/TaskOtter/internal/pathutil"
+	"github.com/task-otter/Taskotter/internal/pathutil"
 )
 
 const (
 	// DefaultTargetFolder is the workspace-relative directory where synced taskfiles are written.
 	DefaultTargetFolder = "taskfiles"
 	// StoreRepository is the GitHub repository that hosts TaskOtter store modules.
-	StoreRepository = "mostafakhairy0305-dot/TaskOtter-store"
+	StoreRepository = "task-otter/Taskotter-store"
 	// LegacyMetadataPath is the pre-migration workspace-relative metadata path.
 	LegacyMetadataPath = ".taskotter/metadata.yml"
 )

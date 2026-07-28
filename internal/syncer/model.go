@@ -4,8 +4,8 @@ package syncer
 import (
 	"os"
 
-	"github.com/mostafakhairy0305-dot/TaskOtter/internal/config"
-	"github.com/mostafakhairy0305-dot/TaskOtter/internal/store"
+	"github.com/task-otter/Taskotter/internal/config"
+	"github.com/task-otter/Taskotter/internal/store"
 )
 
 // ModuleRecord maps a logical task to its source module and destination path.

@@ -7,10 +7,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mostafakhairy0305-dot/TaskOtter/internal/app"
-	"github.com/mostafakhairy0305-dot/TaskOtter/internal/config"
-	"github.com/mostafakhairy0305-dot/TaskOtter/internal/logging"
-	"github.com/mostafakhairy0305-dot/TaskOtter/internal/store"
+	"github.com/task-otter/Taskotter/internal/app"
+	"github.com/task-otter/Taskotter/internal/config"
+	"github.com/task-otter/Taskotter/internal/logging"
+	"github.com/task-otter/Taskotter/internal/store"
 )
 
 type localStore struct {

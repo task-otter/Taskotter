@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mostafakhairy0305-dot/TaskOtter/internal/archive"
+	"github.com/task-otter/Taskotter/internal/archive"
 )
 
 func regularTarHeader(name string, size int64) *tar.Header {

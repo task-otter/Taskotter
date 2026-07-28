@@ -7,9 +7,9 @@ import (
 	"path/filepath"
 	"sort"
 
-	"github.com/mostafakhairy0305-dot/TaskOtter/internal/pathutil"
-	"github.com/mostafakhairy0305-dot/TaskOtter/internal/store"
-	"github.com/mostafakhairy0305-dot/TaskOtter/internal/taskfile"
+	"github.com/task-otter/Taskotter/internal/pathutil"
+	"github.com/task-otter/Taskotter/internal/store"
+	"github.com/task-otter/Taskotter/internal/taskfile"
 	"gopkg.in/yaml.v3"
 )
 

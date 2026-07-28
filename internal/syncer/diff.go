@@ -9,8 +9,8 @@ import (
 	"os"
 	"sort"
 
-	"github.com/mostafakhairy0305-dot/TaskOtter/internal/config"
-	"github.com/mostafakhairy0305-dot/TaskOtter/internal/pathutil"
+	"github.com/task-otter/Taskotter/internal/config"
+	"github.com/task-otter/Taskotter/internal/pathutil"
 	"gopkg.in/yaml.v3"
 )
 

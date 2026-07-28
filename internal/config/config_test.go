@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/mostafakhairy0305-dot/TaskOtter/internal/config"
+	"github.com/task-otter/Taskotter/internal/config"
 )
 
 const (

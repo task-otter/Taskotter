@@ -1,6 +1,6 @@
 # actionlint
 
-A [TaskOtter](https://github.com/mostafakhairy0305-dot/TaskOtter) module for [actionlint](https://github.com/rhysd/actionlint) — a static checker for GitHub Actions workflow files.
+A [TaskOtter](https://github.com/task-otter/Taskotter) module for [actionlint](https://github.com/rhysd/actionlint) — a static checker for GitHub Actions workflow files.
 
 ## What is this Taskfile?
 

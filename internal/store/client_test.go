@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/mostafakhairy0305-dot/TaskOtter/internal/config"
-	"github.com/mostafakhairy0305-dot/TaskOtter/internal/store"
+	"github.com/task-otter/Taskotter/internal/config"
+	"github.com/task-otter/Taskotter/internal/store"
 )
 
 func TestResolveRefDefaultBranch(t *testing.T) {
@@ -16,9 +16,9 @@ func TestResolveRefDefaultBranch(t *testing.T) {
 
 	srv := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, req *http.Request) {
 		switch req.URL.Path {
-		case "/repos/mostafakhairy0305-dot/TaskOtter-store":
+		case "/repos/task-otter/Taskotter-store":
 			_, _ = writer.Write([]byte(`{"default_branch":"main"}`))
-		case "/repos/mostafakhairy0305-dot/TaskOtter-store/commits/main":
+		case "/repos/task-otter/Taskotter-store/commits/main":
 			_, _ = writer.Write([]byte(`{"sha":"abc123def456"}`))
 		default:
 			http.NotFound(writer, req)
@@ -48,9 +48,9 @@ func TestResolveMissingTag(t *testing.T) {
 
 	srv := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, req *http.Request) {
 		switch req.URL.Path {
-		case "/repos/mostafakhairy0305-dot/TaskOtter-store":
+		case "/repos/task-otter/Taskotter-store":
 			_, _ = writer.Write([]byte(`{"default_branch":"main"}`))
-		case "/repos/mostafakhairy0305-dot/TaskOtter-store/git/ref/tags/v9.9.9":
+		case "/repos/task-otter/Taskotter-store/git/ref/tags/v9.9.9":
 			http.NotFound(writer, req)
 		default:
 			http.NotFound(writer, req)

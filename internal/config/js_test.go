@@ -3,7 +3,7 @@ package config_test
 import (
 	"testing"
 
-	"github.com/mostafakhairy0305-dot/TaskOtter/internal/config"
+	"github.com/task-otter/Taskotter/internal/config"
 )
 
 func TestParseJSNodeJSDefaults(t *testing.T) {

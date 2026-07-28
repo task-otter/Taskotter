@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mostafakhairy0305-dot/TaskOtter/internal/config"
-	"github.com/mostafakhairy0305-dot/TaskOtter/internal/resolver"
+	"github.com/task-otter/Taskotter/internal/config"
+	"github.com/task-otter/Taskotter/internal/resolver"
 )
 
 func catalog(names ...string) map[string]struct{} {

@@ -6,10 +6,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mostafakhairy0305-dot/TaskOtter/internal/config"
-	gh "github.com/mostafakhairy0305-dot/TaskOtter/internal/github"
-	"github.com/mostafakhairy0305-dot/TaskOtter/internal/store"
-	"github.com/mostafakhairy0305-dot/TaskOtter/internal/syncer"
+	"github.com/task-otter/Taskotter/internal/config"
+	gh "github.com/task-otter/Taskotter/internal/github"
+	"github.com/task-otter/Taskotter/internal/store"
+	"github.com/task-otter/Taskotter/internal/syncer"
 )
 
 const taskESLint = "eslint"

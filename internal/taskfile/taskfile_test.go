@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mostafakhairy0305-dot/TaskOtter/internal/taskfile"
+	"github.com/task-otter/Taskotter/internal/taskfile"
 )
 
 const (

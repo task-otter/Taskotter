@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mostafakhairy0305-dot/TaskOtter/internal/git"
+	"github.com/task-otter/Taskotter/internal/git"
 )
 
 const testMainBranch = "main"

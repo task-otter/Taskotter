@@ -8,8 +8,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/mostafakhairy0305-dot/TaskOtter/internal/app"
-	"github.com/mostafakhairy0305-dot/TaskOtter/internal/store"
+	"github.com/task-otter/Taskotter/internal/app"
+	"github.com/task-otter/Taskotter/internal/store"
 )
 
 //nolint:gochecknoglobals // serializes stderr capture across parallel tests

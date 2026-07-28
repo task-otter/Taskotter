@@ -149,6 +149,7 @@ project:
 
 ```sh
 task go:test
+task go:test:junit
 task go:bench
 task go:coverage
 task go:fuzz -- -fuzz FuzzName ./internal/parser
@@ -160,9 +161,12 @@ after `--`:
 
 ```sh
 task go:test -- -race -run TestName ./internal/...
+task go:test:junit GO_JUNIT_REPORT=report.xml -- -race ./internal/...
 task go:bench -- -bench BenchmarkName ./internal/parser
 ```
 
+`test:junit` runs `go test -v`, streams test output to stdout, and writes a
+JUnit XML report to `GO_JUNIT_REPORT` (default `junit.xml`).
 `coverage` writes a profile to `GO_COVER_PROFILE` (default `coverage.out`) and
 prints only packages containing executable statements, ordered from lowest to
 highest coverage. Packages with statements and zero coverage are included.
@@ -192,13 +196,15 @@ package. Linux and Windows use official Go downloads for both modes.
 Each development tool has its own optional version variable:
 
 ```sh
+task go:install:go-junit-report
 task go:install:golangci-lint GOLANGCI_LINT_VERSION=v2.1.6
 task go:install:govulncheck GOVULNCHECK_VERSION=v1.1.4
 task go:install:gosec GOSEC_VERSION=v2.22.7
 ```
 
 An empty tool version defaults to `latest`. Supplying a tool version forces its
-installer to run even when the executable already exists.
+installer to run even when the executable already exists. `go-junit-report` is
+pinned to v2.1.0.
 
 ## Public Tasks
 
@@ -208,6 +214,7 @@ installer to run even when the executable already exists.
 | `fmt:check`                 | Check Go file formatting with golangci-lint formatters | `GO_FMT_SKIP_PATTERN` |
 | `install`                   | Install Go on the current operating system if missing | `INSTALL_DIR_UNIX`, `GO_VERSION` |
 | `install:undo`              | Remove Go from the current operating system            | `INSTALL_DIR_UNIX` |
+| `install:go-junit-report`   | Install go-junit-report into the global Go bin        | `GLOBAL_GO_BIN` |
 | `install:golangci-lint`     | Install golangci-lint into the global Go bin          | `GLOBAL_GO_BIN`, `GOLANGCI_LINT_VERSION` |
 | `install:govulncheck`       | Install govulncheck into the global Go bin             | `GLOBAL_GO_BIN`, `GOVULNCHECK_VERSION` |
 | `install:gosec`             | Install gosec into the global Go bin                   | `GLOBAL_GO_BIN`, `GOSEC_VERSION` |
@@ -225,6 +232,7 @@ installer to run even when the executable already exists.
 | `which`                     | Show the path to the Go binary                         | none               |
 | `verify`                    | Print Go version, GOROOT, and GOPATH                   | none               |
 | `test`                      | Run Go unit tests                                      | none               |
+| `test:junit`                | Run Go unit tests and write a JUnit XML report         | `GO_JUNIT_REPORT` |
 | `bench`                     | Run Go benchmarks                                      | none               |
 | `fuzz`                      | Run a Go fuzz target                                   | `GO_FUZZTIME`      |
 | `coverage`                  | Run Go tests and report coverage                       | `GO_COVER_PROFILE` |
@@ -245,6 +253,7 @@ installer to run even when the executable already exists.
 | `GOSEC_VERSION`        | empty (`latest`)                | Optional gosec module version                                         |
 | `GO_FMT_SKIP_PATTERN`  | empty                           | Shell-style path glob for Go files skipped by `fmt` and `fmt:check`   |
 | `GO_LINT_SKIP_PATTERN` | empty                           | Shell-style path glob for Go files skipped by `lint` and `lint:fix`   |
+| `GO_JUNIT_REPORT`      | empty (`junit.xml`)             | Output path for the `test:junit` XML report                           |
 | `GO_COVER_PROFILE`     | empty (`coverage.out`)          | Output path for the `coverage` profile file                          |
 | `GO_FUZZTIME`          | empty (`30s`)                   | Duration a single `fuzz` target runs before stopping                 |
 | `GLOBAL_GO_BIN`        | `GOBIN` or `GOPATH/bin`         | Destination and lookup directory for installed Go development tools   |

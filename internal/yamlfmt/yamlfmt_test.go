@@ -29,7 +29,20 @@ func TestMarshalAddsSingleDocumentStartAndTrailingNewline(t *testing.T) {
 func TestMarshalReportsUnsupportedValue(t *testing.T) {
 	t.Parallel()
 
-	_, err := yamlfmt.Marshal(&yaml.Node{Kind: 99})
+	_, err := yamlfmt.Marshal(&yaml.Node{
+		Kind:        99,
+		Style:       0,
+		Tag:         "",
+		Value:       "",
+		Anchor:      "",
+		Alias:       nil,
+		Content:     nil,
+		HeadComment: "",
+		LineComment: "",
+		FootComment: "",
+		Line:        0,
+		Column:      0,
+	})
 	if err == nil {
 		t.Fatal("expected marshal error")
 	}

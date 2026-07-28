@@ -11,6 +11,7 @@ func TestLoggerWritesGitHubActionsCommands(t *testing.T) {
 	t.Parallel()
 
 	var buf bytes.Buffer
+
 	log := logging.NewWithWriter(&buf)
 
 	log.Printf("plain %s", "line")

@@ -16,10 +16,27 @@ import (
 	"github.com/task-otter/Taskotter/internal/store"
 )
 
+const (
+	storeRepoPath  = "/repos/task-otter/store"
+	storeTagPath   = "/repos/task-otter/store/git/ref/tags/v1.2.3"
+	storeCommitSHA = "abc123"
+)
+
+func storeRefInfo(commit string) store.RefInfo {
+	return store.RefInfo{
+		Repository:       config.StoreRepository,
+		RequestedVersion: "",
+		SourceRef:        "",
+		ResolvedCommit:   commit,
+		DefaultBranch:    "",
+	}
+}
+
 func buildStoreTarGz(t *testing.T) []byte {
 	t.Helper()
 
 	var buf bytes.Buffer
+
 	gzipWriter := gzip.NewWriter(&buf)
 	tarWriter := tar.NewWriter(gzipWriter)
 
@@ -29,30 +46,33 @@ func buildStoreTarGz(t *testing.T) []byte {
 	}
 
 	for name, content := range entries {
-		header := &tar.Header{
-			Name:       name,
-			Mode:       0o644,
-			Size:       int64(len(content)),
-			Typeflag:   tar.TypeReg,
-			ModTime:    time.Time{},
-			AccessTime: time.Time{},
-			ChangeTime: time.Time{},
-		}
+		header := new(tar.Header)
+		header.Name = name
+		header.Mode = 0o644
+		header.Size = int64(len(content))
+		header.Typeflag = tar.TypeReg
+		header.ModTime = time.Time{}
+		header.AccessTime = time.Time{}
+		header.ChangeTime = time.Time{}
 
-		if err := tarWriter.WriteHeader(header); err != nil {
+		err := tarWriter.WriteHeader(header)
+		if err != nil {
 			t.Fatal(err)
 		}
 
-		if _, err := tarWriter.Write(content); err != nil {
+		_, err = tarWriter.Write(content)
+		if err != nil {
 			t.Fatal(err)
 		}
 	}
 
-	if err := tarWriter.Close(); err != nil {
+	err := tarWriter.Close()
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := gzipWriter.Close(); err != nil {
+	err = gzipWriter.Close()
+	if err != nil {
 		t.Fatal(err)
 	}
 
@@ -74,7 +94,7 @@ func TestResolveRefDefaultBranch(t *testing.T) {
 
 	srv := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, req *http.Request) {
 		switch req.URL.Path {
-		case "/repos/task-otter/store":
+		case storeRepoPath:
 			_, _ = writer.Write([]byte(`{"default_branch":"main"}`))
 		case "/repos/task-otter/store/commits/main":
 			_, _ = writer.Write([]byte(`{"sha":"abc123def456"}`))
@@ -106,7 +126,7 @@ func TestResolveMissingTag(t *testing.T) {
 
 	srv := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, req *http.Request) {
 		switch req.URL.Path {
-		case "/repos/task-otter/store":
+		case storeRepoPath:
 			_, _ = writer.Write([]byte(`{"default_branch":"main"}`))
 		case "/repos/task-otter/store/git/ref/tags/v9.9.9":
 			http.NotFound(writer, req)
@@ -130,9 +150,9 @@ func TestResolveLightweightTag(t *testing.T) {
 
 	client, cleanup := newStoreTestClient(t, func(writer http.ResponseWriter, req *http.Request) {
 		switch req.URL.Path {
-		case "/repos/task-otter/store":
+		case storeRepoPath:
 			_, _ = writer.Write([]byte(`{"default_branch":"main"}`))
-		case "/repos/task-otter/store/git/ref/tags/v1.2.3":
+		case storeTagPath:
 			_, _ = writer.Write([]byte(`{"object":{"sha":"tagsha","type":"commit"}}`))
 		default:
 			http.NotFound(writer, req)
@@ -155,9 +175,9 @@ func TestResolveAnnotatedTag(t *testing.T) {
 
 	client, cleanup := newStoreTestClient(t, func(writer http.ResponseWriter, req *http.Request) {
 		switch req.URL.Path {
-		case "/repos/task-otter/store":
+		case storeRepoPath:
 			_, _ = writer.Write([]byte(`{"default_branch":"main"}`))
-		case "/repos/task-otter/store/git/ref/tags/v1.2.3":
+		case storeTagPath:
 			_, _ = writer.Write([]byte(`{"object":{"sha":"annotated","type":"tag"}}`))
 		case "/repos/task-otter/store/git/tags/annotated":
 			_, _ = writer.Write([]byte(`{"object":{"sha":"peeled"}}`))
@@ -194,15 +214,19 @@ func TestResolveRefErrors(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 
-			client, cleanup := newStoreTestClient(t, func(writer http.ResponseWriter, req *http.Request) {
-				if req.URL.Path != "/repos/task-otter/store" {
-					http.NotFound(writer, req)
-					return
-				}
+			client, cleanup := newStoreTestClient(
+				t,
+				func(writer http.ResponseWriter, req *http.Request) {
+					if req.URL.Path != storeRepoPath {
+						http.NotFound(writer, req)
 
-				writer.WriteHeader(testCase.status)
-				_, _ = writer.Write([]byte(testCase.body))
-			})
+						return
+					}
+
+					writer.WriteHeader(testCase.status)
+					_, _ = writer.Write([]byte(testCase.body))
+				},
+			)
 			defer cleanup()
 
 			_, err := client.ResolveRef(context.Background(), "")
@@ -229,17 +253,20 @@ func TestResolveTagErrors(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 
-			client, cleanup := newStoreTestClient(t, func(writer http.ResponseWriter, req *http.Request) {
-				switch req.URL.Path {
-				case "/repos/task-otter/store":
-					_, _ = writer.Write([]byte(`{"default_branch":"main"}`))
-				case "/repos/task-otter/store/git/ref/tags/v1.2.3":
-					writer.WriteHeader(testCase.status)
-					_, _ = writer.Write([]byte(testCase.body))
-				default:
-					http.NotFound(writer, req)
-				}
-			})
+			client, cleanup := newStoreTestClient(
+				t,
+				func(writer http.ResponseWriter, req *http.Request) {
+					switch req.URL.Path {
+					case storeRepoPath:
+						_, _ = writer.Write([]byte(`{"default_branch":"main"}`))
+					case storeTagPath:
+						writer.WriteHeader(testCase.status)
+						_, _ = writer.Write([]byte(testCase.body))
+					default:
+						http.NotFound(writer, req)
+					}
+				},
+			)
 			defer cleanup()
 
 			_, err := client.ResolveRef(context.Background(), "v1.2.3")
@@ -258,9 +285,11 @@ func TestNewClientAndDownloadSnapshot(t *testing.T) {
 	}
 
 	data := buildStoreTarGz(t)
+
 	client, cleanup := newStoreTestClient(t, func(writer http.ResponseWriter, req *http.Request) {
 		if req.URL.Path != "/repos/task-otter/store/tarball/abc123" {
 			http.NotFound(writer, req)
+
 			return
 		}
 
@@ -272,7 +301,10 @@ func TestNewClientAndDownloadSnapshot(t *testing.T) {
 	})
 	defer cleanup()
 
-	snap, err := client.DownloadSnapshot(context.Background(), store.RefInfo{ResolvedCommit: "abc123"})
+	snap, err := client.DownloadSnapshot(
+		context.Background(),
+		storeRefInfo(storeCommitSHA),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -281,11 +313,13 @@ func TestNewClientAndDownloadSnapshot(t *testing.T) {
 		t.Fatalf("Catalog = %#v, want go", snap.Catalog)
 	}
 
-	if err := snap.Close(); err != nil {
+	err = snap.Close()
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	if _, err := os.Stat(snap.RootDir); !os.IsNotExist(err) {
+	_, err = os.Stat(snap.RootDir)
+	if !os.IsNotExist(err) {
 		t.Fatalf("snapshot root still exists or unexpected stat error: %v", err)
 	}
 }
@@ -302,12 +336,18 @@ func TestDownloadSnapshotStatusErrors(t *testing.T) {
 		t.Run(http.StatusText(status), func(t *testing.T) {
 			t.Parallel()
 
-			client, cleanup := newStoreTestClient(t, func(writer http.ResponseWriter, req *http.Request) {
-				writer.WriteHeader(status)
-			})
+			client, cleanup := newStoreTestClient(
+				t,
+				func(writer http.ResponseWriter, _ *http.Request) {
+					writer.WriteHeader(status)
+				},
+			)
 			defer cleanup()
 
-			_, err := client.DownloadSnapshot(context.Background(), store.RefInfo{ResolvedCommit: "abc123"})
+			_, err := client.DownloadSnapshot(
+				context.Background(),
+				storeRefInfo(storeCommitSHA),
+			)
 			if err == nil {
 				t.Fatal("expected DownloadSnapshot error")
 			}
@@ -318,12 +358,12 @@ func TestDownloadSnapshotStatusErrors(t *testing.T) {
 func TestDownloadSnapshotInvalidArchiveCleansUp(t *testing.T) {
 	t.Parallel()
 
-	client, cleanup := newStoreTestClient(t, func(writer http.ResponseWriter, req *http.Request) {
+	client, cleanup := newStoreTestClient(t, func(writer http.ResponseWriter, _ *http.Request) {
 		_, _ = writer.Write([]byte("not a gzip archive"))
 	})
 	defer cleanup()
 
-	_, err := client.DownloadSnapshot(context.Background(), store.RefInfo{ResolvedCommit: "abc123"})
+	_, err := client.DownloadSnapshot(context.Background(), storeRefInfo(storeCommitSHA))
 	if err == nil {
 		t.Fatal("expected DownloadSnapshot error")
 	}

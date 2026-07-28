@@ -10,13 +10,14 @@ import (
 const (
 	destCorepack = "corepack"
 	destESLint   = "eslint"
+	srcESLint    = "eslint/node/fnm/pnpm"
 )
 
 func TestNormalizeExamples(t *testing.T) {
 	t.Parallel()
 
 	cases := map[string]string{
-		"eslint/node/fnm/pnpm": destESLint,
+		srcESLint:              destESLint,
 		"eslint/node/nvm/pnpm": destESLint,
 		"eslint/node/fnm/npm":  destESLint,
 		"eslint/node/nvm/npm":  destESLint,
@@ -60,7 +61,7 @@ func TestNormalizeExamples(t *testing.T) {
 func TestLongestSuffixFirst(t *testing.T) {
 	t.Parallel()
 
-	got, err := normalizer.Normalize("eslint/node/fnm/pnpm")
+	got, err := normalizer.Normalize(srcESLint)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -91,7 +92,7 @@ func TestBuildDestinationMapPropagatesNormalizeError(t *testing.T) {
 func TestDestinationCollision(t *testing.T) {
 	t.Parallel()
 
-	_, err := normalizer.BuildDestinationMap([]string{"eslint/node/fnm/pnpm", "eslint/bun"})
+	_, err := normalizer.BuildDestinationMap([]string{srcESLint, "eslint/bun"})
 	if err == nil {
 		t.Fatal("expected collision error")
 	}
@@ -104,13 +105,14 @@ func TestDestinationCollision(t *testing.T) {
 func TestBuildDestinationMapSortsSources(t *testing.T) {
 	t.Parallel()
 
-	mapping, err := normalizer.BuildDestinationMap([]string{"go", "eslint/node/fnm/pnpm"})
+	mapping, err := normalizer.BuildDestinationMap([]string{"go", srcESLint})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	got := normalizer.SortedSources(mapping)
-	want := []string{"eslint/node/fnm/pnpm", "go"}
+
+	want := []string{srcESLint, "go"}
 	for i := range want {
 		if got[i] != want[i] {
 			t.Fatalf("SortedSources() = %#v, want %#v", got, want)

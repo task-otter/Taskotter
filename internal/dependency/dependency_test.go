@@ -70,7 +70,10 @@ func TestMissingDependency(t *testing.T) {
 		t.Fatal("expected missing dependency error")
 	}
 
-	if !strings.Contains(err.Error(), `module "eslint/node/fnm/pnpm" depends on missing module "missing-mod"`) {
+	if !strings.Contains(
+		err.Error(),
+		`module "eslint/node/fnm/pnpm" depends on missing module "missing-mod"`,
+	) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }

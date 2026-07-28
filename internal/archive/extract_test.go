@@ -108,24 +108,25 @@ func buildTarGzWithHeaders(t *testing.T, headers []*tar.Header) []byte {
 	t.Helper()
 
 	var buf bytes.Buffer
+
 	gzipWriter := gzip.NewWriter(&buf)
 	tarWriter := tar.NewWriter(gzipWriter)
 
 	for _, header := range headers {
-		if err := tarWriter.WriteHeader(header); err != nil {
+		err := tarWriter.WriteHeader(header)
+		if err != nil {
 			t.Fatal(err)
 		}
 
 		if header.Typeflag == tar.TypeReg && header.Size > 0 {
 			chunk := bytes.Repeat([]byte("x"), 32*1024)
+
 			remaining := header.Size
 			for remaining > 0 {
-				writeSize := int64(len(chunk))
-				if remaining < writeSize {
-					writeSize = remaining
-				}
+				writeSize := min(remaining, int64(len(chunk)))
 
-				if _, err := tarWriter.Write(chunk[:writeSize]); err != nil {
+				_, err := tarWriter.Write(chunk[:writeSize])
+				if err != nil {
 					t.Fatal(err)
 				}
 
@@ -134,11 +135,13 @@ func buildTarGzWithHeaders(t *testing.T, headers []*tar.Header) []byte {
 		}
 	}
 
-	if err := tarWriter.Close(); err != nil {
+	err := tarWriter.Close()
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := gzipWriter.Close(); err != nil {
+	err = gzipWriter.Close()
+	if err != nil {
 		t.Fatal(err)
 	}
 

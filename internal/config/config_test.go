@@ -155,7 +155,7 @@ func TestRootTaskfileMustBeYAML(t *testing.T) {
 func TestValidationErrorWithoutField(t *testing.T) {
 	t.Parallel()
 
-	err := (&config.ValidationError{Message: "bad input"}).Error()
+	err := (&config.ValidationError{Field: "", Message: "bad input"}).Error()
 	if err != "bad input" {
 		t.Fatalf("Error() = %q", err)
 	}

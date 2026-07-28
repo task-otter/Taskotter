@@ -12,6 +12,9 @@ import (
 const (
 	folderTaskfiles = "taskfiles"
 	folderTask      = "task"
+	pathTaskfileYML = "Taskfile.yml"
+	pathGoTaskfile  = "taskfiles/go/Taskfile.yml"
+	pathErrorMsgBad = "bad"
 )
 
 func TestIsTestPath(t *testing.T) {
@@ -24,7 +27,7 @@ func TestIsTestPath(t *testing.T) {
 		{"go_test.go", true},
 		{"eslint_test.ts", true},
 		{"nested/pkg/foo_test.go", true},
-		{"Taskfile.yml", false},
+		{pathTaskfileYML, false},
 		{"README.md", false},
 		{"latest.txt", false},
 	}
@@ -65,7 +68,7 @@ func TestHasFolderPrefix(t *testing.T) {
 		want   bool
 	}{
 		{"taskfiles/go", folderTaskfiles, true},
-		{"taskfiles/go/Taskfile.yml", folderTaskfiles, true},
+		{pathGoTaskfile, folderTaskfiles, true},
 		{folderTask, folderTask, true},
 		{"taskfiles-extra/foo", folderTask, false},
 		{"task/extra", folderTaskfiles, false},
@@ -122,7 +125,7 @@ func TestReadRelativeFile(t *testing.T) {
 	t.Parallel()
 
 	root := t.TempDir()
-	rel := "taskfiles/go/Taskfile.yml"
+	rel := pathGoTaskfile
 
 	want := []byte("version: \"3\"\n")
 
@@ -150,7 +153,7 @@ func TestNormalizeSlashes(t *testing.T) {
 	t.Parallel()
 
 	got := pathutil.NormalizeSlashes(` //taskfiles\\go///Taskfile.yml `)
-	if got != "taskfiles/go/Taskfile.yml" {
+	if got != pathGoTaskfile {
 		t.Fatalf("NormalizeSlashes() = %q", got)
 	}
 }
@@ -158,13 +161,13 @@ func TestNormalizeSlashes(t *testing.T) {
 func TestPathErrorString(t *testing.T) {
 	t.Parallel()
 
-	withField := (&pathutil.PathError{Field: "tasks", Message: "bad"}).Error()
+	withField := (&pathutil.PathError{Field: "tasks", Value: "", Message: pathErrorMsgBad}).Error()
 	if withField != "tasks: bad" {
 		t.Fatalf("Error() = %q", withField)
 	}
 
-	withoutField := (&pathutil.PathError{Message: "bad"}).Error()
-	if withoutField != "bad" {
+	withoutField := (&pathutil.PathError{Field: "", Value: "", Message: pathErrorMsgBad}).Error()
+	if withoutField != pathErrorMsgBad {
 		t.Fatalf("Error() = %q", withoutField)
 	}
 }
@@ -174,14 +177,16 @@ func TestValidateTaskName(t *testing.T) {
 
 	valid := []string{"go", "eslint-config", "a1"}
 	for _, name := range valid {
-		if err := pathutil.ValidateTaskName(name); err != nil {
+		err := pathutil.ValidateTaskName(name)
+		if err != nil {
 			t.Fatalf("ValidateTaskName(%q) error = %v", name, err)
 		}
 	}
 
 	invalid := []string{"", "Go", "go/test", `go\test`, "go..test", "-go"}
 	for _, name := range invalid {
-		if err := pathutil.ValidateTaskName(name); err == nil {
+		err := pathutil.ValidateTaskName(name)
+		if err == nil {
 			t.Fatalf("ValidateTaskName(%q) expected error", name)
 		}
 	}
@@ -218,7 +223,8 @@ func TestValidateTargetFolderRejectsUnsafePaths(t *testing.T) {
 	}
 
 	for _, raw := range cases {
-		if _, err := pathutil.ValidateTargetFolder(raw, workspace); err == nil {
+		_, err := pathutil.ValidateTargetFolder(raw, workspace)
+		if err == nil {
 			t.Fatalf("ValidateTargetFolder(%q) expected error", raw)
 		}
 	}
@@ -244,12 +250,13 @@ func TestValidateTargetFolderRejectsEscapingSymlink(t *testing.T) {
 func TestJoinRelativeAndWorkspacePath(t *testing.T) {
 	t.Parallel()
 
-	got := pathutil.JoinRelative("taskfiles", "go", "Taskfile.yml")
-	if got != "taskfiles/go/Taskfile.yml" {
+	got := pathutil.JoinRelative("taskfiles", "go", pathTaskfileYML)
+	if got != pathGoTaskfile {
 		t.Fatalf("JoinRelative() = %q", got)
 	}
 
 	workspace := t.TempDir()
+
 	want := filepath.Join(workspace, "taskfiles", "go")
 	if got := pathutil.WorkspacePath(workspace, "taskfiles/go"); got != want {
 		t.Fatalf("WorkspacePath() = %q, want %q", got, want)
@@ -266,7 +273,7 @@ func TestValidateRelativePathNormalizesValidPath(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if got != "taskfiles/go/Taskfile.yml" {
+	if got != pathGoTaskfile {
 		t.Fatalf("ValidateRelativePath() = %q", got)
 	}
 }
@@ -275,14 +282,18 @@ func TestOpenRelativeFile(t *testing.T) {
 	t.Parallel()
 
 	root := t.TempDir()
-	rel := "taskfiles/go/Taskfile.yml"
+	rel := pathGoTaskfile
 
 	err := os.MkdirAll(filepath.Join(root, "taskfiles", "go"), 0o755)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = os.WriteFile(filepath.Join(root, filepath.FromSlash(rel)), []byte("version: \"3\"\n"), 0o644)
+	err = os.WriteFile(
+		filepath.Join(root, filepath.FromSlash(rel)),
+		[]byte("version: \"3\"\n"),
+		0o644,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -318,7 +329,7 @@ func TestIsDocPath(t *testing.T) {
 		{"docs/setup.md", true},
 		{"go/docs/setup.md", true},
 		{"go/README.md", false},
-		{"Taskfile.yml", false},
+		{pathTaskfileYML, false},
 	}
 
 	for _, testCase := range cases {

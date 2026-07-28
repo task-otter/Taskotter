@@ -12,6 +12,8 @@ import (
 	"github.com/task-otter/Taskotter/internal/store"
 )
 
+const testPullRequestURL = "https://example.com/pull/42"
+
 func emptyRefInfo() store.RefInfo {
 	return store.RefInfo{
 		Repository:       "",
@@ -19,6 +21,44 @@ func emptyRefInfo() store.RefInfo {
 		SourceRef:        "",
 		ResolvedCommit:   "",
 		DefaultBranch:    "",
+	}
+}
+
+func emptyConfig() *config.Config {
+	return &config.Config{
+		Tasks:              nil,
+		JSRuntime:          "",
+		NodePackageManager: "",
+		NodeVersionManager: "",
+		IncludesDoc:        false,
+		SyncRoot:           false,
+		FailOnChanges:      false,
+		StoreVersion:       "",
+		TargetFolder:       "",
+		RootTaskfile:       "",
+		GitHubToken:        "",
+		Workspace:          "",
+		Repository:         "",
+		GitHubOutput:       "",
+		BaseBranch:         "",
+		ConfigurationHash:  "",
+		BranchName:         "",
+	}
+}
+
+func emptyResult() *app.Result {
+	return &app.Result{
+		Changed:              false,
+		StoreVersion:         "",
+		SourceRef:            "",
+		SourceSHA:            "",
+		TargetFolder:         "",
+		ResolvedTasksJSON:    "",
+		ResolvedDependencies: "",
+		PullRequestNumber:    "",
+		PullRequestURL:       "",
+		Plan:                 nil,
+		Ref:                  emptyRefInfo(),
 	}
 }
 
@@ -34,7 +74,7 @@ func TestReportSyncRequiredWithPullRequest(t *testing.T) {
 		ResolvedTasksJSON:    "",
 		ResolvedDependencies: "",
 		PullRequestNumber:    "42",
-		PullRequestURL:       "https://example.com/pull/42",
+		PullRequestURL:       testPullRequestURL,
 		Plan:                 nil,
 		Ref:                  emptyRefInfo(),
 	}
@@ -49,7 +89,7 @@ func TestReportSyncRequiredWithPullRequest(t *testing.T) {
 
 	if !strings.Contains(
 		out.String(),
-		"TaskOtter opened sync PR #42: https://example.com/pull/42",
+		"TaskOtter opened sync PR #42: "+testPullRequestURL,
 	) {
 		t.Fatalf("missing PR summary: %s", out.String())
 	}
@@ -62,7 +102,9 @@ func TestReportSyncRequiredWithPullRequest(t *testing.T) {
 func TestReportSyncRequiredWithUnknownPullRequestNumber(t *testing.T) {
 	t.Parallel()
 
-	result := &app.Result{Changed: true, PullRequestURL: "https://example.com/pull/42"}
+	result := emptyResult()
+	result.Changed = true
+	result.PullRequestURL = testPullRequestURL
 
 	var out bytes.Buffer
 	app.ReportSyncRequiredTo(&out, result)
@@ -140,7 +182,8 @@ func TestWriteActionOutputsToFile(t *testing.T) {
 	t.Parallel()
 
 	outputPath := filepath.Join(t.TempDir(), "github-output")
-	cfg := &config.Config{GitHubOutput: outputPath}
+	cfg := emptyConfig()
+	cfg.GitHubOutput = outputPath
 	result := &app.Result{
 		Changed:              true,
 		StoreVersion:         "v1.2.3",
@@ -150,7 +193,9 @@ func TestWriteActionOutputsToFile(t *testing.T) {
 		ResolvedTasksJSON:    "{}",
 		ResolvedDependencies: "[]",
 		PullRequestNumber:    "42",
-		PullRequestURL:       "https://example.com/pull/42",
+		PullRequestURL:       testPullRequestURL,
+		Plan:                 nil,
+		Ref:                  emptyRefInfo(),
 	}
 
 	err := app.WriteActionOutputs(cfg, result)
@@ -177,8 +222,10 @@ func TestWriteActionOutputsToFile(t *testing.T) {
 func TestWriteActionOutputsWrapsFileError(t *testing.T) {
 	t.Parallel()
 
-	cfg := &config.Config{GitHubOutput: filepath.Join(t.TempDir(), "missing", "output")}
-	err := app.WriteActionOutputs(cfg, &app.Result{})
+	cfg := emptyConfig()
+	cfg.GitHubOutput = filepath.Join(t.TempDir(), "missing", "output")
+
+	err := app.WriteActionOutputs(cfg, emptyResult())
 	if err == nil {
 		t.Fatal("expected write output error")
 	}

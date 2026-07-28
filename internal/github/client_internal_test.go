@@ -2,6 +2,7 @@ package github
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -13,6 +14,11 @@ import (
 	gogithub "github.com/google/go-github/v69/github"
 	"github.com/task-otter/Taskotter/internal/config"
 	"github.com/task-otter/Taskotter/internal/syncer"
+)
+
+const (
+	outputKeyChanged = "changed"
+	outputFalse      = "false"
 )
 
 func newTestClient(t *testing.T, handler http.HandlerFunc) (*Client, func()) {
@@ -60,6 +66,7 @@ func TestFindOpenPR(t *testing.T) {
 	client, cleanup := newTestClient(t, func(writer http.ResponseWriter, req *http.Request) {
 		if req.Method != http.MethodGet || req.URL.Path != "/repos/owner/repo/pulls" {
 			http.NotFound(writer, req)
+
 			return
 		}
 
@@ -75,26 +82,26 @@ func TestFindOpenPR(t *testing.T) {
 	})
 	defer cleanup()
 
-	pr, err := client.FindOpenPR(context.Background(), "taskotter/sync-abc", "main")
+	pullRequest, err := client.FindOpenPR(context.Background(), "taskotter/sync-abc", "main")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if pr.Number != 42 || pr.URL != "https://example.test/pr/42" {
-		t.Fatalf("FindOpenPR() = %#v", pr)
+	if pullRequest.Number != 42 || pullRequest.URL != "https://example.test/pr/42" {
+		t.Fatalf("FindOpenPR() = %#v", pullRequest)
 	}
 }
 
 func TestFindOpenPRNotFound(t *testing.T) {
 	t.Parallel()
 
-	client, cleanup := newTestClient(t, func(writer http.ResponseWriter, req *http.Request) {
+	client, cleanup := newTestClient(t, func(writer http.ResponseWriter, _ *http.Request) {
 		_, _ = writer.Write([]byte(`[]`))
 	})
 	defer cleanup()
 
 	_, err := client.FindOpenPR(context.Background(), "taskotter/sync-abc", "main")
-	if err != ErrPullRequestNotFound {
+	if !errors.Is(err, ErrPullRequestNotFound) {
 		t.Fatalf("FindOpenPR() error = %v, want ErrPullRequestNotFound", err)
 	}
 }
@@ -102,7 +109,7 @@ func TestFindOpenPRNotFound(t *testing.T) {
 func TestFindOpenPRError(t *testing.T) {
 	t.Parallel()
 
-	client, cleanup := newTestClient(t, func(writer http.ResponseWriter, req *http.Request) {
+	client, cleanup := newTestClient(t, func(writer http.ResponseWriter, _ *http.Request) {
 		http.Error(writer, "nope", http.StatusInternalServerError)
 	})
 	defer cleanup()
@@ -119,6 +126,7 @@ func TestCreatePR(t *testing.T) {
 	client, cleanup := newTestClient(t, func(writer http.ResponseWriter, req *http.Request) {
 		if req.Method != http.MethodPost || req.URL.Path != "/repos/owner/repo/pulls" {
 			http.NotFound(writer, req)
+
 			return
 		}
 
@@ -126,20 +134,20 @@ func TestCreatePR(t *testing.T) {
 	})
 	defer cleanup()
 
-	pr, err := client.CreatePR(context.Background(), "taskotter/sync-abc", "main", "body")
+	pullRequest, err := client.CreatePR(context.Background(), "taskotter/sync-abc", "main", "body")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if pr.Number != 7 || pr.URL != "https://example.test/pr/7" {
-		t.Fatalf("CreatePR() = %#v", pr)
+	if pullRequest.Number != 7 || pullRequest.URL != "https://example.test/pr/7" {
+		t.Fatalf("CreatePR() = %#v", pullRequest)
 	}
 }
 
 func TestCreatePRError(t *testing.T) {
 	t.Parallel()
 
-	client, cleanup := newTestClient(t, func(writer http.ResponseWriter, req *http.Request) {
+	client, cleanup := newTestClient(t, func(writer http.ResponseWriter, _ *http.Request) {
 		http.Error(writer, "nope", http.StatusInternalServerError)
 	})
 	defer cleanup()
@@ -156,6 +164,7 @@ func TestUpdatePRBody(t *testing.T) {
 	client, cleanup := newTestClient(t, func(writer http.ResponseWriter, req *http.Request) {
 		if req.Method != http.MethodPatch || req.URL.Path != "/repos/owner/repo/pulls/7" {
 			http.NotFound(writer, req)
+
 			return
 		}
 
@@ -163,7 +172,8 @@ func TestUpdatePRBody(t *testing.T) {
 	})
 	defer cleanup()
 
-	if err := client.UpdatePRBody(context.Background(), 7, "body"); err != nil {
+	err := client.UpdatePRBody(context.Background(), 7, "body")
+	if err != nil {
 		t.Fatal(err)
 	}
 }
@@ -171,12 +181,13 @@ func TestUpdatePRBody(t *testing.T) {
 func TestUpdatePRBodyError(t *testing.T) {
 	t.Parallel()
 
-	client, cleanup := newTestClient(t, func(writer http.ResponseWriter, req *http.Request) {
+	client, cleanup := newTestClient(t, func(writer http.ResponseWriter, _ *http.Request) {
 		http.Error(writer, "nope", http.StatusInternalServerError)
 	})
 	defer cleanup()
 
-	if err := client.UpdatePRBody(context.Background(), 7, "body"); err == nil {
+	err := client.UpdatePRBody(context.Background(), 7, "body")
+	if err == nil {
 		t.Fatal("expected UpdatePRBody error")
 	}
 }
@@ -184,23 +195,30 @@ func TestUpdatePRBodyError(t *testing.T) {
 func TestBuildPRBodyWithoutNodeRuntimeIncludesFileLists(t *testing.T) {
 	t.Parallel()
 
-	cfg := &config.Config{
-		Tasks:        []string{"go"},
-		IncludesDoc:  false,
-		SyncRoot:     false,
-		TargetFolder: "taskfiles",
-		StoreVersion: "v1.2.3",
-	}
-	plan := &syncer.Plan{
-		Requested: map[string]syncer.ModuleRecord{
-			"go": {SourceModule: "go", Path: "taskfiles/go"},
-		},
-		Added:   []string{"taskfiles/go/Taskfile.yml"},
-		Updated: []string{"taskfiles/Taskfile.yml"},
-		Removed: []string{"taskfiles/old.yml"},
-	}
+	cfg := new(config.Config)
+	cfg.Tasks = []string{"go"}
+	cfg.IncludesDoc = false
+	cfg.SyncRoot = false
+	cfg.TargetFolder = "taskfiles"
+	cfg.StoreVersion = "v1.2.3"
 
-	body := BuildPRBody(cfg, plan, StoreRef{})
+	plan := new(syncer.Plan)
+	plan.Requested = map[string]syncer.ModuleRecord{
+		"go": {
+			SourceModule:      "go",
+			DestinationModule: "",
+			Path:              "taskfiles/go",
+		},
+	}
+	plan.Added = []string{"taskfiles/go/Taskfile.yml"}
+	plan.Updated = []string{"taskfiles/Taskfile.yml"}
+	plan.Removed = []string{"taskfiles/old.yml"}
+
+	body := BuildPRBody(cfg, plan, StoreRef{
+		SourceRef:      "",
+		ResolvedCommit: "",
+		DefaultBranch:  "",
+	})
 	if strings.Contains(body, "Package manager") {
 		t.Fatalf("non-node body should not include package manager: %s", body)
 	}
@@ -215,18 +233,21 @@ func TestBuildPRBodyWithoutNodeRuntimeIncludesFileLists(t *testing.T) {
 func TestWriteOutputs(t *testing.T) {
 	t.Parallel()
 
-	if err := WriteOutputs("", map[string]string{"changed": "false"}); err != nil {
+	err := WriteOutputs("", map[string]string{outputKeyChanged: outputFalse})
+	if err != nil {
 		t.Fatal(err)
 	}
 
 	outputPath := filepath.Join(t.TempDir(), "missing", "output")
-	err := WriteOutputs(outputPath, map[string]string{"changed": "false"})
+
+	err = WriteOutputs(outputPath, map[string]string{outputKeyChanged: outputFalse})
 	if err == nil {
 		t.Fatal("expected write error")
 	}
 
 	outputPath = filepath.Join(t.TempDir(), "output")
-	err = WriteOutputs(outputPath, map[string]string{"changed": "false"})
+
+	err = WriteOutputs(outputPath, map[string]string{outputKeyChanged: outputFalse})
 	if err != nil {
 		t.Fatal(err)
 	}

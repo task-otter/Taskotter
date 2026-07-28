@@ -1,13 +1,13 @@
 ---
 name: TaskOtter Sync
 description: Synchronize taskfiles from the TaskOtter store into your repository.
-author: mostafakhairy0305-dot
+author: task-otter
 branding:
   icon: package
   color: blue
 inputs:
   tasks:
-    description: Comma-separated or multiline list of logical task names.
+    description: Comma-separated or multiline list of logical task names (for example go, eslint, prettier, typescript, hadolint).
     required: true
   js:
     description: |

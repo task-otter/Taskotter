@@ -29,6 +29,7 @@ jobs:
             actionlint
             zizmor
             adrs
+            hadolint
           js: |
             runtime: bun
           includes-doc: true
@@ -58,6 +59,6 @@ jobs:
           go-version-file: go.mod
           cache: false
       - name: Install Task
-        run: go install github.com/go-task/task/v3/cmd/task@v3.52.1
+        run: go install github.com/go-task/task/v3/cmd/task@v3.52.0
       - name: Run CI
         run: task ci

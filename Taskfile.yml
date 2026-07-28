@@ -9,6 +9,7 @@ tasks:
     desc: Run CI checks
     cmds:
       - task: taskotter:lint
+      - task: taskotter:go:test
 
   ci:fix:
     desc: Run CI fixs

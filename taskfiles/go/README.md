@@ -149,9 +149,7 @@ project:
 
 ```sh
 task go:test
-task go:test:junit
 task go:bench
-task go:coverage
 task go:fuzz -- -fuzz FuzzName ./internal/parser
 ```
 
@@ -161,21 +159,18 @@ after `--`:
 
 ```sh
 task go:test -- -race -run TestName ./internal/...
-task go:test:junit GO_JUNIT_REPORT=report.xml -- -race ./internal/...
+task go:test GO_JUNIT_REPORT=report.xml GO_COVER_PROFILE=cover.out -- -race ./internal/...
 task go:bench -- -bench BenchmarkName ./internal/parser
 ```
 
-`test:junit` runs `go test -v`, streams test output to stdout, and writes a
-JUnit XML report to `GO_JUNIT_REPORT` (default `junit.xml`).
-`coverage` writes a profile to `GO_COVER_PROFILE` (default `coverage.out`) and
-prints only packages containing executable statements, ordered from lowest to
-highest coverage. Packages with statements and zero coverage are included.
+`test` runs `go test -v`, streams test output to stdout, writes a JUnit XML
+report to `GO_JUNIT_REPORT` (default `junit.xml`), and writes a coverage profile
+to `GO_COVER_PROFILE` (default `coverage.out`).
 `fuzz` runs a single target for `GO_FUZZTIME` (default `30s`); Go fuzzes one
 target in one package per run, so supply the `-fuzz` pattern and package after
 `--`:
 
 ```sh
-task go:coverage GO_COVER_PROFILE=cover.out
 task go:fuzz GO_FUZZTIME=60s -- -fuzz FuzzName ./internal/parser
 ```
 
@@ -231,11 +226,9 @@ pinned to v2.1.0.
 | `version`                   | Show the installed Go version                          | none               |
 | `which`                     | Show the path to the Go binary                         | none               |
 | `verify`                    | Print Go version, GOROOT, and GOPATH                   | none               |
-| `test`                      | Run Go unit tests                                      | none               |
-| `test:junit`                | Run Go unit tests and write a JUnit XML report         | `GO_JUNIT_REPORT` |
+| `test`                      | Run Go unit tests and write JUnit XML and coverage reports | `GO_JUNIT_REPORT`, `GO_COVER_PROFILE` |
 | `bench`                     | Run Go benchmarks                                      | none               |
 | `fuzz`                      | Run a Go fuzz target                                   | `GO_FUZZTIME`      |
-| `coverage`                  | Run Go tests and report coverage                       | `GO_COVER_PROFILE` |
 
 ## Variables
 
@@ -253,8 +246,8 @@ pinned to v2.1.0.
 | `GOSEC_VERSION`        | empty (`latest`)                | Optional gosec module version                                         |
 | `GO_FMT_SKIP_PATTERN`  | empty                           | Shell-style path glob for Go files skipped by `fmt` and `fmt:check`   |
 | `GO_LINT_SKIP_PATTERN` | empty                           | Shell-style path glob for Go files skipped by `lint` and `lint:fix`   |
-| `GO_JUNIT_REPORT`      | empty (`junit.xml`)             | Output path for the `test:junit` XML report                           |
-| `GO_COVER_PROFILE`     | empty (`coverage.out`)          | Output path for the `coverage` profile file                          |
+| `GO_JUNIT_REPORT`      | empty (`junit.xml`)             | Output path for the `test` XML report                                 |
+| `GO_COVER_PROFILE`     | empty (`coverage.out`)          | Output path for the `test` coverage profile file                      |
 | `GO_FUZZTIME`          | empty (`30s`)                   | Duration a single `fuzz` target runs before stopping                 |
 | `GLOBAL_GO_BIN`        | `GOBIN` or `GOPATH/bin`         | Destination and lookup directory for installed Go development tools   |
 

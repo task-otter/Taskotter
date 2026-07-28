@@ -52,12 +52,12 @@ managed_files:
     source_path: taskfiles/cargo/Taskfile.yml
   - destination_module: go
     path: taskfiles/go/README.md
-    sha256: 4db1ead48ba08131abf72c07e3f0d53b9fe119d19eb37c41a4d5fac5f09a9041
+    sha256: 0ae7bc5ca19473d7022c617be1d581d3f91f7ae758ec8cf1511b6cc5c0e20e71
     source_module: go
     source_path: taskfiles/go/README.md
   - destination_module: go
     path: taskfiles/go/Taskfile.yml
-    sha256: 9b30016a58f9bb3497d6cd374d5828e7a6accd548bfc914f70ae23375993f851
+    sha256: 5f5fe4c6276ba4b17c429f5800b0db8a71399317805deb88a2ac591fec1a7f9e
     source_module: go
     source_path: taskfiles/go/Taskfile.yml
   - destination_module: hadolint
@@ -145,5 +145,5 @@ source:
   default_branch: main
   repository: task-otter/store
   requested_version: ""
-  resolved_commit: ddf85e7da5d8d417f7d890ff0f61eb3d7f46eafa
+  resolved_commit: 249cdf9c28cdc1a11b23118316d65cf493b49614
   source_ref: refs/heads/main

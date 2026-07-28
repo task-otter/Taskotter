@@ -1,0 +1,263 @@
+---
+version: "3.5"
+output:
+  group:
+    begin: "::group::{{.TASK}}"
+    end: "::endgroup::"
+    error_only: false
+silent: true
+vars:
+  VERSION: ""
+tasks:
+  default:
+    run: once
+    desc: Show available jq automation tasks
+    summary: Display the list of available jq-related tasks defined in this Taskfile.
+    cmds:
+      - task --list
+  install:
+    run: once
+    desc: Install jq on the current operating system
+    summary: |
+      Install jq for the current platform if it is not already available.
+      Pass VERSION=x.y.z to pin a specific release; exact availability
+      depends on what the platform's package manager/repository carries.
+      macOS uses Homebrew to install jq.
+      Linux uses apt-get or dnf depending on the package manager present.
+      Windows uses Scoop to install jq.
+    cmds:
+      - task: _install:macos
+      - task: _install:linux
+      - task: _install:windows
+  install:undo:
+    run: once
+    desc: Remove jq from the current operating system
+    summary: |
+      Remove jq for the current platform.
+      macOS uses Homebrew to uninstall jq.
+      Linux removes jq via apt-get or dnf.
+      Windows uses Scoop to uninstall jq.
+    prompt:
+      - This will remove jq from this machine.
+      - Continue?
+    cmds:
+      - task: _install:undo:macos
+      - task: _install:undo:linux
+      - task: _install:undo:windows
+  upgrade:
+    run: once
+    desc: Upgrade jq to the latest release
+    summary: |
+      Upgrade jq to the latest available release.
+      macOS uses brew upgrade jq.
+      Linux upgrades jq via apt-get or dnf.
+      Windows uses scoop update jq.
+    cmds:
+      - task: _upgrade:macos
+      - task: _upgrade:linux
+      - task: _upgrade:windows
+  version:
+    run: once
+    desc: Show the installed jq version
+    summary: Print the active jq version via jq --version. Auto-installs jq if missing.
+    deps:
+      - install
+    cmds:
+      - jq --version
+  _install:macos:
+    run: once
+    internal: true
+    platforms: [darwin]
+    set: [errexit, nounset, pipefail]
+    status:
+      - >-
+        command -v jq >/dev/null 2>&1 && { [ -z "{{.VERSION}}" ] || [ "$(jq --version)" = "jq-{{.VERSION}}" ]; }
+    preconditions:
+      - sh: command -v brew >/dev/null 2>&1
+        msg: Homebrew is required to install jq on macOS. Install it from https://brew.sh and re-run this task.
+    cmds:
+      - echo 'Installing jq via Homebrew...'
+      - brew install "jq{{if .VERSION}}@{{.VERSION}}{{end}}"
+      - echo 'jq installed.'
+  _install:linux:
+    run: once
+    internal: true
+    platforms: [linux]
+    set: [errexit, nounset, pipefail]
+    status:
+      - >-
+        command -v jq >/dev/null 2>&1 && { [ -z "{{.VERSION}}" ] || [ "$(jq --version)" = "jq-{{.VERSION}}" ]; }
+    cmds:
+      - task: _install:linux:apt
+      - task: _install:linux:dnf
+  _install:linux:apt:
+    run: once
+    internal: true
+    platforms: [linux]
+    set: [errexit, nounset, pipefail]
+    status:
+      - "! command -v apt-get >/dev/null 2>&1"
+    cmds:
+      - echo 'Installing jq via apt-get...'
+      - cmd: apt-get install -y "jq{{if .VERSION}}={{.VERSION}}{{end}}"
+        if: '[ "$(id -u)" -eq 0 ]'
+      - cmd: sudo apt-get install -y "jq{{if .VERSION}}={{.VERSION}}{{end}}"
+        if: '[ "$(id -u)" -ne 0 ]'
+      - echo 'jq installed.'
+  _install:linux:dnf:
+    run: once
+    internal: true
+    platforms: [linux]
+    set: [errexit, nounset, pipefail]
+    status:
+      - "! command -v dnf >/dev/null 2>&1"
+    cmds:
+      - echo 'Installing jq via dnf...'
+      - cmd: dnf install -y "jq{{if .VERSION}}-{{.VERSION}}{{end}}"
+        if: '[ "$(id -u)" -eq 0 ]'
+      - cmd: sudo dnf install -y "jq{{if .VERSION}}-{{.VERSION}}{{end}}"
+        if: '[ "$(id -u)" -ne 0 ]'
+      - echo 'jq installed.'
+  _install:windows:
+    run: once
+    internal: true
+    platforms: [windows]
+    status:
+      - >-
+        powershell -NoProfile -ExecutionPolicy Bypass -Command "$jq = Get-Command jq -ErrorAction SilentlyContinue; if (-not $jq) { exit 1 }; $requested = '{{.VERSION}}'; if ([string]::IsNullOrWhiteSpace($requested) -or ((& $jq.Source --version) -eq ('jq-' + $requested))) { exit 0 }; exit 1"
+    preconditions:
+      - sh: >-
+          powershell -NoProfile -ExecutionPolicy Bypass -Command "if (Get-Command scoop -ErrorAction SilentlyContinue) { exit 0 } else { exit 1 }"
+        msg: Scoop is required to install jq on Windows. Install it from https://scoop.sh and re-run this task.
+    cmds:
+      - echo Installing jq via Scoop...
+      - powershell -NoProfile -ExecutionPolicy Bypass -Command "scoop install jq{{if .VERSION}}@{{.VERSION}}{{end}}"
+      - echo jq installed. Restart your terminal if jq is not found.
+  _install:undo:macos:
+    run: once
+    internal: true
+    platforms: [darwin]
+    set: [errexit, nounset, pipefail]
+    status:
+      - "! command -v jq >/dev/null 2>&1"
+    preconditions:
+      - sh: command -v brew >/dev/null 2>&1
+        msg: Homebrew is required to remove jq on macOS.
+    cmds:
+      - echo 'Removing jq via Homebrew...'
+      - brew uninstall jq
+      - echo 'jq removed.'
+  _install:undo:linux:
+    run: once
+    internal: true
+    platforms: [linux]
+    set: [errexit, nounset, pipefail]
+    status:
+      - "! command -v jq >/dev/null 2>&1"
+    preconditions:
+      - sh: 'test "$(id -u)" -eq 0 || command -v sudo >/dev/null 2>&1'
+        msg: sudo is required to remove jq when not running as root.
+    cmds:
+      - task: _install:undo:linux:apt
+      - task: _install:undo:linux:dnf
+  _install:undo:linux:apt:
+    run: once
+    internal: true
+    platforms: [linux]
+    set: [errexit, nounset, pipefail]
+    status:
+      - "! command -v apt-get >/dev/null 2>&1"
+    cmds:
+      - echo 'Removing jq via apt-get...'
+      - cmd: apt-get remove -y jq
+        if: '[ "$(id -u)" -eq 0 ]'
+      - cmd: sudo apt-get remove -y jq
+        if: '[ "$(id -u)" -ne 0 ]'
+      - echo 'jq removed.'
+  _install:undo:linux:dnf:
+    run: once
+    internal: true
+    platforms: [linux]
+    set: [errexit, nounset, pipefail]
+    status:
+      - "! command -v dnf >/dev/null 2>&1"
+    cmds:
+      - echo 'Removing jq via dnf...'
+      - cmd: dnf remove -y jq
+        if: '[ "$(id -u)" -eq 0 ]'
+      - cmd: sudo dnf remove -y jq
+        if: '[ "$(id -u)" -ne 0 ]'
+      - echo 'jq removed.'
+  _install:undo:windows:
+    run: once
+    internal: true
+    platforms: [windows]
+    status:
+      - >-
+        powershell -NoProfile -ExecutionPolicy Bypass -Command "if (Get-Command jq -ErrorAction SilentlyContinue) { exit 1 } else { exit 0 }"
+    cmds:
+      - echo Removing jq via Scoop...
+      - powershell -NoProfile -ExecutionPolicy Bypass -Command "scoop uninstall jq"
+      - echo jq removed.
+  _upgrade:macos:
+    run: once
+    internal: true
+    platforms: [darwin]
+    set: [errexit, nounset, pipefail]
+    preconditions:
+      - sh: command -v brew >/dev/null 2>&1
+        msg: Homebrew is required to upgrade jq on macOS.
+    cmds:
+      - echo 'Upgrading jq via Homebrew...'
+      - cmd: brew upgrade jq
+        if: brew list jq >/dev/null 2>&1
+      - cmd: brew install jq
+        if: "! brew list jq >/dev/null 2>&1"
+      - echo 'jq upgraded.'
+  _upgrade:linux:
+    run: once
+    internal: true
+    platforms: [linux]
+    set: [errexit, nounset, pipefail]
+    preconditions:
+      - sh: command -v jq >/dev/null 2>&1
+        msg: jq is not installed. Run task install first.
+    cmds:
+      - task: _upgrade:linux:apt
+      - task: _upgrade:linux:dnf
+  _upgrade:linux:apt:
+    run: once
+    internal: true
+    platforms: [linux]
+    set: [errexit, nounset, pipefail]
+    status:
+      - "! command -v apt-get >/dev/null 2>&1"
+    cmds:
+      - echo 'Upgrading jq via apt-get...'
+      - cmd: apt-get install -y --only-upgrade jq
+        if: '[ "$(id -u)" -eq 0 ]'
+      - cmd: sudo apt-get install -y --only-upgrade jq
+        if: '[ "$(id -u)" -ne 0 ]'
+      - echo 'jq upgraded.'
+  _upgrade:linux:dnf:
+    run: once
+    internal: true
+    platforms: [linux]
+    set: [errexit, nounset, pipefail]
+    status:
+      - "! command -v dnf >/dev/null 2>&1"
+    cmds:
+      - echo 'Upgrading jq via dnf...'
+      - cmd: dnf upgrade -y jq
+        if: '[ "$(id -u)" -eq 0 ]'
+      - cmd: sudo dnf upgrade -y jq
+        if: '[ "$(id -u)" -ne 0 ]'
+      - echo 'jq upgraded.'
+  _upgrade:windows:
+    run: once
+    internal: true
+    platforms: [windows]
+    cmds:
+      - echo Upgrading jq via Scoop...
+      - powershell -NoProfile -ExecutionPolicy Bypass -Command "scoop update jq"
+      - echo jq upgraded. Restart your terminal if prompted.

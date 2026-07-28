@@ -992,29 +992,21 @@ tasks:
   test:
     run: once
     dir: "{{.USER_WORKING_DIR}}"
-    desc: Run Go unit tests
+    desc: Run Go unit tests and write JUnit XML and coverage reports
     summary: |
-      Run `go test` against all Go packages by default. Pass CLI arguments after
-      -- to override the default ./... target or add flags, for example:
-      `task go:test -- -race -run TestName ./internal/...`.
-    cmds:
-      - go test {{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}./...{{end}}
-  test:junit:
-    run: once
-    dir: "{{.USER_WORKING_DIR}}"
-    desc: Run Go unit tests and write a JUnit XML report
-    summary: |
-      Run `go test -v` against all Go packages by default, stream test output
-      to stdout, and write a JUnit XML report to GO_JUNIT_REPORT (default
-      junit.xml). Pass CLI arguments after -- to override the default ./...
-      target or add flags.
+      Run `go test -v` with coverage against all Go packages by default, stream
+      test output to stdout, write a JUnit XML report to GO_JUNIT_REPORT
+      (default junit.xml), and write a coverage profile to GO_COVER_PROFILE
+      (default coverage.out). Pass CLI arguments after -- to override the
+      default ./... target or add flags.
     deps:
       - install:go-junit-report
     vars:
       GO_JUNIT_REPORT_OUT: '{{if .GO_JUNIT_REPORT}}{{.GO_JUNIT_REPORT}}{{else}}junit.xml{{end}}'
+      GO_COVER_OUT: '{{if .GO_COVER_PROFILE}}{{.GO_COVER_PROFILE}}{{else}}coverage.out{{end}}'
     cmds:
       - >-
-        go test -v 2>&1 {{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}./...{{end}} | "{{.GLOBAL_GO_BIN}}/go-junit-report" -set-exit-code -iocopy -out "{{.GO_JUNIT_REPORT_OUT}}"
+        go test -v -covermode atomic -coverprofile "{{.GO_COVER_OUT}}" {{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}./...{{end}} 2>&1 | "{{.GLOBAL_GO_BIN}}/go-junit-report" -set-exit-code -iocopy -out "{{.GO_JUNIT_REPORT_OUT}}"
   bench:
     run: once
     dir: "{{.USER_WORKING_DIR}}"
@@ -1039,119 +1031,6 @@ tasks:
       GO_FUZZ_TIME: '{{if .GO_FUZZTIME}}{{.GO_FUZZTIME}}{{else}}30s{{end}}'
     cmds:
       - go test -run '^$' -fuzztime '{{.GO_FUZZ_TIME}}' {{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}-fuzz . .{{end}}
-  coverage:
-    run: once
-    dir: "{{.USER_WORKING_DIR}}"
-    desc: Report Go test coverage
-    summary: |
-      Run `go test` with coverage across all Go packages, writing the profile to
-      GO_COVER_PROFILE (default coverage.out) and printing packages containing
-      executable statements from lowest to highest coverage. Pass CLI arguments
-      after -- to override the default ./... target.
-    vars:
-      GO_COVER_OUT: '{{if .GO_COVER_PROFILE}}{{.GO_COVER_PROFILE}}{{else}}coverage.out{{end}}'
-    cmds:
-      - cmd: |
-          coverage_log="$(mktemp)"
-          coverage_rows="$(mktemp)"
-          coverage_sorted="$(mktemp)"
-          trap 'rm -f "$coverage_log" "$coverage_rows" "$coverage_sorted"' EXIT
-
-          coverage_status=0
-          go test -covermode atomic -coverprofile '{{.GO_COVER_OUT}}' \
-            {{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}./...{{end}} \
-            >"$coverage_log" 2>&1 || coverage_status=$?
-          if [ "$coverage_status" -ne 0 ]; then
-            cat "$coverage_log"
-            exit "$coverage_status"
-          fi
-
-          awk '
-            NR == 1 { next }
-            {
-              file = $1
-              sub(/:[[:digit:]]+\.[[:digit:]]+,[[:digit:]]+\.[[:digit:]]+$/, "", file)
-              slash = 0
-              for (position = length(file); position > 0; position--) {
-                if (substr(file, position, 1) == "/") {
-                  slash = position
-                  break
-                }
-              }
-              if (slash == 0) { next }
-
-              package = substr(file, 1, slash - 1)
-              statements = $2 + 0
-              total[package] += statements
-              if (($3 + 0) > 0) { covered[package] += statements }
-            }
-            END {
-              for (package in total) {
-                if (total[package] == 0) { continue }
-                percentage = 100 * covered[package] / total[package]
-                printf "%.12f %.1f %s\n", percentage, percentage, package
-              }
-            }
-          ' '{{.GO_COVER_OUT}}' >"$coverage_rows"
-          LC_ALL=C sort -k1,1n -k3,3 "$coverage_rows" >"$coverage_sorted"
-          awk '{ printf "%5.1f%%  %s\n", $2, $3 }' "$coverage_sorted"
-        platforms: [linux, darwin]
-      - cmd: >-
-          powershell -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop'; $coverageLog=[System.IO.Path]::GetTempFileName(); try {
-
-
-            & go test -covermode atomic -coverprofile '{{.GO_COVER_OUT}}'
-              {{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}./...{{end}}
-              *> $coverageLog;
-            $coverageStatus=$LASTEXITCODE;
-            if ($coverageStatus -ne 0) {
-              Get-Content -LiteralPath $coverageLog;
-              exit $coverageStatus;
-            };
-            $packages=@{};
-            Get-Content -LiteralPath '{{.GO_COVER_OUT}}' |
-              Select-Object -Skip 1 |
-              ForEach-Object {
-                if ($_ -notmatch
-                    '^(?<file>.+):\d+\.\d+,\d+\.\d+\s+(?<statements>\d+)\s+(?<count>\d+)$') {
-                  return;
-                };
-                $file=$Matches['file'].Replace('\', '/');
-                $slash=$file.LastIndexOf('/');
-                if ($slash -lt 1) { return };
-                $package=$file.Substring(0, $slash);
-                if (-not $packages.ContainsKey($package)) {
-                  $packages[$package]=[PSCustomObject]@{
-                    Package=$package; Covered=[int64]0; Total=[int64]0
-                  };
-                };
-                $statements=[int64]$Matches['statements'];
-                $packages[$package].Total += $statements;
-                if ([int64]$Matches['count'] -gt 0) {
-                  $packages[$package].Covered += $statements;
-                };
-              };
-            $packages.Values |
-              Where-Object { $_.Total -gt 0 } |
-              ForEach-Object {
-                [PSCustomObject]@{
-                  Package=$_.Package;
-                  Percentage=100.0 * $_.Covered / $_.Total
-                };
-              } |
-              Sort-Object Percentage, Package |
-              ForEach-Object {
-                $percentage=$_.Percentage.ToString(
-                  'F1', [System.Globalization.CultureInfo]::InvariantCulture
-                ).PadLeft(5);
-                Write-Output ($percentage + '%  ' + $_.Package);
-              };
-          } finally {
-
-
-            Remove-Item -LiteralPath $coverageLog -Force -ErrorAction SilentlyContinue;
-          }"
-        platforms: [windows]
   _install:macos:brew:
     run: once
     internal: true

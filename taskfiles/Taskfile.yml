@@ -2,6 +2,7 @@
 version: "3.5"
 vars:
   EXTRA_ARGS: ""
+  CONFIG: ""
 includes:
   go:
     taskfile: go/Taskfile.yml
@@ -48,7 +49,7 @@ includes:
       YAMLLINT_LINT_SKIP_PATTERN: ""
       UV_LOAD: 'export PATH="$HOME/.local/bin:$PATH"'
       TARGETS: "."
-      CONFIG: ""
+      CONFIG: '{{.CONFIG}}'
       EXTRA_ARGS: '{{.EXTRA_ARGS}}'
       YAMLLINT_VERSION: ""
       YAMLFIX_VERSION: ""
@@ -72,6 +73,14 @@ includes:
       CARGO_BIN_UNIX: "$HOME/.cargo/bin"
       EXTRA_ARGS: '{{.EXTRA_ARGS}}'
       ADRS_VERSION: ""
+  hadolint:
+    taskfile: hadolint/Taskfile.yml
+    vars:
+      HADOLINT_LINT_SKIP_PATTERN: ""
+      CONFIG: '{{.CONFIG}}'
+      DOCKERFILE: "Dockerfile"
+      EXTRA_ARGS: '{{.EXTRA_ARGS}}'
+      HADOLINT_VERSION: "2.14.0"
 tasks:
   install:
     desc: Run install for synced TaskOtter modules
@@ -81,6 +90,7 @@ tasks:
       - task: actionlint:install
       - task: zizmor:install
       - task: adrs:install
+      - task: hadolint:install
   install:undo:
     desc: Run install:undo for synced TaskOtter modules
     cmds:
@@ -89,6 +99,7 @@ tasks:
       - task: actionlint:install:undo
       - task: zizmor:install:undo
       - task: adrs:install:undo
+      - task: hadolint:install:undo
   lint:
     desc: Run lint for synced TaskOtter modules
     cmds:
@@ -96,6 +107,7 @@ tasks:
       - task: yamllint:lint
       - task: actionlint:lint
       - task: zizmor:lint
+      - task: hadolint:lint
   lint:fix:
     desc: Run lint:fix for synced TaskOtter modules
     cmds:
@@ -109,6 +121,7 @@ tasks:
       - task: actionlint:upgrade
       - task: zizmor:upgrade
       - task: adrs:upgrade
+      - task: hadolint:upgrade
   version:
     desc: Run version for synced TaskOtter modules
     cmds:
@@ -117,3 +130,4 @@ tasks:
       - task: actionlint:version
       - task: zizmor:version
       - task: adrs:version
+      - task: hadolint:version

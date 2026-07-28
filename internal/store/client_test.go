@@ -121,6 +121,31 @@ func TestResolveRefDefaultBranch(t *testing.T) {
 	}
 }
 
+func TestResolveRefDefaultBranchIgnoresNonStringMetadata(t *testing.T) {
+	t.Parallel()
+
+	client, cleanup := newStoreTestClient(t, func(writer http.ResponseWriter, req *http.Request) {
+		switch req.URL.Path {
+		case storeRepoPath:
+			_, _ = writer.Write([]byte(`{"id":12345,"default_branch":"main"}`))
+		case "/repos/task-otter/store/commits/main":
+			_, _ = writer.Write([]byte(`{"sha":"abc123def456"}`))
+		default:
+			http.NotFound(writer, req)
+		}
+	})
+	defer cleanup()
+
+	ref, err := client.ResolveRef(context.Background(), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if ref.DefaultBranch != "main" {
+		t.Fatalf("DefaultBranch = %q, want main", ref.DefaultBranch)
+	}
+}
+
 func TestResolveMissingTag(t *testing.T) {
 	t.Parallel()
 

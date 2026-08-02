@@ -1,4 +1,6 @@
-// Package taskfile rewrites root and module Taskfile YAML during sync.
+// Taskotter 2026.
+// SPDX-License-Identifier: Apache-2.0.
+
 package taskfile
 
 import (
@@ -9,7 +11,7 @@ import (
 	"strings"
 
 	"github.com/task-otter/Taskotter/internal/yamlfmt"
-	"gopkg.in/yaml.v3"
+	yaml "go.yaml.in/yaml/v3"
 )
 
 const (
@@ -51,6 +53,7 @@ func RewriteIncludes(content []byte, sourceToDest map[string]string) ([]byte, er
 	root := node.Content[0]
 
 	includesNode := findMappingValue(root, "includes")
+
 	if includesNode != nil {
 		rewriteIncludesNode(includesNode, sourceToDest)
 	}
@@ -77,11 +80,13 @@ func rewriteIncludesNode(includes *yaml.Node, sourceToDest map[string]string) {
 
 	for idx := 0; idx < len(includes.Content); idx += yamlMappingPairKeyValue {
 		entry := includes.Content[idx+1]
+
 		if entry.Kind != yaml.MappingNode {
 			continue
 		}
 
 		taskfileNode := findMappingValue(entry, "taskfile")
+
 		if taskfileNode == nil || taskfileNode.Kind != yaml.ScalarNode {
 			continue
 		}
@@ -92,16 +97,19 @@ func rewriteIncludesNode(includes *yaml.Node, sourceToDest map[string]string) {
 
 func rewriteIncludePath(path string, sourceToDest map[string]string) string {
 	normalized := filepath.ToSlash(path)
+
 	if !strings.HasSuffix(normalized, "/Taskfile.yml") {
 		return path
 	}
 
 	prefix, dir := splitRelativePrefix(strings.TrimSuffix(normalized, "/Taskfile.yml"))
+
 	if dir == "" {
 		return path
 	}
 
 	dest, ok := sourceToDest[dir]
+
 	if !ok {
 		return path
 	}
@@ -124,6 +132,7 @@ func splitRelativePrefix(dir string) (string, string) {
 
 	for {
 		rest, ok := strings.CutPrefix(dir, "../")
+
 		if !ok {
 			break
 		}
@@ -147,6 +156,7 @@ func findMappingValue(mapNode *yaml.Node, key string) *yaml.Node {
 
 	for idx := 0; idx < len(mapNode.Content); idx += yamlMappingPairKeyValue {
 		keyNode := mapNode.Content[idx]
+
 		if keyNode.Kind == yaml.ScalarNode && keyNode.Value == key {
 			return mapNode.Content[idx+1]
 		}
@@ -181,6 +191,7 @@ type GeneratedRootTask struct {
 // folder the path collapses to the module directory (for example go/Taskfile.yml).
 func moduleIncludePath(rootDir, targetFolder, dest string) string {
 	target := filepath.ToSlash(filepath.Join(targetFolder, dest, "Taskfile.yml"))
+
 	if rootDir == "" || rootDir == "." {
 		return target
 	}
@@ -256,11 +267,13 @@ func prepareIncludesNode(
 	input RootUpdateInput,
 ) (*yaml.Node, map[string]*yaml.Node, error) {
 	managedSet := make(map[string]struct{}, len(input.Tasks))
+
 	for _, task := range input.Tasks {
 		managedSet[task] = struct{}{}
 	}
 
 	includesNode := findMappingValue(root, "includes")
+
 	if includesNode == nil {
 		includesNode = newYAMLMappingNode()
 		appendMappingPair(root, yamlScalar("includes"), includesNode)
@@ -274,6 +287,7 @@ func prepareIncludesNode(
 
 	for idx := 0; idx < len(includesNode.Content); idx += yamlMappingPairKeyValue {
 		keyNode := includesNode.Content[idx]
+
 		existing[keyNode.Value] = includesNode.Content[idx+1]
 	}
 
@@ -308,6 +322,7 @@ func upsertManagedIncludes(
 ) error {
 	for _, task := range input.Tasks {
 		dest, ok := input.DestByTask[task]
+
 		if !ok {
 			return &RewriteError{Message: fmt.Sprintf("missing destination for task %q", task)}
 		}
@@ -346,6 +361,7 @@ func isManagedInclude(
 	task string,
 ) bool {
 	taskfileNode := findMappingValue(entry, "taskfile")
+
 	if taskfileNode != nil {
 		return taskfileNode.Value == expectedPath
 	}
@@ -359,6 +375,7 @@ func isManagedInclude(
 
 func setIncludePath(entry *yaml.Node, path string) {
 	taskfileNode := findMappingValue(entry, "taskfile")
+
 	if taskfileNode == nil {
 		appendMappingPair(entry, yamlScalar("taskfile"), yamlScalar(path))
 
@@ -385,6 +402,7 @@ func extractVarsNode(content []byte) (*yaml.Node, error) {
 	}
 
 	varsNode := findMappingValue(node.Content[0], "vars")
+
 	if varsNode == nil || varsNode.Kind != yaml.MappingNode || len(varsNode.Content) == 0 {
 		return nil, errNoModuleVars
 	}
@@ -394,6 +412,7 @@ func extractVarsNode(content []byte) (*yaml.Node, error) {
 
 func moduleVarsByTask(input RootUpdateInput) (map[string]*yaml.Node, error) {
 	out := make(map[string]*yaml.Node, len(input.Tasks))
+
 	for _, task := range input.Tasks {
 		moduleVars, err := extractVarsNode(input.ModuleTaskfiles[task])
 		if err != nil {
@@ -418,11 +437,13 @@ func sharedModuleVarNames(
 
 	for _, task := range tasks {
 		varsNode := moduleVarsByTask[task]
+
 		if varsNode == nil || varsNode.Kind != yaml.MappingNode {
 			continue
 		}
 
 		seen := make(map[string]struct{})
+
 		for idx := 0; idx < len(varsNode.Content); idx += yamlMappingPairKeyValue {
 			seen[varsNode.Content[idx].Value] = struct{}{}
 		}
@@ -454,6 +475,7 @@ func upsertRootSharedVars(
 	}
 
 	rootVars := findMappingValue(root, "vars")
+
 	if rootVars == nil {
 		rootVars = newYAMLMappingNode()
 		appendMappingPair(root, yamlScalar("vars"), rootVars)
@@ -464,12 +486,14 @@ func upsertRootSharedVars(
 	}
 
 	existing := mappingKeys(rootVars)
+
 	for _, key := range sortedKeys(sharedVars) {
 		if _, ok := existing[key]; ok {
 			continue
 		}
 
 		value := firstVarValue(tasks, moduleVarsByTask, key)
+
 		if value == nil {
 			continue
 		}
@@ -487,6 +511,7 @@ func firstVarValue(
 ) *yaml.Node {
 	for _, task := range tasks {
 		varsNode := moduleVarsByTask[task]
+
 		if varsNode == nil || varsNode.Kind != yaml.MappingNode {
 			continue
 		}
@@ -507,6 +532,7 @@ func mergeIncludeVars(entry *yaml.Node, moduleVars *yaml.Node, sharedVars map[st
 	}
 
 	existingVars := findMappingValue(entry, "vars")
+
 	if existingVars == nil {
 		appendMappingPair(entry, yamlScalar("vars"), includeVarsNode(moduleVars, sharedVars))
 
@@ -518,12 +544,14 @@ func mergeIncludeVars(entry *yaml.Node, moduleVars *yaml.Node, sharedVars map[st
 	}
 
 	existingKeys := make(map[string]struct{}, len(existingVars.Content)/yamlMappingPairKeyValue)
+
 	for idx := 0; idx < len(existingVars.Content); idx += yamlMappingPairKeyValue {
 		existingKeys[existingVars.Content[idx].Value] = struct{}{}
 	}
 
 	for idx := 0; idx < len(moduleVars.Content); idx += yamlMappingPairKeyValue {
 		key := moduleVars.Content[idx].Value
+
 		if _, shared := sharedVars[key]; shared {
 			setMappingValue(existingVars, key, rootVarReference(key))
 
@@ -549,6 +577,7 @@ func includeVarsNode(moduleVars *yaml.Node, sharedVars map[string]struct{}) *yam
 		key := moduleVars.Content[idx].Value
 
 		value := cloneYAMLNode(moduleVars.Content[idx+1])
+
 		if _, shared := sharedVars[key]; shared {
 			value = rootVarReference(key)
 		}
@@ -576,6 +605,7 @@ func cloneYAMLNode(node *yaml.Node) *yaml.Node {
 	var out yaml.Node
 
 	err = yaml.Unmarshal(data, &out)
+
 	if err != nil || len(out.Content) == 0 {
 		return nil
 	}
@@ -604,6 +634,7 @@ func updateGeneratedRootTasks(root *yaml.Node, input RootUpdateInput) error {
 	}
 
 	tasksNode := findMappingValue(root, "tasks")
+
 	if tasksNode == nil {
 		tasksNode = newYAMLMappingNode()
 		appendMappingPair(root, yamlScalar("tasks"), tasksNode)
@@ -614,6 +645,7 @@ func updateGeneratedRootTasks(root *yaml.Node, input RootUpdateInput) error {
 	}
 
 	generatedSet := make(map[string]struct{}, len(input.GeneratedTasks))
+
 	for _, generated := range input.GeneratedTasks {
 		generatedSet[generated.Name] = struct{}{}
 	}
@@ -647,6 +679,7 @@ func newGeneratedTaskEntry(generated GeneratedRootTask) *yaml.Node {
 	for _, module := range generated.Modules {
 		cmd := newYAMLMappingNode()
 		appendMappingPair(cmd, yamlScalar("task"), yamlScalar(module+":"+generated.Name))
+
 		cmds.Content = append(cmds.Content, cmd)
 	}
 
@@ -712,6 +745,7 @@ func appendMappingPair(mapNode *yaml.Node, key, value *yaml.Node) {
 
 func mappingKeys(mapNode *yaml.Node) map[string]struct{} {
 	keys := make(map[string]struct{}, len(mapNode.Content)/yamlMappingPairKeyValue)
+
 	for idx := 0; idx < len(mapNode.Content); idx += yamlMappingPairKeyValue {
 		keys[mapNode.Content[idx].Value] = struct{}{}
 	}
@@ -737,6 +771,7 @@ func setRootTaskfileVersion(root *yaml.Node) {
 
 func taskfileVersionScalar(value string) *yaml.Node {
 	node := yamlScalar(value)
+
 	node.Style = yaml.DoubleQuotedStyle
 
 	return node
@@ -744,6 +779,7 @@ func taskfileVersionScalar(value string) *yaml.Node {
 
 func sortedKeys(m map[string]struct{}) []string {
 	keys := make([]string, 0, len(m))
+
 	for key := range m {
 		keys = append(keys, key)
 	}

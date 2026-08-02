@@ -1,3 +1,6 @@
+// Taskotter 2026.
+// SPDX-License-Identifier: Apache-2.0.
+
 package syncer_test
 
 import (
@@ -78,6 +81,7 @@ func TestBuildPlanInitialSync(t *testing.T) {
 	}
 
 	rootText := string(plan.RootTaskfile)
+
 	for _, want := range []string{
 		"task: go:lint",
 		"task: eslint:lint",
@@ -94,6 +98,7 @@ func TestBuildPlanInitialSync(t *testing.T) {
 	}
 
 	wantGenerated := []string{"install", "lint", "lint:fix", "version"}
+
 	if !slices.Equal(plan.Lock.GeneratedRootTasks, wantGenerated) {
 		t.Fatalf(
 			"generated root tasks = %#v, want %#v",
@@ -125,6 +130,7 @@ func TestBuildPlanCreatesRootTaskfile(t *testing.T) {
 	}
 
 	sources := make([]string, 0, len(resolutions))
+
 	for _, res := range resolutions {
 		sources = append(sources, res.SourceModule)
 	}
@@ -237,6 +243,7 @@ func TestIncludesDocFalseSkipsReadme(t *testing.T) {
 
 	workspace := t.TempDir()
 	writeRootTaskfile(t, workspace)
+
 	snap := fixtureStore(t)
 	cfg := testConfig(workspace, func(cfg *config.Config) {
 		cfg.Tasks = []string{testModuleEslint}

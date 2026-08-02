@@ -1,10 +1,13 @@
+// Taskotter 2026.
+// SPDX-License-Identifier: Apache-2.0.
+
 package yamlfmt_test
 
 import (
 	"testing"
 
 	"github.com/task-otter/Taskotter/internal/yamlfmt"
-	"gopkg.in/yaml.v3"
+	yaml "go.yaml.in/yaml/v3"
 )
 
 func TestMarshalAddsSingleDocumentStartAndTrailingNewline(t *testing.T) {
@@ -21,6 +24,7 @@ func TestMarshalAddsSingleDocumentStartAndTrailingNewline(t *testing.T) {
 	}
 
 	want := "---\nvars:\n  GO_VERSION: 1.26.5\nversion: \"3\"\n"
+
 	if string(got) != want {
 		t.Fatalf("Marshal() = %q, want %q", got, want)
 	}

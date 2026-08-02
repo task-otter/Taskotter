@@ -1,3 +1,6 @@
+// Taskotter 2026.
+// SPDX-License-Identifier: Apache-2.0.
+
 package github_test
 
 import (
@@ -7,7 +10,7 @@ import (
 	"testing"
 
 	"github.com/task-otter/Taskotter/internal/config"
-	gh "github.com/task-otter/Taskotter/internal/github"
+	"github.com/task-otter/Taskotter/internal/github"
 	"github.com/task-otter/Taskotter/internal/store"
 	"github.com/task-otter/Taskotter/internal/syncer"
 )
@@ -24,7 +27,7 @@ func TestWriteOutputsMultilineJSON(t *testing.T) {
 		"resolved-tasks": "{\n  \"go\": {}\n}\n",
 	}
 
-	err := gh.WriteOutputs(path, values)
+	err := github.WriteOutputs(path, values)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -35,6 +38,7 @@ func TestWriteOutputsMultilineJSON(t *testing.T) {
 	}
 
 	text := string(data)
+
 	if !strings.Contains(text, "resolved-tasks<<EOF") {
 		t.Fatalf("expected heredoc output: %s", text)
 	}
@@ -96,13 +100,14 @@ func TestBuildPRBody(t *testing.T) {
 		StagePaths:       nil,
 	}
 
-	body := gh.BuildPRBody(cfg, plan, gh.StoreRefFrom(store.RefInfo{
+	body := github.BuildPRBody(cfg, plan, github.StoreRefFrom(store.RefInfo{
 		Repository:       "",
 		RequestedVersion: "",
 		SourceRef:        "refs/heads/main",
 		ResolvedCommit:   "abc",
 		DefaultBranch:    "main",
 	}))
+
 	if !strings.Contains(body, "eslint/node/fnm/pnpm") {
 		t.Fatalf("missing module info: %s", body)
 	}

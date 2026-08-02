@@ -1,3 +1,6 @@
+// Taskotter 2026.
+// SPDX-License-Identifier: Apache-2.0.
+
 package app_test
 
 import (
@@ -44,9 +47,9 @@ func (localStore *localStore) DownloadSnapshot(
 }
 
 type mockGitOps struct {
-	unrelated          bool
 	defaultBranch      string
 	defaultBranchCalls int
+	unrelated          bool
 }
 
 func (mockGitOps *mockGitOps) EnsureSafeDirectory(context.Context) error { return nil }
@@ -70,6 +73,7 @@ func (mockGitOps *mockGitOps) Commit(context.Context, string) error     { return
 func (mockGitOps *mockGitOps) Push(context.Context, string, bool) error { return nil }
 func (mockGitOps *mockGitOps) DefaultBranch(context.Context) (string, error) {
 	mockGitOps.defaultBranchCalls++
+
 	if mockGitOps.defaultBranch != "" {
 		return mockGitOps.defaultBranch, nil
 	}
@@ -80,10 +84,10 @@ func (mockGitOps *mockGitOps) DefaultBranch(context.Context) (string, error) {
 type mockPR struct {
 	find        *gh.PullRequest
 	create      *gh.PullRequest
-	updated     int
 	lastBase    string
 	lastHead    string
 	createdBase string
+	updated     int
 }
 
 func (mockPR *mockPR) FindOpenPR(_ context.Context, branch, base string) (*gh.PullRequest, error) {
@@ -95,6 +99,7 @@ func (mockPR *mockPR) FindOpenPR(_ context.Context, branch, base string) (*gh.Pu
 
 func (mockPR *mockPR) CreatePR(_ context.Context, _, base, _ string) (*gh.PullRequest, error) {
 	mockPR.createdBase = base
+
 	if mockPR.create != nil {
 		return mockPR.create, nil
 	}
@@ -121,6 +126,7 @@ func fixtureRoot(t *testing.T) string {
 
 func workspaceWithRootTaskfile(t *testing.T) string {
 	t.Helper()
+
 	workspace := t.TempDir()
 
 	content := []byte(`version: "3"
@@ -173,7 +179,7 @@ func TestOrchestratorNoChangeAfterApply(t *testing.T) {
 		PRClient:    nil,
 	}
 
-	first, err := orchestrator.Run(context.Background(), cfg)
+	first, err := orchestrator.Run(t.Context(), cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -182,7 +188,7 @@ func TestOrchestratorNoChangeAfterApply(t *testing.T) {
 		t.Fatal("expected first run to change files")
 	}
 
-	second, err := orchestrator.Run(context.Background(), cfg)
+	second, err := orchestrator.Run(t.Context(), cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -210,7 +216,7 @@ func TestOrchestratorUnrelatedDirtyTreeFails(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = orchestrator.Run(context.Background(), cfg)
+	_, err = orchestrator.Run(t.Context(), cfg)
 	if err == nil {
 		t.Fatal("expected unrelated changes error")
 	}
@@ -226,6 +232,7 @@ func TestOrchestratorUpdatesExistingPR(t *testing.T) {
 
 	workspace := workspaceWithRootTaskfile(t)
 	cfg := testConfig(workspace)
+
 	cfg.Repository = testRepository
 
 	pullReq := &mockPR{
@@ -250,7 +257,7 @@ func TestOrchestratorUpdatesExistingPR(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	result, err := orchestrator.Run(context.Background(), cfg)
+	result, err := orchestrator.Run(t.Context(), cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -277,6 +284,7 @@ func TestOrchestratorCreatesPRWithResolvedBase(t *testing.T) {
 
 	workspace := workspaceWithRootTaskfile(t)
 	cfg := testConfig(workspace)
+
 	cfg.Repository = testRepository
 
 	pullReq := &mockPR{
@@ -301,7 +309,7 @@ func TestOrchestratorCreatesPRWithResolvedBase(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = orchestrator.Run(context.Background(), cfg)
+	_, err = orchestrator.Run(t.Context(), cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -316,6 +324,7 @@ func TestOrchestratorCreatesPRAgainstTriggerBranch(t *testing.T) {
 
 	workspace := workspaceWithRootTaskfile(t)
 	cfg := testConfig(workspace)
+
 	cfg.Repository = "owner/repo"
 	cfg.BaseBranch = "release/2026"
 
@@ -341,7 +350,7 @@ func TestOrchestratorCreatesPRAgainstTriggerBranch(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = orchestrator.Run(context.Background(), cfg)
+	_, err = orchestrator.Run(t.Context(), cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -378,7 +387,7 @@ func TestNewOrchestratorInvalidRepository(t *testing.T) {
 		BranchName:         "",
 	}
 
-	_, err := app.NewOrchestrator(context.Background(), cfg)
+	_, err := app.NewOrchestrator(t.Context(), cfg)
 	if err == nil {
 		t.Fatal("expected repository parse error")
 	}

@@ -1,4 +1,6 @@
-// Package repo parses GitHub repository coordinates.
+// Taskotter 2026.
+// SPDX-License-Identifier: Apache-2.0.
+
 package repo
 
 import (
@@ -12,6 +14,7 @@ var errInvalidRepository = errors.New("invalid repository")
 // Parse splits owner/name repository coordinates.
 func Parse(full string) (string, string, error) {
 	parts := strings.Split(full, "/")
+
 	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
 		return "", "", fmt.Errorf("%w %q", errInvalidRepository, full)
 	}

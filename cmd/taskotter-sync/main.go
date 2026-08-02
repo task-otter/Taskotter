@@ -1,4 +1,6 @@
-// Command taskotter-sync is the container entrypoint for the TaskOtter GitHub Action.
+// Taskotter 2026.
+// SPDX-License-Identifier: Apache-2.0.
+
 package main
 
 import (
@@ -19,6 +21,7 @@ func main() {
 
 func run() int {
 	ctx, cancel := context.WithTimeout(context.Background(), runTimeout)
+
 	defer cancel()
 
 	cfg, err := config.LoadFromEnv()

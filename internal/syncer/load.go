@@ -1,3 +1,6 @@
+// Taskotter 2026.
+// SPDX-License-Identifier: Apache-2.0.
+
 package syncer
 
 import (
@@ -9,7 +12,7 @@ import (
 
 	"github.com/task-otter/Taskotter/internal/config"
 	"github.com/task-otter/Taskotter/internal/pathutil"
-	"gopkg.in/yaml.v3"
+	yaml "go.yaml.in/yaml/v3"
 )
 
 var errPreviousMetadataNotFound = errors.New("previous metadata not found")
@@ -50,6 +53,7 @@ func LoadLock(workspace, rel string) (*LockFile, error) {
 
 func loadPreviousState(workspace string, cfg *config.Config) (*LockFile, *Metadata, string, error) {
 	oldMeta, err := loadCurrentMetadata(workspace, cfg)
+
 	if errors.Is(err, errPreviousMetadataNotFound) {
 		oldMeta = nil
 	} else if err != nil {
@@ -66,12 +70,14 @@ func loadPreviousState(workspace string, cfg *config.Config) (*LockFile, *Metada
 
 func loadCurrentMetadata(workspace string, cfg *config.Config) (*Metadata, error) {
 	meta, found, err := loadMetadataIfExists(workspace, cfg.MetadataPath())
+
 	if err != nil || found {
 		return meta, err
 	}
 
 	if cfg.MetadataPath() != config.LegacyMetadataPath {
 		meta, found, err = loadMetadataIfExists(workspace, config.LegacyMetadataPath)
+
 		if err != nil || found {
 			return meta, err
 		}
@@ -84,6 +90,7 @@ func loadCurrentMetadata(workspace string, cfg *config.Config) (*Metadata, error
 
 func loadMetadataIfExists(workspace, metadataPath string) (*Metadata, bool, error) {
 	meta, err := LoadMetadata(workspace, metadataPath)
+
 	if errors.Is(err, os.ErrNotExist) {
 		return nil, false, nil
 	}
@@ -112,6 +119,7 @@ func loadPreviousLock(
 	}
 
 	oldLock, err := LoadLock(workspace, oldLockPath)
+
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return nil, "", err
 	}
@@ -178,6 +186,7 @@ func previousMetadataCandidate(
 	}
 
 	rel = filepath.ToSlash(rel)
+
 	if rel == currentMetadataPath || rel == config.LegacyMetadataPath {
 		return "", false, nil
 	}

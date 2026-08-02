@@ -1,3 +1,6 @@
+// Taskotter 2026.
+// SPDX-License-Identifier: Apache-2.0.
+
 package archive_test
 
 import (
@@ -79,6 +82,7 @@ func buildTarGzWithMode(t *testing.T, name string, content []byte, mode int64) [
 	tarWriter := tar.NewWriter(gzipWriter)
 
 	header := regularTarHeader(name, int64(len(content)))
+
 	header.Mode = mode
 
 	err := tarWriter.WriteHeader(header)
@@ -122,6 +126,7 @@ func buildTarGzWithHeaders(t *testing.T, headers []*tar.Header) []byte {
 			chunk := bytes.Repeat([]byte("x"), 32*1024)
 
 			remaining := header.Size
+
 			for remaining > 0 {
 				writeSize := min(remaining, int64(len(chunk)))
 
@@ -332,6 +337,7 @@ func TestRejectSymlink(t *testing.T) {
 
 	_ = tarWriter.Close()
 	_ = gzipWriter.Close()
+
 	dest := t.TempDir()
 
 	_, err = archive.ExtractTarGz(bytes.NewReader(buf.Bytes()), dest)

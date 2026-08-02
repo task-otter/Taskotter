@@ -1,28 +1,24 @@
-// Package yamlfmt marshals values into yamllint-compliant YAML documents.
-//
-// Every generated file (root Taskfile, lock file, metadata, rewritten module
-// Taskfiles) is emitted through Marshal so the output is uniform: a leading
-// "---" document-start marker, two-space indentation, and a single trailing
-// newline. This satisfies yamllint's default ruleset (document-start,
-// indentation, new-line-at-end-of-file) without per-call configuration.
+// Taskotter 2026.
+// SPDX-License-Identifier: Apache-2.0.
+
 package yamlfmt
 
 import (
 	"bytes"
 	"fmt"
 
-	"gopkg.in/yaml.v3"
+	yaml "go.yaml.in/yaml/v3"
 )
 
 const (
-	// indentSpaces is the two-space indentation used for all generated YAML.
+	// IndentSpaces is the two-space indentation used for all generated YAML.
 	indentSpaces = 2
-	// documentStart is the yamllint-required document-start marker.
+	// DocumentStart is the yamllint-required document-start marker.
 	documentStart = "---\n"
 )
 
 // Marshal encodes value as a single YAML document prefixed with "---" using
-// two-space indentation. value may be a struct, map, or *yaml.Node. The result
+// two-space indentation. Value may be a struct, map, or *yaml.Node. The result
 // always ends with exactly one newline and carries exactly one document-start
 // marker.
 func Marshal(value any) ([]byte, error) {
@@ -48,6 +44,7 @@ func Marshal(value any) ([]byte, error) {
 	body := bytes.TrimPrefix(buf.Bytes(), []byte(documentStart))
 
 	out := make([]byte, 0, len(documentStart)+len(body))
+
 	out = append(out, documentStart...)
 	out = append(out, body...)
 

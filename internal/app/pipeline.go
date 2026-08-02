@@ -1,3 +1,6 @@
+// Taskotter 2026.
+// SPDX-License-Identifier: Apache-2.0.
+
 package app
 
 import (
@@ -19,6 +22,7 @@ func PrepareSyncInput(
 	depSources []string,
 ) (syncer.SyncInput, error) {
 	requestedSources := make([]string, 0, len(resolutions))
+
 	for _, res := range resolutions {
 		requestedSources = append(requestedSources, res.SourceModule)
 	}
@@ -35,6 +39,7 @@ func PrepareSyncInput(
 
 	for _, res := range resolutions {
 		dest := sourceToDest[res.SourceModule]
+
 		requestedRecords[res.LogicalTask] = syncer.ModuleRecord{
 			SourceModule:      res.SourceModule,
 			DestinationModule: dest,
@@ -44,8 +49,10 @@ func PrepareSyncInput(
 	}
 
 	dependencyRecords := make([]syncer.ModuleRecord, 0, len(depSources))
+
 	for _, dep := range depSources {
 		dest := sourceToDest[dep]
+
 		dependencyRecords = append(dependencyRecords, syncer.ModuleRecord{
 			SourceModule:      dep,
 			DestinationModule: dest,

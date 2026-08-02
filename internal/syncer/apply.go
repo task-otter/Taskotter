@@ -1,3 +1,6 @@
+// Taskotter 2026.
+// SPDX-License-Identifier: Apache-2.0.
+
 package syncer
 
 import (
@@ -11,7 +14,7 @@ import (
 	"github.com/task-otter/Taskotter/internal/config"
 	"github.com/task-otter/Taskotter/internal/pathutil"
 	"github.com/task-otter/Taskotter/internal/yamlfmt"
-	"gopkg.in/yaml.v3"
+	yaml "go.yaml.in/yaml/v3"
 )
 
 type stagedFile struct {
@@ -26,6 +29,7 @@ func buildStagedFiles(plan *Plan, syncInput SyncInput) ([]stagedFile, error) {
 		contents := plan.ModuleContents[mod.SourceModule]
 
 		rels := make([]string, 0, len(contents))
+
 		for rel := range contents {
 			rels = append(rels, rel)
 		}
@@ -33,8 +37,10 @@ func buildStagedFiles(plan *Plan, syncInput SyncInput) ([]stagedFile, error) {
 		sort.Strings(rels)
 
 		destDirRel := pathutil.JoinRelative(syncInput.Config.TargetFolder, mod.DestinationModule)
+
 		for _, rel := range rels {
 			finalRel := pathutil.JoinRelative(destDirRel, rel)
+
 			staged = append(staged, stagedFile{finalRel: finalRel, entry: contents[rel]})
 		}
 	}
@@ -79,6 +85,7 @@ func ApplyPlan(plan *Plan, syncInput SyncInput) error {
 	}
 
 	copyFile := plan.copyFileTo
+
 	if copyFile == nil {
 		copyFile = copyFileTo
 	}
@@ -87,6 +94,7 @@ func ApplyPlan(plan *Plan, syncInput SyncInput) error {
 	if err != nil {
 		return err
 	}
+
 	defer func() { _ = os.RemoveAll(stagingRoot) }()
 
 	err = validateGeneratedYAML(staged, plan.RootTaskfilePath)
@@ -195,6 +203,7 @@ func validateGeneratedYAML(staged []stagedFile, rootPath string) error {
 
 func removeObsolete(plan *Plan, workspace string) error {
 	currentPaths := make(map[string]struct{}, len(plan.ManagedFiles))
+
 	for _, managed := range plan.ManagedFiles {
 		currentPaths[managed.Path] = struct{}{}
 	}
@@ -211,6 +220,7 @@ func removeObsolete(plan *Plan, workspace string) error {
 		abs := pathutil.WorkspacePath(workspace, old.Path)
 
 		err := os.Remove(abs)
+
 		if err != nil && !os.IsNotExist(err) {
 			return fmt.Errorf("remove obsolete file %q: %w", old.Path, err)
 		}
@@ -222,6 +232,7 @@ func removeObsolete(plan *Plan, workspace string) error {
 func cleanupOldTarget(plan *Plan, workspace string) error {
 	if plan.OldLock == nil || plan.OldTargetFolder == "" ||
 		plan.OldTargetFolder == plan.Metadata.TargetFolder {
+
 		return nil
 	}
 
@@ -267,6 +278,7 @@ func removeOldTargetMetadata(plan *Plan, workspace string) error {
 	oldMetadata := pathutil.WorkspacePath(workspace, oldMetadataRel)
 
 	err = os.Remove(filepath.Dir(oldMetadata))
+
 	if err != nil && !os.IsNotExist(err) && !errorsIsDirectoryNotEmpty(err) {
 		return fmt.Errorf("remove old metadata directory: %w", err)
 	}
@@ -276,6 +288,7 @@ func removeOldTargetMetadata(plan *Plan, workspace string) error {
 
 func removeIfExists(workspace, rel string) error {
 	err := os.Remove(pathutil.WorkspacePath(workspace, rel))
+
 	if err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("remove %q: %w", rel, err)
 	}
@@ -291,11 +304,13 @@ func cleanupLegacyMetadata(workspace, metadataPath string) error {
 	legacy := pathutil.WorkspacePath(workspace, config.LegacyMetadataPath)
 
 	err := os.Remove(legacy)
+
 	if err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("remove legacy metadata: %w", err)
 	}
 
 	err = os.Remove(pathutil.WorkspacePath(workspace, ".taskotter"))
+
 	if err != nil && !os.IsNotExist(err) && !errorsIsDirectoryNotEmpty(err) {
 		return fmt.Errorf("remove legacy metadata directory: %w", err)
 	}

@@ -1,4 +1,6 @@
-// Package archive extracts store snapshot tar.gz archives safely.
+// Taskotter 2026.
+// SPDX-License-Identifier: Apache-2.0.
+
 package archive
 
 import (
@@ -43,6 +45,7 @@ func ExtractTarGz(reader io.Reader, destDir string) (string, error) {
 	if err != nil {
 		return "", &ExtractError{Message: fmt.Sprintf("invalid gzip archive: %v", err)}
 	}
+
 	defer func() { _ = gzipReader.Close() }()
 
 	extractor := &tarExtractor{
@@ -62,16 +65,17 @@ func ExtractTarGz(reader io.Reader, destDir string) (string, error) {
 }
 
 type tarExtractor struct {
-	destDir    string
 	reader     *tar.Reader
-	total      int64
+	destDir    string
 	rootPrefix string
+	total      int64
 	rootSet    bool
 }
 
 func (e *tarExtractor) run() error {
 	for {
 		header, err := e.reader.Next()
+
 		if errors.Is(err, io.EOF) {
 			return nil
 		}
@@ -106,6 +110,7 @@ func (e *tarExtractor) processHeader(header *tar.Header) error {
 	name := filepath.Clean(header.Name)
 
 	parts := strings.Split(strings.Trim(name, "/"), "/")
+
 	if len(parts) == 0 {
 		return nil
 	}
@@ -116,6 +121,7 @@ func (e *tarExtractor) processHeader(header *tar.Header) error {
 	}
 
 	rel := strings.TrimPrefix(strings.TrimPrefix(name, e.rootPrefix), "/")
+
 	if rel == "" || rel == "." {
 		if header.Typeflag == tar.TypeDir {
 			return nil
@@ -145,6 +151,7 @@ func (e *tarExtractor) writeEntry(header *tar.Header, target string) error {
 		}
 
 		e.total += header.Size
+
 		if e.total > MaxTotalExtracted {
 			return &ExtractError{Message: "total extracted size exceeds limit"}
 		}
@@ -195,6 +202,7 @@ func validTarPath(name string) bool {
 	}
 
 	clean := filepath.Clean(name)
+
 	if strings.HasPrefix(clean, "..") {
 		return false
 	}
@@ -233,6 +241,7 @@ func safeTarFileMode(mode int64) (os.FileMode, error) {
 	}
 
 	perm := mode & maxTarFileMode
+
 	if perm > maxTarFileMode {
 		return 0, &ExtractError{Message: fmt.Sprintf("file mode %o out of range", mode)}
 	}

@@ -1,3 +1,6 @@
+// Taskotter 2026.
+// SPDX-License-Identifier: Apache-2.0.
+
 package syncer
 
 import (
@@ -11,7 +14,7 @@ import (
 
 	"github.com/task-otter/Taskotter/internal/config"
 	"github.com/task-otter/Taskotter/internal/pathutil"
-	"gopkg.in/yaml.v3"
+	yaml "go.yaml.in/yaml/v3"
 )
 
 func lockContentChanged(old *LockFile, newLock *LockFile) (bool, error) {
@@ -34,6 +37,7 @@ func marshalLockForCompare(lock *LockFile) ([]byte, error) {
 	}
 
 	cloned := *lock
+
 	cloned.Source.ResolvedCommit = ""
 
 	data, err := yaml.Marshal(cloned)
@@ -53,6 +57,7 @@ func diffFiles(
 	plannedMeta []byte,
 ) ([]string, []string, []string, error) {
 	current := make(map[string]ManagedFile, len(plan.ManagedFiles))
+
 	for _, managed := range plan.ManagedFiles {
 		current[managed.Path] = managed
 	}
@@ -120,6 +125,7 @@ func diffManagedFilePaths(
 		}
 
 		sum := sha256.Sum256(data)
+
 		if hex.EncodeToString(sum[:]) != managed.SHA256 {
 			updated = append(updated, path)
 		}
@@ -150,6 +156,7 @@ func diffLockFile(
 	added, updated []string,
 ) ([]string, []string, error) {
 	oldLockBytes, readErr := pathutil.ReadRelativeFile(workspace, lockPath)
+
 	if readErr != nil && !errors.Is(readErr, os.ErrNotExist) {
 		return nil, nil, fmt.Errorf("read lock file %q: %w", lockPath, readErr)
 	}
@@ -176,6 +183,7 @@ func diffMetadataFile(
 	added, updated []string,
 ) ([]string, []string, error) {
 	oldMetaBytes, readErr := pathutil.ReadRelativeFile(workspace, metadataPath)
+
 	if readErr != nil && !errors.Is(readErr, os.ErrNotExist) {
 		return nil, nil, fmt.Errorf("read metadata %q: %w", metadataPath, readErr)
 	}
@@ -193,6 +201,7 @@ func diffMetadataFile(
 
 func buildStagePaths(plan *Plan, workspace, metadataPath string, syncRoot bool) []string {
 	paths := make(map[string]struct{})
+
 	for _, managed := range plan.ManagedFiles {
 		paths[managed.Path] = struct{}{}
 	}
@@ -215,8 +224,10 @@ func buildStagePaths(plan *Plan, workspace, metadataPath string, syncRoot bool) 
 
 func addMetadataStagePaths(paths map[string]struct{}, workspace, metadataPath string) {
 	paths[metadataPath] = struct{}{}
+
 	if metadataPath != config.LegacyMetadataPath &&
 		relativePathExists(workspace, config.LegacyMetadataPath) {
+
 		paths[config.LegacyMetadataPath] = struct{}{}
 	}
 }
@@ -224,6 +235,7 @@ func addMetadataStagePaths(paths map[string]struct{}, workspace, metadataPath st
 func addOldTargetStagePaths(paths map[string]struct{}, plan *Plan, workspace string) {
 	if plan.OldLock != nil && plan.OldTargetFolder != "" &&
 		plan.OldTargetFolder != plan.Metadata.TargetFolder {
+
 		for _, managed := range plan.OldLock.ManagedFiles {
 			if pathutil.HasFolderPrefix(managed.Path, plan.OldTargetFolder) {
 				paths[managed.Path] = struct{}{}
@@ -231,9 +243,11 @@ func addOldTargetStagePaths(paths map[string]struct{}, plan *Plan, workspace str
 		}
 
 		oldLockPath := pathutil.JoinRelative(plan.OldTargetFolder, ".taskotter-lock.yml")
+
 		paths[oldLockPath] = struct{}{}
 
 		oldMetadataPath := pathutil.JoinRelative(plan.OldTargetFolder, ".taskotter/metadata.yml")
+
 		if relativePathExists(workspace, oldMetadataPath) {
 			paths[oldMetadataPath] = struct{}{}
 		}
@@ -242,6 +256,7 @@ func addOldTargetStagePaths(paths map[string]struct{}, plan *Plan, workspace str
 
 func sortedStagePaths(paths map[string]struct{}) []string {
 	out := make([]string, 0, len(paths))
+
 	for relPath := range paths {
 		out = append(out, relPath)
 	}

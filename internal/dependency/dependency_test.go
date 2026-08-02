@@ -1,3 +1,6 @@
+// Taskotter 2026.
+// SPDX-License-Identifier: Apache-2.0.
+
 package dependency_test
 
 import (
@@ -33,6 +36,7 @@ func TestResolveTransitive(t *testing.T) {
 	}
 
 	want := []string{modCorepackFnm, modFnm, modPnpmFnm}
+
 	if len(got) != len(want) {
 		t.Fatalf("got %#v, want %#v", got, want)
 	}
@@ -63,6 +67,7 @@ func TestMissingDependency(t *testing.T) {
 	t.Parallel()
 
 	depMap := deps()
+
 	depMap[modESLintPnpmFnm] = []string{"missing-mod"}
 
 	_, err := dependency.ResolveTransitive([]string{modESLintPnpmFnm}, depMap)
@@ -74,6 +79,7 @@ func TestMissingDependency(t *testing.T) {
 		err.Error(),
 		`module "eslint/node/fnm/pnpm" depends on missing module "missing-mod"`,
 	) {
+
 		t.Fatalf("unexpected error: %v", err)
 	}
 }

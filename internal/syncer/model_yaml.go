@@ -1,10 +1,13 @@
+// Taskotter 2026.
+// SPDX-License-Identifier: Apache-2.0.
+
 package syncer
 
 import (
 	"errors"
 	"fmt"
 
-	"gopkg.in/yaml.v3"
+	yaml "go.yaml.in/yaml/v3"
 )
 
 const yamlMappingPairKeyValue = 2
@@ -45,8 +48,8 @@ const (
 )
 
 type yamlDecodeTarget struct {
-	key string
 	out any
+	key string
 }
 
 // MarshalYAML encodes a module record using the lock file's snake_case keys.
@@ -55,6 +58,7 @@ func (record ModuleRecord) MarshalYAML() (any, error) {
 		yamlKeySourceModule:      record.SourceModule,
 		yamlKeyDestinationModule: record.DestinationModule,
 	}
+
 	if record.Path != "" {
 		out[yamlKeyPath] = record.Path
 	}
@@ -129,6 +133,7 @@ func (lock LockFile) MarshalYAML() (any, error) {
 		},
 		yamlKeyManagedFiles: lock.ManagedFiles,
 	}
+
 	if len(lock.GeneratedRootTasks) > 0 {
 		out[yamlKeyGeneratedRootTasks] = lock.GeneratedRootTasks
 	}
@@ -247,6 +252,7 @@ func yamlFields(value *yaml.Node) (map[string]*yaml.Node, error) {
 	}
 
 	fields := make(map[string]*yaml.Node, len(value.Content)/yamlMappingPairKeyValue)
+
 	for idx := 0; idx < len(value.Content); idx += yamlMappingPairKeyValue {
 		fields[value.Content[idx].Value] = value.Content[idx+1]
 	}
@@ -256,6 +262,7 @@ func yamlFields(value *yaml.Node) (map[string]*yaml.Node, error) {
 
 func nestedYAMLFields(fields map[string]*yaml.Node, key string) (map[string]*yaml.Node, error) {
 	node := fields[key]
+
 	if node == nil {
 		return map[string]*yaml.Node{}, nil
 	}
@@ -281,6 +288,7 @@ func decodeYAMLFields(fields map[string]*yaml.Node, targets ...yamlDecodeTarget)
 
 func decodeYAMLField(fields map[string]*yaml.Node, key string, out any) error {
 	node := fields[key]
+
 	if node == nil {
 		return nil
 	}

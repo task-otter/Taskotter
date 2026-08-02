@@ -1,4 +1,6 @@
-// Package normalizer maps store module names to destination folder names.
+// Taskotter 2026.
+// SPDX-License-Identifier: Apache-2.0.
+
 package normalizer
 
 import (
@@ -28,8 +30,10 @@ func (e *CollisionError) Error() string {
 // Normalize strips package-manager and version-manager suffixes from a source module name.
 func Normalize(source string) (string, error) {
 	current := source
+
 	for {
 		next, changed := variants.StripOneSuffix(current)
+
 		if !changed {
 			break
 		}
@@ -75,6 +79,7 @@ func BuildDestinationMap(sources []string) (map[string]string, error) {
 // SortedSources returns map keys sorted lexicographically.
 func SortedSources(m map[string]string) []string {
 	out := make([]string, 0, len(m))
+
 	for source := range m {
 		out = append(out, source)
 	}

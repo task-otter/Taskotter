@@ -1,4 +1,6 @@
-// Package app orchestrates the TaskOtter sync pipeline from store resolution through git and PR creation.
+// Taskotter 2026.
+// SPDX-License-Identifier: Apache-2.0.
+
 package app
 
 import (
@@ -10,7 +12,7 @@ import (
 	"github.com/task-otter/Taskotter/internal/config"
 	"github.com/task-otter/Taskotter/internal/dependency"
 	"github.com/task-otter/Taskotter/internal/git"
-	gh "github.com/task-otter/Taskotter/internal/github"
+	"github.com/task-otter/Taskotter/internal/github"
 	"github.com/task-otter/Taskotter/internal/logging"
 	"github.com/task-otter/Taskotter/internal/resolver"
 	"github.com/task-otter/Taskotter/internal/store"
@@ -30,7 +32,7 @@ type Orchestrator struct {
 	Logger      *logging.Logger
 	StoreClient StoreClient
 	GitOps      git.Operations
-	PRClient    gh.PRClient
+	PRClient    github.PRClient
 }
 
 // Run creates an orchestrator from configuration and executes the sync pipeline.
@@ -51,8 +53,9 @@ func NewOrchestrator(ctx context.Context, cfg *config.Config) (*Orchestrator, er
 		GitOps:      git.NewClient(cfg.Workspace),
 		PRClient:    nil,
 	}
+
 	if cfg.Repository != "" {
-		prClient, err := gh.NewClient(ctx, cfg.GitHubToken, cfg.Repository)
+		prClient, err := github.NewClient(ctx, cfg.GitHubToken, cfg.Repository)
 		if err != nil {
 			return nil, fmt.Errorf("create GitHub PR client: %w", err)
 		}
@@ -110,7 +113,7 @@ func (o *Orchestrator) wireDefaults(ctx context.Context, cfg *config.Config) err
 	}
 
 	if o.PRClient == nil && cfg.Repository != "" {
-		prClient, err := gh.NewClient(ctx, cfg.GitHubToken, cfg.Repository)
+		prClient, err := github.NewClient(ctx, cfg.GitHubToken, cfg.Repository)
 		if err != nil {
 			return fmt.Errorf("create GitHub PR client: %w", err)
 		}
@@ -200,10 +203,11 @@ func (o *Orchestrator) runPR(
 	defaultBranch string,
 	result *Result,
 ) error {
-	body := gh.BuildPRBody(cfg, plan, gh.StoreRefFrom(ref))
+	body := github.BuildPRBody(cfg, plan, github.StoreRefFrom(ref))
 
 	existing, err := o.PRClient.FindOpenPR(ctx, cfg.BranchName, defaultBranch)
-	if err != nil && !errors.Is(err, gh.ErrPullRequestNotFound) {
+
+	if err != nil && !errors.Is(err, github.ErrPullRequestNotFound) {
 		return fmt.Errorf("find open pull request: %w", err)
 	}
 
@@ -306,6 +310,7 @@ func (o *Orchestrator) resolveModulesAndDeps(
 
 	depSources, err := runGroup(o.Logger, "Resolve dependencies", func() ([]string, error) {
 		requestedSources := make([]string, 0, len(resolutions))
+
 		for _, res := range resolutions {
 			requestedSources = append(requestedSources, res.SourceModule)
 		}

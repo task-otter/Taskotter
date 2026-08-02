@@ -1,3 +1,6 @@
+// Taskotter 2026.
+// SPDX-License-Identifier: Apache-2.0.
+
 package app_test
 
 import (
@@ -91,6 +94,7 @@ func TestReportSyncRequiredWithPullRequest(t *testing.T) {
 		out.String(),
 		"TaskOtter opened sync PR #42: "+testPullRequestURL,
 	) {
+
 		t.Fatalf("missing PR summary: %s", out.String())
 	}
 
@@ -103,10 +107,12 @@ func TestReportSyncRequiredWithUnknownPullRequestNumber(t *testing.T) {
 	t.Parallel()
 
 	result := emptyResult()
+
 	result.Changed = true
 	result.PullRequestURL = testPullRequestURL
 
 	var out bytes.Buffer
+
 	app.ReportSyncRequiredTo(&out, result)
 
 	if !strings.Contains(out.String(), "sync PR #unknown") {
@@ -156,6 +162,7 @@ func TestSyncRequired(t *testing.T) {
 		Plan:                 nil,
 		Ref:                  emptyRefInfo(),
 	}
+
 	if !app.SyncRequired(changed) {
 		t.Fatal("expected changed result to require sync")
 	}
@@ -173,6 +180,7 @@ func TestSyncRequired(t *testing.T) {
 		Plan:                 nil,
 		Ref:                  emptyRefInfo(),
 	}
+
 	if app.SyncRequired(unchanged) {
 		t.Fatal("expected unchanged result not to require sync")
 	}
@@ -183,7 +191,9 @@ func TestWriteActionOutputsToFile(t *testing.T) {
 
 	outputPath := filepath.Join(t.TempDir(), "github-output")
 	cfg := emptyConfig()
+
 	cfg.GitHubOutput = outputPath
+
 	result := &app.Result{
 		Changed:              true,
 		StoreVersion:         "v1.2.3",
@@ -223,6 +233,7 @@ func TestWriteActionOutputsWrapsFileError(t *testing.T) {
 	t.Parallel()
 
 	cfg := emptyConfig()
+
 	cfg.GitHubOutput = filepath.Join(t.TempDir(), "missing", "output")
 
 	err := app.WriteActionOutputs(cfg, emptyResult())

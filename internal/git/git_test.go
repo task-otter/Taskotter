@@ -1,3 +1,6 @@
+// Taskotter 2026.
+// SPDX-License-Identifier: Apache-2.0.
+
 package git_test
 
 import (
@@ -14,10 +17,10 @@ import (
 const testMainBranch = "main"
 
 type mockGitOps struct {
-	branchExists bool
 	branchErr    error
-	lastMessage  string
 	messageErr   error
+	lastMessage  string
+	branchExists bool
 }
 
 func (mockGitOps *mockGitOps) EnsureSafeDirectory(context.Context) error { return nil }
@@ -55,6 +58,7 @@ func runGit(t *testing.T, dir string, args ...string) string {
 	t.Helper()
 
 	cmd := exec.Command("git", args...)
+
 	cmd.Dir = dir
 
 	out, err := cmd.CombinedOutput()
@@ -67,6 +71,7 @@ func runGit(t *testing.T, dir string, args ...string) string {
 
 func setupRemoteRepo(t *testing.T) string {
 	t.Helper()
+
 	root := t.TempDir()
 	bareDir := filepath.Join(root, "bare.git")
 	cloneDir := filepath.Join(root, "clone")
@@ -108,7 +113,7 @@ func TestDefaultBranchSymbolicRef(t *testing.T) {
 
 	client := git.NewClient(cloneDir)
 
-	branch, err := client.DefaultBranch(context.Background())
+	branch, err := client.DefaultBranch(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -126,13 +131,14 @@ func TestDefaultBranchMissingOriginHEAD(t *testing.T) {
 	originHEAD := filepath.Join(cloneDir, ".git", "refs", "remotes", "origin", "HEAD")
 
 	err := os.Remove(originHEAD)
+
 	if err != nil && !os.IsNotExist(err) {
 		t.Fatal(err)
 	}
 
 	client := git.NewClient(cloneDir)
 
-	branch, err := client.DefaultBranch(context.Background())
+	branch, err := client.DefaultBranch(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -157,7 +163,7 @@ func TestDefaultBranchDirectRef(t *testing.T) {
 
 	client := git.NewClient(cloneDir)
 
-	branch, err := client.DefaultBranch(context.Background())
+	branch, err := client.DefaultBranch(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -212,12 +218,13 @@ func TestStageForceAddsGitignoredMetadata(t *testing.T) {
 
 	client := git.NewClient(cloneDir)
 
-	err = client.Stage(context.Background(), []string{"taskfiles/.taskotter/metadata.yml"})
+	err = client.Stage(t.Context(), []string{"taskfiles/.taskotter/metadata.yml"})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	out := runGit(t, cloneDir, "status", "--porcelain")
+
 	if !strings.Contains(out, "taskfiles/.taskotter/metadata.yml") {
 		t.Fatalf("expected staged metadata, got status:\n%s", out)
 	}
@@ -228,7 +235,7 @@ func TestClientHelpers(t *testing.T) {
 
 	cloneDir := setupRemoteRepo(t)
 	client := git.NewClient(cloneDir)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	err := client.EnsureSafeDirectory(ctx)
 	if err != nil {
@@ -254,7 +261,7 @@ func TestClientBranchMethods(t *testing.T) {
 
 	cloneDir := setupRemoteRepo(t)
 	client := git.NewClient(cloneDir)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	err := client.CheckoutBranch(ctx, "feature/test", true)
 	if err != nil {
@@ -280,6 +287,7 @@ func TestClientBranchMethods(t *testing.T) {
 	}
 
 	msg, err := client.LastCommitMessage(ctx, testMainBranch)
+
 	if err != nil || msg != "init" {
 		t.Fatalf("LastCommitMessage() = %q, %v; want init, nil", msg, err)
 	}
@@ -290,7 +298,7 @@ func TestClientCommitAndPush(t *testing.T) {
 
 	cloneDir := setupRemoteRepo(t)
 	client := git.NewClient(cloneDir)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	err := client.CheckoutBranch(ctx, "feature/test", true)
 	if err != nil {
@@ -329,7 +337,7 @@ func TestHasUnrelatedChanges(t *testing.T) {
 	}
 
 	unrelated, err := client.HasUnrelatedChanges(
-		context.Background(),
+		t.Context(),
 		git.AllowedPathSet([]string{"taskfiles"}),
 	)
 	if err != nil {
@@ -346,7 +354,7 @@ func TestHasUnrelatedChanges(t *testing.T) {
 	}
 
 	unrelated, err = client.HasUnrelatedChanges(
-		context.Background(),
+		t.Context(),
 		git.AllowedPathSet([]string{"taskfiles"}),
 	)
 	if err != nil {
@@ -368,7 +376,7 @@ func TestEnsureBranchOwnedAllowsNewBranch(t *testing.T) {
 		messageErr:   nil,
 	}
 
-	err := git.EnsureBranchOwned(context.Background(), mockOps, "taskotter/sync-abc")
+	err := git.EnsureBranchOwned(t.Context(), mockOps, "taskotter/sync-abc")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -384,7 +392,7 @@ func TestEnsureBranchOwnedAllowsTaskOtterBranch(t *testing.T) {
 		messageErr:   nil,
 	}
 
-	err := git.EnsureBranchOwned(context.Background(), mockOps, "taskotter/sync-abc")
+	err := git.EnsureBranchOwned(t.Context(), mockOps, "taskotter/sync-abc")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -400,7 +408,7 @@ func TestEnsureBranchOwnedRejectsForeignBranch(t *testing.T) {
 		messageErr:   nil,
 	}
 
-	err := git.EnsureBranchOwned(context.Background(), mockOps, "taskotter/sync-abc")
+	err := git.EnsureBranchOwned(t.Context(), mockOps, "taskotter/sync-abc")
 	if err == nil {
 		t.Fatal("expected branch ownership error")
 	}
@@ -410,7 +418,7 @@ func TestEnsureBranchOwnedWrapsOperationErrors(t *testing.T) {
 	t.Parallel()
 
 	err := git.EnsureBranchOwned(
-		context.Background(),
+		t.Context(),
 		&mockGitOps{
 			branchExists: false,
 			branchErr:    os.ErrInvalid,
@@ -419,12 +427,13 @@ func TestEnsureBranchOwnedWrapsOperationErrors(t *testing.T) {
 		},
 		"taskotter/sync-abc",
 	)
+
 	if err == nil || !strings.Contains(err.Error(), "check branch exists") {
 		t.Fatalf("expected branch exists wrapper, got %v", err)
 	}
 
 	err = git.EnsureBranchOwned(
-		context.Background(),
+		t.Context(),
 		&mockGitOps{
 			branchExists: true,
 			branchErr:    nil,
@@ -433,6 +442,7 @@ func TestEnsureBranchOwnedWrapsOperationErrors(t *testing.T) {
 		},
 		"taskotter/sync-abc",
 	)
+
 	if err == nil || !strings.Contains(err.Error(), "read last commit message") {
 		t.Fatalf("expected last message wrapper, got %v", err)
 	}
@@ -459,6 +469,7 @@ func TestValidateGitRefRejectsInvalid(t *testing.T) {
 		"branch with spaces",
 		"branch;rm -rf /",
 	}
+
 	for _, ref := range cases {
 		err := git.ValidateGitRef(ref)
 		if err == nil {

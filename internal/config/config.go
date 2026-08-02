@@ -1,4 +1,6 @@
-// Package config loads and validates TaskOtter GitHub Action inputs from the environment.
+// Taskotter 2026.
+// SPDX-License-Identifier: Apache-2.0.
+
 package config
 
 import (
@@ -44,6 +46,7 @@ func (e *ValidationError) Error() string {
 // (for example INPUT_GITHUB_TOKEN).
 func actionInput(name string) string {
 	upper := strings.ToUpper(name)
+
 	for _, key := range []string{
 		"INPUT_" + upper,
 		"INPUT_" + strings.ReplaceAll(upper, "-", "_"),
@@ -96,31 +99,31 @@ const (
 
 // Config holds validated TaskOtter action inputs and derived sync metadata.
 type Config struct {
-	Tasks              []string
-	JSRuntime          JSRuntime
-	NodePackageManager PackageManager
-	NodeVersionManager VersionManager
-	IncludesDoc        bool
-	SyncRoot           bool
-	FailOnChanges      bool
-	StoreVersion       string
-	TargetFolder       string
-	RootTaskfile       string
-	GitHubToken        string
-	Workspace          string
 	Repository         string
 	GitHubOutput       string
-	BaseBranch         string
-	ConfigurationHash  string
+	NodePackageManager PackageManager
+	NodeVersionManager VersionManager
 	BranchName         string
+	ConfigurationHash  string
+	BaseBranch         string
+	StoreVersion       string
+	JSRuntime          JSRuntime
+	RootTaskfile       string
+	TargetFolder       string
+	Workspace          string
+	GitHubToken        string
+	Tasks              []string
+	FailOnChanges      bool
+	SyncRoot           bool
+	IncludesDoc        bool
 }
 
 type hashPayload struct {
-	Tasks              []string
 	NodePackageManager string
 	NodeVersionManager string
 	TargetFolder       string
 	StoreVersion       string
+	Tasks              []string
 	IncludesDoc        bool
 	SyncRoot           bool
 }
@@ -171,15 +174,15 @@ func LoadFromEnv() (*Config, error) {
 }
 
 type parsedEnvInputs struct {
-	tasks            []string
 	jsRuntime        JSRuntime
 	packageManager   PackageManager
 	versionManager   VersionManager
+	normalizedTarget string
+	rootTaskfile     string
+	tasks            []string
 	includesDoc      bool
 	syncRoot         bool
 	failOnChanges    bool
-	normalizedTarget string
-	rootTaskfile     string
 }
 
 func parseEnvInputs(raw rawEnvConfig) (parsedEnvInputs, error) {
@@ -216,6 +219,7 @@ func parseEnvInputs(raw rawEnvConfig) (parsedEnvInputs, error) {
 	}
 
 	targetFolder := DefaultTargetFolder
+
 	if raw.targetFolderRaw != "" {
 		targetFolder = raw.targetFolderRaw
 	}
@@ -248,6 +252,7 @@ func parseEnvInputs(raw rawEnvConfig) (parsedEnvInputs, error) {
 // caller-provided workspace-relative path is validated and must be a YAML file.
 func resolveRootTaskfile(raw, targetFolder, workspace string) (string, error) {
 	raw = strings.TrimSpace(raw)
+
 	if raw == "" {
 		return pathutil.JoinRelative(targetFolder, "Taskfile.yml"), nil
 	}
@@ -286,6 +291,7 @@ type rawEnvConfig struct {
 
 func loadRawEnv() rawEnvConfig {
 	token := actionInput("github-token")
+
 	if token == "" {
 		token = strings.TrimSpace(os.Getenv("GITHUB_TOKEN"))
 	}
@@ -317,6 +323,7 @@ func resolveBaseBranch(githubBaseRef, githubRef string) string {
 	}
 
 	const branchRefPrefix = "refs/heads/"
+
 	if branch, ok := strings.CutPrefix(strings.TrimSpace(githubRef), branchRefPrefix); ok {
 		return strings.TrimSpace(branch)
 	}
@@ -346,6 +353,7 @@ func jsSettingsFromConfig(jsCfg *jsConfig) (JSRuntime, PackageManager, VersionMa
 
 func parseTasks(raw string) ([]string, error) {
 	raw = strings.ReplaceAll(raw, ",", "\n")
+
 	lines := strings.Split(raw, "\n")
 	seen := make(map[string]struct{})
 
@@ -353,6 +361,7 @@ func parseTasks(raw string) ([]string, error) {
 
 	for _, line := range lines {
 		name := strings.TrimSpace(line)
+
 		if name == "" {
 			continue
 		}

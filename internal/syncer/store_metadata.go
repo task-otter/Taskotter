@@ -1,3 +1,6 @@
+// Taskotter 2026.
+// SPDX-License-Identifier: Apache-2.0.
+
 package syncer
 
 import (
@@ -10,7 +13,7 @@ import (
 	"github.com/task-otter/Taskotter/internal/pathutil"
 	"github.com/task-otter/Taskotter/internal/store"
 	"github.com/task-otter/Taskotter/internal/taskfile"
-	"gopkg.in/yaml.v3"
+	yaml "go.yaml.in/yaml/v3"
 )
 
 const (
@@ -99,6 +102,7 @@ func resolveStoreTaskMetadata(
 		}
 
 		parent := path.Dir(current)
+
 		if parent == "." || parent == current {
 			break
 		}
@@ -117,6 +121,7 @@ func resolveStoreTaskMetadata(
 
 func commonStoreTaskNames(metadata map[string]storeTaskMetadata) map[string]struct{} {
 	counts := make(map[string]int)
+
 	for _, meta := range metadata {
 		seen := make(map[string]struct{})
 
@@ -154,11 +159,13 @@ func buildGeneratedRootTasks(
 
 	for _, logicalTask := range requested {
 		record, foundRecord := requestedRecords[logicalTask]
+
 		if !foundRecord {
 			continue
 		}
 
 		meta, ok := resolveStoreTaskMetadata(record.SourceModule, metadata)
+
 		if !ok {
 			continue
 		}
@@ -173,6 +180,7 @@ func buildGeneratedRootTasks(
 	}
 
 	names := make([]string, 0, len(modulesByTask))
+
 	for name, modules := range modulesByTask {
 		if len(modules) >= minModulesForGeneratedRootTask {
 			names = append(names, name)
@@ -182,6 +190,7 @@ func buildGeneratedRootTasks(
 	sort.Strings(names)
 
 	generated := make([]taskfile.GeneratedRootTask, 0, len(names))
+
 	for _, name := range names {
 		generated = append(generated, taskfile.GeneratedRootTask{
 			Name:    name,

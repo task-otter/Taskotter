@@ -1,3 +1,6 @@
+// Taskotter 2026.
+// SPDX-License-Identifier: Apache-2.0.
+
 package syncer_test
 
 import (
@@ -68,6 +71,7 @@ func assertCollected(t *testing.T, contents map[string]syncer.FileEntry, want ma
 
 	for path, wantSynced := range want {
 		_, ok := contents[path]
+
 		if ok != wantSynced {
 			t.Fatalf("collected %q = %t, want %t", path, ok, wantSynced)
 		}

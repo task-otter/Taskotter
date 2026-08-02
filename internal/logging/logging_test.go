@@ -1,3 +1,6 @@
+// Taskotter 2026.
+// SPDX-License-Identifier: Apache-2.0.
+
 package logging_test
 
 import (
@@ -30,6 +33,7 @@ func TestLoggerWritesGitHubActionsCommands(t *testing.T) {
 		"::group::sync\n" +
 		"inside\n" +
 		"::endgroup::\n"
+
 	if buf.String() != want {
 		t.Fatalf("log output = %q, want %q", buf.String(), want)
 	}
@@ -56,6 +60,7 @@ func TestRedact(t *testing.T) {
 
 	for _, testCase := range cases {
 		got := logging.Redact(testCase.input)
+
 		if got != testCase.want {
 			t.Fatalf("Redact(%q) = %q, want %q", testCase.input, got, testCase.want)
 		}

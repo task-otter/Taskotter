@@ -1,4 +1,6 @@
-// Package github creates and updates TaskOtter sync pull requests.
+// Taskotter 2026.
+// SPDX-License-Identifier: Apache-2.0.
+
 package github
 
 import (
@@ -27,8 +29,8 @@ var ErrPullRequestNotFound = errors.New("open pull request not found")
 
 // PullRequest is a minimal view of a GitHub pull request.
 type PullRequest struct {
-	Number int
 	URL    string
+	Number int
 }
 
 // Client wraps the GitHub API for TaskOtter sync operations.
@@ -144,6 +146,7 @@ func StoreRefFrom(ref store.RefInfo) StoreRef {
 // BuildPRBody renders the markdown body for a sync pull request.
 func BuildPRBody(cfg *config.Config, plan *syncer.Plan, ref StoreRef) string {
 	var body strings.Builder
+
 	body.WriteString("## TaskOtter\n\n")
 	fmt.Fprintf(&body, "- Source: `%s`\n", config.StoreRepository)
 	fmt.Fprintf(&body, "- Requested version: `%s`\n", emptyDash(cfg.StoreVersion))

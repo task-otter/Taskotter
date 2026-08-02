@@ -1,4 +1,6 @@
-// Package syncer plans and applies taskfile sync operations from the store into the workspace.
+// Taskotter 2026.
+// SPDX-License-Identifier: Apache-2.0.
+
 package syncer
 
 import (
@@ -33,20 +35,20 @@ type LockFile struct {
 		ResolvedCommit   string
 		DefaultBranch    string
 	}
-	Configuration struct {
-		TargetFolder       string
-		Tasks              []string
-		NodePackageManager string
-		NodeVersionManager string
-		IncludesDoc        bool
-		SyncRoot           bool
-	}
 	ResolvedModules struct {
 		Requested    orderedRequested
 		Dependencies []ModuleRecord
 	}
 	GeneratedRootTasks []string
 	ManagedFiles       []ManagedFile
+	Configuration      struct {
+		TargetFolder       string
+		NodePackageManager string
+		NodeVersionManager string
+		Tasks              []string
+		IncludesDoc        bool
+		SyncRoot           bool
+	}
 }
 
 // Metadata points to the active lock file and configuration hash.
@@ -64,22 +66,22 @@ type FileEntry struct {
 
 // Plan describes the sync diff and generated artifacts for one run.
 type Plan struct {
-	Requested        map[string]ModuleRecord
-	Dependencies     []ModuleRecord
-	ManagedFiles     []ManagedFile
+	OldLock          *LockFile
+	copyFileTo       func(string, FileEntry) error
 	ModuleContents   map[string]map[string]FileEntry
-	RootTaskfile     []byte
-	RootTaskfilePath string
-	Lock             LockFile
+	Requested        map[string]ModuleRecord
 	Metadata         Metadata
-	Added            []string
+	OldTargetFolder  string
+	RootTaskfilePath string
+	RootTaskfile     []byte
 	Updated          []string
 	Removed          []string
-	Changed          bool
-	OldLock          *LockFile
-	OldTargetFolder  string
+	Added            []string
+	ManagedFiles     []ManagedFile
 	StagePaths       []string
-	copyFileTo       func(string, FileEntry) error
+	Dependencies     []ModuleRecord
+	Lock             LockFile
+	Changed          bool
 }
 
 // SyncInput is the resolved store snapshot and module mapping for BuildPlan.
@@ -87,9 +89,9 @@ type SyncInput struct {
 	Config       *config.Config
 	Snapshot     *store.Snapshot
 	Requested    map[string]ModuleRecord
-	Dependencies []ModuleRecord
 	SourceToDest map[string]string
 	DestByTask   map[string]string
+	Dependencies []ModuleRecord
 }
 
 // SyncError reports user-facing sync planning failures.

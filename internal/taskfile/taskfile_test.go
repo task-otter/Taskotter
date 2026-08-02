@@ -1,3 +1,6 @@
+// Taskotter 2026.
+// SPDX-License-Identifier: Apache-2.0.
+
 package taskfile_test
 
 import (
@@ -43,6 +46,7 @@ tasks:
 	}
 
 	text := string(out)
+
 	if !strings.Contains(text, "../../../../pnpm/Taskfile.yml") {
 		t.Fatalf("include not rewritten: %s", text)
 	}
@@ -78,6 +82,7 @@ includes:
 	}
 
 	text := string(out)
+
 	for _, want := range []string{
 		"../internal/skipfiles/Taskfile.yml",
 		"../bun/Taskfile.yml",
@@ -117,6 +122,7 @@ vars:
 	}
 
 	text := string(out)
+
 	if !strings.Contains(text, `version: "3.5"`) {
 		t.Fatalf("expected root Taskfile version 3.5: %s", text)
 	}
@@ -155,6 +161,7 @@ func TestUpdateRootTaskfileFolderRelativeIncludes(t *testing.T) {
 	}
 
 	text := string(out)
+
 	if !strings.Contains(text, "taskfile: go/Taskfile.yml") {
 		t.Fatalf("expected folder-relative include, got: %s", text)
 	}
@@ -188,6 +195,7 @@ includes:
 	}
 
 	text := string(out)
+
 	if !strings.Contains(text, `version: "3.5"`) {
 		t.Fatalf("expected root Taskfile version 3.5: %s", text)
 	}
@@ -226,6 +234,7 @@ vars:
 	}
 
 	text := string(out)
+
 	if !strings.Contains(text, "go1.22.0") {
 		t.Fatalf("existing include var override removed: %s", text)
 	}
@@ -263,6 +272,7 @@ tasks:
 	}
 
 	text := string(out)
+
 	if !strings.Contains(text, "taskfiles/go/Taskfile.yml") {
 		t.Fatalf("missing go include: %s", text)
 	}
@@ -299,6 +309,7 @@ func TestUpdateRootTaskfileGeneratedTasksAndSharedVars(t *testing.T) {
 	}
 
 	text := string(out)
+
 	for _, want := range []string{
 		"VERSION: 1.2.3",
 		"VERSION: '{{.VERSION}}'",

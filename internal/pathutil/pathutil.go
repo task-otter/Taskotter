@@ -1,4 +1,6 @@
-// Package pathutil validates and normalizes workspace-relative paths.
+// Taskotter 2026.
+// SPDX-License-Identifier: Apache-2.0.
+
 package pathutil
 
 import (
@@ -43,6 +45,7 @@ func NormalizeSlashes(path string) string {
 	path = strings.ReplaceAll(path, "\\", "/")
 
 	path = strings.TrimSpace(path)
+
 	for strings.Contains(path, "//") {
 		path = strings.ReplaceAll(path, "//", "/")
 	}
@@ -80,6 +83,7 @@ func ValidateTaskName(name string) error {
 // ValidateTargetFolder resolves and validates a workspace-relative target folder.
 func ValidateTargetFolder(raw, workspace string) (string, error) {
 	raw = strings.TrimSpace(raw)
+
 	if raw == "" {
 		return "", &PathError{Field: fieldTargetFolder, Value: "", Message: "must not be empty"}
 	}
@@ -122,6 +126,7 @@ func normalizeTargetFolder(raw string) (string, error) {
 	}
 
 	normalized := NormalizeSlashes(raw)
+
 	if normalized == "" {
 		return "", &PathError{
 			Field:   fieldTargetFolder,
@@ -178,6 +183,7 @@ func ensureTargetInsideWorkspace(evalWorkspace, normalized, raw string) error {
 
 func validatePathComponents(evalWorkspace, normalized, raw string) error {
 	current := evalWorkspace
+
 	for part := range strings.SplitSeq(normalized, "/") {
 		current = filepath.Join(current, part)
 
@@ -201,8 +207,10 @@ func validatePathComponents(evalWorkspace, normalized, raw string) error {
 			}
 
 			linkRel, err := filepath.Rel(evalWorkspace, linkTarget)
+
 			if err != nil || linkRel == ".." ||
 				strings.HasPrefix(linkRel, ".."+string(os.PathSeparator)) {
+
 				return &PathError{
 					Field:   fieldTargetFolder,
 					Value:   raw,
@@ -226,6 +234,7 @@ func JoinRelative(base string, parts ...string) string {
 
 func toOSParts(parts []string) []string {
 	out := make([]string, len(parts))
+
 	for i, part := range parts {
 		out[i] = filepath.FromSlash(part)
 	}
@@ -266,6 +275,7 @@ func ValidateRelativePath(root, rel string) (string, error) {
 
 func normalizeRelativePath(rel string) (string, error) {
 	rel = strings.TrimSpace(rel)
+
 	if rel == "" {
 		return "", &PathError{
 			Field:   fieldPath,
@@ -279,6 +289,7 @@ func normalizeRelativePath(rel string) (string, error) {
 	}
 
 	normalized := NormalizeSlashes(rel)
+
 	if normalized == "" {
 		return "", &PathError{
 			Field:   fieldPath,
@@ -341,6 +352,7 @@ func OpenRelativeFile(root, rel string) (fs.File, error) {
 // IsDocPath reports whether rel is documentation copied when includes-doc is enabled.
 func IsDocPath(rel string) bool {
 	rel = NormalizeSlashes(rel)
+
 	if rel == "README.md" {
 		return true
 	}
@@ -360,6 +372,7 @@ func IsTestPath(rel string) bool {
 	rel = NormalizeSlashes(rel)
 
 	base := rel
+
 	if idx := strings.LastIndex(rel, "/"); idx >= 0 {
 		base = rel[idx+1:]
 	}
@@ -372,6 +385,7 @@ func HasFolderPrefix(path, folder string) bool {
 	path = NormalizeSlashes(path)
 
 	folder = NormalizeSlashes(folder)
+
 	if path == folder {
 		return true
 	}

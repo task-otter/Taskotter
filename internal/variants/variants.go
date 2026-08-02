@@ -1,4 +1,6 @@
-// Package variants resolves Node task source module names from runtime configuration.
+// Taskotter 2026.
+// SPDX-License-Identifier: Apache-2.0.
+
 package variants
 
 import (
@@ -50,6 +52,7 @@ func stripSuffixes() []string {
 // IsNodeToolVariant reports whether moduleName is a Node variant of logicalTask.
 func IsNodeToolVariant(moduleName, logicalTask string) bool {
 	prefix := logicalTask + "/"
+
 	if len(moduleName) <= len(prefix) {
 		return false
 	}
@@ -88,6 +91,7 @@ func StripOneSuffix(name string) (string, bool) {
 	for _, suffix := range stripSuffixes() {
 		if len(name) > len(suffix) && name[len(name)-len(suffix):] == suffix {
 			stripped := name[:len(name)-len(suffix)]
+
 			if stripped == "" {
 				continue
 			}

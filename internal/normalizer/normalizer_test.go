@@ -1,3 +1,6 @@
+// Taskotter 2026.
+// SPDX-License-Identifier: Apache-2.0.
+
 package normalizer_test
 
 import (
@@ -46,6 +49,7 @@ func TestNormalizeExamples(t *testing.T) {
 		"bun":                  "bun",
 		"go":                   "go",
 	}
+
 	for source, want := range cases {
 		got, err := normalizer.Normalize(source)
 		if err != nil {
@@ -113,6 +117,7 @@ func TestBuildDestinationMapSortsSources(t *testing.T) {
 	got := normalizer.SortedSources(mapping)
 
 	want := []string{srcESLint, "go"}
+
 	for i := range want {
 		if got[i] != want[i] {
 			t.Fatalf("SortedSources() = %#v, want %#v", got, want)

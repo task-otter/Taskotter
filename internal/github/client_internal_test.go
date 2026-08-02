@@ -1,7 +1,9 @@
+// Taskotter 2026.
+// SPDX-License-Identifier: Apache-2.0.
+
 package github
 
 import (
-	"context"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -41,7 +43,7 @@ func newTestClient(t *testing.T, handler http.HandlerFunc) (*Client, func()) {
 func TestNewClientParsesRepository(t *testing.T) {
 	t.Parallel()
 
-	client, err := NewClient(context.Background(), "token", "owner/repo")
+	client, err := NewClient(t.Context(), "token", "owner/repo")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -54,7 +56,7 @@ func TestNewClientParsesRepository(t *testing.T) {
 func TestNewClientRejectsInvalidRepository(t *testing.T) {
 	t.Parallel()
 
-	_, err := NewClient(context.Background(), "token", "owner")
+	_, err := NewClient(t.Context(), "token", "owner")
 	if err == nil {
 		t.Fatal("expected invalid repository error")
 	}
@@ -80,9 +82,10 @@ func TestFindOpenPR(t *testing.T) {
 
 		_, _ = writer.Write([]byte(`[{"number":42,"html_url":"https://example.test/pr/42"}]`))
 	})
+
 	defer cleanup()
 
-	pullRequest, err := client.FindOpenPR(context.Background(), "taskotter/sync-abc", "main")
+	pullRequest, err := client.FindOpenPR(t.Context(), "taskotter/sync-abc", "main")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -98,9 +101,11 @@ func TestFindOpenPRNotFound(t *testing.T) {
 	client, cleanup := newTestClient(t, func(writer http.ResponseWriter, _ *http.Request) {
 		_, _ = writer.Write([]byte(`[]`))
 	})
+
 	defer cleanup()
 
-	_, err := client.FindOpenPR(context.Background(), "taskotter/sync-abc", "main")
+	_, err := client.FindOpenPR(t.Context(), "taskotter/sync-abc", "main")
+
 	if !errors.Is(err, ErrPullRequestNotFound) {
 		t.Fatalf("FindOpenPR() error = %v, want ErrPullRequestNotFound", err)
 	}
@@ -112,9 +117,10 @@ func TestFindOpenPRError(t *testing.T) {
 	client, cleanup := newTestClient(t, func(writer http.ResponseWriter, _ *http.Request) {
 		http.Error(writer, "nope", http.StatusInternalServerError)
 	})
+
 	defer cleanup()
 
-	_, err := client.FindOpenPR(context.Background(), "taskotter/sync-abc", "main")
+	_, err := client.FindOpenPR(t.Context(), "taskotter/sync-abc", "main")
 	if err == nil {
 		t.Fatal("expected FindOpenPR error")
 	}
@@ -132,9 +138,10 @@ func TestCreatePR(t *testing.T) {
 
 		_, _ = writer.Write([]byte(`{"number":7,"html_url":"https://example.test/pr/7"}`))
 	})
+
 	defer cleanup()
 
-	pullRequest, err := client.CreatePR(context.Background(), "taskotter/sync-abc", "main", "body")
+	pullRequest, err := client.CreatePR(t.Context(), "taskotter/sync-abc", "main", "body")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -150,9 +157,10 @@ func TestCreatePRError(t *testing.T) {
 	client, cleanup := newTestClient(t, func(writer http.ResponseWriter, _ *http.Request) {
 		http.Error(writer, "nope", http.StatusInternalServerError)
 	})
+
 	defer cleanup()
 
-	_, err := client.CreatePR(context.Background(), "taskotter/sync-abc", "main", "body")
+	_, err := client.CreatePR(t.Context(), "taskotter/sync-abc", "main", "body")
 	if err == nil {
 		t.Fatal("expected CreatePR error")
 	}
@@ -170,9 +178,10 @@ func TestUpdatePRBody(t *testing.T) {
 
 		_, _ = writer.Write([]byte(`{"number":7}`))
 	})
+
 	defer cleanup()
 
-	err := client.UpdatePRBody(context.Background(), 7, "body")
+	err := client.UpdatePRBody(t.Context(), 7, "body")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -184,9 +193,10 @@ func TestUpdatePRBodyError(t *testing.T) {
 	client, cleanup := newTestClient(t, func(writer http.ResponseWriter, _ *http.Request) {
 		http.Error(writer, "nope", http.StatusInternalServerError)
 	})
+
 	defer cleanup()
 
-	err := client.UpdatePRBody(context.Background(), 7, "body")
+	err := client.UpdatePRBody(t.Context(), 7, "body")
 	if err == nil {
 		t.Fatal("expected UpdatePRBody error")
 	}
@@ -196,6 +206,7 @@ func TestBuildPRBodyWithoutNodeRuntimeIncludesFileLists(t *testing.T) {
 	t.Parallel()
 
 	cfg := new(config.Config)
+
 	cfg.Tasks = []string{"go"}
 	cfg.IncludesDoc = false
 	cfg.SyncRoot = false
@@ -203,6 +214,7 @@ func TestBuildPRBodyWithoutNodeRuntimeIncludesFileLists(t *testing.T) {
 	cfg.StoreVersion = "v1.2.3"
 
 	plan := new(syncer.Plan)
+
 	plan.Requested = map[string]syncer.ModuleRecord{
 		"go": {
 			SourceModule:      "go",
@@ -219,6 +231,7 @@ func TestBuildPRBodyWithoutNodeRuntimeIncludesFileLists(t *testing.T) {
 		ResolvedCommit: "",
 		DefaultBranch:  "",
 	})
+
 	if strings.Contains(body, "Package manager") {
 		t.Fatalf("non-node body should not include package manager: %s", body)
 	}

@@ -1,3 +1,6 @@
+// Taskotter 2026.
+// SPDX-License-Identifier: Apache-2.0.
+
 package app
 
 import (
@@ -9,7 +12,7 @@ import (
 	"strconv"
 
 	"github.com/task-otter/Taskotter/internal/config"
-	gh "github.com/task-otter/Taskotter/internal/github"
+	"github.com/task-otter/Taskotter/internal/github"
 	"github.com/task-otter/Taskotter/internal/logging"
 	"github.com/task-otter/Taskotter/internal/store"
 	"github.com/task-otter/Taskotter/internal/syncer"
@@ -19,7 +22,8 @@ const syncRequiredErrorSuffix = " Merge the sync pull request to update taskfile
 
 // Result captures sync outcomes for logging, GitHub Actions output, and PR metadata.
 type Result struct {
-	Changed              bool
+	Plan                 *syncer.Plan
+	Ref                  store.RefInfo
 	StoreVersion         string
 	SourceRef            string
 	SourceSHA            string
@@ -28,8 +32,7 @@ type Result struct {
 	ResolvedDependencies string
 	PullRequestNumber    string
 	PullRequestURL       string
-	Plan                 *syncer.Plan
-	Ref                  store.RefInfo
+	Changed              bool
 }
 
 // ResolvedTask is the JSON representation of a resolved task module mapping.
@@ -55,6 +58,7 @@ func (t ResolvedTask) MarshalJSON() ([]byte, error) {
 
 func buildResolvedTasksJSON(requested map[string]syncer.ModuleRecord) (string, error) {
 	out := make(map[string]ResolvedTask, len(requested))
+
 	for task, rec := range requested {
 		out[task] = ResolvedTask{
 			SourceModule:      rec.SourceModule,
@@ -73,6 +77,7 @@ func buildResolvedTasksJSON(requested map[string]syncer.ModuleRecord) (string, e
 
 func buildResolvedDependenciesJSON(deps []syncer.ModuleRecord) (string, error) {
 	out := make([]ResolvedTask, 0, len(deps))
+
 	for _, dep := range deps {
 		out = append(out, ResolvedTask{
 			SourceModule:      dep.SourceModule,
@@ -175,6 +180,7 @@ func ReportSyncRequiredTo(writer io.Writer, result *Result) {
 
 	if result.PullRequestURL != "" {
 		prNumber := result.PullRequestNumber
+
 		if prNumber == "" {
 			prNumber = "unknown"
 		}
@@ -218,8 +224,9 @@ func WriteActionOutputs(cfg *config.Config, result *Result) error {
 		"pull-request-number":   result.PullRequestNumber,
 		"pull-request-url":      result.PullRequestURL,
 	}
+
 	if cfg.GitHubOutput != "" {
-		err := gh.WriteOutputs(cfg.GitHubOutput, values)
+		err := github.WriteOutputs(cfg.GitHubOutput, values)
 		if err != nil {
 			return fmt.Errorf("write GitHub Actions outputs: %w", err)
 		}
@@ -228,6 +235,7 @@ func WriteActionOutputs(cfg *config.Config, result *Result) error {
 	}
 
 	keys := make([]string, 0, len(values))
+
 	for key := range values {
 		keys = append(keys, key)
 	}

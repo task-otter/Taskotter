@@ -1,4 +1,6 @@
-// Package resolver maps logical task names to store source modules.
+// Taskotter 2026.
+// SPDX-License-Identifier: Apache-2.0.
+
 package resolver
 
 import (
@@ -34,11 +36,13 @@ type ResolveError struct {
 
 func (e *ResolveError) Error() string {
 	msg := fmt.Sprintf(`task %q`, e.LogicalTask)
+
 	if e.Attempted != "" {
 		msg += fmt.Sprintf(" (attempted source module %q)", e.Attempted)
 	}
 
 	msg += ": " + e.Message
+
 	if len(e.CloseMatches) > 0 {
 		msg += "; close matches: " + strings.Join(e.CloseMatches, ", ")
 	}
@@ -75,6 +79,7 @@ func Resolve(
 	versionManager config.VersionManager,
 ) (Resolution, error) {
 	nodeVariants := findVariants(task, catalog)
+
 	if len(nodeVariants) == 0 {
 		if _, ok := catalog[task]; ok {
 			return Resolution{LogicalTask: task, SourceModule: task}, nil
@@ -138,6 +143,7 @@ func findVariants(task string, catalog map[string]struct{}) []string {
 
 func catalogKeys(catalog map[string]struct{}) []string {
 	keys := make([]string, 0, len(catalog))
+
 	for key := range catalog {
 		keys = append(keys, key)
 	}
@@ -157,6 +163,7 @@ func closeMatches(query string, candidates []string, limit int) []string {
 
 	for _, candidate := range candidates {
 		score := similarity(query, candidate)
+
 		if score > 0 {
 			scores = append(scores, scored{name: candidate, score: score})
 		}
@@ -171,6 +178,7 @@ func closeMatches(query string, candidates []string, limit int) []string {
 	})
 
 	var out []string
+
 	for i := 0; i < len(scores) && i < limit; i++ {
 		out = append(out, scores[i].name)
 	}
@@ -196,6 +204,7 @@ func levenshtein(left, right string) int {
 	}
 
 	leftLen, rightLen := len(left), len(right)
+
 	if leftLen == 0 || rightLen == 0 {
 		return 0
 	}
@@ -203,6 +212,7 @@ func levenshtein(left, right string) int {
 	prev := make([]int, rightLen+1)
 
 	curr := make([]int, rightLen+1)
+
 	for col := 0; col <= rightLen; col++ {
 		prev[col] = col
 	}
@@ -212,6 +222,7 @@ func levenshtein(left, right string) int {
 
 		for col := 1; col <= rightLen; col++ {
 			cost := 1
+
 			if left[row-1] == right[col-1] {
 				cost = 0
 			}

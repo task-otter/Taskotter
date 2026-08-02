@@ -1,4 +1,6 @@
-// Package git wraps workspace git operations used during TaskOtter sync.
+// Taskotter 2026.
+// SPDX-License-Identifier: Apache-2.0.
+
 package git
 
 import (
@@ -44,6 +46,7 @@ var gitRefPattern = regexp.MustCompile(`^[a-zA-Z0-9._/-]+$`)
 // ValidateGitRef checks that ref is safe to pass to git commands.
 func ValidateGitRef(ref string) error {
 	ref = strings.TrimSpace(ref)
+
 	if ref == "" {
 		return fmt.Errorf("%w: must not be empty", errInvalidGitRef)
 	}
@@ -66,6 +69,7 @@ func ValidateGitRef(ref string) error {
 // ValidateStagePath checks that path is a safe workspace-relative git add target.
 func ValidateStagePath(workspace, path string) error {
 	trimmed := strings.TrimSpace(path)
+
 	if strings.HasPrefix(trimmed, "-") {
 		return fmt.Errorf("%w: must not start with '-'", errInvalidStagePath)
 	}
@@ -142,6 +146,7 @@ func (c *Client) HasUnrelatedChanges(
 	}
 
 	lines := strings.SplitSeq(strings.TrimSpace(out), "\n")
+
 	for line := range lines {
 		if line == "" {
 			continue
@@ -152,6 +157,7 @@ func (c *Client) HasUnrelatedChanges(
 		}
 
 		path := strings.TrimSpace(line[gitStatusPathOffset:])
+
 		if path == "" {
 			continue
 		}
@@ -178,6 +184,7 @@ func (c *Client) CheckoutBranch(ctx context.Context, branch string, create bool)
 	}
 
 	args := []string{"checkout"}
+
 	if create {
 		args = append(args, "-B")
 	}
@@ -262,6 +269,7 @@ func (c *Client) Push(ctx context.Context, branch string, forceWithLease bool) e
 	}
 
 	args := []string{"push"}
+
 	if forceWithLease {
 		args = append(args, "--force-with-lease")
 	}
@@ -324,6 +332,7 @@ func (c *Client) defaultBranchFromOriginHEADCommit(ctx context.Context) (string,
 
 	for line := range strings.SplitSeq(strings.TrimSpace(refs), "\n") {
 		line = strings.TrimSpace(line)
+
 		if line == "" || line == "origin/HEAD" {
 			continue
 		}
@@ -346,6 +355,7 @@ func (c *Client) defaultBranchFromRemoteShow(ctx context.Context) (string, error
 
 	for line := range strings.SplitSeq(out, "\n") {
 		line = strings.TrimSpace(line)
+
 		if after, ok := strings.CutPrefix(line, prefix); ok {
 			if branch := strings.TrimSpace(after); branch != "" {
 				return branch, nil
@@ -411,6 +421,7 @@ func (c *Client) output(ctx context.Context, args ...string) (string, error) {
 // AllowedPathSet converts staged path strings into a lookup set.
 func AllowedPathSet(paths []string) map[string]struct{} {
 	out := make(map[string]struct{}, len(paths))
+
 	for _, path := range paths {
 		out[filepath.ToSlash(path)] = struct{}{}
 	}
@@ -465,6 +476,7 @@ func normalizeBranch(name string) string {
 
 func isPlausibleDefaultBranch(branch string) bool {
 	branch = strings.TrimSpace(branch)
+
 	if branch == "" || branch == "HEAD" || branch == "origin" {
 		return false
 	}

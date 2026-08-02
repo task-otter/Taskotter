@@ -1,3 +1,6 @@
+// Taskotter 2026.
+// SPDX-License-Identifier: Apache-2.0.
+
 package config_test
 
 import (
@@ -9,6 +12,7 @@ import (
 func TestParseJSNodeJSDefaults(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
+
 	env["INPUT_JS"] = "runtime: nodejs\n"
 	setEnv(t, env)
 
@@ -33,6 +37,7 @@ func TestParseJSNodeJSDefaults(t *testing.T) {
 func TestParseJSBun(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
+
 	env["INPUT_JS"] = "runtime: bun\n"
 	setEnv(t, env)
 
@@ -57,6 +62,7 @@ func TestParseJSBun(t *testing.T) {
 func TestParseJSBunRejectsVersionManager(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
+
 	env["INPUT_JS"] = "runtime: bun\nversion-manager: fnm\n"
 	setEnv(t, env)
 
@@ -69,6 +75,7 @@ func TestParseJSBunRejectsVersionManager(t *testing.T) {
 func TestParseJSBunRejectsPackageManager(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
+
 	env["INPUT_JS"] = "runtime: bun\npackage-manager: pnpm\n"
 	setEnv(t, env)
 
@@ -81,6 +88,7 @@ func TestParseJSBunRejectsPackageManager(t *testing.T) {
 func TestParseJSNodeJSRejectsBunPackageManager(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
+
 	env["INPUT_JS"] = "runtime: nodejs\npackage-manager: bun\n"
 	setEnv(t, env)
 
@@ -111,6 +119,7 @@ func TestParseJSEmpty(t *testing.T) {
 func TestParseJSDefaultsRuntimeToNodeJS(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
+
 	env["INPUT_JS"] = "package-manager: yarn\nversion-manager: nvm\n"
 	setEnv(t, env)
 
@@ -127,6 +136,7 @@ func TestParseJSDefaultsRuntimeToNodeJS(t *testing.T) {
 func TestParseJSRejectsInvalidYAML(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
+
 	env["INPUT_JS"] = ":"
 	setEnv(t, env)
 
@@ -139,6 +149,7 @@ func TestParseJSRejectsInvalidYAML(t *testing.T) {
 func TestParseJSRejectsInvalidRuntime(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
+
 	env["INPUT_JS"] = "runtime: deno\n"
 	setEnv(t, env)
 
@@ -151,6 +162,7 @@ func TestParseJSRejectsInvalidRuntime(t *testing.T) {
 func TestParseJSRejectsInvalidVersionManager(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
+
 	env["INPUT_JS"] = "runtime: nodejs\nversion-manager: volta\n"
 	setEnv(t, env)
 

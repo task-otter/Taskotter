@@ -1,4 +1,6 @@
-// Package store downloads and loads TaskOtter store snapshots from GitHub.
+// Taskotter 2026.
+// SPDX-License-Identifier: Apache-2.0.
+
 package store
 
 import (
@@ -18,7 +20,7 @@ import (
 	"github.com/task-otter/Taskotter/internal/archive"
 	"github.com/task-otter/Taskotter/internal/config"
 	"github.com/task-otter/Taskotter/internal/pathutil"
-	"gopkg.in/yaml.v3"
+	yaml "go.yaml.in/yaml/v3"
 )
 
 const (
@@ -51,11 +53,11 @@ type RefInfo struct {
 
 // Snapshot holds an extracted store tree and module metadata.
 type Snapshot struct {
-	RootDir string
 	Catalog map[string]struct{}
 	Deps    map[string][]string
-	Ref     RefInfo
 	cleanup func() error
+	Ref     RefInfo
+	RootDir string
 }
 
 // Close removes temporary snapshot files when present.
@@ -162,7 +164,7 @@ func (c *Client) DownloadSnapshot(ctx context.Context, ref RefInfo) (*Snapshot, 
 		fmt.Sprintf("/repos/%s/%s/tarball/%s", storeOwner, storeRepo, ref.ResolvedCommit),
 	)
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, downloadURL, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, downloadURL, http.NoBody)
 	if err != nil {
 		return nil, fmt.Errorf("create download request: %w", err)
 	}
@@ -173,6 +175,7 @@ func (c *Client) DownloadSnapshot(ctx context.Context, ref RefInfo) (*Snapshot, 
 	if err != nil {
 		return nil, fmt.Errorf("download store archive: %w", err)
 	}
+
 	defer func() { _ = resp.Body.Close() }()
 
 	err = archiveDownloadStatusError(resp.StatusCode)
@@ -330,7 +333,7 @@ func (c *Client) applyHeaders(req *http.Request) {
 }
 
 func (c *Client) getJSON(ctx context.Context, path string, payload any) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.apiURL(path), nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.apiURL(path), http.NoBody)
 	if err != nil {
 		return fmt.Errorf("create API request: %w", err)
 	}
@@ -400,7 +403,7 @@ func (c *Client) resolveTag(ctx context.Context, tag string) (string, error) {
 
 	path := fmt.Sprintf("/repos/%s/%s/git/ref/tags/%s", storeOwner, storeRepo, url.PathEscape(tag))
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.apiURL(path), nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.apiURL(path), http.NoBody)
 	if err != nil {
 		return "", fmt.Errorf("create tag request: %w", err)
 	}
@@ -428,6 +431,7 @@ func (c *Client) resolveTag(ctx context.Context, tag string) (string, error) {
 	}
 
 	sha := payload.Object.SHA
+
 	if payload.Object.Type == "tag" {
 		sha, err = c.peelAnnotatedTag(ctx, sha)
 		if err != nil {

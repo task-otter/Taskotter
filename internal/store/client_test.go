@@ -1,10 +1,12 @@
+// Taskotter 2026.
+// SPDX-License-Identifier: Apache-2.0.
+
 package store_test
 
 import (
 	"archive/tar"
 	"bytes"
 	"compress/gzip"
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -47,6 +49,7 @@ func buildStoreTarGz(t *testing.T) []byte {
 
 	for name, content := range entries {
 		header := new(tar.Header)
+
 		header.Name = name
 		header.Mode = 0o644
 		header.Size = int64(len(content))
@@ -83,7 +86,7 @@ func newStoreTestClient(t *testing.T, handler http.HandlerFunc) (*store.Client, 
 	t.Helper()
 
 	srv := httptest.NewServer(handler)
-	client := store.NewClientWithHTTP(context.Background(), "token", srv.Client()).
+	client := store.NewClientWithHTTP(t.Context(), "token", srv.Client()).
 		WithBaseURL(srv.URL)
 
 	return client, srv.Close
@@ -102,12 +105,13 @@ func TestResolveRefDefaultBranch(t *testing.T) {
 			http.NotFound(writer, req)
 		}
 	}))
+
 	defer srv.Close()
 
-	client := store.NewClientWithHTTP(context.Background(), "token", srv.Client()).
+	client := store.NewClientWithHTTP(t.Context(), "token", srv.Client()).
 		WithBaseURL(srv.URL)
 
-	ref, err := client.ResolveRef(context.Background(), "")
+	ref, err := client.ResolveRef(t.Context(), "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -134,9 +138,10 @@ func TestResolveRefDefaultBranchIgnoresNonStringMetadata(t *testing.T) {
 			http.NotFound(writer, req)
 		}
 	})
+
 	defer cleanup()
 
-	ref, err := client.ResolveRef(context.Background(), "")
+	ref, err := client.ResolveRef(t.Context(), "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -159,12 +164,13 @@ func TestResolveMissingTag(t *testing.T) {
 			http.NotFound(writer, req)
 		}
 	}))
+
 	defer srv.Close()
 
-	client := store.NewClientWithHTTP(context.Background(), "token", srv.Client()).
+	client := store.NewClientWithHTTP(t.Context(), "token", srv.Client()).
 		WithBaseURL(srv.URL)
 
-	_, err := client.ResolveRef(context.Background(), "v9.9.9")
+	_, err := client.ResolveRef(t.Context(), "v9.9.9")
 	if err == nil {
 		t.Fatal("expected missing tag error")
 	}
@@ -183,9 +189,10 @@ func TestResolveLightweightTag(t *testing.T) {
 			http.NotFound(writer, req)
 		}
 	})
+
 	defer cleanup()
 
-	ref, err := client.ResolveRef(context.Background(), "v1.2.3")
+	ref, err := client.ResolveRef(t.Context(), "v1.2.3")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -210,9 +217,10 @@ func TestResolveAnnotatedTag(t *testing.T) {
 			http.NotFound(writer, req)
 		}
 	})
+
 	defer cleanup()
 
-	ref, err := client.ResolveRef(context.Background(), "v1.2.3")
+	ref, err := client.ResolveRef(t.Context(), "v1.2.3")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -227,8 +235,8 @@ func TestResolveRefErrors(t *testing.T) {
 
 	cases := []struct {
 		name   string
-		status int
 		body   string
+		status int
 	}{
 		{name: "metadata not ok", status: http.StatusInternalServerError, body: `{}`},
 		{name: "empty default branch", status: http.StatusOK, body: `{"default_branch":""}`},
@@ -249,12 +257,14 @@ func TestResolveRefErrors(t *testing.T) {
 					}
 
 					writer.WriteHeader(testCase.status)
+
 					_, _ = writer.Write([]byte(testCase.body))
 				},
 			)
+
 			defer cleanup()
 
-			_, err := client.ResolveRef(context.Background(), "")
+			_, err := client.ResolveRef(t.Context(), "")
 			if err == nil {
 				t.Fatal("expected ResolveRef error")
 			}
@@ -267,8 +277,8 @@ func TestResolveTagErrors(t *testing.T) {
 
 	cases := []struct {
 		name   string
-		status int
 		body   string
+		status int
 	}{
 		{name: "server error", status: http.StatusInternalServerError, body: `{}`},
 		{name: "invalid json", status: http.StatusOK, body: `{`},
@@ -286,15 +296,17 @@ func TestResolveTagErrors(t *testing.T) {
 						_, _ = writer.Write([]byte(`{"default_branch":"main"}`))
 					case storeTagPath:
 						writer.WriteHeader(testCase.status)
+
 						_, _ = writer.Write([]byte(testCase.body))
 					default:
 						http.NotFound(writer, req)
 					}
 				},
 			)
+
 			defer cleanup()
 
-			_, err := client.ResolveRef(context.Background(), "v1.2.3")
+			_, err := client.ResolveRef(t.Context(), "v1.2.3")
 			if err == nil {
 				t.Fatal("expected ResolveRef error")
 			}
@@ -305,7 +317,7 @@ func TestResolveTagErrors(t *testing.T) {
 func TestNewClientAndDownloadSnapshot(t *testing.T) {
 	t.Parallel()
 
-	if store.NewClient(context.Background(), "token") == nil {
+	if store.NewClient(t.Context(), "token") == nil {
 		t.Fatal("NewClient() returned nil")
 	}
 
@@ -324,10 +336,11 @@ func TestNewClientAndDownloadSnapshot(t *testing.T) {
 
 		_, _ = writer.Write(data)
 	})
+
 	defer cleanup()
 
 	snap, err := client.DownloadSnapshot(
-		context.Background(),
+		t.Context(),
 		storeRefInfo(storeCommitSHA),
 	)
 	if err != nil {
@@ -344,6 +357,7 @@ func TestNewClientAndDownloadSnapshot(t *testing.T) {
 	}
 
 	_, err = os.Stat(snap.RootDir)
+
 	if !os.IsNotExist(err) {
 		t.Fatalf("snapshot root still exists or unexpected stat error: %v", err)
 	}
@@ -367,10 +381,11 @@ func TestDownloadSnapshotStatusErrors(t *testing.T) {
 					writer.WriteHeader(status)
 				},
 			)
+
 			defer cleanup()
 
 			_, err := client.DownloadSnapshot(
-				context.Background(),
+				t.Context(),
 				storeRefInfo(storeCommitSHA),
 			)
 			if err == nil {
@@ -386,9 +401,10 @@ func TestDownloadSnapshotInvalidArchiveCleansUp(t *testing.T) {
 	client, cleanup := newStoreTestClient(t, func(writer http.ResponseWriter, _ *http.Request) {
 		_, _ = writer.Write([]byte("not a gzip archive"))
 	})
+
 	defer cleanup()
 
-	_, err := client.DownloadSnapshot(context.Background(), storeRefInfo(storeCommitSHA))
+	_, err := client.DownloadSnapshot(t.Context(), storeRefInfo(storeCommitSHA))
 	if err == nil {
 		t.Fatal("expected DownloadSnapshot error")
 	}
@@ -418,14 +434,14 @@ func TestLocalSnapshotLoadsFixture(t *testing.T) {
 		t.Fatalf("unexpected deps: %#v", snap.Deps["eslint/node/fnm/pnpm"])
 	}
 
-	// internal/ has no Taskfile.yml of its own, so it is a namespace whose
-	// children are catalogued under their full namespaced name.
+	// Internal/ has no Taskfile.yml of its own, so it is a namespace whose
+	// children are cataloged under their full namespaced name.
 	if _, ok := snap.Catalog["internal/skipfiles"]; !ok {
 		t.Fatalf("expected namespaced module in catalog: %#v", snap.Catalog)
 	}
 
 	if _, ok := snap.Catalog["internal"]; ok {
-		t.Fatal("namespace directory must not be catalogued as a module")
+		t.Fatal("namespace directory must not be cataloged as a module")
 	}
 
 	if snap.ModuleDir(
@@ -436,6 +452,7 @@ func TestLocalSnapshotLoadsFixture(t *testing.T) {
 		"internal",
 		"skipfiles",
 	) {
+
 		t.Fatalf("unexpected module dir: %s", snap.ModuleDir("internal/skipfiles"))
 	}
 }

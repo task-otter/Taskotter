@@ -1,3 +1,6 @@
+// Taskotter 2026.
+// SPDX-License-Identifier: Apache-2.0.
+
 package syncer
 
 import (
@@ -31,6 +34,7 @@ func writeFileAtomic(path string, data []byte, mode os.FileMode) error {
 	tmpPath := tmp.Name()
 
 	cleanup := true
+
 	defer func() {
 		if cleanup {
 			_ = tmp.Close()
@@ -73,6 +77,7 @@ func CopyFile(root, rel, dst string, mode os.FileMode) error {
 	if err != nil {
 		return fmt.Errorf("open %q: %w", rel, err)
 	}
+
 	defer func() { _ = source.Close() }()
 
 	data, err := io.ReadAll(source)
@@ -85,6 +90,7 @@ func CopyFile(root, rel, dst string, mode os.FileMode) error {
 
 func sortedModuleRecords(requested map[string]ModuleRecord, deps []ModuleRecord) []ModuleRecord {
 	tasks := make([]string, 0, len(requested))
+
 	for task := range requested {
 		tasks = append(tasks, task)
 	}
@@ -92,6 +98,7 @@ func sortedModuleRecords(requested map[string]ModuleRecord, deps []ModuleRecord)
 	sort.Strings(tasks)
 
 	out := make([]ModuleRecord, 0, len(requested)+len(deps))
+
 	for _, task := range tasks {
 		out = append(out, requested[task])
 	}
@@ -101,6 +108,7 @@ func sortedModuleRecords(requested map[string]ModuleRecord, deps []ModuleRecord)
 
 func preserveMode(mode os.FileMode) os.FileMode {
 	perm := mode.Perm()
+
 	if perm&0o111 != 0 {
 		return perm
 	}

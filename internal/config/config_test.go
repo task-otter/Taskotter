@@ -1,3 +1,6 @@
+// Taskotter 2026.
+// SPDX-License-Identifier: Apache-2.0.
+
 package config_test
 
 import (
@@ -40,6 +43,7 @@ func baseEnv(workspace string) map[string]string {
 func TestLoadFromEnvUsesTriggerBranchAsPRBase(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
+
 	env["GITHUB_REF"] = "refs/heads/" + testBaseBranch
 	setEnv(t, env)
 
@@ -56,6 +60,7 @@ func TestLoadFromEnvUsesTriggerBranchAsPRBase(t *testing.T) {
 func TestLoadFromEnvUsesPullRequestTargetAsPRBase(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
+
 	env["GITHUB_REF"] = "refs/pull/42/merge"
 	env["GITHUB_BASE_REF"] = testBaseBranch
 	setEnv(t, env)
@@ -111,6 +116,7 @@ func TestLoadFromEnvDefaults(t *testing.T) {
 func TestRootTaskfileCustomPath(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
+
 	env["INPUT_ROOT_TASKFILE"] = "build/Taskfile.yml"
 	setEnv(t, env)
 
@@ -127,6 +133,7 @@ func TestRootTaskfileCustomPath(t *testing.T) {
 func TestRootTaskfileFollowsTargetFolder(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
+
 	env["INPUT_TARGET_FOLDER"] = "tools/tasks"
 	setEnv(t, env)
 
@@ -143,6 +150,7 @@ func TestRootTaskfileFollowsTargetFolder(t *testing.T) {
 func TestRootTaskfileMustBeYAML(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
+
 	env["INPUT_ROOT_TASKFILE"] = "build/Taskfile.txt"
 	setEnv(t, env)
 
@@ -156,6 +164,7 @@ func TestValidationErrorWithoutField(t *testing.T) {
 	t.Parallel()
 
 	err := (&config.ValidationError{Field: "", Message: "bad input"}).Error()
+
 	if err != "bad input" {
 		t.Fatalf("Error() = %q", err)
 	}
@@ -165,6 +174,7 @@ func TestMissingRuntimeInputs(t *testing.T) {
 	dir := t.TempDir()
 
 	env := baseEnv(dir)
+
 	env["GITHUB_WORKSPACE"] = ""
 	setEnv(t, env)
 
@@ -186,6 +196,7 @@ func TestMissingRuntimeInputs(t *testing.T) {
 func TestLoadFromEnvGitHubTokenFallback(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
+
 	env["INPUT_GITHUB_TOKEN"] = ""
 	env["GITHUB_TOKEN"] = "fallback-token"
 	setEnv(t, env)
@@ -203,6 +214,7 @@ func TestLoadFromEnvGitHubTokenFallback(t *testing.T) {
 func TestLoadFromEnvDockerInputEnvNames(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
+
 	env["INPUT_GITHUB_TOKEN"] = ""
 	env["INPUT_GITHUB-TOKEN"] = "docker-token"
 	env["INPUT_JS"] = "runtime: nodejs\npackage-manager: pnpm\nversion-manager: fnm\n"
@@ -244,6 +256,7 @@ func TestLoadFromEnvDockerInputEnvNames(t *testing.T) {
 func TestParseTasksMultilineAndDedupe(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
+
 	env["INPUT_TASKS"] = "eslint\nprettier,\ngo\ngo\n"
 	setEnv(t, env)
 
@@ -253,6 +266,7 @@ func TestParseTasksMultilineAndDedupe(t *testing.T) {
 	}
 
 	want := []string{"eslint", "prettier", "go"}
+
 	if len(cfg.Tasks) != len(want) {
 		t.Fatalf("Tasks = %#v, want %#v", cfg.Tasks, want)
 	}
@@ -267,6 +281,7 @@ func TestParseTasksMultilineAndDedupe(t *testing.T) {
 func TestInvalidTaskName(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
+
 	env["INPUT_TASKS"] = "../evil"
 	setEnv(t, env)
 
@@ -279,6 +294,7 @@ func TestInvalidTaskName(t *testing.T) {
 func TestBunWithVersionManagerRejected(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
+
 	env["INPUT_TASKS"] = "eslint"
 	env["INPUT_JS"] = "runtime: bun\nversion-manager: fnm\n"
 	setEnv(t, env)
@@ -292,6 +308,7 @@ func TestBunWithVersionManagerRejected(t *testing.T) {
 func TestInvalidPackageManager(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
+
 	env["INPUT_JS"] = "runtime: nodejs\npackage-manager: cargo\n"
 	setEnv(t, env)
 
@@ -304,6 +321,7 @@ func TestInvalidPackageManager(t *testing.T) {
 func TestInvalidIncludesDoc(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
+
 	env["INPUT_INCLUDES_DOC"] = testInvalidBool
 	setEnv(t, env)
 
@@ -316,6 +334,7 @@ func TestInvalidIncludesDoc(t *testing.T) {
 func TestInvalidSyncRoot(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
+
 	env["INPUT_SYNC_ROOT"] = testInvalidBool
 	setEnv(t, env)
 
@@ -342,6 +361,7 @@ func TestFailOnChangesDefaultsFalse(t *testing.T) {
 func TestFailOnChangesTrue(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
+
 	env["INPUT_FAIL-ON-CHANGES"] = "true"
 	setEnv(t, env)
 
@@ -358,6 +378,7 @@ func TestFailOnChangesTrue(t *testing.T) {
 func TestInvalidFailOnChanges(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
+
 	env["INPUT_FAIL-ON-CHANGES"] = testInvalidBool
 	setEnv(t, env)
 
@@ -370,6 +391,7 @@ func TestInvalidFailOnChanges(t *testing.T) {
 func TestUnsafeStoreVersion(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
+
 	env["INPUT_STORE_VERSION"] = "refs/heads/main"
 	setEnv(t, env)
 
@@ -382,6 +404,7 @@ func TestUnsafeStoreVersion(t *testing.T) {
 func TestStoreVersionAllowsSafeTag(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
+
 	env["INPUT_STORE_VERSION"] = "v1.2.3"
 	setEnv(t, env)
 
@@ -409,13 +432,16 @@ func TestTargetFolderValidation(t *testing.T) {
 		{"dot", "../taskfiles", false},
 		{"dot git", ".git", false},
 	}
+
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
 			env := baseEnv(dir)
+
 			env["INPUT_TARGET_FOLDER"] = testCase.value
 			setEnv(t, env)
 
 			_, err := config.LoadFromEnv()
+
 			if testCase.ok && err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -439,6 +465,7 @@ func TestTargetFolderSymlinkEscape(t *testing.T) {
 	}
 
 	env := baseEnv(workspace)
+
 	env["INPUT_TARGET_FOLDER"] = "link-out/taskfiles"
 	setEnv(t, env)
 

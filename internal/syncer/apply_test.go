@@ -1,3 +1,6 @@
+// Taskotter 2026.
+// SPDX-License-Identifier: Apache-2.0.
+
 package syncer_test
 
 import (
@@ -17,6 +20,7 @@ var errSimulatedPromoteFailure = errors.New("simulated promote failure")
 
 func preparePlan(t *testing.T, _ string, cfg *config.Config) (syncer.SyncInput, *syncer.Plan) {
 	t.Helper()
+
 	snap := fixtureStore(t)
 
 	resolutions, err := resolver.ResolveAll(
@@ -30,6 +34,7 @@ func preparePlan(t *testing.T, _ string, cfg *config.Config) (syncer.SyncInput, 
 	}
 
 	sources := make([]string, 0, len(resolutions))
+
 	for _, res := range resolutions {
 		sources = append(sources, res.SourceModule)
 	}
@@ -66,6 +71,7 @@ func TestApplyPlanWritesFiles(t *testing.T) {
 
 	workspace := t.TempDir()
 	writeRootTaskfile(t, workspace)
+
 	cfg := testConfig(workspace, func(cfg *config.Config) {
 		cfg.Tasks = []string{"go"}
 		cfg.IncludesDoc = true
@@ -127,6 +133,7 @@ func TestApplyPlanMigratesLegacyMetadataPath(t *testing.T) {
 	}
 
 	_, err = os.Stat(filepath.Join(workspace, config.LegacyMetadataPath))
+
 	if !os.IsNotExist(err) {
 		t.Fatalf("legacy metadata should be removed, stat returned: %v", err)
 	}
@@ -285,6 +292,7 @@ func TestApplyPlanPromoteBeforeDelete(t *testing.T) {
 		}
 
 		promoted++
+
 		if promoted == 1 {
 			return errSimulatedPromoteFailure
 		}
@@ -308,6 +316,7 @@ func TestApplyPlanWriteOrder(t *testing.T) {
 
 	workspace := t.TempDir()
 	writeRootTaskfile(t, workspace)
+
 	cfg := testConfig(workspace, func(cfg *config.Config) {
 		cfg.Tasks = []string{"go"}
 		cfg.IncludesDoc = true
@@ -342,6 +351,7 @@ func TestApplyPlanWriteOrder(t *testing.T) {
 	metaIdx := indexOfSuffix(order, "metadata.yml")
 
 	moduleIdx := indexOfContains(order, config.DefaultTargetFolder+"/go/")
+
 	if lockIdx < moduleIdx || metaIdx < lockIdx {
 		t.Fatalf("expected modules before lock before metadata, got %v", order)
 	}

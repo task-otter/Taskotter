@@ -1,3 +1,6 @@
+// Taskotter 2026.
+// SPDX-License-Identifier: Apache-2.0.
+
 package variants_test
 
 import (
@@ -69,21 +72,25 @@ func TestStripOneSuffix(t *testing.T) {
 	t.Parallel()
 
 	got, stripped := variants.StripOneSuffix("eslint/node/fnm/pnpm")
+
 	if !stripped || got != taskESLint {
 		t.Fatalf("got %q stripped=%t", got, stripped)
 	}
 
 	got, stripped = variants.StripOneSuffix(taskESLint)
+
 	if stripped || got != taskESLint {
 		t.Fatalf("got %q stripped=%t", got, stripped)
 	}
 
 	got, stripped = variants.StripOneSuffix("eslint-fnm")
+
 	if !stripped || got != taskESLint {
 		t.Fatalf("got %q stripped=%t", got, stripped)
 	}
 
 	got, stripped = variants.StripOneSuffix("/bun")
+
 	if stripped || got != "/bun" {
 		t.Fatalf("got %q stripped=%t", got, stripped)
 	}

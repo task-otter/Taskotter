@@ -1,3 +1,6 @@
+// Taskotter 2026.
+// SPDX-License-Identifier: Apache-2.0.
+
 package syncer
 
 import (
@@ -143,8 +146,10 @@ func buildRootTaskfile(
 	}
 
 	moduleTaskfiles := make(map[string][]byte, len(syncInput.Requested))
+
 	for task, rec := range syncInput.Requested {
 		files, ok := moduleContents[rec.SourceModule]
+
 		if !ok {
 			continue
 		}
@@ -192,6 +197,7 @@ func finalizePlanDiff(
 	metadataPath string,
 ) (*Plan, error) {
 	oldRootForDiff := rootBytes
+
 	if !rootExisted {
 		oldRootForDiff = nil
 	}
@@ -221,6 +227,7 @@ func finalizePlanDiff(
 // source-module-ordered slice so planning is deterministic.
 func sortedModules(syncInput SyncInput) []ModuleRecord {
 	allModules := make([]ModuleRecord, 0, len(syncInput.Requested)+len(syncInput.Dependencies))
+
 	for _, rec := range syncInput.Requested {
 		allModules = append(allModules, rec)
 	}
@@ -295,6 +302,7 @@ func appendManagedFiles(
 ) []ManagedFile {
 	for rel, entry := range contents {
 		sum := sha256.Sum256(entry.Data)
+
 		planned = append(planned, ManagedFile{
 			SourceModule:      mod.SourceModule,
 			DestinationModule: mod.DestinationModule,
@@ -309,6 +317,7 @@ func appendManagedFiles(
 
 func validateDestination(destDirAbs string, mod ModuleRecord, oldLock *LockFile) error {
 	info, err := os.Stat(destDirAbs)
+
 	if os.IsNotExist(err) {
 		return nil
 	}
@@ -385,6 +394,7 @@ func collectModuleFile(
 	}
 
 	rel = filepath.ToSlash(rel)
+
 	if !includesDoc && pathutil.IsDocPath(rel) {
 		return nil
 	}
@@ -443,6 +453,7 @@ func buildLock(
 
 func generatedRootTaskNames(generated []taskfile.GeneratedRootTask) []string {
 	names := make([]string, 0, len(generated))
+
 	for _, task := range generated {
 		names = append(names, task.Name)
 	}

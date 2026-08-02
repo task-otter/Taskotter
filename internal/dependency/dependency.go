@@ -1,4 +1,6 @@
-// Package dependency resolves transitive module dependencies from .deps.yml.
+// Taskotter 2026.
+// SPDX-License-Identifier: Apache-2.0.
+
 package dependency
 
 import (
@@ -70,6 +72,7 @@ func visitModule(
 	}
 
 	needed[module] = struct{}{}
+
 	for _, dep := range deps[module] {
 		if _, ok := deps[dep]; !ok {
 			return &MissingDependencyError{Module: module, Dependency: dep}
@@ -86,6 +89,7 @@ func visitModule(
 
 func transitiveDependencies(requested []string, needed map[string]struct{}) []string {
 	requestedSet := make(map[string]struct{}, len(requested))
+
 	for _, module := range requested {
 		requestedSet[module] = struct{}{}
 	}

@@ -1,0 +1,7 @@
+---
+version: v2.12.2
+name: custom-golangci-lint
+destination: ./bin
+plugins:
+  - module: 'github.com/gostafa/coverlint'
+    version: v0.0.1

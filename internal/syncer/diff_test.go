@@ -1,3 +1,6 @@
+// Taskotter 2026.
+// SPDX-License-Identifier: Apache-2.0.
+
 package syncer_test
 
 import (
@@ -9,7 +12,7 @@ import (
 	"github.com/task-otter/Taskotter/internal/config"
 	"github.com/task-otter/Taskotter/internal/resolver"
 	"github.com/task-otter/Taskotter/internal/syncer"
-	"gopkg.in/yaml.v3"
+	yaml "go.yaml.in/yaml/v3"
 )
 
 // writeCorruptLock seeds workspace with metadata pointing at a lock file whose
@@ -146,6 +149,7 @@ func TestMetadataOnlyChangeMarksChanged(t *testing.T) {
 
 	workspace := t.TempDir()
 	writeRootTaskfile(t, workspace)
+
 	cfg := testConfig(workspace, func(cfg *config.Config) {
 		cfg.Tasks = []string{"go"}
 		cfg.IncludesDoc = true
@@ -162,6 +166,7 @@ func TestMetadataOnlyChangeMarksChanged(t *testing.T) {
 	cfg.ConfigurationHash = "hash-b"
 
 	_, plan2 := preparePlan(t, workspace, cfg)
+
 	if !plan2.Changed {
 		t.Fatal("expected metadata-only configuration hash change to mark plan changed")
 	}
@@ -172,6 +177,7 @@ func TestSHAOnlyLockChangeNotChanged(t *testing.T) {
 
 	workspace := t.TempDir()
 	writeRootTaskfile(t, workspace)
+
 	cfg := testConfig(workspace, func(cfg *config.Config) {
 		cfg.Tasks = []string{"go"}
 		cfg.IncludesDoc = true
@@ -185,6 +191,7 @@ func TestSHAOnlyLockChangeNotChanged(t *testing.T) {
 	}
 
 	snap := fixtureStore(t)
+
 	snap.Ref.ResolvedCommit = "different-sha-only"
 
 	resolutions, err := resolver.ResolveAll(
@@ -198,6 +205,7 @@ func TestSHAOnlyLockChangeNotChanged(t *testing.T) {
 	}
 
 	sources := make([]string, 0, len(resolutions))
+
 	for _, res := range resolutions {
 		sources = append(sources, res.SourceModule)
 	}
@@ -232,6 +240,7 @@ func TestConfigurationChangeMarksUpdated(t *testing.T) {
 
 	workspace := t.TempDir()
 	writeRootTaskfile(t, workspace)
+
 	cfg := testConfig(workspace, func(cfg *config.Config) {
 		cfg.Tasks = []string{"go"}
 		cfg.IncludesDoc = true
@@ -247,6 +256,7 @@ func TestConfigurationChangeMarksUpdated(t *testing.T) {
 	cfg.IncludesDoc = false
 
 	_, plan2 := preparePlan(t, workspace, cfg)
+
 	if !plan2.Changed {
 		t.Fatal("expected changes when includes-doc toggles")
 	}

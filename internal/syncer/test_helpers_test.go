@@ -1,3 +1,6 @@
+// Taskotter 2026.
+// SPDX-License-Identifier: Apache-2.0.
+
 package syncer_test
 
 import (
@@ -53,6 +56,7 @@ func testConfig(workspace string, mutate func(*config.Config)) *config.Config {
 		ConfigurationHash:  "",
 		BranchName:         "",
 	}
+
 	if mutate != nil {
 		mutate(cfg)
 	}

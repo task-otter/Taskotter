@@ -1,3 +1,6 @@
+// Taskotter 2026.
+// SPDX-License-Identifier: Apache-2.0.
+
 package resolver_test
 
 import (
@@ -11,6 +14,7 @@ import (
 
 func catalog(names ...string) map[string]struct{} {
 	cat := make(map[string]struct{}, len(names))
+
 	for _, name := range names {
 		cat[name] = struct{}{}
 	}
@@ -82,6 +86,7 @@ func TestResolveNodeVariants(t *testing.T) {
 		{config.PMPnpm, config.VMNvm, "eslint/node/nvm/pnpm"},
 		{config.PMBun, "", "eslint/bun"},
 	}
+
 	for _, testCase := range cases {
 		res, err := resolver.Resolve("eslint", cat, testCase.pm, testCase.vm)
 		if err != nil {
@@ -171,6 +176,7 @@ func TestMissingTaskCloseMatches(t *testing.T) {
 	}
 
 	ok := errors.As(err, &resolveErr)
+
 	if !ok {
 		t.Fatalf("unexpected error type: %T", err)
 	}

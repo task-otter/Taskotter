@@ -1,10 +1,13 @@
+// Taskotter 2026.
+// SPDX-License-Identifier: Apache-2.0.
+
 package config
 
 import (
 	"fmt"
 	"strings"
 
-	"gopkg.in/yaml.v3"
+	yaml "go.yaml.in/yaml/v3"
 )
 
 const (
@@ -36,6 +39,7 @@ type jsConfig struct {
 
 func parseJS(raw string) (*jsConfig, error) {
 	raw = strings.TrimSpace(raw)
+
 	if raw == "" {
 		return &jsConfig{
 			Runtime:            "",
@@ -53,6 +57,7 @@ func parseJS(raw string) (*jsConfig, error) {
 	}
 
 	runtime := strings.TrimSpace(yamlInput.Runtime)
+
 	if runtime == "" {
 		runtime = string(JSRuntimeNodeJS)
 	}
@@ -109,11 +114,13 @@ func parseJSBun(yamlInput jsInput) (*jsConfig, error) {
 
 func parseJSNodeJS(yamlInput jsInput) (*jsConfig, error) {
 	packageManagerRaw := strings.TrimSpace(yamlInput.PackageManager)
+
 	if packageManagerRaw == "" {
 		packageManagerRaw = string(PMNPM)
 	}
 
 	versionManagerRaw := strings.TrimSpace(yamlInput.VersionManager)
+
 	if versionManagerRaw == "" {
 		versionManagerRaw = string(VMFnm)
 	}

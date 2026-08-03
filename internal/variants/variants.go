@@ -1,6 +1,7 @@
 // Taskotter 2026.
 // SPDX-License-Identifier: Apache-2.0.
 
+// Package variants identifies and manipulates node/package-manager tool variant module names.
 package variants
 
 import (
@@ -11,7 +12,10 @@ import (
 	"strings"
 
 	"github.com/task-otter/Taskotter/internal/config"
+	"github.com/task-otter/Taskotter/internal/consts"
 )
+
+const fmtWrapQuoted = "%w %q"
 
 var (
 	errVersionManagerRequired = errors.New("js.version-manager required for package manager")
@@ -76,29 +80,43 @@ func BuildSourceModule(
 	case config.PMBun:
 		return path.Join(task, string(packageManager)), nil
 	case config.PMNPM, config.PMYarn, config.PMPnpm:
-		if versionManager == "" {
-			return "", fmt.Errorf("%w %q", errVersionManagerRequired, packageManager)
+		if versionManager == consts.Empty {
+			return consts.Empty, fmt.Errorf(
+				fmtWrapQuoted,
+				errVersionManagerRequired,
+				packageManager,
+			)
 		}
 
 		return path.Join(task, "node", string(versionManager), string(packageManager)), nil
 	default:
-		return "", fmt.Errorf("%w %q", errInvalidPackageManager, packageManager)
+		return consts.Empty, fmt.Errorf(fmtWrapQuoted, errInvalidPackageManager, packageManager)
 	}
 }
 
 // StripOneSuffix removes one known suffix from the end of name.
 func StripOneSuffix(name string) (string, bool) {
-	for _, suffix := range stripSuffixes() {
-		if len(name) > len(suffix) && name[len(name)-len(suffix):] == suffix {
-			stripped := name[:len(name)-len(suffix)]
+	suffixes := stripSuffixes()
 
-			if stripped == "" {
-				continue
-			}
+	for i := range suffixes {
+		suffix := suffixes[i]
 
-			return stripped, true
+		if !hasSuffixLongerThan(name, suffix) {
+			continue
 		}
+
+		stripped := name[:len(name)-len(suffix)]
+
+		if stripped == consts.Empty {
+			continue
+		}
+
+		return stripped, true
 	}
 
 	return name, false
+}
+
+func hasSuffixLongerThan(name, suffix string) bool {
+	return len(name) > len(suffix) && name[len(name)-len(suffix):] == suffix
 }

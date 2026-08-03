@@ -5,6 +5,7 @@ package syncer_test
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -12,7 +13,9 @@ import (
 
 	"github.com/task-otter/Taskotter/internal/app"
 	"github.com/task-otter/Taskotter/internal/config"
+	"github.com/task-otter/Taskotter/internal/consts"
 	"github.com/task-otter/Taskotter/internal/resolver"
+	"github.com/task-otter/Taskotter/internal/store"
 	"github.com/task-otter/Taskotter/internal/syncer"
 )
 
@@ -22,6 +25,28 @@ func preparePlan(t *testing.T, _ string, cfg *config.Config) (syncer.SyncInput, 
 	t.Helper()
 
 	snap := fixtureStore(t)
+
+	resolutions, depSources := resolveModulesForTest(t, cfg, snap)
+
+	syncInput, err := app.PrepareSyncInput(cfg, snap, resolutions, depSources)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	plan, err := syncer.BuildPlan(&syncInput)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return syncInput, plan
+}
+
+func resolveModulesForTest(
+	t *testing.T,
+	cfg *config.Config,
+	snap *store.Snapshot,
+) ([]resolver.Resolution, []string) {
+	t.Helper()
 
 	resolutions, err := resolver.ResolveAll(
 		cfg.Tasks,
@@ -33,75 +58,115 @@ func preparePlan(t *testing.T, _ string, cfg *config.Config) (syncer.SyncInput, 
 		t.Fatal(err)
 	}
 
-	sources := make([]string, 0, len(resolutions))
+	depSources, err := dependencySources(t, sourceModulesOfResolutions(resolutions), snap)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return resolutions, depSources
+}
+
+func sourceModulesOfResolutions(resolutions []resolver.Resolution) []string {
+	sources := make([]string, consts.IndexZero, len(resolutions))
 
 	for _, res := range resolutions {
 		sources = append(sources, res.SourceModule)
 	}
 
-	depSources, err := dependencySources(t, sources, snap)
+	return sources
+}
+
+func writeFileEntry(path string, entry syncer.FileEntry) error {
+	err := os.MkdirAll(filepath.Dir(path), consts.FilePerm755)
+	if err != nil {
+		return fmt.Errorf("create directory for %q: %w", path, err)
+	}
+
+	err = os.WriteFile(path, entry.Data, entry.Mode)
+	if err != nil {
+		return fmt.Errorf("write file %q: %w", path, err)
+	}
+
+	return nil
+}
+
+func mutateGoWithDocs(cfg *config.Config) {
+	cfg.Tasks = []string{consts.Go}
+	cfg.IncludesDoc = true
+}
+
+func mutateGoWithDocsNoSyncRoot(cfg *config.Config) {
+	mutateGoWithDocs(cfg)
+
+	cfg.SyncRoot = false
+}
+
+func setupPlan(
+	t *testing.T,
+	workspace string,
+	mutate func(*config.Config),
+) (*config.Config, syncer.SyncInput, *syncer.Plan) {
+	t.Helper()
+
+	writeRootTaskfile(t, workspace)
+
+	cfg := testConfig(workspace, mutate)
+	syncInput, plan := preparePlan(t, workspace, cfg)
+
+	return cfg, syncInput, plan
+}
+
+func setupPlanWithRootContent(
+	t *testing.T,
+	workspace, rootContent string,
+	mutate func(*config.Config),
+) (syncer.SyncInput, *syncer.Plan) {
+	t.Helper()
+
+	err := os.WriteFile(
+		filepath.Join(workspace, testTaskfileName),
+		[]byte(rootContent),
+		consts.FilePerm644,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	syncInput, err := app.PrepareSyncInput(cfg, snap, resolutions, depSources)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	plan, err := syncer.BuildPlan(syncInput)
-	if err != nil {
-		t.Fatal(err)
-	}
+	cfg := testConfig(workspace, mutate)
+	syncInput, plan := preparePlan(t, workspace, cfg)
 
 	return syncInput, plan
 }
 
-func writeFileEntry(path string, entry syncer.FileEntry) error {
-	err := os.MkdirAll(filepath.Dir(path), 0o755)
-	if err != nil {
-		return err
-	}
+func assertFileExists(t *testing.T, path string) {
+	t.Helper()
 
-	return os.WriteFile(path, entry.Data, entry.Mode)
+	_, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
 }
 
+// TestApplyPlanWritesFiles verifies applying a plan writes module and metadata files.
 func TestApplyPlanWritesFiles(t *testing.T) {
 	t.Parallel()
 
 	workspace := t.TempDir()
-	writeRootTaskfile(t, workspace)
+	cfg, syncInput, plan := setupPlan(t, workspace, mutateGoWithDocs)
 
-	cfg := testConfig(workspace, func(cfg *config.Config) {
-		cfg.Tasks = []string{"go"}
-		cfg.IncludesDoc = true
-	})
-
-	syncInput, plan := preparePlan(t, workspace, cfg)
-
-	err := runApplyPlan(t, plan, syncInput)
+	err := runApplyPlan(t, plan, &syncInput)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	_, err = os.Stat(filepath.Join(workspace, config.DefaultTargetFolder, "go/Taskfile.yml"))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	_, err = os.Stat(filepath.Join(workspace, cfg.MetadataPath()))
-	if err != nil {
-		t.Fatal(err)
-	}
+	assertFileExists(t, filepath.Join(workspace, config.DefaultTargetFolder, testGoTaskfilePath))
+	assertFileExists(t, filepath.Join(workspace, cfg.MetadataPath()))
 }
 
-func TestApplyPlanMigratesLegacyMetadataPath(t *testing.T) {
-	t.Parallel()
+func writeLegacyMetadataFixture(t *testing.T, workspace string) {
+	t.Helper()
 
-	workspace := t.TempDir()
-	writeRootTaskfile(t, workspace)
-
-	err := os.MkdirAll(filepath.Join(workspace, ".taskotter"), 0o755)
+	err := os.MkdirAll(filepath.Join(workspace, testLegacyMetaDir), consts.FilePerm755)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -109,55 +174,44 @@ func TestApplyPlanMigratesLegacyMetadataPath(t *testing.T) {
 	err = os.WriteFile(
 		filepath.Join(workspace, config.LegacyMetadataPath),
 		[]byte("target_folder: taskfiles\nlock_file: taskfiles/.taskotter-lock.yml\n"),
-		0o644,
+		consts.FilePerm644,
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
+}
 
-	cfg := testConfig(workspace, func(cfg *config.Config) {
-		cfg.Tasks = []string{"go"}
-		cfg.IncludesDoc = true
-	})
+func assertMetadataMigrated(t *testing.T, workspace string, cfg *config.Config) {
+	t.Helper()
 
-	syncInput, plan := preparePlan(t, workspace, cfg)
+	assertFileExists(t, filepath.Join(workspace, cfg.MetadataPath()))
 
-	err = runApplyPlan(t, plan, syncInput)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	_, err = os.Stat(filepath.Join(workspace, cfg.MetadataPath()))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	_, err = os.Stat(filepath.Join(workspace, config.LegacyMetadataPath))
+	_, err := os.Stat(filepath.Join(workspace, config.LegacyMetadataPath))
 
 	if !os.IsNotExist(err) {
 		t.Fatalf("legacy metadata should be removed, stat returned: %v", err)
 	}
 }
 
-func TestApplyPlanSkipsRootTaskfileWhenDisabled(t *testing.T) {
+// TestApplyPlanMigratesLegacyMetadataPath verifies legacy metadata is migrated and the old file removed.
+func TestApplyPlanMigratesLegacyMetadataPath(t *testing.T) {
 	t.Parallel()
 
 	workspace := t.TempDir()
-	rootPath := filepath.Join(workspace, "Taskfile.yml")
-	rootContent := "this is intentionally not valid Taskfile YAML: ["
+	writeLegacyMetadataFixture(t, workspace)
 
-	err := os.WriteFile(rootPath, []byte(rootContent), 0o644)
+	cfg, syncInput, plan := setupPlan(t, workspace, mutateGoWithDocs)
+
+	err := runApplyPlan(t, plan, &syncInput)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	cfg := testConfig(workspace, func(cfg *config.Config) {
-		cfg.Tasks = []string{"go"}
-		cfg.IncludesDoc = true
-		cfg.SyncRoot = false
-	})
+	assertMetadataMigrated(t, workspace, cfg)
+}
 
-	syncInput, plan := preparePlan(t, workspace, cfg)
+func assertRootTaskfileNotDiffed(t *testing.T, plan *syncer.Plan) {
+	t.Helper()
 
 	if containsRootTaskfile(plan.Added) || containsRootTaskfile(plan.Updated) {
 		t.Fatalf(
@@ -174,11 +228,10 @@ func TestApplyPlanSkipsRootTaskfileWhenDisabled(t *testing.T) {
 	if plan.Lock.Configuration.SyncRoot {
 		t.Fatal("lock SyncRoot = true, want false")
 	}
+}
 
-	err = runApplyPlan(t, plan, syncInput)
-	if err != nil {
-		t.Fatal(err)
-	}
+func assertRootTaskfileSkipped(t *testing.T, workspace, rootPath, rootContent string) {
+	t.Helper()
 
 	data, err := os.ReadFile(rootPath)
 	if err != nil {
@@ -189,26 +242,45 @@ func TestApplyPlanSkipsRootTaskfileWhenDisabled(t *testing.T) {
 		t.Fatalf("root Taskfile.yml changed to %q, want %q", data, rootContent)
 	}
 
-	_, err = os.Stat(filepath.Join(workspace, config.DefaultTargetFolder, "go", "Taskfile.yml"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	assertFileExists(t, filepath.Join(workspace, config.DefaultTargetFolder, "go", "Taskfile.yml"))
 }
 
-func TestApplyPlanPreservesExecutableMode(t *testing.T) {
+// TestApplyPlanSkipsRootTaskfileWhenDisabled verifies the root Taskfile is left untouched when sync-root is off.
+func TestApplyPlanSkipsRootTaskfileWhenDisabled(t *testing.T) {
 	t.Parallel()
 
 	workspace := t.TempDir()
-	writeRootTaskfile(t, workspace)
+	rootPath := filepath.Join(workspace, testTaskfileName)
+	rootContent := "this is intentionally not valid Taskfile YAML: ["
+
+	syncInput, plan := setupPlanWithRootContent(
+		t,
+		workspace,
+		rootContent,
+		mutateGoWithDocsNoSyncRoot,
+	)
+
+	assertRootTaskfileNotDiffed(t, plan)
+
+	err := runApplyPlan(t, plan, &syncInput)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assertRootTaskfileSkipped(t, workspace, rootPath, rootContent)
+}
+
+func makeSetupScriptExecutableForTest(t *testing.T) {
+	t.Helper()
 
 	setupPath := filepath.Join(
-		"..",
-		"..",
-		"tests",
-		"fixtures",
-		"store",
+		consts.PathParent,
+		consts.PathParent,
+		dirTests,
+		dirFixtures,
+		dirStore,
 		"taskfiles",
-		"go",
+		consts.Go,
 		"setup.sh",
 	)
 
@@ -219,137 +291,185 @@ func TestApplyPlanPreservesExecutableMode(t *testing.T) {
 
 	origMode := info.Mode().Perm()
 
-	err = os.Chmod(setupPath, 0o755)
+	err = os.Chmod(setupPath, consts.FilePerm755)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	t.Cleanup(func() {
-		_ = os.Chmod(setupPath, origMode)
-	})
+	t.Cleanup(
+		func() { _ = os.Chmod(setupPath, origMode) },
+	)
+}
 
-	cfg := testConfig(workspace, func(cfg *config.Config) {
-		cfg.Tasks = []string{"go"}
-		cfg.IncludesDoc = true
-	})
+func assertExecutableBit(t *testing.T, path string) {
+	t.Helper()
 
-	syncInput, plan := preparePlan(t, workspace, cfg)
-
-	err = runApplyPlan(t, plan, syncInput)
+	info, err := os.Stat(path)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	info, err = os.Stat(filepath.Join(workspace, config.DefaultTargetFolder, "go/setup.sh"))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if info.Mode().Perm()&0o111 == 0 {
+	if info.Mode().Perm()&consts.FilePerm111 == consts.IndexZero {
 		t.Fatalf("expected executable bit, got %o", info.Mode().Perm())
 	}
 }
 
-func TestApplyPlanPromoteBeforeDelete(t *testing.T) {
+// TestApplyPlanPreservesExecutableMode verifies executable bits are preserved when writing files.
+func TestApplyPlanPreservesExecutableMode(t *testing.T) {
 	t.Parallel()
 
 	workspace := t.TempDir()
-	writeRootTaskfile(t, workspace)
+	makeSetupScriptExecutableForTest(t)
 
-	obsolete := filepath.Join(workspace, config.DefaultTargetFolder, "go/obsolete.txt")
+	_, syncInput, plan := setupPlan(t, workspace, mutateGoWithDocs)
 
-	err := os.MkdirAll(filepath.Dir(obsolete), 0o755)
+	err := runApplyPlan(t, plan, &syncInput)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = os.WriteFile(obsolete, []byte("old"), 0o644)
+	assertExecutableBit(t, filepath.Join(workspace, config.DefaultTargetFolder, "go/setup.sh"))
+}
+
+func writeObsoleteManagedFile(t *testing.T, workspace string) string {
+	t.Helper()
+
+	obsolete := filepath.Join(workspace, config.DefaultTargetFolder, "go/obsolete.txt")
+
+	err := os.MkdirAll(filepath.Dir(obsolete), consts.FilePerm755)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = os.WriteFile(obsolete, []byte("old"), consts.FilePerm644)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	writeMinimalLock(t, workspace, config.DefaultTargetFolder, []syncer.ManagedFile{
 		{
-			SourceModule:      "",
-			DestinationModule: "go",
-			SourcePath:        "",
+			SourceModule:      consts.Empty,
+			DestinationModule: consts.Go,
+			SourcePath:        consts.Empty,
 			Path:              config.DefaultTargetFolder + "/go/obsolete.txt",
-			SHA256:            "",
+			SHA256:            consts.Empty,
 		},
 	})
 
-	cfg := testConfig(workspace, func(cfg *config.Config) {
-		cfg.Tasks = []string{"go"}
-		cfg.IncludesDoc = true
-	})
-	syncInput, plan := preparePlan(t, workspace, cfg)
+	return obsolete
+}
 
-	var promoted int
-
-	withCopyFileHook(t, plan, func(path string, entry syncer.FileEntry) error {
-		if strings.Contains(path, filepath.Join(".taskotter", "staging")) {
+func failFirstPromoteHook(promoted *int) func(string, syncer.FileEntry) error {
+	return func(path string, entry syncer.FileEntry) error {
+		if strings.Contains(path, filepath.Join(testLegacyMetaDir, testStagingDir)) {
 			return writeFileEntry(path, entry)
 		}
 
-		promoted++
+		*promoted++
 
-		if promoted == 1 {
+		if *promoted == consts.IndexOne {
 			return errSimulatedPromoteFailure
 		}
 
 		return writeFileEntry(path, entry)
-	}, func() {
-		err = syncer.ApplyPlan(plan, syncInput)
+	}
+}
+
+func assertPromoteFails(t *testing.T, plan *syncer.Plan, syncInput syncer.SyncInput) func() {
+	return func() {
+		err := syncer.ApplyPlan(plan, &syncInput)
 		if err == nil {
 			t.Fatal("expected promote failure")
 		}
-	})
+	}
+}
 
-	_, err = os.Stat(obsolete)
+// TestApplyPlanPromoteBeforeDelete verifies obsolete files remain if a promote step fails before delete.
+func TestApplyPlanPromoteBeforeDelete(t *testing.T) {
+	t.Parallel()
+
+	workspace := t.TempDir()
+	obsolete := writeObsoleteManagedFile(t, workspace)
+
+	_, syncInput, plan := setupPlan(t, workspace, mutateGoWithDocs)
+
+	var promoted int
+
+	withCopyFileHook(
+		t,
+		plan,
+		failFirstPromoteHook(&promoted),
+		assertPromoteFails(t, plan, syncInput),
+	)
+
+	_, err := os.Stat(obsolete)
 	if err != nil {
 		t.Fatal("obsolete file should remain when promote fails before delete")
 	}
 }
 
-func TestApplyPlanWriteOrder(t *testing.T) {
-	t.Parallel()
-
-	workspace := t.TempDir()
-	writeRootTaskfile(t, workspace)
-
-	cfg := testConfig(workspace, func(cfg *config.Config) {
-		cfg.Tasks = []string{"go"}
-		cfg.IncludesDoc = true
-	})
-	syncInput, plan := preparePlan(t, workspace, cfg)
-
-	var order []string
-
-	stagingMarker := filepath.Join(config.DefaultTargetFolder, ".taskotter", "staging")
-
-	withCopyFileHook(t, plan, func(path string, entry syncer.FileEntry) error {
+func recordingCopyHook(
+	workspace, stagingMarker string,
+	order *[]string,
+) func(string, syncer.FileEntry) error {
+	return func(path string, entry syncer.FileEntry) error {
 		if strings.Contains(path, stagingMarker) {
 			return writeFileEntry(path, entry)
 		}
 
 		rel, err := filepath.Rel(workspace, path)
 		if err != nil {
-			return err
+			return fmt.Errorf("rel path: %w", err)
 		}
 
-		order = append(order, filepath.ToSlash(rel))
+		*order = append(*order, filepath.ToSlash(rel))
 
 		return writeFileEntry(path, entry)
-	}, func() {
-		err := syncer.ApplyPlan(plan, syncInput)
+	}
+}
+
+func applyPlanOK(t *testing.T, plan *syncer.Plan, syncInput syncer.SyncInput) func() {
+	return func() {
+		err := syncer.ApplyPlan(plan, &syncInput)
 		if err != nil {
 			t.Fatal(err)
 		}
-	})
+	}
+}
 
-	lockIdx := indexOfSuffix(order, ".taskotter-lock.yml")
-	metaIdx := indexOfSuffix(order, "metadata.yml")
+func recordWriteOrder(
+	t *testing.T,
+	workspace string,
+	plan *syncer.Plan,
+	syncInput syncer.SyncInput,
+) []string {
+	t.Helper()
 
+	var order []string
+
+	stagingMarker := filepath.Join(config.DefaultTargetFolder, testLegacyMetaDir, testStagingDir)
+
+	withCopyFileHook(
+		t,
+		plan,
+		recordingCopyHook(workspace, stagingMarker, &order),
+		applyPlanOK(t, plan, syncInput),
+	)
+
+	return order
+}
+
+// TestApplyPlanWriteOrder verifies modules are written before the lock and before metadata.
+func TestApplyPlanWriteOrder(t *testing.T) {
+	t.Parallel()
+
+	workspace := t.TempDir()
+	_, syncInput, plan := setupPlan(t, workspace, mutateGoWithDocs)
+
+	order := recordWriteOrder(t, workspace, plan, syncInput)
+
+	lockIdx := indexOfSuffix(order, testLockFileName)
+	metaIdx := indexOfSuffix(order, testMetadataFileName)
 	moduleIdx := indexOfContains(order, config.DefaultTargetFolder+"/go/")
 
 	if lockIdx < moduleIdx || metaIdx < lockIdx {
@@ -364,7 +484,7 @@ func indexOfSuffix(paths []string, suffix string) int {
 		}
 	}
 
-	return -1
+	return notFoundIndex
 }
 
 func indexOfContains(paths []string, part string) int {
@@ -374,5 +494,5 @@ func indexOfContains(paths []string, part string) int {
 		}
 	}
 
-	return -1
+	return notFoundIndex
 }

@@ -14,6 +14,8 @@ import (
 	"github.com/task-otter/Taskotter/internal/syncer"
 )
 
+const zeroCapacity = 0
+
 // PrepareSyncInput maps resolved modules and dependencies into syncer input records.
 func PrepareSyncInput(
 	cfg *config.Config,
@@ -21,12 +23,7 @@ func PrepareSyncInput(
 	resolutions []resolver.Resolution,
 	depSources []string,
 ) (syncer.SyncInput, error) {
-	requestedSources := make([]string, 0, len(resolutions))
-
-	for _, res := range resolutions {
-		requestedSources = append(requestedSources, res.SourceModule)
-	}
-
+	requestedSources := collectRequestedSources(resolutions)
 	allSources := append(append([]string{}, requestedSources...), depSources...)
 
 	sourceToDest, err := normalizer.BuildDestinationMap(allSources)
@@ -34,10 +31,39 @@ func PrepareSyncInput(
 		return syncer.SyncInput{}, fmt.Errorf("build destination map: %w", err)
 	}
 
-	requestedRecords := make(map[string]syncer.ModuleRecord)
-	destByTask := make(map[string]string)
+	requestedRecords, destByTask := buildRequestedRecords(cfg, resolutions, sourceToDest)
+	dependencyRecords := buildDependencyRecords(cfg, depSources, sourceToDest)
 
-	for _, res := range resolutions {
+	return syncer.SyncInput{
+		Config:       cfg,
+		Snapshot:     snapshot,
+		Requested:    requestedRecords,
+		Dependencies: dependencyRecords,
+		SourceToDest: sourceToDest,
+		DestByTask:   destByTask,
+	}, nil
+}
+
+func collectRequestedSources(resolutions []resolver.Resolution) []string {
+	requestedSources := make([]string, zeroCapacity, len(resolutions))
+
+	for i := range resolutions {
+		requestedSources = append(requestedSources, resolutions[i].SourceModule)
+	}
+
+	return requestedSources
+}
+
+func buildRequestedRecords(
+	cfg *config.Config,
+	resolutions []resolver.Resolution,
+	sourceToDest map[string]string,
+) (requestedRecords map[string]syncer.ModuleRecord, destByTask map[string]string) {
+	requestedRecords = make(map[string]syncer.ModuleRecord)
+	destByTask = make(map[string]string)
+
+	for i := range resolutions {
+		res := &resolutions[i]
 		dest := sourceToDest[res.SourceModule]
 
 		requestedRecords[res.LogicalTask] = syncer.ModuleRecord{
@@ -48,9 +74,18 @@ func PrepareSyncInput(
 		destByTask[res.LogicalTask] = dest
 	}
 
-	dependencyRecords := make([]syncer.ModuleRecord, 0, len(depSources))
+	return requestedRecords, destByTask
+}
 
-	for _, dep := range depSources {
+func buildDependencyRecords(
+	cfg *config.Config,
+	depSources []string,
+	sourceToDest map[string]string,
+) []syncer.ModuleRecord {
+	dependencyRecords := make([]syncer.ModuleRecord, zeroCapacity, len(depSources))
+
+	for i := range depSources {
+		dep := depSources[i]
 		dest := sourceToDest[dep]
 
 		dependencyRecords = append(dependencyRecords, syncer.ModuleRecord{
@@ -60,12 +95,5 @@ func PrepareSyncInput(
 		})
 	}
 
-	return syncer.SyncInput{
-		Config:       cfg,
-		Snapshot:     snapshot,
-		Requested:    requestedRecords,
-		Dependencies: dependencyRecords,
-		SourceToDest: sourceToDest,
-		DestByTask:   destByTask,
-	}, nil
+	return dependencyRecords
 }

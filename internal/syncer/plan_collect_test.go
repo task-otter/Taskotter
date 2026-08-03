@@ -4,38 +4,52 @@
 package syncer_test
 
 import (
-	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/task-otter/Taskotter/internal/consts"
 	"github.com/task-otter/Taskotter/internal/syncer"
 )
 
+func writeModuleFile(t *testing.T, dir, rel, content string) {
+	t.Helper()
+
+	writeFileWithDir(t, filepath.Join(dir, rel), []byte(content), consts.FilePerm644)
+}
+
+func writeModuleFixtureFiles(t *testing.T, dir string) {
+	t.Helper()
+
+	writeModuleFile(t, dir, testTaskfileName, "version: \"3\"\n")
+	writeModuleFile(t, dir, testReadmeName, "docs\n")
+	writeModuleFile(t, dir, docGuideMD, "guide\n")
+	writeModuleFile(t, dir, fileGoTestGo, "package go_test\n")
+	writeModuleFile(t, dir, testMetadataFileName, "module: go\n")
+	writeModuleFile(t, dir, docMetadataYML, "module: go\n")
+}
+
+func assertCollectedWithoutDocs(t *testing.T, dir string) {
+	t.Helper()
+
+	withoutDocs, err := syncer.CollectModuleFiles(dir, false, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assertCollected(t, withoutDocs, map[string]bool{
+		testTaskfileName: true,
+		testReadmeName:   false,
+		docGuideMD:       false,
+		docMetadataYML:   false,
+	})
+}
+
+// TestCollectModuleFilesSkipsTestsAndDocs verifies test and doc files are excluded unless requested.
 func TestCollectModuleFilesSkipsTestsAndDocs(t *testing.T) {
 	t.Parallel()
 
 	dir := t.TempDir()
-	write := func(rel, content string) {
-		t.Helper()
-
-		path := filepath.Join(dir, rel)
-
-		err := os.MkdirAll(filepath.Dir(path), 0o755)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		err = os.WriteFile(path, []byte(content), 0o644)
-		if err != nil {
-			t.Fatal(err)
-		}
-	}
-	write(testTaskfileName, "version: \"3\"\n")
-	write(testReadmeName, "docs\n")
-	write("docs/guide.md", "guide\n")
-	write("go_test.go", "package go_test\n")
-	write("metadata.yml", "module: go\n")
-	write("docs/metadata.yml", "module: go\n")
+	writeModuleFixtureFiles(t, dir)
 
 	withDocs, err := syncer.CollectModuleFiles(dir, true, nil)
 	if err != nil {
@@ -45,25 +59,15 @@ func TestCollectModuleFilesSkipsTestsAndDocs(t *testing.T) {
 	// The module's own metadata.yml describes it to the store; only a
 	// same-named file deeper in the module is ordinary content.
 	assertCollected(t, withDocs, map[string]bool{
-		"Taskfile.yml":      true,
-		"README.md":         true,
-		"docs/guide.md":     true,
-		"docs/metadata.yml": true,
-		"go_test.go":        false,
-		"metadata.yml":      false,
+		testTaskfileName:     true,
+		testReadmeName:       true,
+		docGuideMD:           true,
+		docMetadataYML:       true,
+		fileGoTestGo:         false,
+		testMetadataFileName: false,
 	})
 
-	withoutDocs, err := syncer.CollectModuleFiles(dir, false, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	assertCollected(t, withoutDocs, map[string]bool{
-		"Taskfile.yml":      true,
-		"README.md":         false,
-		"docs/guide.md":     false,
-		"docs/metadata.yml": false,
-	})
+	assertCollectedWithoutDocs(t, dir)
 }
 
 func assertCollected(t *testing.T, contents map[string]syncer.FileEntry, want map[string]bool) {

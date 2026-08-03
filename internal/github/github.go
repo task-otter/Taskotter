@@ -1,51 +1,65 @@
 // Taskotter 2026.
 // SPDX-License-Identifier: Apache-2.0.
 
+// Package github provides helpers for interacting with the GitHub API and Actions outputs.
 package github
 
 import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/google/go-github/v69/github"
 	"github.com/task-otter/Taskotter/internal/config"
+	"github.com/task-otter/Taskotter/internal/consts"
 	"github.com/task-otter/Taskotter/internal/repo"
 	"github.com/task-otter/Taskotter/internal/store"
 	"github.com/task-otter/Taskotter/internal/syncer"
 	"golang.org/x/oauth2"
 )
 
+func sbWrite(w *strings.Builder, s string) {
+	_, _ = w.WriteString(s) //nolint:errcheck // strings.Builder.WriteString cannot fail
+}
+
+func sbPrintf(w io.Writer, format string, args ...any) {
+	_, _ = fmt.Fprintf(w, format, args...) //nolint:errcheck // strings.Builder cannot fail
+}
+
+type (
+	// PullRequest is a minimal view of a GitHub pull request.
+	PullRequest struct {
+		URL    string
+		Number int
+	}
+
+	// Client wraps the GitHub API for TaskOtter sync operations.
+	Client struct {
+		api   *github.Client
+		owner string
+		repo  string
+	}
+
+	// StoreRef carries store reference metadata for PR rendering.
+	StoreRef struct {
+		SourceRef      string
+		ResolvedCommit string
+		DefaultBranch  string
+	}
+)
+
 const (
 	prTitle        = "chore(taskotter): sync taskfiles"
 	outputFilePerm = 0o600
+	fmtBulletItem  = "  - `%s`\n"
 )
 
 // ErrPullRequestNotFound indicates no open pull request exists for the branch.
 var ErrPullRequestNotFound = errors.New("open pull request not found")
-
-// PullRequest is a minimal view of a GitHub pull request.
-type PullRequest struct {
-	URL    string
-	Number int
-}
-
-// Client wraps the GitHub API for TaskOtter sync operations.
-type Client struct {
-	api   *github.Client
-	owner string
-	repo  string
-}
-
-// StoreRef carries store reference metadata for PR rendering.
-type StoreRef struct {
-	SourceRef      string
-	ResolvedCommit string
-	DefaultBranch  string
-}
 
 // NewClient creates a GitHub API client for repository.
 func NewClient(ctx context.Context, token, repository string) (*Client, error) {
@@ -80,8 +94,8 @@ func (c *Client) FindOpenPR(ctx context.Context, branch, base string) (*PullRequ
 		Sort:      "",
 		Direction: "",
 		ListOptions: github.ListOptions{
-			Page:    0,
-			PerPage: 0,
+			Page:    consts.IndexZero,
+			PerPage: consts.IndexZero,
 		},
 	}
 
@@ -90,11 +104,11 @@ func (c *Client) FindOpenPR(ctx context.Context, branch, base string) (*PullRequ
 		return nil, fmt.Errorf("list pull requests: %w", err)
 	}
 
-	if len(prs) == 0 {
+	if len(prs) == consts.IndexZero {
 		return nil, ErrPullRequestNotFound
 	}
 
-	pr := prs[0]
+	pr := prs[consts.IndexZero]
 
 	return &PullRequest{Number: pr.GetNumber(), URL: pr.GetHTMLURL()}, nil
 }
@@ -135,8 +149,8 @@ func (c *Client) UpdatePRBody(ctx context.Context, number int, body string) erro
 }
 
 // StoreRefFrom converts store reference metadata for PR rendering.
-func StoreRefFrom(ref store.RefInfo) StoreRef {
-	return StoreRef{
+func StoreRefFrom(ref *store.RefInfo) *StoreRef {
+	return &StoreRef{
 		SourceRef:      ref.SourceRef,
 		ResolvedCommit: ref.ResolvedCommit,
 		DefaultBranch:  ref.DefaultBranch,
@@ -144,69 +158,90 @@ func StoreRefFrom(ref store.RefInfo) StoreRef {
 }
 
 // BuildPRBody renders the markdown body for a sync pull request.
-func BuildPRBody(cfg *config.Config, plan *syncer.Plan, ref StoreRef) string {
+func BuildPRBody(cfg *config.Config, plan *syncer.Plan, ref *StoreRef) string {
 	var body strings.Builder
 
-	body.WriteString("## TaskOtter\n\n")
-	fmt.Fprintf(&body, "- Source: `%s`\n", config.StoreRepository)
-	fmt.Fprintf(&body, "- Requested version: `%s`\n", emptyDash(cfg.StoreVersion))
-	fmt.Fprintf(&body, "- Source reference: `%s`\n", ref.SourceRef)
-	fmt.Fprintf(&body, "- Resolved commit: `%s`\n", ref.ResolvedCommit)
-	fmt.Fprintf(&body, "- Default branch: `%s`\n", ref.DefaultBranch)
-	fmt.Fprintf(&body, "- Target folder: `%s`\n", cfg.TargetFolder)
-	fmt.Fprintf(&body, "- Documentation included: `%t`\n", cfg.IncludesDoc)
-	fmt.Fprintf(&body, "- Root Taskfile synchronized: `%t`\n", cfg.SyncRoot)
-	fmt.Fprintf(&body, "- JS runtime: `%s`\n", emptyDash(string(cfg.JSRuntime)))
+	sbWrite(&body, "## TaskOtter\n\n")
 
-	if cfg.JSRuntime == config.JSRuntimeNodeJS {
-		fmt.Fprintf(&body, "- Package manager: `%s`\n", cfg.NodePackageManager)
-		fmt.Fprintf(&body, "- Version manager: `%s`\n", cfg.NodeVersionManager)
-	}
-
-	body.WriteString("\n")
-
-	body.WriteString("### Requested modules\n\n")
-	body.WriteString("| Task | Source module | Destination |\n")
-	body.WriteString("|---|---|---|\n")
-
-	for _, task := range cfg.Tasks {
-		rec := plan.Requested[task]
-		fmt.Fprintf(&body, "| %s | `%s` | `%s` |\n", task, rec.SourceModule, rec.Path)
-	}
-
-	body.WriteString("\n### Dependencies\n\n")
-	body.WriteString("| Source module | Destination |\n")
-	body.WriteString("|---|---|\n")
-
-	for _, dep := range plan.Dependencies {
-		fmt.Fprintf(&body, "| `%s` | `%s` |\n", dep.SourceModule, dep.Path)
-	}
-
-	body.WriteString("\n### File changes\n\n")
-	fmt.Fprintf(&body, "- Added: %d\n", len(plan.Added))
-
-	for _, path := range plan.Added {
-		fmt.Fprintf(&body, "  - `%s`\n", path)
-	}
-
-	fmt.Fprintf(&body, "- Updated: %d\n", len(plan.Updated))
-
-	for _, path := range plan.Updated {
-		fmt.Fprintf(&body, "  - `%s`\n", path)
-	}
-
-	fmt.Fprintf(&body, "- Removed: %d\n", len(plan.Removed))
-
-	for _, path := range plan.Removed {
-		fmt.Fprintf(&body, "  - `%s`\n", path)
-	}
+	writeMetadataSection(&body, cfg, ref)
+	writeRequestedModulesSection(&body, cfg, plan)
+	writeDependenciesSection(&body, plan.Dependencies)
+	writeFileChangesSection(&body, plan)
 
 	return body.String()
 }
 
+func writeMetadataSection(body *strings.Builder, cfg *config.Config, ref *StoreRef) {
+	writeCoreMetadata(body, cfg, ref)
+	writeJSRuntimeMetadata(body, cfg)
+
+	sbWrite(body, consts.Newline)
+}
+
+func writeCoreMetadata(body *strings.Builder, cfg *config.Config, ref *StoreRef) {
+	sbPrintf(body, "- Source: `%s`\n", config.StoreRepository)
+	sbPrintf(body, "- Requested version: `%s`\n", emptyDash(cfg.StoreVersion))
+	sbPrintf(body, "- Source reference: `%s`\n", ref.SourceRef)
+	sbPrintf(body, "- Resolved commit: `%s`\n", ref.ResolvedCommit)
+	sbPrintf(body, "- Default branch: `%s`\n", ref.DefaultBranch)
+	sbPrintf(body, "- Target folder: `%s`\n", cfg.TargetFolder)
+	sbPrintf(body, "- Documentation included: `%t`\n", cfg.IncludesDoc)
+	sbPrintf(body, "- Root Taskfile synchronized: `%t`\n", cfg.SyncRoot)
+	sbPrintf(body, "- JS runtime: `%s`\n", emptyDash(string(cfg.JSRuntime)))
+}
+
+func writeJSRuntimeMetadata(body *strings.Builder, cfg *config.Config) {
+	if cfg.JSRuntime != config.JSRuntimeNodeJS {
+		return
+	}
+
+	sbPrintf(body, "- Package manager: `%s`\n", cfg.NodePackageManager)
+	sbPrintf(body, "- Version manager: `%s`\n", cfg.NodeVersionManager)
+}
+
+func writeRequestedModulesSection(body *strings.Builder, cfg *config.Config, plan *syncer.Plan) {
+	sbWrite(body, "### Requested modules\n\n")
+	sbWrite(body, "| Task | Source module | Destination |\n")
+	sbWrite(body, "|---|---|---|\n")
+
+	tasks := cfg.Tasks
+
+	for i := range tasks {
+		task := tasks[i]
+		rec := plan.Requested[task]
+		sbPrintf(body, "| %s | `%s` | `%s` |\n", task, rec.SourceModule, rec.Path)
+	}
+}
+
+func writeDependenciesSection(body *strings.Builder, deps []syncer.ModuleRecord) {
+	sbWrite(body, "\n### Dependencies\n\n")
+	sbWrite(body, "| Source module | Destination |\n")
+	sbWrite(body, "|---|---|\n")
+
+	for i := range deps {
+		dep := &deps[i]
+		sbPrintf(body, "| `%s` | `%s` |\n", dep.SourceModule, dep.Path)
+	}
+}
+
+func writeFileChangesSection(body *strings.Builder, plan *syncer.Plan) {
+	sbWrite(body, "\n### File changes\n\n")
+	writeBulletGroup(body, "Added", plan.Added)
+	writeBulletGroup(body, "Updated", plan.Updated)
+	writeBulletGroup(body, "Removed", plan.Removed)
+}
+
+func writeBulletGroup(body *strings.Builder, label string, paths []string) {
+	sbPrintf(body, "- %s: %d\n", label, len(paths))
+
+	for i := range paths {
+		sbPrintf(body, fmtBulletItem, paths[i])
+	}
+}
+
 func emptyDash(v string) string {
-	if v == "" {
-		return ""
+	if v == consts.Empty {
+		return consts.Empty
 	}
 
 	return v
@@ -214,26 +249,14 @@ func emptyDash(v string) string {
 
 // WriteOutputs writes GitHub Actions step outputs to path.
 func WriteOutputs(path string, values map[string]string) error {
-	if path == "" {
+	if path == consts.Empty {
 		return nil
 	}
 
 	var output strings.Builder
 
-	for key, value := range values {
-		if strings.Contains(value, "\n") {
-			output.WriteString(key)
-			output.WriteString("<<EOF\n")
-			output.WriteString(value)
-			output.WriteString("\nEOF\n")
-
-			continue
-		}
-
-		output.WriteString(key)
-		output.WriteString("=")
-		output.WriteString(value)
-		output.WriteString("\n")
+	for key := range values {
+		sbWrite(&output, formatOutputLine(key, values[key]))
 	}
 
 	err := os.WriteFile(path, []byte(output.String()), outputFilePerm)
@@ -242,4 +265,12 @@ func WriteOutputs(path string, values map[string]string) error {
 	}
 
 	return nil
+}
+
+func formatOutputLine(key, value string) string {
+	if strings.Contains(value, consts.Newline) {
+		return key + "<<EOF\n" + value + "\nEOF\n"
+	}
+
+	return key + "=" + value + consts.Newline
 }

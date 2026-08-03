@@ -7,91 +7,124 @@ import (
 	"testing"
 
 	"github.com/task-otter/Taskotter/internal/config"
+	"github.com/task-otter/Taskotter/internal/consts"
 	"github.com/task-otter/Taskotter/internal/variants"
 )
 
-const taskESLint = "eslint"
+const (
+	taskESLint       = "eslint"
+	srcESLintFnmPnpm = "eslint/node/fnm/pnpm"
+	fmtGotQ          = "got %q"
+	fmtGotStrippedQ  = "got %q stripped=%t"
+	suffixBun        = "/bun"
+)
 
+func assertBuildSourceModule(
+	t *testing.T,
+	task string,
+	pm config.PackageManager,
+	vm config.VersionManager,
+	want string,
+) {
+	t.Helper()
+
+	got, err := variants.BuildSourceModule(task, pm, vm)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if got != want {
+		t.Fatalf(fmtGotQ, got)
+	}
+}
+
+func assertBuildSourceModuleError(
+	t *testing.T,
+	task string,
+	pm config.PackageManager,
+	vm config.VersionManager,
+) {
+	t.Helper()
+
+	_, err := variants.BuildSourceModule(task, pm, vm)
+	if err == nil {
+		t.Fatal("expected BuildSourceModule error")
+	}
+}
+
+// TestBuildSourceModule verifies source module names build correctly and reject invalid combinations.
 func TestBuildSourceModule(t *testing.T) {
 	t.Parallel()
 
-	got, err := variants.BuildSourceModule(taskESLint, config.PMPnpm, config.VMFnm)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if got != "eslint/node/fnm/pnpm" {
-		t.Fatalf("got %q", got)
-	}
-
-	got, err = variants.BuildSourceModule(taskESLint, config.PMBun, "")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if got != "eslint/bun" {
-		t.Fatalf("got %q", got)
-	}
-
-	_, err = variants.BuildSourceModule(taskESLint, config.PMPnpm, "")
-	if err == nil {
-		t.Fatal("expected missing version manager error")
-	}
-
-	_, err = variants.BuildSourceModule(taskESLint, config.PackageManager("deno"), "")
-	if err == nil {
-		t.Fatal("expected invalid package manager error")
-	}
+	assertBuildSourceModule(t, taskESLint, config.PMPnpm, config.VMFnm, srcESLintFnmPnpm)
+	assertBuildSourceModule(t, taskESLint, config.PMBun, consts.Empty, "eslint/bun")
+	assertBuildSourceModuleError(t, taskESLint, config.PMPnpm, consts.Empty)
+	assertBuildSourceModuleError(t, taskESLint, config.PackageManager("deno"), consts.Empty)
 }
 
+// TestIsNodeToolVariant verifies node tool variant module names are correctly identified.
 func TestIsNodeToolVariant(t *testing.T) {
 	t.Parallel()
 
-	if !variants.IsNodeToolVariant("eslint/node/fnm/pnpm", taskESLint) {
-		t.Fatal("expected variant")
+	cases := []struct {
+		name        string
+		moduleName  string
+		logicalTask string
+		want        bool
+	}{
+		{"variant", srcESLintFnmPnpm, taskESLint, true},
+		{"non-node task", consts.Go, consts.Go, false},
+		{"equal to logical task", taskESLint, taskESLint, false},
+		{"different logical task", "prettier/node/fnm/pnpm", taskESLint, false},
+		{"unknown node suffix", "eslint/node/fnm/deno", taskESLint, false},
 	}
 
-	if variants.IsNodeToolVariant("go", "go") {
-		t.Fatal("go is not a node variant")
-	}
+	for i := range cases {
+		tc := &cases[i]
+		got := variants.IsNodeToolVariant(tc.moduleName, tc.logicalTask)
 
-	if variants.IsNodeToolVariant(taskESLint, taskESLint) {
-		t.Fatal("module equal to logical task is not a variant")
-	}
-
-	if variants.IsNodeToolVariant("prettier/node/fnm/pnpm", taskESLint) {
-		t.Fatal("different logical task is not a variant")
-	}
-
-	if variants.IsNodeToolVariant("eslint/node/fnm/deno", taskESLint) {
-		t.Fatal("unknown node suffix is not a variant")
+		if got != tc.want {
+			t.Fatalf(
+				"IsNodeToolVariant(%q, %q) = %t, want %t",
+				tc.moduleName,
+				tc.logicalTask,
+				got,
+				tc.want,
+			)
+		}
 	}
 }
 
+// TestStripOneSuffix verifies a single matching suffix is stripped from module names.
 func TestStripOneSuffix(t *testing.T) {
 	t.Parallel()
 
-	got, stripped := variants.StripOneSuffix("eslint/node/fnm/pnpm")
-
-	if !stripped || got != taskESLint {
-		t.Fatalf("got %q stripped=%t", got, stripped)
+	cases := []struct {
+		name         string
+		input        string
+		wantResult   string
+		wantStripped bool
+	}{
+		{
+			name: "variant with two segments", input: srcESLintFnmPnpm,
+			wantStripped: true, wantResult: taskESLint,
+		},
+		{name: "no known suffix", input: taskESLint, wantStripped: false, wantResult: taskESLint},
+		{name: "single suffix", input: "eslint-fnm", wantStripped: true, wantResult: taskESLint},
+		{
+			name:         "strip would empty name",
+			input:        suffixBun,
+			wantStripped: false,
+			wantResult:   suffixBun,
+		},
 	}
 
-	got, stripped = variants.StripOneSuffix(taskESLint)
+	for i := range cases {
+		tc := &cases[i]
+		got, stripped := variants.StripOneSuffix(tc.input)
 
-	if stripped || got != taskESLint {
-		t.Fatalf("got %q stripped=%t", got, stripped)
-	}
-
-	got, stripped = variants.StripOneSuffix("eslint-fnm")
-
-	if !stripped || got != taskESLint {
-		t.Fatalf("got %q stripped=%t", got, stripped)
-	}
-
-	got, stripped = variants.StripOneSuffix("/bun")
-
-	if stripped || got != "/bun" {
-		t.Fatalf("got %q stripped=%t", got, stripped)
+		if stripped != tc.wantStripped || got != tc.wantResult {
+			t.Fatalf(fmtGotStrippedQ, got, stripped)
+		}
 	}
 }

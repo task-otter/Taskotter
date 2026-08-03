@@ -1,6 +1,7 @@
 // Taskotter 2026.
 // SPDX-License-Identifier: Apache-2.0.
 
+// Package git provides helpers for running git commands used by the sync workflow.
 package git
 
 import (
@@ -14,7 +15,28 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/task-otter/Taskotter/internal/consts"
 	"github.com/task-otter/Taskotter/internal/pathutil"
+)
+
+type (
+	// Operations abstracts git commands against a workspace checkout.
+	Operations interface {
+		EnsureSafeDirectory(ctx context.Context) error
+		HasUnrelatedChanges(ctx context.Context, allowed map[string]struct{}) (bool, error)
+		CheckoutBranch(ctx context.Context, branch string, create bool) error
+		BranchExists(ctx context.Context, branch string) (bool, error)
+		LastCommitMessage(ctx context.Context, branch string) (string, error)
+		Stage(ctx context.Context, paths []string) error
+		Commit(ctx context.Context, message string) error
+		Push(ctx context.Context, branch string, forceWithLease bool) error
+		DefaultBranch(ctx context.Context) (string, error)
+	}
+
+	// Client runs git commands in a workspace directory.
+	Client struct {
+		workspace string
+	}
 )
 
 const (
@@ -25,6 +47,16 @@ const (
 	commitUserEmail = "taskotter@users.noreply.github.com"
 
 	gitStatusPathOffset = 3
+
+	gitRemote                 = "remote"
+	gitVerifyFlag             = "--verify"
+	gitConfigFlag             = "-c"
+	gitBinary                 = "git"
+	fmtGitCmdErr              = "git %s: %w: %s"
+	argSep                    = " "
+	errMustNotStartWithHyphen = "%w: must not start with '-'"
+
+	maxGitRefLen = 255
 )
 
 var (
@@ -37,22 +69,20 @@ var (
 	errBranchNotOwned   = errors.New("branch exists but is not owned by TaskOtter")
 	errInvalidGitRef    = errors.New("invalid git ref")
 	errInvalidStagePath = errors.New("invalid stage path")
+
+	gitRefPattern = regexp.MustCompile(`^[a-zA-Z0-9._/-]+$`)
 )
-
-const maxGitRefLen = 255
-
-var gitRefPattern = regexp.MustCompile(`^[a-zA-Z0-9._/-]+$`)
 
 // ValidateGitRef checks that ref is safe to pass to git commands.
 func ValidateGitRef(ref string) error {
 	ref = strings.TrimSpace(ref)
 
-	if ref == "" {
+	if ref == consts.Empty {
 		return fmt.Errorf("%w: must not be empty", errInvalidGitRef)
 	}
 
-	if strings.HasPrefix(ref, "-") {
-		return fmt.Errorf("%w: must not start with '-'", errInvalidGitRef)
+	if strings.HasPrefix(ref, consts.Hyphen) {
+		return fmt.Errorf(errMustNotStartWithHyphen, errInvalidGitRef)
 	}
 
 	if len(ref) > maxGitRefLen {
@@ -70,34 +100,16 @@ func ValidateGitRef(ref string) error {
 func ValidateStagePath(workspace, path string) error {
 	trimmed := strings.TrimSpace(path)
 
-	if strings.HasPrefix(trimmed, "-") {
-		return fmt.Errorf("%w: must not start with '-'", errInvalidStagePath)
+	if strings.HasPrefix(trimmed, consts.Hyphen) {
+		return fmt.Errorf(errMustNotStartWithHyphen, errInvalidStagePath)
 	}
 
 	_, err := pathutil.ValidateRelativePath(workspace, path)
 	if err != nil {
-		return fmt.Errorf("%w: %w", errInvalidStagePath, err)
+		return fmt.Errorf("%w: %s", errInvalidStagePath, err)
 	}
 
 	return nil
-}
-
-// Operations abstracts git commands against a workspace checkout.
-type Operations interface {
-	EnsureSafeDirectory(ctx context.Context) error
-	HasUnrelatedChanges(ctx context.Context, allowed map[string]struct{}) (bool, error)
-	CheckoutBranch(ctx context.Context, branch string, create bool) error
-	BranchExists(ctx context.Context, branch string) (bool, error)
-	LastCommitMessage(ctx context.Context, branch string) (string, error)
-	Stage(ctx context.Context, paths []string) error
-	Commit(ctx context.Context, message string) error
-	Push(ctx context.Context, branch string, forceWithLease bool) error
-	DefaultBranch(ctx context.Context) (string, error)
-}
-
-// Client runs git commands in a workspace directory.
-type Client struct {
-	workspace string
 }
 
 // NewClient returns a git client bound to the given workspace path.
@@ -120,19 +132,28 @@ func (c *Client) DefaultBranch(ctx context.Context) (string, error) {
 		return branch, nil
 	}
 
-	_ = c.run(ctx, "remote", "set-head", "origin", "-a")
+	refreshErr := c.run(ctx, gitRemote, "set-head", consts.GitOrigin, "-a")
 
-	branch, err = c.defaultBranchFromOriginHEAD(ctx)
-	if err == nil {
-		return branch, nil
+	detectors := []func(context.Context) (string, error){
+		c.defaultBranchFromOriginHEAD,
+		c.defaultBranchFromRemoteShow,
 	}
 
-	branch, err = c.defaultBranchFromRemoteShow(ctx)
-	if err == nil {
-		return branch, nil
+	for i := range detectors {
+		branch, err = detectors[i](ctx)
+		if err == nil {
+			return branch, nil
+		}
 	}
 
-	return "", errDefaultBranchDetectionFailed
+	if refreshErr != nil {
+		return consts.Empty, errors.Join(
+			errDefaultBranchDetectionFailed,
+			fmt.Errorf("refresh origin head: %w", refreshErr),
+		)
+	}
+
+	return consts.Empty, errDefaultBranchDetectionFailed
 }
 
 // HasUnrelatedChanges reports whether the working tree has changes outside allowed paths.
@@ -142,31 +163,15 @@ func (c *Client) HasUnrelatedChanges(
 ) (bool, error) {
 	out, err := c.output(ctx, "status", "--porcelain")
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("git status: %w", err)
 	}
 
-	lines := strings.SplitSeq(strings.TrimSpace(out), "\n")
+	lines := strings.SplitSeq(strings.TrimSpace(out), consts.Newline)
 
 	for line := range lines {
-		if line == "" {
-			continue
-		}
+		path, ok := parseStatusPath(line)
 
-		if len(line) < gitStatusPathOffset {
-			continue
-		}
-
-		path := strings.TrimSpace(line[gitStatusPathOffset:])
-
-		if path == "" {
-			continue
-		}
-
-		if _, ok := allowed[path]; ok {
-			continue
-		}
-
-		if isAllowedPath(path, allowed) {
+		if !ok || isChangeAllowed(path, allowed) {
 			continue
 		}
 
@@ -176,11 +181,33 @@ func (c *Client) HasUnrelatedChanges(
 	return false, nil
 }
 
+func parseStatusPath(line string) (string, bool) {
+	if line == consts.Empty || len(line) < gitStatusPathOffset {
+		return consts.Empty, false
+	}
+
+	path := strings.TrimSpace(line[gitStatusPathOffset:])
+
+	if path == consts.Empty {
+		return consts.Empty, false
+	}
+
+	return path, true
+}
+
+func isChangeAllowed(path string, allowed map[string]struct{}) bool {
+	if _, ok := allowed[path]; ok {
+		return true
+	}
+
+	return isAllowedPath(path, allowed)
+}
+
 // CheckoutBranch checks out a branch, optionally creating or resetting it.
 func (c *Client) CheckoutBranch(ctx context.Context, branch string, create bool) error {
 	err := ValidateGitRef(branch)
 	if err != nil {
-		return err
+		return fmt.Errorf("validate git ref: %w", err)
 	}
 
 	args := []string{"checkout"}
@@ -191,22 +218,27 @@ func (c *Client) CheckoutBranch(ctx context.Context, branch string, create bool)
 
 	args = append(args, branch)
 
-	return c.run(ctx, args...)
+	err = c.run(ctx, args...)
+	if err != nil {
+		return fmt.Errorf("checkout branch: %w", err)
+	}
+
+	return nil
 }
 
 // BranchExists reports whether a local branch ref exists.
 func (c *Client) BranchExists(ctx context.Context, branch string) (bool, error) {
 	err := ValidateGitRef(branch)
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("validate git ref: %w", err)
 	}
 
-	_, err = c.output(ctx, "rev-parse", "--verify", branch)
+	_, err = c.output(ctx, consts.GitRevParse, gitVerifyFlag, branch)
 	if err == nil {
 		return true, nil
 	}
 
-	_, err = c.output(ctx, "rev-parse", "--verify", "refs/heads/"+branch)
+	_, err = c.output(ctx, consts.GitRevParse, gitVerifyFlag, "refs/heads/"+branch)
 	if err == nil {
 		return true, nil
 	}
@@ -218,12 +250,12 @@ func (c *Client) BranchExists(ctx context.Context, branch string) (bool, error) 
 func (c *Client) LastCommitMessage(ctx context.Context, branch string) (string, error) {
 	err := ValidateGitRef(branch)
 	if err != nil {
-		return "", err
+		return consts.Empty, fmt.Errorf("validate git ref: %w", err)
 	}
 
 	out, err := c.output(ctx, "log", "-1", "--format=%s", branch)
 	if err != nil {
-		return "", err
+		return consts.Empty, fmt.Errorf("git log: %w", err)
 	}
 
 	return strings.TrimSpace(out), nil
@@ -231,20 +263,25 @@ func (c *Client) LastCommitMessage(ctx context.Context, branch string) (string, 
 
 // Stage force-adds the given paths to the index.
 func (c *Client) Stage(ctx context.Context, paths []string) error {
-	if len(paths) == 0 {
+	if len(paths) == consts.IndexZero {
 		return nil
 	}
 
-	for _, path := range paths {
-		err := ValidateStagePath(c.workspace, path)
+	for i := range paths {
+		err := ValidateStagePath(c.workspace, paths[i])
 		if err != nil {
-			return err
+			return fmt.Errorf("validate stage path: %w", err)
 		}
 	}
 
-	args := append([]string{"add", "-f", "--"}, paths...)
+	args := append([]string{consts.GitAdd, "-f", "--"}, paths...)
 
-	return c.run(ctx, args...)
+	err := c.run(ctx, args...)
+	if err != nil {
+		return fmt.Errorf("stage paths: %w", err)
+	}
+
+	return nil
 }
 
 // Commit creates a commit with the given message.
@@ -255,7 +292,7 @@ func (c *Client) Commit(ctx context.Context, message string) error {
 			return nil
 		}
 
-		return err
+		return fmt.Errorf("git commit: %w", err)
 	}
 
 	return nil
@@ -265,7 +302,7 @@ func (c *Client) Commit(ctx context.Context, message string) error {
 func (c *Client) Push(ctx context.Context, branch string, forceWithLease bool) error {
 	err := ValidateGitRef(branch)
 	if err != nil {
-		return err
+		return fmt.Errorf("validate git ref: %w", err)
 	}
 
 	args := []string{"push"}
@@ -274,32 +311,40 @@ func (c *Client) Push(ctx context.Context, branch string, forceWithLease bool) e
 		args = append(args, "--force-with-lease")
 	}
 
-	args = append(args, "origin", branch)
+	args = append(args, consts.GitOrigin, branch)
 
-	return c.run(ctx, args...)
+	err = c.run(ctx, args...)
+	if err != nil {
+		return fmt.Errorf("git push: %w", err)
+	}
+
+	return nil
 }
 
 func (c *Client) gitArgs(args ...string) []string {
 	return append([]string{
-		"-c", "safe.directory=" + c.workspace,
-		"-c", "user.email=" + commitUserEmail,
-		"-c", "user.name=" + commitUserName,
+		gitConfigFlag, "safe.directory=" + c.workspace,
+		gitConfigFlag, "user.email=" + commitUserEmail,
+		gitConfigFlag, "user.name=" + commitUserName,
 	}, args...)
 }
 
 func (c *Client) defaultBranchFromOriginHEAD(ctx context.Context) (string, error) {
-	out, err := c.output(ctx, "symbolic-ref", "--short", "refs/remotes/origin/HEAD")
-	if err == nil {
-		if branch := normalizeBranch(out); isPlausibleDefaultBranch(branch) {
-			return branch, nil
-		}
+	branch, ok := c.branchFromCommand(ctx, "symbolic-ref", "--short", "refs/remotes/origin/HEAD")
+
+	if ok {
+		return branch, nil
 	}
 
-	out, err = c.output(ctx, "rev-parse", "--abbrev-ref", "refs/remotes/origin/HEAD")
-	if err == nil {
-		if branch := normalizeBranch(out); isPlausibleDefaultBranch(branch) {
-			return branch, nil
-		}
+	branch, ok = c.branchFromCommand(
+		ctx,
+		consts.GitRevParse,
+		"--abbrev-ref",
+		consts.GitRemoteHeadRef,
+	)
+
+	if ok {
+		return branch, nil
 	}
 
 	branch, err := c.defaultBranchFromOriginHEADCommit(ctx)
@@ -310,13 +355,22 @@ func (c *Client) defaultBranchFromOriginHEAD(ctx context.Context) (string, error
 	return "", errOriginHEADNotAvailable
 }
 
-func (c *Client) defaultBranchFromOriginHEADCommit(ctx context.Context) (string, error) {
-	sha, err := c.output(ctx, "rev-parse", "refs/remotes/origin/HEAD")
+func (c *Client) branchFromCommand(ctx context.Context, args ...string) (string, bool) {
+	out, err := c.output(ctx, args...)
 	if err != nil {
-		return "", err
+		return consts.Empty, false
 	}
 
-	sha = strings.TrimSpace(sha)
+	branch := normalizeBranch(out)
+
+	return branch, isPlausibleDefaultBranch(branch)
+}
+
+func (c *Client) defaultBranchFromOriginHEADCommit(ctx context.Context) (string, error) {
+	sha, err := c.output(ctx, consts.GitRevParse, consts.GitRemoteHeadRef)
+	if err != nil {
+		return consts.Empty, fmt.Errorf("resolve origin head sha: %w", err)
+	}
 
 	refs, err := c.output(
 		ctx,
@@ -324,53 +378,87 @@ func (c *Client) defaultBranchFromOriginHEADCommit(ctx context.Context) (string,
 		"--format=%(refname:short)",
 		"refs/remotes/origin/",
 		"--points-at",
-		sha,
+		strings.TrimSpace(sha),
 	)
 	if err != nil {
-		return "", err
+		return consts.Empty, fmt.Errorf("list refs pointing at origin head: %w", err)
 	}
 
-	for line := range strings.SplitSeq(strings.TrimSpace(refs), "\n") {
-		line = strings.TrimSpace(line)
+	branch, ok := firstPlausibleRef(refs)
 
-		if line == "" || line == "origin/HEAD" {
-			continue
-		}
+	if !ok {
+		return consts.Empty, errNoRemoteBranchAtOriginHEAD
+	}
 
-		if branch := normalizeBranch(line); isPlausibleDefaultBranch(branch) {
-			return branch, nil
+	return branch, nil
+}
+
+func firstPlausibleRef(refs string) (string, bool) {
+	for line := range strings.SplitSeq(strings.TrimSpace(refs), consts.Newline) {
+		branch, ok := plausibleBranchFromLine(line)
+
+		if ok {
+			return branch, true
 		}
 	}
 
-	return "", errNoRemoteBranchAtOriginHEAD
+	return consts.Empty, false
+}
+
+func plausibleBranchFromLine(line string) (string, bool) {
+	line = strings.TrimSpace(line)
+
+	if line == consts.Empty || line == "origin/HEAD" {
+		return consts.Empty, false
+	}
+
+	branch := normalizeBranch(line)
+
+	return branch, isPlausibleDefaultBranch(branch)
 }
 
 func (c *Client) defaultBranchFromRemoteShow(ctx context.Context) (string, error) {
-	out, err := c.output(ctx, "remote", "show", "origin")
+	out, err := c.output(ctx, gitRemote, "show", consts.GitOrigin)
 	if err != nil {
-		return "", err
+		return consts.Empty, fmt.Errorf("git remote show: %w", err)
 	}
 
+	branch, ok := parseHEADBranchLine(out)
+
+	if !ok {
+		return consts.Empty, errHEADBranchNotFound
+	}
+
+	return branch, nil
+}
+
+func parseHEADBranchLine(out string) (string, bool) {
 	const prefix = "HEAD branch: "
 
-	for line := range strings.SplitSeq(out, "\n") {
+	for line := range strings.SplitSeq(out, consts.Newline) {
 		line = strings.TrimSpace(line)
 
-		if after, ok := strings.CutPrefix(line, prefix); ok {
-			if branch := strings.TrimSpace(after); branch != "" {
-				return branch, nil
-			}
+		after, ok := strings.CutPrefix(line, prefix)
+
+		if !ok {
+			continue
+		}
+
+		branch := strings.TrimSpace(after)
+
+		if branch != consts.Empty {
+			return branch, true
 		}
 	}
 
-	return "", errHEADBranchNotFound
+	return consts.Empty, false
 }
 
 func (c *Client) newGitCommand(ctx context.Context, args ...string) *exec.Cmd {
 	gitArgs := c.gitArgs(args...)
-	cmd := exec.CommandContext(ctx, "git")
+	cmd := exec.CommandContext(ctx, gitBinary)
 
-	cmd.Args = append([]string{"git"}, gitArgs...)
+	cmd.Args = append([]string{gitBinary}, gitArgs...)
 	cmd.Dir = c.workspace
 
 	return cmd
@@ -386,8 +474,8 @@ func (c *Client) run(ctx context.Context, args ...string) error {
 	err := cmd.Run()
 	if err != nil {
 		return fmt.Errorf(
-			"git %s: %w: %s",
-			strings.Join(args, " "),
+			fmtGitCmdErr,
+			strings.Join(args, argSep),
 			err,
 			strings.TrimSpace(stderr.String()),
 		)
@@ -407,9 +495,9 @@ func (c *Client) output(ctx context.Context, args ...string) (string, error) {
 
 	err := cmd.Run()
 	if err != nil {
-		return "", fmt.Errorf(
-			"git %s: %w: %s",
-			strings.Join(args, " "),
+		return consts.Empty, fmt.Errorf(
+			fmtGitCmdErr,
+			strings.Join(args, argSep),
 			err,
 			strings.TrimSpace(stderr.String()),
 		)
@@ -422,8 +510,8 @@ func (c *Client) output(ctx context.Context, args ...string) (string, error) {
 func AllowedPathSet(paths []string) map[string]struct{} {
 	out := make(map[string]struct{}, len(paths))
 
-	for _, path := range paths {
-		out[filepath.ToSlash(path)] = struct{}{}
+	for i := range paths {
+		out[filepath.ToSlash(paths[i])] = struct{}{}
 	}
 
 	return out
@@ -461,6 +549,15 @@ func EnsureBranchOwned(ctx context.Context, ops Operations, branch string) error
 		return fmt.Errorf("read last commit message: %w", err)
 	}
 
+	err = checkBranchOwnership(msg, branch)
+	if err != nil {
+		return fmt.Errorf("check branch ownership: %w", err)
+	}
+
+	return nil
+}
+
+func checkBranchOwnership(msg, branch string) error {
 	if msg != SyncCommitMessage {
 		return fmt.Errorf("%w: %q", errBranchNotOwned, branch)
 	}
@@ -477,25 +574,49 @@ func normalizeBranch(name string) string {
 func isPlausibleDefaultBranch(branch string) bool {
 	branch = strings.TrimSpace(branch)
 
-	if branch == "" || branch == "HEAD" || branch == "origin" {
+	if isReservedBranchName(branch) {
 		return false
 	}
 
-	if len(branch) >= 7 && isHexString(branch) {
+	if isLikelyCommitSHA(branch) {
 		return false
 	}
 
 	return true
 }
 
+func isReservedBranchName(branch string) bool {
+	return branch == consts.Empty || branch == "HEAD" || branch == consts.GitOrigin
+}
+
+func isLikelyCommitSHA(branch string) bool {
+	return len(branch) >= consts.IndexSeven && isHexString(branch)
+}
+
 func isHexString(value string) bool {
-	for _, r := range value {
-		if (r < '0' || r > '9') && (r < 'a' || r > 'f') && (r < 'A' || r > 'F') {
+	for i := range len(value) {
+		if !isHexDigit(rune(value[i])) {
 			return false
 		}
 	}
 
 	return true
+}
+
+func isHexDigit(r rune) bool {
+	return isDigit(r) || isLowerHexLetter(r) || isUpperHexLetter(r)
+}
+
+func isDigit(r rune) bool {
+	return r >= '0' && r <= '9'
+}
+
+func isLowerHexLetter(r rune) bool {
+	return r >= 'a' && r <= 'f'
+}
+
+func isUpperHexLetter(r rune) bool {
+	return r >= 'A' && r <= 'F'
 }
 
 func isAllowedPath(path string, allowed map[string]struct{}) bool {

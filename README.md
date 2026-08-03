@@ -4,7 +4,7 @@
 
 # TaskOtter
 
-[![codecov](https://codecov.io/gh/task-otter/Taskotter/graph/badge.svg)](https://codecov.io/gh/task-otter/Taskotter)
+[![LICENSE](https://img.shields.io/github/license/task-otter/Taskotter)](/LICENSE)![codecov](https://codecov.io/gh/task-otter/Taskotter/graph/badge.svg)](https://codecov.io/gh/task-otter/Taskotter)
 
 Docker-based GitHub Action that synchronizes task modules from the [TaskOtter store](https://github.com/task-otter/store) into your repository, resolves transitive dependencies, normalizes destination folder names, optionally updates your root `Taskfile.yml`, and opens or updates a deterministic pull request when changes exist.
 

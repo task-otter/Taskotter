@@ -12,71 +12,76 @@ import (
 
 	"github.com/task-otter/Taskotter/internal/app"
 	"github.com/task-otter/Taskotter/internal/config"
+	"github.com/task-otter/Taskotter/internal/consts"
 	"github.com/task-otter/Taskotter/internal/store"
 )
 
-const testPullRequestURL = "https://example.com/pull/42"
+const (
+	testPullRequestURL = "https://example.com/pull/42"
+	testPRNumber42     = "42"
+)
 
 func emptyRefInfo() store.RefInfo {
 	return store.RefInfo{
-		Repository:       "",
-		RequestedVersion: "",
-		SourceRef:        "",
-		ResolvedCommit:   "",
-		DefaultBranch:    "",
+		Repository:       consts.Empty,
+		RequestedVersion: consts.Empty,
+		SourceRef:        consts.Empty,
+		ResolvedCommit:   consts.Empty,
+		DefaultBranch:    consts.Empty,
 	}
 }
 
 func emptyConfig() *config.Config {
 	return &config.Config{
 		Tasks:              nil,
-		JSRuntime:          "",
-		NodePackageManager: "",
-		NodeVersionManager: "",
+		JSRuntime:          consts.Empty,
+		NodePackageManager: consts.Empty,
+		NodeVersionManager: consts.Empty,
 		IncludesDoc:        false,
 		SyncRoot:           false,
 		FailOnChanges:      false,
-		StoreVersion:       "",
-		TargetFolder:       "",
-		RootTaskfile:       "",
-		GitHubToken:        "",
-		Workspace:          "",
-		Repository:         "",
-		GitHubOutput:       "",
-		BaseBranch:         "",
-		ConfigurationHash:  "",
-		BranchName:         "",
+		StoreVersion:       consts.Empty,
+		TargetFolder:       consts.Empty,
+		RootTaskfile:       consts.Empty,
+		GitHubToken:        consts.Empty,
+		Workspace:          consts.Empty,
+		Repository:         consts.Empty,
+		GitHubOutput:       consts.Empty,
+		BaseBranch:         consts.Empty,
+		ConfigurationHash:  consts.Empty,
+		BranchName:         consts.Empty,
 	}
 }
 
 func emptyResult() *app.Result {
 	return &app.Result{
 		Changed:              false,
-		StoreVersion:         "",
-		SourceRef:            "",
-		SourceSHA:            "",
-		TargetFolder:         "",
-		ResolvedTasksJSON:    "",
-		ResolvedDependencies: "",
-		PullRequestNumber:    "",
-		PullRequestURL:       "",
+		StoreVersion:         consts.Empty,
+		SourceRef:            consts.Empty,
+		SourceSHA:            consts.Empty,
+		TargetFolder:         consts.Empty,
+		ResolvedTasksJSON:    consts.Empty,
+		ResolvedDependencies: consts.Empty,
+		PullRequestNumber:    consts.Empty,
+		PullRequestURL:       consts.Empty,
 		Plan:                 nil,
 		Ref:                  emptyRefInfo(),
 	}
 }
 
+// TestReportSyncRequiredWithPullRequest verifies the report includes the opened pull request summary.
 func TestReportSyncRequiredWithPullRequest(t *testing.T) {
 	t.Parallel()
 
 	result := &app.Result{
 		Changed:              true,
-		StoreVersion:         "",
-		SourceRef:            "",
-		SourceSHA:            "",
-		TargetFolder:         "",
-		ResolvedTasksJSON:    "",
-		ResolvedDependencies: "",
-		PullRequestNumber:    "42",
+		StoreVersion:         consts.Empty,
+		SourceRef:            consts.Empty,
+		SourceSHA:            consts.Empty,
+		TargetFolder:         consts.Empty,
+		ResolvedTasksJSON:    consts.Empty,
+		ResolvedDependencies: consts.Empty,
+		PullRequestNumber:    testPRNumber42,
 		PullRequestURL:       testPullRequestURL,
 		Plan:                 nil,
 		Ref:                  emptyRefInfo(),
@@ -90,11 +95,7 @@ func TestReportSyncRequiredWithPullRequest(t *testing.T) {
 		t.Fatalf("missing error annotation: %s", out.String())
 	}
 
-	if !strings.Contains(
-		out.String(),
-		"TaskOtter opened sync PR #42: "+testPullRequestURL,
-	) {
-
+	if !strings.Contains(out.String(), "TaskOtter opened sync PR #42: "+testPullRequestURL) {
 		t.Fatalf("missing PR summary: %s", out.String())
 	}
 
@@ -103,6 +104,7 @@ func TestReportSyncRequiredWithPullRequest(t *testing.T) {
 	}
 }
 
+// TestReportSyncRequiredWithUnknownPullRequestNumber verifies an unknown PR number falls back gracefully.
 func TestReportSyncRequiredWithUnknownPullRequestNumber(t *testing.T) {
 	t.Parallel()
 
@@ -120,19 +122,20 @@ func TestReportSyncRequiredWithUnknownPullRequestNumber(t *testing.T) {
 	}
 }
 
+// TestReportSyncRequiredWithoutPullRequest verifies the report falls back when no PR URL is set.
 func TestReportSyncRequiredWithoutPullRequest(t *testing.T) {
 	t.Parallel()
 
 	result := &app.Result{
 		Changed:              true,
-		StoreVersion:         "",
-		SourceRef:            "",
-		SourceSHA:            "",
-		TargetFolder:         "",
-		ResolvedTasksJSON:    "",
-		ResolvedDependencies: "",
-		PullRequestNumber:    "",
-		PullRequestURL:       "",
+		StoreVersion:         consts.Empty,
+		SourceRef:            consts.Empty,
+		SourceSHA:            consts.Empty,
+		TargetFolder:         consts.Empty,
+		ResolvedTasksJSON:    consts.Empty,
+		ResolvedDependencies: consts.Empty,
+		PullRequestNumber:    consts.Empty,
+		PullRequestURL:       consts.Empty,
 		Plan:                 nil,
 		Ref:                  emptyRefInfo(),
 	}
@@ -146,19 +149,20 @@ func TestReportSyncRequiredWithoutPullRequest(t *testing.T) {
 	}
 }
 
+// TestSyncRequired verifies changed results require sync and unchanged ones do not.
 func TestSyncRequired(t *testing.T) {
 	t.Parallel()
 
 	changed := &app.Result{
 		Changed:              true,
-		StoreVersion:         "",
-		SourceRef:            "",
-		SourceSHA:            "",
-		TargetFolder:         "",
-		ResolvedTasksJSON:    "",
-		ResolvedDependencies: "",
-		PullRequestNumber:    "",
-		PullRequestURL:       "",
+		StoreVersion:         consts.Empty,
+		SourceRef:            consts.Empty,
+		SourceSHA:            consts.Empty,
+		TargetFolder:         consts.Empty,
+		ResolvedTasksJSON:    consts.Empty,
+		ResolvedDependencies: consts.Empty,
+		PullRequestNumber:    consts.Empty,
+		PullRequestURL:       consts.Empty,
 		Plan:                 nil,
 		Ref:                  emptyRefInfo(),
 	}
@@ -169,14 +173,14 @@ func TestSyncRequired(t *testing.T) {
 
 	unchanged := &app.Result{
 		Changed:              false,
-		StoreVersion:         "",
-		SourceRef:            "",
-		SourceSHA:            "",
-		TargetFolder:         "",
-		ResolvedTasksJSON:    "",
-		ResolvedDependencies: "",
-		PullRequestNumber:    "",
-		PullRequestURL:       "",
+		StoreVersion:         consts.Empty,
+		SourceRef:            consts.Empty,
+		SourceSHA:            consts.Empty,
+		TargetFolder:         consts.Empty,
+		ResolvedTasksJSON:    consts.Empty,
+		ResolvedDependencies: consts.Empty,
+		PullRequestNumber:    consts.Empty,
+		PullRequestURL:       consts.Empty,
 		Plan:                 nil,
 		Ref:                  emptyRefInfo(),
 	}
@@ -186,15 +190,8 @@ func TestSyncRequired(t *testing.T) {
 	}
 }
 
-func TestWriteActionOutputsToFile(t *testing.T) {
-	t.Parallel()
-
-	outputPath := filepath.Join(t.TempDir(), "github-output")
-	cfg := emptyConfig()
-
-	cfg.GitHubOutput = outputPath
-
-	result := &app.Result{
+func newResultWithOutputs() *app.Result {
+	return &app.Result{
 		Changed:              true,
 		StoreVersion:         "v1.2.3",
 		SourceRef:            "refs/tags/v1.2.3",
@@ -202,11 +199,20 @@ func TestWriteActionOutputsToFile(t *testing.T) {
 		TargetFolder:         "taskfiles",
 		ResolvedTasksJSON:    "{}",
 		ResolvedDependencies: "[]",
-		PullRequestNumber:    "42",
+		PullRequestNumber:    testPRNumber42,
 		PullRequestURL:       testPullRequestURL,
 		Plan:                 nil,
 		Ref:                  emptyRefInfo(),
 	}
+}
+
+func writeOutputsAndRead(
+	t *testing.T,
+	cfg *config.Config,
+	result *app.Result,
+	outputPath string,
+) string {
+	t.Helper()
 
 	err := app.WriteActionOutputs(cfg, result)
 	if err != nil {
@@ -218,17 +224,38 @@ func TestWriteActionOutputsToFile(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	for _, want := range []string{
-		"changed=true\n",
-		"source-sha=abc123\n",
-		"pull-request-number=42\n",
-	} {
-		if !strings.Contains(string(data), want) {
-			t.Fatalf("output missing %q: %s", want, data)
+	return string(data)
+}
+
+func assertContainsAll(t *testing.T, haystack string, wants []string) {
+	t.Helper()
+
+	for i := range wants {
+		if !strings.Contains(haystack, wants[i]) {
+			t.Fatalf("output missing %q: %s", wants[i], haystack)
 		}
 	}
 }
 
+// TestWriteActionOutputsToFile verifies action outputs are written to the GitHub output file.
+func TestWriteActionOutputsToFile(t *testing.T) {
+	t.Parallel()
+
+	outputPath := filepath.Join(t.TempDir(), "github-output")
+	cfg := emptyConfig()
+
+	cfg.GitHubOutput = outputPath
+
+	data := writeOutputsAndRead(t, cfg, newResultWithOutputs(), outputPath)
+
+	assertContainsAll(t, data, []string{
+		"changed=true\n",
+		"source-sha=abc123\n",
+		"pull-request-number=42\n",
+	})
+}
+
+// TestWriteActionOutputsWrapsFileError verifies a missing output path returns a wrapped error.
 func TestWriteActionOutputsWrapsFileError(t *testing.T) {
 	t.Parallel()
 

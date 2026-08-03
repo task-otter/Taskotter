@@ -7,14 +7,20 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/task-otter/Taskotter/internal/consts"
 	yaml "go.yaml.in/yaml/v3"
 )
 
-const yamlMappingPairKeyValue = 2
-
-var errYAMLMappingNodeExpected = errors.New("expected YAML mapping node")
+type yamlDecodeTarget struct {
+	out any
+	key string
+}
 
 const (
+	yamlMappingPairKeyValue = 2
+
+	errDecode = "decode %q: %w"
+
 	yamlKeyConfiguration      = "configuration"
 	yamlKeyConfigurationHash  = "configuration_hash"
 	yamlKeyDefaultBranch      = "default_branch"
@@ -47,10 +53,7 @@ const (
 	yamlKeyVariants           = "variants"
 )
 
-type yamlDecodeTarget struct {
-	out any
-	key string
-}
+var errYAMLMappingNodeExpected = errors.New("expected YAML mapping node")
 
 // MarshalYAML encodes a module record using the lock file's snake_case keys.
 func (record ModuleRecord) MarshalYAML() (any, error) {
@@ -73,12 +76,17 @@ func (record *ModuleRecord) UnmarshalYAML(value *yaml.Node) error {
 		return fmt.Errorf("decode module record: %w", err)
 	}
 
-	return decodeYAMLFields(
+	err = decodeYAMLFields(
 		fields,
 		yamlDecodeTarget{key: yamlKeySourceModule, out: &record.SourceModule},
 		yamlDecodeTarget{key: yamlKeyDestinationModule, out: &record.DestinationModule},
 		yamlDecodeTarget{key: yamlKeyPath, out: &record.Path},
 	)
+	if err != nil {
+		return fmt.Errorf("decode module record fields: %w", err)
+	}
+
+	return nil
 }
 
 // MarshalYAML encodes a managed file using the lock file's snake_case keys.
@@ -99,7 +107,7 @@ func (managed *ManagedFile) UnmarshalYAML(value *yaml.Node) error {
 		return fmt.Errorf("decode managed file: %w", err)
 	}
 
-	return decodeYAMLFields(
+	err = decodeYAMLFields(
 		fields,
 		yamlDecodeTarget{key: yamlKeySourceModule, out: &managed.SourceModule},
 		yamlDecodeTarget{key: yamlKeyDestinationModule, out: &managed.DestinationModule},
@@ -107,6 +115,11 @@ func (managed *ManagedFile) UnmarshalYAML(value *yaml.Node) error {
 		yamlDecodeTarget{key: yamlKeyPath, out: &managed.Path},
 		yamlDecodeTarget{key: yamlKeySHA256, out: &managed.SHA256},
 	)
+	if err != nil {
+		return fmt.Errorf("decode managed file fields: %w", err)
+	}
+
+	return nil
 }
 
 // MarshalYAML encodes the TaskOtter lock file using its stable on-disk keys.
@@ -134,7 +147,7 @@ func (lock LockFile) MarshalYAML() (any, error) {
 		yamlKeyManagedFiles: lock.ManagedFiles,
 	}
 
-	if len(lock.GeneratedRootTasks) > 0 {
+	if len(lock.GeneratedRootTasks) > consts.IndexZero {
 		out[yamlKeyGeneratedRootTasks] = lock.GeneratedRootTasks
 	}
 
@@ -148,35 +161,49 @@ func (lock *LockFile) UnmarshalYAML(value *yaml.Node) error {
 		return fmt.Errorf("decode lock file: %w", err)
 	}
 
-	err = decodeLockSource(fields, lock)
+	err = decodeLockSections(fields, lock)
 	if err != nil {
-		return err
+		return fmt.Errorf("decode lock sections: %w", err)
 	}
 
-	err = decodeLockConfiguration(fields, lock)
-	if err != nil {
-		return err
-	}
-
-	err = decodeLockResolvedModules(fields, lock)
-	if err != nil {
-		return err
-	}
-
-	return decodeYAMLFields(
+	err = decodeYAMLFields(
 		fields,
 		yamlDecodeTarget{key: yamlKeyGeneratedRootTasks, out: &lock.GeneratedRootTasks},
 		yamlDecodeTarget{key: yamlKeyManagedFiles, out: &lock.ManagedFiles},
 	)
+	if err != nil {
+		return fmt.Errorf("decode lock top-level fields: %w", err)
+	}
+
+	return nil
+}
+
+func decodeLockSections(fields map[string]*yaml.Node, lock *LockFile) error {
+	err := decodeLockSource(fields, lock)
+	if err != nil {
+		return fmt.Errorf("decode lock source: %w", err)
+	}
+
+	err = decodeLockConfiguration(fields, lock)
+	if err != nil {
+		return fmt.Errorf("decode lock configuration: %w", err)
+	}
+
+	err = decodeLockResolvedModules(fields, lock)
+	if err != nil {
+		return fmt.Errorf("decode lock resolved modules: %w", err)
+	}
+
+	return nil
 }
 
 func decodeLockSource(fields map[string]*yaml.Node, lock *LockFile) error {
 	source, err := nestedYAMLFields(fields, yamlKeySource)
 	if err != nil {
-		return err
+		return fmt.Errorf("nested source fields: %w", err)
 	}
 
-	return decodeYAMLFields(
+	err = decodeYAMLFields(
 		source,
 		yamlDecodeTarget{key: yamlKeyRepository, out: &lock.Source.Repository},
 		yamlDecodeTarget{key: yamlKeyRequestedVersion, out: &lock.Source.RequestedVersion},
@@ -184,15 +211,20 @@ func decodeLockSource(fields map[string]*yaml.Node, lock *LockFile) error {
 		yamlDecodeTarget{key: yamlKeyResolvedCommit, out: &lock.Source.ResolvedCommit},
 		yamlDecodeTarget{key: yamlKeyDefaultBranch, out: &lock.Source.DefaultBranch},
 	)
+	if err != nil {
+		return fmt.Errorf("decode source fields: %w", err)
+	}
+
+	return nil
 }
 
 func decodeLockConfiguration(fields map[string]*yaml.Node, lock *LockFile) error {
 	cfg, err := nestedYAMLFields(fields, yamlKeyConfiguration)
 	if err != nil {
-		return err
+		return fmt.Errorf("nested configuration fields: %w", err)
 	}
 
-	return decodeYAMLFields(
+	err = decodeYAMLFields(
 		cfg,
 		yamlDecodeTarget{key: yamlKeyTargetFolder, out: &lock.Configuration.TargetFolder},
 		yamlDecodeTarget{key: yamlKeyTasks, out: &lock.Configuration.Tasks},
@@ -207,19 +239,29 @@ func decodeLockConfiguration(fields map[string]*yaml.Node, lock *LockFile) error
 		yamlDecodeTarget{key: yamlKeyIncludesDoc, out: &lock.Configuration.IncludesDoc},
 		yamlDecodeTarget{key: yamlKeySyncRoot, out: &lock.Configuration.SyncRoot},
 	)
+	if err != nil {
+		return fmt.Errorf("decode configuration fields: %w", err)
+	}
+
+	return nil
 }
 
 func decodeLockResolvedModules(fields map[string]*yaml.Node, lock *LockFile) error {
 	resolved, err := nestedYAMLFields(fields, yamlKeyResolvedModules)
 	if err != nil {
-		return err
+		return fmt.Errorf("nested resolved modules fields: %w", err)
 	}
 
-	return decodeYAMLFields(
+	err = decodeYAMLFields(
 		resolved,
 		yamlDecodeTarget{key: yamlKeyRequested, out: &lock.ResolvedModules.Requested},
 		yamlDecodeTarget{key: yamlKeyDependencies, out: &lock.ResolvedModules.Dependencies},
 	)
+	if err != nil {
+		return fmt.Errorf("decode resolved modules fields: %w", err)
+	}
+
+	return nil
 }
 
 // MarshalYAML encodes TaskOtter metadata using its stable on-disk keys.
@@ -238,12 +280,17 @@ func (meta *Metadata) UnmarshalYAML(value *yaml.Node) error {
 		return fmt.Errorf("decode metadata: %w", err)
 	}
 
-	return decodeYAMLFields(
+	err = decodeYAMLFields(
 		fields,
 		yamlDecodeTarget{key: yamlKeyTargetFolder, out: &meta.TargetFolder},
 		yamlDecodeTarget{key: yamlKeyLockFile, out: &meta.LockFile},
 		yamlDecodeTarget{key: yamlKeyConfigurationHash, out: &meta.ConfigurationHash},
 	)
+	if err != nil {
+		return fmt.Errorf("decode metadata fields: %w", err)
+	}
+
+	return nil
 }
 
 func yamlFields(value *yaml.Node) (map[string]*yaml.Node, error) {
@@ -253,8 +300,8 @@ func yamlFields(value *yaml.Node) (map[string]*yaml.Node, error) {
 
 	fields := make(map[string]*yaml.Node, len(value.Content)/yamlMappingPairKeyValue)
 
-	for idx := 0; idx < len(value.Content); idx += yamlMappingPairKeyValue {
-		fields[value.Content[idx].Value] = value.Content[idx+1]
+	for idx := consts.IndexZero; idx < len(value.Content); idx += yamlMappingPairKeyValue {
+		fields[value.Content[idx].Value] = value.Content[idx+consts.IndexOne]
 	}
 
 	return fields, nil
@@ -269,17 +316,19 @@ func nestedYAMLFields(fields map[string]*yaml.Node, key string) (map[string]*yam
 
 	nested, err := yamlFields(node)
 	if err != nil {
-		return nil, fmt.Errorf("decode %q: %w", key, err)
+		return nil, fmt.Errorf(errDecode, key, err)
 	}
 
 	return nested, nil
 }
 
 func decodeYAMLFields(fields map[string]*yaml.Node, targets ...yamlDecodeTarget) error {
-	for _, target := range targets {
+	for i := range targets {
+		target := &targets[i]
+
 		err := decodeYAMLField(fields, target.key, target.out)
 		if err != nil {
-			return err
+			return fmt.Errorf("decode field %q: %w", target.key, err)
 		}
 	}
 
@@ -295,7 +344,7 @@ func decodeYAMLField(fields map[string]*yaml.Node, key string, out any) error {
 
 	err := node.Decode(out)
 	if err != nil {
-		return fmt.Errorf("decode %q: %w", key, err)
+		return fmt.Errorf(errDecode, key, err)
 	}
 
 	return nil

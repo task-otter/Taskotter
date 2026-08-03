@@ -5,26 +5,52 @@ package app_test
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/task-otter/Taskotter/internal/app"
 	"github.com/task-otter/Taskotter/internal/config"
+	"github.com/task-otter/Taskotter/internal/consts"
 	"github.com/task-otter/Taskotter/internal/git"
 	gh "github.com/task-otter/Taskotter/internal/github"
 	"github.com/task-otter/Taskotter/internal/store"
 )
 
-const (
-	testMainBranch   = "main"
-	testRepository   = "owner/repo"
-	testTargetFolder = "taskfiles"
+type (
+	localStore struct {
+		root string
+	}
+
+	mockGitOps struct {
+		defaultBranch      string
+		defaultBranchCalls int
+		unrelated          bool
+	}
+
+	mockPR struct {
+		find        *gh.PullRequest
+		create      *gh.PullRequest
+		lastBase    string
+		lastHead    string
+		createdBase string
+		updated     int
+	}
 )
 
-type localStore struct {
-	root string
-}
+const (
+	testMainBranch    = "main"
+	testRepository    = "owner/repo"
+	testTargetFolder  = "taskfiles"
+	testDevelopBranch = "develop"
+	testReleaseBranch = "release/2026"
+)
+
+var (
+	_ git.Operations = (*mockGitOps)(nil)
+	_ gh.PRClient    = (*mockPR)(nil)
+)
 
 func (localStore *localStore) ResolveRef(
 	_ context.Context,
@@ -41,15 +67,14 @@ func (localStore *localStore) ResolveRef(
 
 func (localStore *localStore) DownloadSnapshot(
 	_ context.Context,
-	ref store.RefInfo,
+	ref *store.RefInfo,
 ) (*store.Snapshot, error) {
-	return store.LocalSnapshot(localStore.root, ref)
-}
+	snap, err := store.LocalSnapshot(localStore.root, ref)
+	if err != nil {
+		return nil, fmt.Errorf("local snapshot: %w", err)
+	}
 
-type mockGitOps struct {
-	defaultBranch      string
-	defaultBranchCalls int
-	unrelated          bool
+	return snap, nil
 }
 
 func (mockGitOps *mockGitOps) EnsureSafeDirectory(context.Context) error { return nil }
@@ -66,7 +91,7 @@ func (mockGitOps *mockGitOps) BranchExists(context.Context, string) (bool, error
 }
 
 func (mockGitOps *mockGitOps) LastCommitMessage(context.Context, string) (string, error) {
-	return "", nil
+	return consts.Empty, nil
 }
 func (mockGitOps *mockGitOps) Stage(context.Context, []string) error    { return nil }
 func (mockGitOps *mockGitOps) Commit(context.Context, string) error     { return nil }
@@ -74,20 +99,11 @@ func (mockGitOps *mockGitOps) Push(context.Context, string, bool) error { return
 func (mockGitOps *mockGitOps) DefaultBranch(context.Context) (string, error) {
 	mockGitOps.defaultBranchCalls++
 
-	if mockGitOps.defaultBranch != "" {
+	if mockGitOps.defaultBranch != consts.Empty {
 		return mockGitOps.defaultBranch, nil
 	}
 
 	return testMainBranch, nil
-}
-
-type mockPR struct {
-	find        *gh.PullRequest
-	create      *gh.PullRequest
-	lastBase    string
-	lastHead    string
-	createdBase string
-	updated     int
 }
 
 func (mockPR *mockPR) FindOpenPR(_ context.Context, branch, base string) (*gh.PullRequest, error) {
@@ -104,7 +120,7 @@ func (mockPR *mockPR) CreatePR(_ context.Context, _, base, _ string) (*gh.PullRe
 		return mockPR.create, nil
 	}
 
-	return &gh.PullRequest{Number: 99, URL: "https://example/pr/99"}, nil
+	return &gh.PullRequest{Number: consts.Index99, URL: "https://example/pr/99"}, nil
 }
 
 func (mockPR *mockPR) UpdatePRBody(context.Context, int, string) error {
@@ -116,7 +132,9 @@ func (mockPR *mockPR) UpdatePRBody(context.Context, int, string) error {
 func fixtureRoot(t *testing.T) string {
 	t.Helper()
 
-	root, err := filepath.Abs(filepath.Join("..", "..", "tests", "fixtures", "store"))
+	root, err := filepath.Abs(
+		filepath.Join(consts.PathParent, consts.PathParent, "tests", "fixtures", "store"),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -137,7 +155,7 @@ tasks:
       - echo hello
 `)
 
-	err := os.WriteFile(filepath.Join(workspace, "Taskfile.yml"), content, 0o644)
+	err := os.WriteFile(filepath.Join(workspace, consts.Taskfile), content, consts.FilePerm644)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -145,246 +163,263 @@ tasks:
 	return workspace
 }
 
-func testConfig(workspace string) *config.Config {
-	return &config.Config{
-		Tasks:              []string{"go"},
-		JSRuntime:          "",
-		NodePackageManager: "",
-		NodeVersionManager: "",
-		IncludesDoc:        true,
-		SyncRoot:           true,
-		FailOnChanges:      false,
-		StoreVersion:       "",
-		TargetFolder:       testTargetFolder,
-		RootTaskfile:       "Taskfile.yml",
-		GitHubToken:        "",
-		Workspace:          workspace,
-		Repository:         "",
-		GitHubOutput:       "",
-		BaseBranch:         "",
-		ConfigurationHash:  "",
-		BranchName:         "",
+func newMockPR(find, create *gh.PullRequest) *mockPR {
+	return &mockPR{
+		find:        find,
+		create:      create,
+		updated:     consts.IndexZero,
+		lastBase:    consts.Empty,
+		lastHead:    consts.Empty,
+		createdBase: consts.Empty,
 	}
 }
 
-func TestOrchestratorNoChangeAfterApply(t *testing.T) {
-	t.Parallel()
-
-	workspace := workspaceWithRootTaskfile(t)
-	cfg := testConfig(workspace)
-	orchestrator := &app.Orchestrator{
-		Logger:      nil,
-		StoreClient: &localStore{root: fixtureRoot(t)},
-		GitOps:      nil,
-		PRClient:    nil,
-	}
-
-	first, err := orchestrator.Run(t.Context(), cfg)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if !first.Changed {
-		t.Fatal("expected first run to change files")
-	}
-
-	second, err := orchestrator.Run(t.Context(), cfg)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if second.Changed {
-		t.Fatal("expected no changes on second run")
+func newMockGitOps(unrelated bool, defaultBranch string) *mockGitOps {
+	return &mockGitOps{
+		unrelated:          unrelated,
+		defaultBranch:      defaultBranch,
+		defaultBranchCalls: consts.IndexZero,
 	}
 }
 
-func TestOrchestratorUnrelatedDirtyTreeFails(t *testing.T) {
-	t.Parallel()
+func newTestOrchestrator(t *testing.T, gitOps git.Operations, pr gh.PRClient) *app.Orchestrator {
+	t.Helper()
 
-	workspace := workspaceWithRootTaskfile(t)
-	cfg := testConfig(workspace)
-
-	orchestrator := &app.Orchestrator{
-		Logger:      nil,
-		StoreClient: &localStore{root: fixtureRoot(t)},
-		GitOps:      &mockGitOps{unrelated: true, defaultBranch: "", defaultBranchCalls: 0},
-		PRClient:    nil,
-	}
-
-	err := os.MkdirAll(filepath.Join(workspace, ".git"), 0o755)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	_, err = orchestrator.Run(t.Context(), cfg)
-	if err == nil {
-		t.Fatal("expected unrelated changes error")
-	}
-
-	_, statErr := os.Stat(filepath.Join(workspace, "taskfiles/go/Taskfile.yml"))
-	if statErr == nil {
-		t.Fatal("workspace should not be mutated when git preconditions fail")
-	}
-}
-
-func TestOrchestratorUpdatesExistingPR(t *testing.T) {
-	t.Parallel()
-
-	workspace := workspaceWithRootTaskfile(t)
-	cfg := testConfig(workspace)
-
-	cfg.Repository = testRepository
-
-	pullReq := &mockPR{
-		find:        &gh.PullRequest{Number: 7, URL: "https://example/pr/7"},
-		create:      nil,
-		updated:     0,
-		lastBase:    "",
-		lastHead:    "",
-		createdBase: "",
-	}
-	gitOps := &mockGitOps{unrelated: false, defaultBranch: testMainBranch, defaultBranchCalls: 0}
-
-	orchestrator := &app.Orchestrator{
+	return &app.Orchestrator{
 		Logger:      nil,
 		StoreClient: &localStore{root: fixtureRoot(t)},
 		GitOps:      gitOps,
-		PRClient:    pullReq,
+		PRClient:    pr,
 	}
+}
 
-	err := os.MkdirAll(filepath.Join(workspace, ".git"), 0o755)
+func initGitWorkspace(t *testing.T, workspace string) {
+	t.Helper()
+
+	err := os.MkdirAll(filepath.Join(workspace, consts.GitDir), consts.FilePerm755)
 	if err != nil {
 		t.Fatal(err)
 	}
+}
+
+func runOrchestrator(t *testing.T, orchestrator *app.Orchestrator, cfg *config.Config) *app.Result {
+	t.Helper()
 
 	result, err := orchestrator.Run(t.Context(), cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if pullReq.updated != 1 {
+	return result
+}
+
+func assertPathNotExist(t *testing.T, path string) {
+	t.Helper()
+
+	_, err := os.Stat(path)
+	if err == nil {
+		t.Fatalf("expected %q not to exist", path)
+	}
+}
+
+func assertPRUpdated(
+	t *testing.T,
+	pullReq *mockPR,
+	gitOps *mockGitOps,
+	result *app.Result,
+	wantBase, wantNumber string,
+) {
+	t.Helper()
+
+	if pullReq.updated != consts.IndexOne {
 		t.Fatalf("expected PR body update, got %d", pullReq.updated)
 	}
 
-	if pullReq.lastBase != testMainBranch {
-		t.Fatalf("PR base = %q, want main", pullReq.lastBase)
+	if pullReq.lastBase != wantBase {
+		t.Fatalf("PR base = %q, want %s", pullReq.lastBase, wantBase)
 	}
 
-	if gitOps.defaultBranchCalls == 0 {
+	if gitOps.defaultBranchCalls == consts.IndexZero {
 		t.Fatal("expected DefaultBranch before PR")
 	}
 
-	if result.PullRequestNumber != "7" {
+	if result.PullRequestNumber != wantNumber {
 		t.Fatalf("got PR number %q", result.PullRequestNumber)
 	}
 }
 
+func assertPRCreated(
+	t *testing.T,
+	pullReq *mockPR,
+	gitOps *mockGitOps,
+	wantBase string,
+	wantDefaultBranchCalls int,
+) {
+	t.Helper()
+
+	if pullReq.createdBase != wantBase {
+		t.Fatalf("created PR base = %q, want %s", pullReq.createdBase, wantBase)
+	}
+
+	if gitOps.defaultBranchCalls != wantDefaultBranchCalls {
+		t.Fatalf(
+			"DefaultBranch called %d times, want %d",
+			gitOps.defaultBranchCalls,
+			wantDefaultBranchCalls,
+		)
+	}
+}
+
+func testConfig(workspace string) *config.Config {
+	return &config.Config{
+		Tasks:              []string{consts.Go},
+		JSRuntime:          consts.Empty,
+		NodePackageManager: consts.Empty,
+		NodeVersionManager: consts.Empty,
+		IncludesDoc:        true,
+		SyncRoot:           true,
+		FailOnChanges:      false,
+		StoreVersion:       consts.Empty,
+		TargetFolder:       testTargetFolder,
+		RootTaskfile:       consts.Taskfile,
+		GitHubToken:        consts.Empty,
+		Workspace:          workspace,
+		Repository:         consts.Empty,
+		GitHubOutput:       consts.Empty,
+		BaseBranch:         consts.Empty,
+		ConfigurationHash:  consts.Empty,
+		BranchName:         consts.Empty,
+	}
+}
+
+func testConfigWithRepo(workspace, repo string) *config.Config {
+	cfg := testConfig(workspace)
+
+	cfg.Repository = repo
+
+	return cfg
+}
+
+// TestOrchestratorNoChangeAfterApply verifies a second run reports no changes after apply.
+func TestOrchestratorNoChangeAfterApply(t *testing.T) {
+	t.Parallel()
+
+	workspace := workspaceWithRootTaskfile(t)
+	cfg := testConfig(workspace)
+	orchestrator := newTestOrchestrator(t, nil, nil)
+
+	first := runOrchestrator(t, orchestrator, cfg)
+
+	if !first.Changed {
+		t.Fatal("expected first run to change files")
+	}
+
+	second := runOrchestrator(t, orchestrator, cfg)
+
+	if second.Changed {
+		t.Fatal("expected no changes on second run")
+	}
+}
+
+// TestOrchestratorUnrelatedDirtyTreeFails verifies unrelated dirty changes fail the run.
+func TestOrchestratorUnrelatedDirtyTreeFails(t *testing.T) {
+	t.Parallel()
+
+	workspace := workspaceWithRootTaskfile(t)
+	cfg := testConfig(workspace)
+	orchestrator := newTestOrchestrator(t, newMockGitOps(true, consts.Empty), nil)
+
+	initGitWorkspace(t, workspace)
+
+	_, err := orchestrator.Run(t.Context(), cfg)
+	if err == nil {
+		t.Fatal("expected unrelated changes error")
+	}
+
+	assertPathNotExist(t, filepath.Join(workspace, "taskfiles", "go", "Taskfile.yml"))
+}
+
+// TestOrchestratorUpdatesExistingPR verifies an existing open pull request is updated.
+func TestOrchestratorUpdatesExistingPR(t *testing.T) {
+	t.Parallel()
+
+	workspace := workspaceWithRootTaskfile(t)
+	cfg := testConfigWithRepo(workspace, testRepository)
+
+	pullReq := newMockPR(
+		&gh.PullRequest{Number: consts.IndexSeven, URL: "https://example/pr/7"},
+		nil,
+	)
+	gitOps := newMockGitOps(false, testMainBranch)
+	orchestrator := newTestOrchestrator(t, gitOps, pullReq)
+
+	initGitWorkspace(t, workspace)
+
+	result := runOrchestrator(t, orchestrator, cfg)
+
+	assertPRUpdated(t, pullReq, gitOps, result, testMainBranch, "7")
+}
+
+// TestOrchestratorCreatesPRWithResolvedBase verifies the PR base resolves to the default branch.
 func TestOrchestratorCreatesPRWithResolvedBase(t *testing.T) {
 	t.Parallel()
 
 	workspace := workspaceWithRootTaskfile(t)
-	cfg := testConfig(workspace)
+	cfg := testConfigWithRepo(workspace, testRepository)
 
-	cfg.Repository = testRepository
+	pullReq := newMockPR(nil, nil)
+	gitOps := newMockGitOps(false, testDevelopBranch)
+	orchestrator := newTestOrchestrator(t, gitOps, pullReq)
 
-	pullReq := &mockPR{
-		find:        nil,
-		create:      nil,
-		updated:     0,
-		lastBase:    "",
-		lastHead:    "",
-		createdBase: "",
-	}
-	gitOps := &mockGitOps{unrelated: false, defaultBranch: "develop", defaultBranchCalls: 0}
+	initGitWorkspace(t, workspace)
+	runOrchestrator(t, orchestrator, cfg)
 
-	orchestrator := &app.Orchestrator{
-		Logger:      nil,
-		StoreClient: &localStore{root: fixtureRoot(t)},
-		GitOps:      gitOps,
-		PRClient:    pullReq,
-	}
-
-	err := os.MkdirAll(filepath.Join(workspace, ".git"), 0o755)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	_, err = orchestrator.Run(t.Context(), cfg)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if pullReq.createdBase != "develop" {
+	if pullReq.createdBase != testDevelopBranch {
 		t.Fatalf("created PR base = %q, want develop", pullReq.createdBase)
 	}
 }
 
+// TestOrchestratorCreatesPRAgainstTriggerBranch verifies the PR targets the configured base branch.
 func TestOrchestratorCreatesPRAgainstTriggerBranch(t *testing.T) {
 	t.Parallel()
 
 	workspace := workspaceWithRootTaskfile(t)
-	cfg := testConfig(workspace)
+	cfg := testConfigWithRepo(workspace, testRepository)
 
-	cfg.Repository = "owner/repo"
-	cfg.BaseBranch = "release/2026"
+	cfg.BaseBranch = testReleaseBranch
 
-	pullReq := &mockPR{
-		find:        nil,
-		create:      nil,
-		updated:     0,
-		lastBase:    "",
-		lastHead:    "",
-		createdBase: "",
-	}
-	gitOps := &mockGitOps{unrelated: false, defaultBranch: "", defaultBranchCalls: 0}
+	pullReq := newMockPR(nil, nil)
+	gitOps := newMockGitOps(false, consts.Empty)
+	orchestrator := newTestOrchestrator(t, gitOps, pullReq)
 
-	orchestrator := &app.Orchestrator{
-		Logger:      nil,
-		StoreClient: &localStore{root: fixtureRoot(t)},
-		GitOps:      gitOps,
-		PRClient:    pullReq,
-	}
+	initGitWorkspace(t, workspace)
+	runOrchestrator(t, orchestrator, cfg)
 
-	err := os.MkdirAll(filepath.Join(workspace, ".git"), 0o755)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	_, err = orchestrator.Run(t.Context(), cfg)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if pullReq.createdBase != "release/2026" {
-		t.Fatalf("created PR base = %q, want release/2026", pullReq.createdBase)
-	}
-
-	if gitOps.defaultBranchCalls != 0 {
-		t.Fatalf("DefaultBranch called %d times, want 0", gitOps.defaultBranchCalls)
-	}
+	assertPRCreated(t, pullReq, gitOps, testReleaseBranch, consts.IndexZero)
 }
 
+// TestNewOrchestratorInvalidRepository verifies an invalid repository coordinate fails construction.
 func TestNewOrchestratorInvalidRepository(t *testing.T) {
 	t.Parallel()
 
 	cfg := &config.Config{
 		Tasks:              nil,
-		JSRuntime:          "",
-		NodePackageManager: "",
-		NodeVersionManager: "",
+		JSRuntime:          consts.Empty,
+		NodePackageManager: consts.Empty,
+		NodeVersionManager: consts.Empty,
 		IncludesDoc:        false,
 		SyncRoot:           false,
 		FailOnChanges:      false,
-		StoreVersion:       "",
-		TargetFolder:       "",
-		RootTaskfile:       "",
-		GitHubToken:        "",
-		Workspace:          "",
+		StoreVersion:       consts.Empty,
+		TargetFolder:       consts.Empty,
+		RootTaskfile:       consts.Empty,
+		GitHubToken:        consts.Empty,
+		Workspace:          consts.Empty,
 		Repository:         "not-a-valid-repo",
-		GitHubOutput:       "",
-		BaseBranch:         "",
-		ConfigurationHash:  "",
-		BranchName:         "",
+		GitHubOutput:       consts.Empty,
+		BaseBranch:         consts.Empty,
+		ConfigurationHash:  consts.Empty,
+		BranchName:         consts.Empty,
 	}
 
 	_, err := app.NewOrchestrator(t.Context(), cfg)
@@ -392,8 +427,3 @@ func TestNewOrchestratorInvalidRepository(t *testing.T) {
 		t.Fatal("expected repository parse error")
 	}
 }
-
-var (
-	_ git.Operations = (*mockGitOps)(nil)
-	_ gh.PRClient    = (*mockPR)(nil)
-)

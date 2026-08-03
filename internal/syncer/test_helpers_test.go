@@ -4,9 +4,11 @@
 package syncer_test
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/task-otter/Taskotter/internal/config"
+	"github.com/task-otter/Taskotter/internal/consts"
 	"github.com/task-otter/Taskotter/internal/syncer"
 )
 
@@ -14,12 +16,39 @@ const (
 	testModuleEslint = "eslint"
 	testTaskfileName = "Taskfile.yml"
 	testReadmeName   = "README.md"
+
+	testLegacyMetaDir          = ".taskotter"
+	testGoTaskfilePath         = "go/Taskfile.yml"
+	testLockFileName           = ".taskotter-lock.yml"
+	testMetadataFileName       = "metadata.yml"
+	testStagingDir             = "staging"
+	dirTests                   = "tests"
+	dirFixtures                = "fixtures"
+	dirStore                   = "store"
+	notFoundIndex              = -1
+	testMetadataRelPath        = ".taskotter/metadata.yml"
+	testInvalidYAML            = "{{not yaml"
+	testBadYAML                = "{{bad"
+	errExpectedCorruptLock     = "expected corrupt lock error"
+	errExpectedCorruptMetadata = "expected corrupt metadata error"
+	taskGoTaskfilePath         = "task/go/Taskfile.yml"
+	contentKeep                = "keep"
+	targetFolderTask           = "task"
+	docGuideMD                 = "docs/guide.md"
+	fileGoTestGo               = "go_test.go"
+	docMetadataYML             = "docs/metadata.yml"
+	errExpectedChangesInitial  = "expected changes on initial sync"
 )
 
-func runApplyPlan(t *testing.T, plan *syncer.Plan, syncInput syncer.SyncInput) error {
+func runApplyPlan(t *testing.T, plan *syncer.Plan, syncInput *syncer.SyncInput) error {
 	t.Helper()
 
-	return syncer.ApplyPlan(plan, syncInput)
+	err := syncer.ApplyPlan(plan, syncInput)
+	if err != nil {
+		return fmt.Errorf("apply plan: %w", err)
+	}
+
+	return nil
 }
 
 func withCopyFileHook(
@@ -39,22 +68,22 @@ func withCopyFileHook(
 func testConfig(workspace string, mutate func(*config.Config)) *config.Config {
 	cfg := &config.Config{
 		Tasks:              nil,
-		JSRuntime:          "",
-		NodePackageManager: "",
-		NodeVersionManager: "",
+		JSRuntime:          consts.Empty,
+		NodePackageManager: consts.Empty,
+		NodeVersionManager: consts.Empty,
 		IncludesDoc:        false,
 		SyncRoot:           true,
 		FailOnChanges:      false,
-		StoreVersion:       "",
+		StoreVersion:       consts.Empty,
 		TargetFolder:       config.DefaultTargetFolder,
 		RootTaskfile:       testTaskfileName,
-		GitHubToken:        "",
+		GitHubToken:        consts.Empty,
 		Workspace:          workspace,
-		Repository:         "",
-		GitHubOutput:       "",
-		BaseBranch:         "",
-		ConfigurationHash:  "",
-		BranchName:         "",
+		Repository:         consts.Empty,
+		GitHubOutput:       consts.Empty,
+		BaseBranch:         consts.Empty,
+		ConfigurationHash:  consts.Empty,
+		BranchName:         consts.Empty,
 	}
 
 	if mutate != nil {

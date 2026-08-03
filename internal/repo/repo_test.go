@@ -9,6 +9,7 @@ import (
 	"github.com/task-otter/Taskotter/internal/repo"
 )
 
+// TestParse verifies a valid owner/name repository coordinate parses correctly.
 func TestParse(t *testing.T) {
 	t.Parallel()
 
@@ -22,6 +23,7 @@ func TestParse(t *testing.T) {
 	}
 }
 
+// TestParseRejectsInvalidCoordinates verifies malformed repository coordinates return errors.
 func TestParseRejectsInvalidCoordinates(t *testing.T) {
 	t.Parallel()
 
@@ -33,10 +35,10 @@ func TestParseRejectsInvalidCoordinates(t *testing.T) {
 		"owner/repo/extra",
 	}
 
-	for _, input := range cases {
-		_, _, err := repo.Parse(input)
+	for i := range cases {
+		_, _, err := repo.Parse(cases[i])
 		if err == nil {
-			t.Fatalf("Parse(%q) expected error", input)
+			t.Fatalf("Parse(%q) expected error", cases[i])
 		}
 	}
 }

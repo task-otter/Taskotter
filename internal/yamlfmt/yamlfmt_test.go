@@ -10,6 +10,7 @@ import (
 	yaml "go.yaml.in/yaml/v3"
 )
 
+// TestMarshalAddsSingleDocumentStartAndTrailingNewline verifies output has a doc marker and trailing newline.
 func TestMarshalAddsSingleDocumentStartAndTrailingNewline(t *testing.T) {
 	t.Parallel()
 
@@ -30,6 +31,7 @@ func TestMarshalAddsSingleDocumentStartAndTrailingNewline(t *testing.T) {
 	}
 }
 
+// TestMarshalReportsUnsupportedValue verifies an unsupported YAML node kind returns an error.
 func TestMarshalReportsUnsupportedValue(t *testing.T) {
 	t.Parallel()
 

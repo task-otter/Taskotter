@@ -7,17 +7,18 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/task-otter/Taskotter/internal/consts"
 	yaml "go.yaml.in/yaml/v3"
 )
 
 type orderedRequested map[string]ModuleRecord
 
 func (m orderedRequested) MarshalYAML() (any, error) {
-	if len(m) == 0 {
+	if len(m) == consts.IndexZero {
 		return map[string]ModuleRecord{}, nil
 	}
 
-	keys := make([]string, 0, len(m))
+	keys := make([]string, consts.IndexZero, len(m))
 
 	for k := range m {
 		keys = append(keys, k)

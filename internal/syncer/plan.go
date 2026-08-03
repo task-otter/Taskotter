@@ -14,12 +14,24 @@ import (
 	"sort"
 
 	"github.com/task-otter/Taskotter/internal/config"
+	"github.com/task-otter/Taskotter/internal/consts"
 	"github.com/task-otter/Taskotter/internal/pathutil"
 	"github.com/task-otter/Taskotter/internal/taskfile"
 	"github.com/task-otter/Taskotter/internal/yamlfmt"
 )
 
-func mustMarshalMetadata(meta Metadata) []byte {
+// planArtifacts bundles the intermediate outputs produced while planning managed
+// files and the generated root Taskfile, before they're assembled into a Plan.
+type planArtifacts struct {
+	moduleContents     map[string]map[string]FileEntry
+	plannedFiles       []ManagedFile
+	rootBytes          []byte
+	newRoot            []byte
+	generatedRootTasks []taskfile.GeneratedRootTask
+	rootExisted        bool
+}
+
+func mustMarshalMetadata(meta *Metadata) []byte {
 	data, err := yamlfmt.Marshal(meta)
 	if err != nil {
 		return nil
@@ -29,17 +41,39 @@ func mustMarshalMetadata(meta Metadata) []byte {
 }
 
 // BuildPlan computes the sync diff and generated artifacts for syncInput.
-func BuildPlan(syncInput SyncInput) (*Plan, error) {
-	workspace := syncInput.Config.Workspace
-
-	oldLock, _, oldTarget, err := loadPreviousState(workspace, syncInput.Config)
+func BuildPlan(syncInput *SyncInput) (*Plan, error) {
+	oldLock, _, oldTarget, err := loadPreviousState(syncInput.Config.Workspace, syncInput.Config)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("load previous state: %w", err)
 	}
 
+	artifacts, err := planAllFiles(syncInput, oldLock)
+	if err != nil {
+		return nil, fmt.Errorf("plan all files: %w", err)
+	}
+
+	plan, meta := newPlanFromInputs(syncInput, &artifacts, oldLock, oldTarget)
+
+	finalPlan, err := finalizePlanDiff(
+		plan,
+		syncInput.Config.Workspace,
+		artifacts.rootBytes,
+		artifacts.rootExisted,
+		syncInput.Config.SyncRoot,
+		meta,
+		syncInput.Config.MetadataPath(),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("finalize plan diff: %w", err)
+	}
+
+	return finalPlan, nil
+}
+
+func planAllFiles(syncInput *SyncInput, oldLock *LockFile) (planArtifacts, error) {
 	plannedFiles, moduleContents, err := planManagedFiles(syncInput, oldLock)
 	if err != nil {
-		return nil, err
+		return planArtifacts{}, fmt.Errorf("plan managed files: %w", err)
 	}
 
 	rootBytes, rootExisted, newRoot, generatedRootTasks, err := planRootTaskfile(
@@ -48,11 +82,27 @@ func BuildPlan(syncInput SyncInput) (*Plan, error) {
 		moduleContents,
 	)
 	if err != nil {
-		return nil, err
+		return planArtifacts{}, fmt.Errorf("plan root taskfile: %w", err)
 	}
 
-	lock := buildLock(syncInput, plannedFiles, generatedRootTasks)
-	meta := Metadata{
+	return planArtifacts{
+		plannedFiles:       plannedFiles,
+		moduleContents:     moduleContents,
+		rootBytes:          rootBytes,
+		rootExisted:        rootExisted,
+		newRoot:            newRoot,
+		generatedRootTasks: generatedRootTasks,
+	}, nil
+}
+
+func newPlanFromInputs(
+	syncInput *SyncInput,
+	artifacts *planArtifacts,
+	oldLock *LockFile,
+	oldTarget string,
+) (*Plan, *Metadata) {
+	lock := buildLock(syncInput, artifacts.plannedFiles, artifacts.generatedRootTasks)
+	meta := &Metadata{
 		TargetFolder:      syncInput.Config.TargetFolder,
 		LockFile:          syncInput.Config.LockFilePath(),
 		ConfigurationHash: syncInput.Config.ConfigurationHash,
@@ -61,12 +111,12 @@ func BuildPlan(syncInput SyncInput) (*Plan, error) {
 	plan := &Plan{
 		Requested:        syncInput.Requested,
 		Dependencies:     syncInput.Dependencies,
-		ManagedFiles:     plannedFiles,
-		ModuleContents:   moduleContents,
-		RootTaskfile:     newRoot,
+		ManagedFiles:     artifacts.plannedFiles,
+		ModuleContents:   artifacts.moduleContents,
+		RootTaskfile:     artifacts.newRoot,
 		RootTaskfilePath: syncInput.Config.RootTaskfile,
 		Lock:             lock,
-		Metadata:         meta,
+		Metadata:         *meta,
 		Added:            nil,
 		Updated:          nil,
 		Removed:          nil,
@@ -77,48 +127,40 @@ func BuildPlan(syncInput SyncInput) (*Plan, error) {
 		copyFileTo:       nil,
 	}
 
-	return finalizePlanDiff(
-		plan,
-		workspace,
-		rootBytes,
-		rootExisted,
-		syncInput.Config.SyncRoot,
-		meta,
-		syncInput.Config.MetadataPath(),
-	)
+	return plan, meta
 }
 
 func planRootTaskfile(
-	syncInput SyncInput,
+	syncInput *SyncInput,
 	oldLock *LockFile,
 	moduleContents map[string]map[string]FileEntry,
-) ([]byte, bool, []byte, []taskfile.GeneratedRootTask, error) {
+) (rootBytes []byte, rootExisted bool, newRoot []byte, generatedRootTasks []taskfile.GeneratedRootTask, err error) {
 	if !syncInput.Config.SyncRoot {
 		return nil, false, nil, nil, nil
 	}
 
-	rootBytes, rootExisted, err := readRootTaskfile(
+	rootBytes, rootExisted, err = readRootTaskfile(
 		syncInput.Config.Workspace,
 		syncInput.Config.RootTaskfile,
 	)
 	if err != nil {
-		return nil, false, nil, nil, err
+		return nil, false, nil, nil, fmt.Errorf("read root taskfile: %w", err)
 	}
 
-	newRoot, generatedRootTasks, err := buildRootTaskfile(
+	newRoot, generatedRootTasks, err = buildRootTaskfile(
 		syncInput,
 		oldLock,
 		moduleContents,
 		rootBytes,
 	)
 	if err != nil {
-		return nil, false, nil, nil, err
+		return nil, false, nil, nil, fmt.Errorf("build root taskfile: %w", err)
 	}
 
 	return rootBytes, rootExisted, newRoot, generatedRootTasks, nil
 }
 
-func readRootTaskfile(workspace, rootPath string) ([]byte, bool, error) {
+func readRootTaskfile(workspace, rootPath string) (data []byte, existed bool, err error) {
 	rootBytes, err := pathutil.ReadRelativeFile(workspace, rootPath)
 	if err == nil {
 		return rootBytes, true, nil
@@ -132,36 +174,17 @@ func readRootTaskfile(workspace, rootPath string) ([]byte, bool, error) {
 }
 
 func buildRootTaskfile(
-	syncInput SyncInput,
+	syncInput *SyncInput,
 	oldLock *LockFile,
 	moduleContents map[string]map[string]FileEntry,
 	rootBytes []byte,
 ) ([]byte, []taskfile.GeneratedRootTask, error) {
-	managedTasks := syncInput.Config.Tasks
-	managedRootTasks := []string(nil)
-
-	if oldLock != nil {
-		managedTasks = oldLock.Configuration.Tasks
-		managedRootTasks = oldLock.GeneratedRootTasks
-	}
-
-	moduleTaskfiles := make(map[string][]byte, len(syncInput.Requested))
-
-	for task, rec := range syncInput.Requested {
-		files, ok := moduleContents[rec.SourceModule]
-
-		if !ok {
-			continue
-		}
-
-		if entry, ok := files[rootTaskfileName]; ok {
-			moduleTaskfiles[task] = entry.Data
-		}
-	}
+	managedTasks, managedRootTasks := resolveManagedTasks(syncInput, oldLock)
+	moduleTaskfiles := collectModuleRootTaskfiles(syncInput.Requested, moduleContents)
 
 	storeMetadata, err := loadStoreTaskMetadata(syncInput.Snapshot)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("load store task metadata: %w", err)
 	}
 
 	generatedRootTasks := buildGeneratedRootTasks(
@@ -187,49 +210,102 @@ func buildRootTaskfile(
 	return newRoot, generatedRootTasks, nil
 }
 
+func resolveManagedTasks(
+	syncInput *SyncInput,
+	oldLock *LockFile,
+) (managedTasks, managedRootTasks []string) {
+	if oldLock != nil {
+		return oldLock.Configuration.Tasks, oldLock.GeneratedRootTasks
+	}
+
+	return syncInput.Config.Tasks, nil
+}
+
+func collectModuleRootTaskfiles(
+	requested map[string]ModuleRecord,
+	moduleContents map[string]map[string]FileEntry,
+) map[string][]byte {
+	moduleTaskfiles := make(map[string][]byte, len(requested))
+
+	for task := range requested {
+		rec := requested[task]
+		files, ok := moduleContents[rec.SourceModule]
+
+		if !ok {
+			continue
+		}
+
+		if entry, ok := files[rootTaskfileName]; ok {
+			moduleTaskfiles[task] = entry.Data
+		}
+	}
+
+	return moduleTaskfiles
+}
+
 func finalizePlanDiff(
 	plan *Plan,
 	workspace string,
 	rootBytes []byte,
 	rootExisted bool,
 	syncRoot bool,
-	meta Metadata,
+	meta *Metadata,
 	metadataPath string,
 ) (*Plan, error) {
-	oldRootForDiff := rootBytes
-
-	if !rootExisted {
-		oldRootForDiff = nil
-	}
-
 	added, updated, removed, err := diffFiles(
 		plan,
 		workspace,
-		oldRootForDiff,
+		oldRootForDiffing(rootBytes, rootExisted),
 		syncRoot,
 		metadataPath,
 		mustMarshalMetadata(meta),
 	)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("diff files: %w", err)
 	}
 
-	plan.Added = added
-	plan.Updated = updated
-	plan.Removed = removed
-	plan.Changed = len(added) > 0 || len(updated) > 0 || len(removed) > 0
-	plan.StagePaths = buildStagePaths(plan, workspace, metadataPath, syncRoot)
+	applyDiffResults(plan, added, updated, removed, workspace, metadataPath, syncRoot)
 
 	return plan, nil
 }
 
+func oldRootForDiffing(rootBytes []byte, rootExisted bool) []byte {
+	if !rootExisted {
+		return nil
+	}
+
+	return rootBytes
+}
+
+func applyDiffResults(
+	plan *Plan,
+	added, updated, removed []string,
+	workspace, metadataPath string,
+	syncRoot bool,
+) {
+	plan.Added = added
+	plan.Updated = updated
+	plan.Removed = removed
+	plan.Changed = anyChanges(added, updated, removed)
+	plan.StagePaths = buildStagePaths(plan, workspace, metadataPath, syncRoot)
+}
+
+func anyChanges(added, updated, removed []string) bool {
+	return len(added) > consts.IndexZero || len(updated) > consts.IndexZero ||
+		len(removed) > consts.IndexZero
+}
+
 // sortedModules merges the requested and dependency modules into a single
 // source-module-ordered slice so planning is deterministic.
-func sortedModules(syncInput SyncInput) []ModuleRecord {
-	allModules := make([]ModuleRecord, 0, len(syncInput.Requested)+len(syncInput.Dependencies))
+func sortedModules(syncInput *SyncInput) []ModuleRecord {
+	allModules := make(
+		[]ModuleRecord,
+		consts.IndexZero,
+		len(syncInput.Requested)+len(syncInput.Dependencies),
+	)
 
-	for _, rec := range syncInput.Requested {
-		allModules = append(allModules, rec)
+	for key := range syncInput.Requested {
+		allModules = append(allModules, syncInput.Requested[key])
 	}
 
 	allModules = append(allModules, syncInput.Dependencies...)
@@ -241,7 +317,7 @@ func sortedModules(syncInput SyncInput) []ModuleRecord {
 }
 
 func planManagedFiles(
-	syncInput SyncInput,
+	syncInput *SyncInput,
 	oldLock *LockFile,
 ) ([]ManagedFile, map[string]map[string]FileEntry, error) {
 	allModules := sortedModules(syncInput)
@@ -249,40 +325,111 @@ func planManagedFiles(
 
 	var planned []ManagedFile
 
-	for _, mod := range allModules {
-		sourceDir := syncInput.Snapshot.ModuleDir(mod.SourceModule)
+	for i := range allModules {
+		mod := &allModules[i]
 
-		_, err := os.Stat(sourceDir)
+		var err error
+
+		planned, err = accumulateModulePlan(syncInput, mod, oldLock, moduleContents, planned)
 		if err != nil {
-			return nil, nil, &SyncError{
-				Message: fmt.Sprintf(
-					"source module directory %q does not exist",
-					mod.SourceModule,
-				),
-			}
+			return nil, nil, fmt.Errorf("accumulate module plan for %q: %w", mod.SourceModule, err)
 		}
-
-		destDirRel := pathutil.JoinRelative(syncInput.Config.TargetFolder, mod.DestinationModule)
-		destDirAbs := pathutil.WorkspacePath(syncInput.Config.Workspace, destDirRel)
-
-		err = validateDestination(destDirAbs, mod, oldLock)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		contents, err := CollectModuleFiles(
-			sourceDir,
-			syncInput.Config.IncludesDoc,
-			syncInput.SourceToDest,
-		)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		moduleContents[mod.SourceModule] = contents
-		planned = appendManagedFiles(planned, mod, destDirRel, contents)
 	}
 
+	sortManagedFiles(planned)
+
+	return planned, moduleContents, nil
+}
+
+func accumulateModulePlan(
+	syncInput *SyncInput,
+	mod *ModuleRecord,
+	oldLock *LockFile,
+	moduleContents map[string]map[string]FileEntry,
+	planned []ManagedFile,
+) ([]ManagedFile, error) {
+	contents, managed, err := planModuleFiles(syncInput, mod, oldLock)
+	if err != nil {
+		return nil, fmt.Errorf("plan module files: %w", err)
+	}
+
+	moduleContents[mod.SourceModule] = contents
+
+	return append(planned, managed...), nil
+}
+
+func planModuleFiles(
+	syncInput *SyncInput,
+	mod *ModuleRecord,
+	oldLock *LockFile,
+) (map[string]FileEntry, []ManagedFile, error) {
+	sourceDir := syncInput.Snapshot.ModuleDir(mod.SourceModule)
+
+	err := ensureSourceDirExists(sourceDir, mod)
+	if err != nil {
+		return nil, nil, fmt.Errorf("ensure source dir exists: %w", err)
+	}
+
+	destDirRel, err := validateModuleDestination(syncInput, mod, oldLock)
+	if err != nil {
+		return nil, nil, fmt.Errorf("validate module destination: %w", err)
+	}
+
+	contents, managed, err := collectAndTrackModuleFiles(syncInput, mod, sourceDir, destDirRel)
+	if err != nil {
+		return nil, nil, fmt.Errorf("collect and track module files: %w", err)
+	}
+
+	return contents, managed, nil
+}
+
+func ensureSourceDirExists(sourceDir string, mod *ModuleRecord) error {
+	_, err := os.Stat(sourceDir)
+	if err != nil {
+		return &SyncError{
+			Message: fmt.Sprintf("source module directory %q does not exist", mod.SourceModule),
+		}
+	}
+
+	return nil
+}
+
+func validateModuleDestination(
+	syncInput *SyncInput,
+	mod *ModuleRecord,
+	oldLock *LockFile,
+) (string, error) {
+	destDirRel := pathutil.JoinRelative(syncInput.Config.TargetFolder, mod.DestinationModule)
+	destDirAbs := pathutil.WorkspacePath(syncInput.Config.Workspace, destDirRel)
+
+	err := validateDestination(destDirAbs, mod, oldLock)
+	if err != nil {
+		return consts.Empty, fmt.Errorf("validate destination: %w", err)
+	}
+
+	return destDirRel, nil
+}
+
+func collectAndTrackModuleFiles(
+	syncInput *SyncInput,
+	mod *ModuleRecord,
+	sourceDir, destDirRel string,
+) (map[string]FileEntry, []ManagedFile, error) {
+	contents, err := CollectModuleFiles(
+		sourceDir,
+		syncInput.Config.IncludesDoc,
+		syncInput.SourceToDest,
+	)
+	if err != nil {
+		return nil, nil, fmt.Errorf("collect module files: %w", err)
+	}
+
+	managed := appendManagedFiles(nil, mod, destDirRel, contents)
+
+	return contents, managed, nil
+}
+
+func sortManagedFiles(planned []ManagedFile) {
 	sort.Slice(planned, func(i, j int) bool {
 		if planned[i].Path == planned[j].Path {
 			return planned[i].SourceModule < planned[j].SourceModule
@@ -290,23 +437,22 @@ func planManagedFiles(
 
 		return planned[i].Path < planned[j].Path
 	})
-
-	return planned, moduleContents, nil
 }
 
 func appendManagedFiles(
 	planned []ManagedFile,
-	mod ModuleRecord,
+	mod *ModuleRecord,
 	destDirRel string,
 	contents map[string]FileEntry,
 ) []ManagedFile {
-	for rel, entry := range contents {
+	for rel := range contents {
+		entry := contents[rel]
 		sum := sha256.Sum256(entry.Data)
 
 		planned = append(planned, ManagedFile{
 			SourceModule:      mod.SourceModule,
 			DestinationModule: mod.DestinationModule,
-			SourcePath:        pathutil.JoinRelative("taskfiles", mod.SourceModule, rel),
+			SourcePath:        pathutil.JoinRelative(taskfilesDirName, mod.SourceModule, rel),
 			Path:              pathutil.JoinRelative(destDirRel, rel),
 			SHA256:            hex.EncodeToString(sum[:]),
 		})
@@ -315,7 +461,7 @@ func appendManagedFiles(
 	return planned
 }
 
-func validateDestination(destDirAbs string, mod ModuleRecord, oldLock *LockFile) error {
+func validateDestination(destDirAbs string, mod *ModuleRecord, oldLock *LockFile) error {
 	info, err := os.Stat(destDirAbs)
 
 	if os.IsNotExist(err) {
@@ -332,20 +478,28 @@ func validateDestination(destDirAbs string, mod ModuleRecord, oldLock *LockFile)
 		}
 	}
 
-	if oldLock == nil {
-		return unmanagedDestinationError(mod)
-	}
-
-	for _, managed := range oldLock.ManagedFiles {
-		if managed.DestinationModule == mod.DestinationModule {
-			return nil
-		}
+	if isDestinationManaged(oldLock, mod) {
+		return nil
 	}
 
 	return unmanagedDestinationError(mod)
 }
 
-func unmanagedDestinationError(mod ModuleRecord) *SyncError {
+func isDestinationManaged(oldLock *LockFile, mod *ModuleRecord) bool {
+	if oldLock == nil {
+		return false
+	}
+
+	for i := range oldLock.ManagedFiles {
+		if oldLock.ManagedFiles[i].DestinationModule == mod.DestinationModule {
+			return true
+		}
+	}
+
+	return false
+}
+
+func unmanagedDestinationError(mod *ModuleRecord) *SyncError {
 	return &SyncError{
 		Message: fmt.Sprintf(
 			`Cannot copy source module %q to %q: the destination exists but is not managed by TaskOtter.`,
@@ -363,17 +517,20 @@ func CollectModuleFiles(
 ) (map[string]FileEntry, error) {
 	contents := make(map[string]FileEntry)
 
-	err := filepath.WalkDir(sourceDir, func(path string, entry os.DirEntry, walkErr error) error {
-		if walkErr != nil {
-			return fmt.Errorf("walk %q: %w", path, walkErr)
-		}
+	err := filepath.WalkDir(
+		sourceDir,
+		func(absPath string, entry os.DirEntry, walkErr error) error {
+			if walkErr != nil {
+				return fmt.Errorf(errWalk, absPath, walkErr)
+			}
 
-		if entry.IsDir() {
-			return nil
-		}
+			if entry.IsDir() {
+				return nil
+			}
 
-		return collectModuleFile(sourceDir, path, entry, includesDoc, sourceToDest, contents)
-	})
+			return collectModuleFile(sourceDir, absPath, entry, includesDoc, sourceToDest, contents)
+		},
+	)
 	if err != nil {
 		return nil, fmt.Errorf("walk module directory %q: %w", sourceDir, err)
 	}
@@ -382,80 +539,131 @@ func CollectModuleFiles(
 }
 
 func collectModuleFile(
-	sourceDir, path string,
+	sourceDir, absPath string,
 	entry os.DirEntry,
 	includesDoc bool,
 	sourceToDest map[string]string,
 	contents map[string]FileEntry,
 ) error {
-	rel, err := filepath.Rel(sourceDir, path)
+	rel, err := relSlashPath(sourceDir, absPath)
 	if err != nil {
-		return fmt.Errorf("rel path for %q: %w", path, err)
+		return fmt.Errorf("rel slash path: %w", err)
 	}
 
-	rel = filepath.ToSlash(rel)
-
-	if !includesDoc && pathutil.IsDocPath(rel) {
+	if shouldSkipModuleFile(rel, includesDoc) {
 		return nil
 	}
 
-	if pathutil.IsTestPath(rel) || pathutil.IsModuleMetadataPath(rel) {
-		return nil
-	}
-
-	info, err := entry.Info()
+	fileEntry, err := buildFileEntry(sourceDir, rel, absPath, entry, sourceToDest)
 	if err != nil {
-		return fmt.Errorf("file info for %q: %w", path, err)
+		return fmt.Errorf("build file entry: %w", err)
 	}
 
-	data, err := pathutil.ReadRelativeFile(sourceDir, rel)
-	if err != nil {
-		return fmt.Errorf("read module file %q: %w", path, err)
-	}
-
-	if rel == rootTaskfileName {
-		data, err = taskfile.RewriteIncludes(data, sourceToDest)
-		if err != nil {
-			return fmt.Errorf("rewrite includes in %q: %w", path, err)
-		}
-	}
-
-	contents[rel] = FileEntry{Data: data, Mode: preserveMode(info.Mode())}
+	contents[rel] = fileEntry
 
 	return nil
 }
 
+func relSlashPath(sourceDir, absPath string) (string, error) {
+	rel, err := filepath.Rel(sourceDir, absPath)
+	if err != nil {
+		return consts.Empty, fmt.Errorf("rel path for %q: %w", absPath, err)
+	}
+
+	return filepath.ToSlash(rel), nil
+}
+
+func shouldSkipModuleFile(rel string, includesDoc bool) bool {
+	if !includesDoc && pathutil.IsDocPath(rel) {
+		return true
+	}
+
+	return pathutil.IsTestPath(rel) || pathutil.IsModuleMetadataPath(rel)
+}
+
+func buildFileEntry(
+	sourceDir, rel, absPath string,
+	entry os.DirEntry,
+	sourceToDest map[string]string,
+) (FileEntry, error) {
+	info, err := entry.Info()
+	if err != nil {
+		return FileEntry{}, fmt.Errorf("file info for %q: %w", absPath, err)
+	}
+
+	data, err := readAndMaybeRewriteModuleFile(sourceDir, rel, absPath, sourceToDest)
+	if err != nil {
+		return FileEntry{}, fmt.Errorf("read/rewrite module file: %w", err)
+	}
+
+	return FileEntry{Data: data, Mode: preserveMode(info.Mode())}, nil
+}
+
+func readAndMaybeRewriteModuleFile(
+	sourceDir, rel, absPath string,
+	sourceToDest map[string]string,
+) ([]byte, error) {
+	data, err := pathutil.ReadRelativeFile(sourceDir, rel)
+	if err != nil {
+		return nil, fmt.Errorf("read module file %q: %w", absPath, err)
+	}
+
+	if rel != rootTaskfileName {
+		return data, nil
+	}
+
+	rewritten, err := taskfile.RewriteIncludes(data, sourceToDest)
+	if err != nil {
+		return nil, fmt.Errorf("rewrite includes in %q: %w", absPath, err)
+	}
+
+	return rewritten, nil
+}
+
 func buildLock(
-	syncInput SyncInput,
+	syncInput *SyncInput,
 	files []ManagedFile,
 	generatedRootTasks []taskfile.GeneratedRootTask,
 ) LockFile {
 	var lock LockFile
 
-	lock.Source.Repository = config.StoreRepository
-	lock.Source.RequestedVersion = syncInput.Config.StoreVersion
-	lock.Source.SourceRef = syncInput.Snapshot.Ref.SourceRef
-	lock.Source.ResolvedCommit = syncInput.Snapshot.Ref.ResolvedCommit
-	lock.Source.DefaultBranch = syncInput.Snapshot.Ref.DefaultBranch
-	lock.Configuration.TargetFolder = syncInput.Config.TargetFolder
-	lock.Configuration.Tasks = append([]string{}, syncInput.Config.Tasks...)
-	lock.Configuration.NodePackageManager = string(syncInput.Config.NodePackageManager)
-	lock.Configuration.NodeVersionManager = string(syncInput.Config.NodeVersionManager)
-	lock.Configuration.IncludesDoc = syncInput.Config.IncludesDoc
-	lock.Configuration.SyncRoot = syncInput.Config.SyncRoot
-	lock.ResolvedModules.Requested = orderedRequested(syncInput.Requested)
-	lock.ResolvedModules.Dependencies = append([]ModuleRecord{}, syncInput.Dependencies...)
+	setLockSource(&lock, syncInput)
+	setLockConfiguration(&lock, syncInput.Config)
+	setLockResolvedModules(&lock, syncInput)
+
 	lock.GeneratedRootTasks = generatedRootTaskNames(generatedRootTasks)
 	lock.ManagedFiles = files
 
 	return lock
 }
 
-func generatedRootTaskNames(generated []taskfile.GeneratedRootTask) []string {
-	names := make([]string, 0, len(generated))
+func setLockSource(lock *LockFile, syncInput *SyncInput) {
+	lock.Source.Repository = config.StoreRepository
+	lock.Source.RequestedVersion = syncInput.Config.StoreVersion
+	lock.Source.SourceRef = syncInput.Snapshot.Ref.SourceRef
+	lock.Source.ResolvedCommit = syncInput.Snapshot.Ref.ResolvedCommit
+	lock.Source.DefaultBranch = syncInput.Snapshot.Ref.DefaultBranch
+}
 
-	for _, task := range generated {
-		names = append(names, task.Name)
+func setLockConfiguration(lock *LockFile, cfg *config.Config) {
+	lock.Configuration.TargetFolder = cfg.TargetFolder
+	lock.Configuration.Tasks = append([]string{}, cfg.Tasks...)
+	lock.Configuration.NodePackageManager = string(cfg.NodePackageManager)
+	lock.Configuration.NodeVersionManager = string(cfg.NodeVersionManager)
+	lock.Configuration.IncludesDoc = cfg.IncludesDoc
+	lock.Configuration.SyncRoot = cfg.SyncRoot
+}
+
+func setLockResolvedModules(lock *LockFile, syncInput *SyncInput) {
+	lock.ResolvedModules.Requested = orderedRequested(syncInput.Requested)
+	lock.ResolvedModules.Dependencies = append([]ModuleRecord{}, syncInput.Dependencies...)
+}
+
+func generatedRootTaskNames(generated []taskfile.GeneratedRootTask) []string {
+	names := make([]string, consts.IndexZero, len(generated))
+
+	for i := range generated {
+		names = append(names, generated[i].Name)
 	}
 
 	sort.Strings(names)

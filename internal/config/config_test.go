@@ -9,80 +9,133 @@ import (
 	"testing"
 
 	"github.com/task-otter/Taskotter/internal/config"
+	"github.com/task-otter/Taskotter/internal/consts"
 )
 
 const (
-	testBaseBranch  = "release/2026"
-	testInvalidBool = "yes"
+	testBaseBranch         = "release/2026"
+	testInvalidBool        = "yes"
+	testFalseValue         = "false"
+	testBuildTaskfile      = "build/Taskfile.yml"
+	testBadInputMsg        = "bad input"
+	testFallbackToken      = "fallback-token"
+	testDockerToken        = "docker-token"
+	testCustomTaskfiles    = "custom/taskfiles"
+	testTaskEslint         = "eslint"
+	testStoreVersionTag    = "v1.2.3"
+	fmtWantFnm             = "NodeVersionManager = %q, want fnm"
+	fmtTasksWant           = "Tasks = %#v, want %#v"
+	fmtBaseBranchWant      = "BaseBranch = %q, want %s"
+	fmtJSRuntimeWantNodeJS = "JSRuntime = %q, want nodejs"
 )
 
 func setEnv(t *testing.T, kv map[string]string) {
 	t.Helper()
 
-	for k, v := range kv {
-		t.Setenv(k, v)
+	for k := range kv {
+		t.Setenv(k, kv[k])
+	}
+}
+
+func loadEnvOK(t *testing.T, env map[string]string) *config.Config {
+	t.Helper()
+
+	setEnv(t, env)
+
+	cfg, err := config.LoadFromEnv()
+	if err != nil {
+		t.Fatalf(consts.FormatErr, err)
+	}
+
+	return cfg
+}
+
+func loadEnvExpectError(t *testing.T, env map[string]string, msg string) {
+	t.Helper()
+
+	setEnv(t, env)
+
+	_, err := config.LoadFromEnv()
+	if err == nil {
+		t.Fatal(msg)
 	}
 }
 
 func baseEnv(workspace string) map[string]string {
 	return map[string]string{
-		"INPUT_TASKS":         "go",
-		"INPUT_JS":            "",
-		"INPUT_INCLUDES_DOC":  "",
-		"INPUT_SYNC_ROOT":     "",
-		"INPUT_STORE_VERSION": "",
-		"INPUT_TARGET_FOLDER": "",
-		"INPUT_GITHUB_TOKEN":  "token",
-		"GITHUB_WORKSPACE":    workspace,
-		"GITHUB_REPOSITORY":   "owner/repo",
-		"GITHUB_REF":          "",
-		"GITHUB_BASE_REF":     "",
+		consts.InputTasks:        consts.Go,
+		consts.InputJS:           consts.Empty,
+		"INPUT_INCLUDES_DOC":     consts.Empty,
+		"INPUT_SYNC_ROOT":        consts.Empty,
+		consts.InputStoreVersion: consts.Empty,
+		consts.InputTargetFolder: consts.Empty,
+		consts.InputGithubToken:  "token",
+		"GITHUB_WORKSPACE":       workspace,
+		"GITHUB_REPOSITORY":      "owner/repo",
+		consts.GitHubRefEnv:      consts.Empty,
+		"GITHUB_BASE_REF":        consts.Empty,
 	}
 }
 
+// TestLoadFromEnvUsesTriggerBranchAsPRBase verifies a push ref sets the PR base to the trigger branch.
 func TestLoadFromEnvUsesTriggerBranchAsPRBase(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
 
-	env["GITHUB_REF"] = "refs/heads/" + testBaseBranch
+	env[consts.GitHubRefEnv] = "refs/heads/" + testBaseBranch
 	setEnv(t, env)
 
 	cfg, err := config.LoadFromEnv()
 	if err != nil {
-		t.Fatalf("LoadFromEnv() error = %v", err)
+		t.Fatalf(consts.FormatErr, err)
 	}
 
 	if cfg.BaseBranch != testBaseBranch {
-		t.Fatalf("BaseBranch = %q, want %s", cfg.BaseBranch, testBaseBranch)
+		t.Fatalf(fmtBaseBranchWant, cfg.BaseBranch, testBaseBranch)
 	}
 }
 
+// TestLoadFromEnvUsesPullRequestTargetAsPRBase verifies a pull request ref uses GITHUB_BASE_REF as the PR base.
 func TestLoadFromEnvUsesPullRequestTargetAsPRBase(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
 
-	env["GITHUB_REF"] = "refs/pull/42/merge"
+	env[consts.GitHubRefEnv] = "refs/pull/42/merge"
 	env["GITHUB_BASE_REF"] = testBaseBranch
 	setEnv(t, env)
 
 	cfg, err := config.LoadFromEnv()
 	if err != nil {
-		t.Fatalf("LoadFromEnv() error = %v", err)
+		t.Fatalf(consts.FormatErr, err)
 	}
 
 	if cfg.BaseBranch != testBaseBranch {
-		t.Fatalf("BaseBranch = %q, want %s", cfg.BaseBranch, testBaseBranch)
+		t.Fatalf(fmtBaseBranchWant, cfg.BaseBranch, testBaseBranch)
 	}
 }
 
+// TestLoadFromEnvDefaults verifies default paths, includes-doc, sync-root, and tasks are set.
 func TestLoadFromEnvDefaults(t *testing.T) {
 	dir := t.TempDir()
-	setEnv(t, baseEnv(dir))
+	cfg := loadEnvOK(t, baseEnv(dir))
 
-	cfg, err := config.LoadFromEnv()
-	if err != nil {
-		t.Fatalf("LoadFromEnv() error = %v", err)
+	assertDefaultPaths(t, cfg)
+
+	if !cfg.IncludesDoc {
+		t.Fatal("IncludesDoc should default to true")
 	}
+
+	if !cfg.SyncRoot {
+		t.Fatal("SyncRoot should default to true")
+	}
+
+	if len(cfg.Tasks) != consts.IndexOne || cfg.Tasks[consts.IndexZero] != consts.Go {
+		t.Fatalf("Tasks = %#v", cfg.Tasks)
+	}
+}
+
+func assertDefaultPaths(t *testing.T, cfg *config.Config) {
+	t.Helper()
 
 	if cfg.TargetFolder != "taskfiles" {
 		t.Fatalf("TargetFolder = %q, want taskfiles", cfg.TargetFolder)
@@ -99,47 +152,37 @@ func TestLoadFromEnvDefaults(t *testing.T) {
 	if cfg.MetadataPath() != "taskfiles/.taskotter/metadata.yml" {
 		t.Fatalf("MetadataPath = %q, want taskfiles/.taskotter/metadata.yml", cfg.MetadataPath())
 	}
-
-	if !cfg.IncludesDoc {
-		t.Fatal("IncludesDoc should default to true")
-	}
-
-	if !cfg.SyncRoot {
-		t.Fatal("SyncRoot should default to true")
-	}
-
-	if len(cfg.Tasks) != 1 || cfg.Tasks[0] != "go" {
-		t.Fatalf("Tasks = %#v", cfg.Tasks)
-	}
 }
 
+// TestRootTaskfileCustomPath verifies a custom root-taskfile input path is honored.
 func TestRootTaskfileCustomPath(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
 
-	env["INPUT_ROOT_TASKFILE"] = "build/Taskfile.yml"
+	env["INPUT_ROOT_TASKFILE"] = testBuildTaskfile
 	setEnv(t, env)
 
 	cfg, err := config.LoadFromEnv()
 	if err != nil {
-		t.Fatalf("LoadFromEnv() error = %v", err)
+		t.Fatalf(consts.FormatErr, err)
 	}
 
-	if cfg.RootTaskfile != "build/Taskfile.yml" {
+	if cfg.RootTaskfile != testBuildTaskfile {
 		t.Fatalf("RootTaskfile = %q, want build/Taskfile.yml", cfg.RootTaskfile)
 	}
 }
 
+// TestRootTaskfileFollowsTargetFolder verifies the default root taskfile path tracks target-folder.
 func TestRootTaskfileFollowsTargetFolder(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
 
-	env["INPUT_TARGET_FOLDER"] = "tools/tasks"
+	env[consts.InputTargetFolder] = "tools/tasks"
 	setEnv(t, env)
 
 	cfg, err := config.LoadFromEnv()
 	if err != nil {
-		t.Fatalf("LoadFromEnv() error = %v", err)
+		t.Fatalf(consts.FormatErr, err)
 	}
 
 	if cfg.RootTaskfile != "tools/tasks/Taskfile.yml" {
@@ -147,6 +190,7 @@ func TestRootTaskfileFollowsTargetFolder(t *testing.T) {
 	}
 }
 
+// TestRootTaskfileMustBeYAML verifies a non-YAML root-taskfile path is rejected.
 func TestRootTaskfileMustBeYAML(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
@@ -160,84 +204,93 @@ func TestRootTaskfileMustBeYAML(t *testing.T) {
 	}
 }
 
+// TestValidationErrorWithoutField verifies Error() returns just the message when Field is empty.
 func TestValidationErrorWithoutField(t *testing.T) {
 	t.Parallel()
 
-	err := (&config.ValidationError{Field: "", Message: "bad input"}).Error()
+	err := (&config.ValidationError{Field: consts.Empty, Message: testBadInputMsg}).Error()
 
-	if err != "bad input" {
+	if err != testBadInputMsg {
 		t.Fatalf("Error() = %q", err)
 	}
 }
 
+// TestMissingRuntimeInputs verifies missing workspace or token inputs cause an error.
 func TestMissingRuntimeInputs(t *testing.T) {
 	dir := t.TempDir()
 
 	env := baseEnv(dir)
 
-	env["GITHUB_WORKSPACE"] = ""
-	setEnv(t, env)
-
-	_, err := config.LoadFromEnv()
-	if err == nil {
-		t.Fatal("expected missing workspace error")
-	}
+	env["GITHUB_WORKSPACE"] = consts.Empty
+	loadEnvExpectError(t, env, "expected missing workspace error")
 
 	env = baseEnv(dir)
-	env["INPUT_GITHUB_TOKEN"] = ""
-	setEnv(t, env)
-
-	_, err = config.LoadFromEnv()
-	if err == nil {
-		t.Fatal("expected missing token error")
-	}
+	env[consts.InputGithubToken] = consts.Empty
+	loadEnvExpectError(t, env, "expected missing token error")
 }
 
+// TestLoadFromEnvGitHubTokenFallback verifies GITHUB_TOKEN is used when the input token is empty.
 func TestLoadFromEnvGitHubTokenFallback(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
 
-	env["INPUT_GITHUB_TOKEN"] = ""
-	env["GITHUB_TOKEN"] = "fallback-token"
+	env[consts.InputGithubToken] = consts.Empty
+	env["GITHUB_TOKEN"] = testFallbackToken
 	setEnv(t, env)
 
 	cfg, err := config.LoadFromEnv()
 	if err != nil {
-		t.Fatalf("LoadFromEnv() error = %v", err)
+		t.Fatalf(consts.FormatErr, err)
 	}
 
-	if cfg.GitHubToken != "fallback-token" {
+	if cfg.GitHubToken != testFallbackToken {
 		t.Fatalf("GitHubToken = %q, want fallback-token", cfg.GitHubToken)
 	}
 }
 
+// TestLoadFromEnvDockerInputEnvNames verifies hyphenated Docker action input env names are read.
 func TestLoadFromEnvDockerInputEnvNames(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
 
-	env["INPUT_GITHUB_TOKEN"] = ""
-	env["INPUT_GITHUB-TOKEN"] = "docker-token"
-	env["INPUT_JS"] = "runtime: nodejs\npackage-manager: pnpm\nversion-manager: fnm\n"
-	env["INPUT_INCLUDES-DOC"] = "false"
-	env["INPUT_SYNC-ROOT"] = "false"
-	env["INPUT_TARGET-FOLDER"] = "custom/taskfiles"
-	setEnv(t, env)
+	env[consts.InputGithubToken] = consts.Empty
+	env["INPUT_GITHUB-TOKEN"] = testDockerToken
+	env[consts.InputJS] = "runtime: nodejs\npackage-manager: pnpm\nversion-manager: fnm\n"
+	env["INPUT_INCLUDES-DOC"] = testFalseValue
+	env["INPUT_SYNC-ROOT"] = testFalseValue
+	env["INPUT_TARGET-FOLDER"] = testCustomTaskfiles
 
-	cfg, err := config.LoadFromEnv()
-	if err != nil {
-		t.Fatalf("LoadFromEnv() error = %v", err)
-	}
+	assertDockerInputs(t, loadEnvOK(t, env))
+}
 
-	if cfg.GitHubToken != "docker-token" {
+func assertDockerInputs(t *testing.T, cfg *config.Config) {
+	t.Helper()
+
+	assertDockerAuth(t, cfg)
+	assertDockerJSSettings(t, cfg)
+}
+
+func assertDockerAuth(t *testing.T, cfg *config.Config) {
+	t.Helper()
+
+	if cfg.GitHubToken != testDockerToken {
 		t.Fatalf("GitHubToken = %q, want docker-token", cfg.GitHubToken)
 	}
+
+	if cfg.TargetFolder != testCustomTaskfiles {
+		t.Fatalf("TargetFolder = %q, want custom/taskfiles", cfg.TargetFolder)
+	}
+}
+
+func assertDockerJSSettings(t *testing.T, cfg *config.Config) {
+	t.Helper()
 
 	if cfg.NodePackageManager != config.PMPnpm {
 		t.Fatalf("NodePackageManager = %q, want pnpm", cfg.NodePackageManager)
 	}
 
 	if cfg.NodeVersionManager != config.VMFnm {
-		t.Fatalf("NodeVersionManager = %q, want fnm", cfg.NodeVersionManager)
+		t.Fatalf(fmtWantFnm, cfg.NodeVersionManager)
 	}
 
 	if cfg.IncludesDoc {
@@ -247,42 +300,41 @@ func TestLoadFromEnvDockerInputEnvNames(t *testing.T) {
 	if cfg.SyncRoot {
 		t.Fatal("SyncRoot = true, want false")
 	}
-
-	if cfg.TargetFolder != "custom/taskfiles" {
-		t.Fatalf("TargetFolder = %q, want custom/taskfiles", cfg.TargetFolder)
-	}
 }
 
+// TestParseTasksMultilineAndDedupe verifies multiline, comma-separated task input is deduped.
 func TestParseTasksMultilineAndDedupe(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
 
-	env["INPUT_TASKS"] = "eslint\nprettier,\ngo\ngo\n"
-	setEnv(t, env)
+	env[consts.InputTasks] = "eslint\nprettier,\ngo\ngo\n"
 
-	cfg, err := config.LoadFromEnv()
-	if err != nil {
-		t.Fatalf("LoadFromEnv() error = %v", err)
-	}
+	cfg := loadEnvOK(t, env)
 
-	want := []string{"eslint", "prettier", "go"}
+	want := []string{testTaskEslint, "prettier", consts.Go}
+	assertTasksEqual(t, cfg.Tasks, want)
+}
 
-	if len(cfg.Tasks) != len(want) {
-		t.Fatalf("Tasks = %#v, want %#v", cfg.Tasks, want)
+func assertTasksEqual(t *testing.T, got, want []string) {
+	t.Helper()
+
+	if len(got) != len(want) {
+		t.Fatalf(fmtTasksWant, got, want)
 	}
 
 	for i := range want {
-		if cfg.Tasks[i] != want[i] {
-			t.Fatalf("Tasks = %#v, want %#v", cfg.Tasks, want)
+		if got[i] != want[i] {
+			t.Fatalf(fmtTasksWant, got, want)
 		}
 	}
 }
 
+// TestInvalidTaskName verifies an unsafe task name is rejected.
 func TestInvalidTaskName(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
 
-	env["INPUT_TASKS"] = "../evil"
+	env[consts.InputTasks] = "../evil"
 	setEnv(t, env)
 
 	_, err := config.LoadFromEnv()
@@ -291,12 +343,13 @@ func TestInvalidTaskName(t *testing.T) {
 	}
 }
 
+// TestBunWithVersionManagerRejected verifies bun runtime with a version-manager fails validation.
 func TestBunWithVersionManagerRejected(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
 
-	env["INPUT_TASKS"] = "eslint"
-	env["INPUT_JS"] = "runtime: bun\nversion-manager: fnm\n"
+	env[consts.InputTasks] = testTaskEslint
+	env[consts.InputJS] = "runtime: bun\nversion-manager: fnm\n"
 	setEnv(t, env)
 
 	_, err := config.LoadFromEnv()
@@ -305,11 +358,12 @@ func TestBunWithVersionManagerRejected(t *testing.T) {
 	}
 }
 
+// TestInvalidPackageManager verifies an unrecognized package manager is rejected.
 func TestInvalidPackageManager(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
 
-	env["INPUT_JS"] = "runtime: nodejs\npackage-manager: cargo\n"
+	env[consts.InputJS] = "runtime: nodejs\npackage-manager: cargo\n"
 	setEnv(t, env)
 
 	_, err := config.LoadFromEnv()
@@ -318,6 +372,7 @@ func TestInvalidPackageManager(t *testing.T) {
 	}
 }
 
+// TestInvalidIncludesDoc verifies a non-boolean includes-doc input is rejected.
 func TestInvalidIncludesDoc(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
@@ -331,6 +386,7 @@ func TestInvalidIncludesDoc(t *testing.T) {
 	}
 }
 
+// TestInvalidSyncRoot verifies a non-boolean sync-root input is rejected.
 func TestInvalidSyncRoot(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
@@ -344,13 +400,14 @@ func TestInvalidSyncRoot(t *testing.T) {
 	}
 }
 
+// TestFailOnChangesDefaultsFalse verifies fail-on-changes defaults to false when unset.
 func TestFailOnChangesDefaultsFalse(t *testing.T) {
 	dir := t.TempDir()
 	setEnv(t, baseEnv(dir))
 
 	cfg, err := config.LoadFromEnv()
 	if err != nil {
-		t.Fatalf("LoadFromEnv() error = %v", err)
+		t.Fatalf(consts.FormatErr, err)
 	}
 
 	if cfg.FailOnChanges {
@@ -358,6 +415,7 @@ func TestFailOnChangesDefaultsFalse(t *testing.T) {
 	}
 }
 
+// TestFailOnChangesTrue verifies fail-on-changes is set to true when the input is "true".
 func TestFailOnChangesTrue(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
@@ -367,7 +425,7 @@ func TestFailOnChangesTrue(t *testing.T) {
 
 	cfg, err := config.LoadFromEnv()
 	if err != nil {
-		t.Fatalf("LoadFromEnv() error = %v", err)
+		t.Fatalf(consts.FormatErr, err)
 	}
 
 	if !cfg.FailOnChanges {
@@ -375,6 +433,7 @@ func TestFailOnChangesTrue(t *testing.T) {
 	}
 }
 
+// TestInvalidFailOnChanges verifies a non-boolean fail-on-changes input is rejected.
 func TestInvalidFailOnChanges(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
@@ -388,11 +447,12 @@ func TestInvalidFailOnChanges(t *testing.T) {
 	}
 }
 
+// TestUnsafeStoreVersion verifies an unsafe store-version value is rejected.
 func TestUnsafeStoreVersion(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
 
-	env["INPUT_STORE_VERSION"] = "refs/heads/main"
+	env[consts.InputStoreVersion] = "refs/heads/main"
 	setEnv(t, env)
 
 	_, err := config.LoadFromEnv()
@@ -401,11 +461,12 @@ func TestUnsafeStoreVersion(t *testing.T) {
 	}
 }
 
+// TestStoreVersionAllowsSafeTag verifies a safe tag store-version value is accepted.
 func TestStoreVersionAllowsSafeTag(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
 
-	env["INPUT_STORE_VERSION"] = "v1.2.3"
+	env[consts.InputStoreVersion] = testStoreVersionTag
 	setEnv(t, env)
 
 	cfg, err := config.LoadFromEnv()
@@ -413,11 +474,12 @@ func TestStoreVersionAllowsSafeTag(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if cfg.StoreVersion != "v1.2.3" {
+	if cfg.StoreVersion != testStoreVersionTag {
 		t.Fatalf("StoreVersion = %q", cfg.StoreVersion)
 	}
 }
 
+// TestTargetFolderValidation verifies target-folder values are accepted or rejected as expected.
 func TestTargetFolderValidation(t *testing.T) {
 	dir := t.TempDir()
 
@@ -433,26 +495,35 @@ func TestTargetFolderValidation(t *testing.T) {
 		{"dot git", ".git", false},
 	}
 
-	for _, testCase := range cases {
+	for i := range cases {
+		testCase := &cases[i]
 		t.Run(testCase.name, func(t *testing.T) {
 			env := baseEnv(dir)
 
-			env["INPUT_TARGET_FOLDER"] = testCase.value
-			setEnv(t, env)
+			env[consts.InputTargetFolder] = testCase.value
 
-			_, err := config.LoadFromEnv()
-
-			if testCase.ok && err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-
-			if !testCase.ok && err == nil {
-				t.Fatal("expected validation error")
-			}
+			assertTargetFolderResult(t, env, testCase.ok)
 		})
 	}
 }
 
+func assertTargetFolderResult(t *testing.T, env map[string]string, wantOK bool) {
+	t.Helper()
+
+	setEnv(t, env)
+
+	_, err := config.LoadFromEnv()
+
+	if wantOK && err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !wantOK && err == nil {
+		t.Fatal(consts.ExpectedValidErr)
+	}
+}
+
+// TestTargetFolderSymlinkEscape verifies a target folder escaping via symlink is rejected.
 func TestTargetFolderSymlinkEscape(t *testing.T) {
 	workspace := t.TempDir()
 	outside := t.TempDir()
@@ -466,11 +537,7 @@ func TestTargetFolderSymlinkEscape(t *testing.T) {
 
 	env := baseEnv(workspace)
 
-	env["INPUT_TARGET_FOLDER"] = "link-out/taskfiles"
-	setEnv(t, env)
+	env[consts.InputTargetFolder] = "link-out/taskfiles"
 
-	_, err = config.LoadFromEnv()
-	if err == nil {
-		t.Fatal("expected symlink escape rejection")
-	}
+	loadEnvExpectError(t, env, "expected symlink escape rejection")
 }

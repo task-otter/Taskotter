@@ -9,68 +9,92 @@ import (
 	"testing"
 
 	"github.com/task-otter/Taskotter/internal/config"
+	"github.com/task-otter/Taskotter/internal/consts"
 	"github.com/task-otter/Taskotter/internal/resolver"
+)
+
+const (
+	taskEslint          = "eslint"
+	taskPrettier        = "prettier"
+	moduleEslintBun     = "eslint/bun"
+	moduleEslintFnmNpm  = "eslint/node/fnm/npm"
+	moduleEslintNvmNpm  = "eslint/node/nvm/npm"
+	moduleEslintFnmYarn = "eslint/node/fnm/yarn"
+	moduleEslintNvmYarn = "eslint/node/nvm/yarn"
+	moduleEslintFnmPnpm = "eslint/node/fnm/pnpm"
+	moduleEslintNvmPnpm = "eslint/node/nvm/pnpm"
+	errExpected         = "expected error"
+	fmtUnexpectedErr    = "unexpected error: %v"
 )
 
 func catalog(names ...string) map[string]struct{} {
 	cat := make(map[string]struct{}, len(names))
 
-	for _, name := range names {
-		cat[name] = struct{}{}
+	for i := range names {
+		cat[names[i]] = struct{}{}
 	}
 
 	return cat
 }
 
+// TestResolveNonNodeTask verifies a non-node task resolves directly to its module.
 func TestResolveNonNodeTask(t *testing.T) {
 	t.Parallel()
 
-	res, err := resolver.Resolve("go", catalog("go"), "", "")
+	res, err := resolver.Resolve(consts.Go, catalog(consts.Go), consts.Empty, consts.Empty)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if res.SourceModule != "go" {
+	if res.SourceModule != consts.Go {
 		t.Fatalf("got %q", res.SourceModule)
 	}
 }
 
+// TestResolveAll verifies multiple logical tasks resolve into the expected number of resolutions.
 func TestResolveAll(t *testing.T) {
 	t.Parallel()
 
 	resolutions, err := resolver.ResolveAll(
-		[]string{"go", "prettier"},
-		catalog("go", "prettier"),
-		"",
-		"",
+		[]string{consts.Go, taskPrettier},
+		catalog(consts.Go, taskPrettier),
+		consts.Empty,
+		consts.Empty,
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if len(resolutions) != 2 {
+	if len(resolutions) != consts.IndexTwo {
 		t.Fatalf("ResolveAll() returned %d resolutions", len(resolutions))
 	}
 }
 
+// TestResolveAllStopsOnError verifies resolution stops and errors on the first missing task.
 func TestResolveAllStopsOnError(t *testing.T) {
 	t.Parallel()
 
-	_, err := resolver.ResolveAll([]string{"go", "missing"}, catalog("go"), "", "")
+	_, err := resolver.ResolveAll(
+		[]string{consts.Go, "missing"},
+		catalog(consts.Go),
+		consts.Empty,
+		consts.Empty,
+	)
 	if err == nil {
 		t.Fatal("expected ResolveAll error")
 	}
 }
 
+// TestResolveNodeVariants verifies node tasks resolve to the module matching the package/version manager.
 func TestResolveNodeVariants(t *testing.T) {
 	t.Parallel()
 
 	cat := catalog(
-		"eslint",
-		"eslint/node/fnm/npm", "eslint/node/nvm/npm",
-		"eslint/node/fnm/yarn", "eslint/node/nvm/yarn",
-		"eslint/node/fnm/pnpm", "eslint/node/nvm/pnpm",
-		"eslint/bun",
+		taskEslint,
+		moduleEslintFnmNpm, moduleEslintNvmNpm,
+		moduleEslintFnmYarn, moduleEslintNvmYarn,
+		moduleEslintFnmPnpm, moduleEslintNvmPnpm,
+		moduleEslintBun,
 	)
 
 	cases := []struct {
@@ -78,17 +102,19 @@ func TestResolveNodeVariants(t *testing.T) {
 		vm   config.VersionManager
 		want string
 	}{
-		{config.PMNPM, config.VMFnm, "eslint/node/fnm/npm"},
-		{config.PMNPM, config.VMNvm, "eslint/node/nvm/npm"},
-		{config.PMYarn, config.VMFnm, "eslint/node/fnm/yarn"},
-		{config.PMYarn, config.VMNvm, "eslint/node/nvm/yarn"},
-		{config.PMPnpm, config.VMFnm, "eslint/node/fnm/pnpm"},
-		{config.PMPnpm, config.VMNvm, "eslint/node/nvm/pnpm"},
-		{config.PMBun, "", "eslint/bun"},
+		{config.PMNPM, config.VMFnm, moduleEslintFnmNpm},
+		{config.PMNPM, config.VMNvm, moduleEslintNvmNpm},
+		{config.PMYarn, config.VMFnm, moduleEslintFnmYarn},
+		{config.PMYarn, config.VMNvm, moduleEslintNvmYarn},
+		{config.PMPnpm, config.VMFnm, moduleEslintFnmPnpm},
+		{config.PMPnpm, config.VMNvm, moduleEslintNvmPnpm},
+		{config.PMBun, consts.Empty, moduleEslintBun},
 	}
 
-	for _, testCase := range cases {
-		res, err := resolver.Resolve("eslint", cat, testCase.pm, testCase.vm)
+	for i := range cases {
+		testCase := &cases[i]
+
+		res, err := resolver.Resolve(taskEslint, cat, testCase.pm, testCase.vm)
 		if err != nil {
 			t.Fatalf("%+v: %v", testCase, err)
 		}
@@ -99,57 +125,61 @@ func TestResolveNodeVariants(t *testing.T) {
 	}
 }
 
+// TestNodeTaskRequiresPackageManager verifies a node task without js configuration fails.
 func TestNodeTaskRequiresPackageManager(t *testing.T) {
 	t.Parallel()
 
-	cat := catalog("eslint/bun")
+	cat := catalog(moduleEslintBun)
 
-	_, err := resolver.Resolve("eslint", cat, "", "")
+	_, err := resolver.Resolve(taskEslint, cat, consts.Empty, consts.Empty)
 	if err == nil {
-		t.Fatal("expected error")
+		t.Fatal(errExpected)
 	}
 
 	if !strings.Contains(err.Error(), "requires js configuration") {
-		t.Fatalf("unexpected error: %v", err)
+		t.Fatalf(fmtUnexpectedErr, err)
 	}
 }
 
+// TestNpmRequiresVersionManager verifies npm package manager requires a version manager to be set.
 func TestNpmRequiresVersionManager(t *testing.T) {
 	t.Parallel()
 
-	cat := catalog("eslint/node/fnm/npm")
+	cat := catalog(moduleEslintFnmNpm)
 
-	_, err := resolver.Resolve("eslint", cat, config.PMNPM, "")
+	_, err := resolver.Resolve(taskEslint, cat, config.PMNPM, consts.Empty)
 	if err == nil {
-		t.Fatal("expected error")
+		t.Fatal(errExpected)
 	}
 
 	if !strings.Contains(err.Error(), "js.version-manager required") {
-		t.Fatalf("unexpected error: %v", err)
+		t.Fatalf(fmtUnexpectedErr, err)
 	}
 }
 
+// TestNodeAttemptedSourceMissing verifies the error names the attempted source module when missing.
 func TestNodeAttemptedSourceMissing(t *testing.T) {
 	t.Parallel()
 
-	cat := catalog("eslint/node/fnm/npm")
+	cat := catalog(moduleEslintFnmNpm)
 
-	_, err := resolver.Resolve("eslint", cat, config.PMPnpm, config.VMFnm)
+	_, err := resolver.Resolve(taskEslint, cat, config.PMPnpm, config.VMFnm)
 	if err == nil {
 		t.Fatal("expected missing attempted source error")
 	}
 
 	if !strings.Contains(err.Error(), `attempted source module "eslint/node/fnm/pnpm"`) {
-		t.Fatalf("unexpected error: %v", err)
+		t.Fatalf(fmtUnexpectedErr, err)
 	}
 }
 
+// TestResolveInvalidPackageManager verifies an unrecognized package manager value is rejected.
 func TestResolveInvalidPackageManager(t *testing.T) {
 	t.Parallel()
 
 	_, err := resolver.Resolve(
-		"eslint",
-		catalog("eslint/node/fnm/npm"),
+		taskEslint,
+		catalog(moduleEslintFnmNpm),
 		config.PackageManager("deno"),
 		"",
 	)
@@ -158,20 +188,27 @@ func TestResolveInvalidPackageManager(t *testing.T) {
 	}
 }
 
+// TestMissingTaskCloseMatches verifies a misspelled task name returns close match suggestions.
 func TestMissingTaskCloseMatches(t *testing.T) {
 	t.Parallel()
 
-	cat := catalog("eslint/bun", "eslint/node/fnm/npm")
+	cat := catalog(moduleEslintBun, moduleEslintFnmNpm)
 
-	_, err := resolver.Resolve("eslit", cat, config.PMBun, "")
+	_, err := resolver.Resolve("eslit", cat, config.PMBun, consts.Empty)
 	if err == nil {
-		t.Fatal("expected error")
+		t.Fatal(errExpected)
 	}
 
+	assertHasCloseMatches(t, err)
+}
+
+func assertHasCloseMatches(t *testing.T, err error) {
+	t.Helper()
+
 	resolveErr := &resolver.ResolveError{
-		LogicalTask:  "",
-		Attempted:    "",
-		Message:      "",
+		LogicalTask:  consts.Empty,
+		Attempted:    consts.Empty,
+		Message:      consts.Empty,
 		CloseMatches: nil,
 	}
 
@@ -181,15 +218,16 @@ func TestMissingTaskCloseMatches(t *testing.T) {
 		t.Fatalf("unexpected error type: %T", err)
 	}
 
-	if len(resolveErr.CloseMatches) == 0 {
+	if len(resolveErr.CloseMatches) == consts.IndexZero {
 		t.Fatal("expected close matches")
 	}
 }
 
+// TestMissingTaskWithoutCloseMatches verifies an unrelated missing task returns no close matches.
 func TestMissingTaskWithoutCloseMatches(t *testing.T) {
 	t.Parallel()
 
-	_, err := resolver.Resolve("zzz", catalog("go"), "", "")
+	_, err := resolver.Resolve("zzz", catalog(consts.Go), consts.Empty, consts.Empty)
 	if err == nil {
 		t.Fatal("expected missing task error")
 	}

@@ -14,24 +14,32 @@ import (
 	"time"
 
 	"github.com/task-otter/Taskotter/internal/archive"
+	"github.com/task-otter/Taskotter/internal/consts"
+)
+
+const (
+	testRepoTaskfileGo = "repo-main/taskfiles/go/Taskfile.yml"
+	testTaskfileGoPath = "taskfiles/go/Taskfile.yml"
+	testContentX       = "x"
+	testContentNope    = "nope"
 )
 
 func regularTarHeader(name string, size int64) *tar.Header {
 	return &tar.Header{
 		Name:       name,
-		Mode:       0o644,
+		Mode:       consts.FilePerm644,
 		Size:       size,
 		Typeflag:   tar.TypeReg,
-		Linkname:   "",
-		Uid:        0,
-		Gid:        0,
-		Uname:      "",
-		Gname:      "",
+		Linkname:   consts.Empty,
+		Uid:        consts.IndexZero,
+		Gid:        consts.IndexZero,
+		Uname:      consts.Empty,
+		Gname:      consts.Empty,
 		ModTime:    time.Time{},
 		AccessTime: time.Time{},
 		ChangeTime: time.Time{},
-		Devmajor:   0,
-		Devminor:   0,
+		Devmajor:   consts.IndexZero,
+		Devminor:   consts.IndexZero,
 		Xattrs:     nil,
 		PAXRecords: nil,
 		Format:     tar.FormatUnknown,
@@ -46,7 +54,8 @@ func buildTarGz(t *testing.T, entries map[string][]byte) []byte {
 	gzipWriter := gzip.NewWriter(&buf)
 	tarWriter := tar.NewWriter(gzipWriter)
 
-	for name, content := range entries {
+	for name := range entries {
+		content := entries[name]
 		header := regularTarHeader(name, int64(len(content)))
 
 		err := tarWriter.WriteHeader(header)
@@ -116,18 +125,20 @@ func buildTarGzWithHeaders(t *testing.T, headers []*tar.Header) []byte {
 	gzipWriter := gzip.NewWriter(&buf)
 	tarWriter := tar.NewWriter(gzipWriter)
 
-	for _, header := range headers {
+	for i := range headers {
+		header := headers[i]
+
 		err := tarWriter.WriteHeader(header)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		if header.Typeflag == tar.TypeReg && header.Size > 0 {
-			chunk := bytes.Repeat([]byte("x"), 32*1024)
+		if header.Typeflag == tar.TypeReg && header.Size > consts.IndexZero {
+			chunk := bytes.Repeat([]byte(testContentX), 32*1024)
 
 			remaining := header.Size
 
-			for remaining > 0 {
+			for remaining > consts.IndexZero {
 				writeSize := min(remaining, int64(len(chunk)))
 
 				_, err := tarWriter.Write(chunk[:writeSize])
@@ -153,14 +164,15 @@ func buildTarGzWithHeaders(t *testing.T, headers []*tar.Header) []byte {
 	return buf.Bytes()
 }
 
+// TestExtractStripsSetuidMode verifies the setuid bit is stripped from extracted file modes.
 func TestExtractStripsSetuidMode(t *testing.T) {
 	t.Parallel()
 
 	data := buildTarGzWithMode(
 		t,
-		"repo-main/taskfiles/go/Taskfile.yml",
+		testRepoTaskfileGo,
 		[]byte("version: \"3\"\n"),
-		0o4755,
+		consts.FilePerm4755,
 	)
 	dest := t.TempDir()
 
@@ -169,20 +181,21 @@ func TestExtractStripsSetuidMode(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	info, err := os.Stat(filepath.Join(dest, "taskfiles/go/Taskfile.yml"))
+	info, err := os.Stat(filepath.Join(dest, testTaskfileGoPath))
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if info.Mode().Perm() != 0o755 {
-		t.Fatalf("file mode = %o, want %o", info.Mode().Perm(), 0o755)
+	if info.Mode().Perm() != consts.FilePerm755 {
+		t.Fatalf("file mode = %o, want %o", info.Mode().Perm(), consts.FilePerm755)
 	}
 }
 
+// TestRejectNegativeFileMode verifies a negative tar file mode is rejected.
 func TestRejectNegativeFileMode(t *testing.T) {
 	t.Parallel()
 
-	data := buildTarGzWithMode(t, "repo-main/taskfiles/go/Taskfile.yml", []byte("x"), -1)
+	data := buildTarGzWithMode(t, testRepoTaskfileGo, []byte(testContentX), -1)
 	dest := t.TempDir()
 
 	_, err := archive.ExtractTarGz(bytes.NewReader(data), dest)
@@ -191,11 +204,12 @@ func TestRejectNegativeFileMode(t *testing.T) {
 	}
 }
 
+// TestExtractValidArchive verifies a well-formed archive extracts its files successfully.
 func TestExtractValidArchive(t *testing.T) {
 	t.Parallel()
 
 	data := buildTarGz(t, map[string][]byte{
-		"repo-main/taskfiles/go/Taskfile.yml": []byte("version: \"3\"\n"),
+		testRepoTaskfileGo: []byte("version: \"3\"\n"),
 	})
 	dest := t.TempDir()
 
@@ -204,12 +218,13 @@ func TestExtractValidArchive(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = os.Stat(filepath.Join(dest, "taskfiles/go/Taskfile.yml"))
+	_, err = os.Stat(filepath.Join(dest, testTaskfileGoPath))
 	if err != nil {
 		t.Fatal(err)
 	}
 }
 
+// TestRejectInvalidGzip verifies non-gzip input is rejected with an error.
 func TestRejectInvalidGzip(t *testing.T) {
 	t.Parallel()
 
@@ -219,13 +234,14 @@ func TestRejectInvalidGzip(t *testing.T) {
 	}
 }
 
+// TestExtractDirectoryEntry verifies directory entries are created on disk.
 func TestExtractDirectoryEntry(t *testing.T) {
 	t.Parallel()
 
 	data := buildTarGzWithHeaders(t, []*tar.Header{
-		{Name: "repo-main/", Mode: 0o755, Typeflag: tar.TypeDir},
-		{Name: "repo-main/taskfiles", Mode: 0o755, Typeflag: tar.TypeDir},
-		regularTarHeader("repo-main/taskfiles/go/Taskfile.yml", int64(len("version: \"3\"\n"))),
+		{Name: "repo-main/", Mode: consts.FilePerm755, Typeflag: tar.TypeDir},
+		{Name: "repo-main/taskfiles", Mode: consts.FilePerm755, Typeflag: tar.TypeDir},
+		regularTarHeader(testRepoTaskfileGo, int64(len("version: \"3\"\n"))),
 	})
 	dest := t.TempDir()
 
@@ -244,11 +260,12 @@ func TestExtractDirectoryEntry(t *testing.T) {
 	}
 }
 
+// TestRejectBackslashPath verifies entry names containing backslashes are rejected.
 func TestRejectBackslashPath(t *testing.T) {
 	t.Parallel()
 
 	data := buildTarGz(t, map[string][]byte{
-		`repo-main\taskfiles\go\Taskfile.yml`: []byte("nope"),
+		`repo-main\taskfiles\go\Taskfile.yml`: []byte(testContentNope),
 	})
 	dest := t.TempDir()
 
@@ -258,11 +275,12 @@ func TestRejectBackslashPath(t *testing.T) {
 	}
 }
 
+// TestRejectUnsupportedEntryType verifies unsupported tar entry types are rejected.
 func TestRejectUnsupportedEntryType(t *testing.T) {
 	t.Parallel()
 
 	data := buildTarGzWithHeaders(t, []*tar.Header{
-		{Name: "repo-main/device", Mode: 0o644, Typeflag: tar.TypeChar},
+		{Name: "repo-main/device", Mode: consts.FilePerm644, Typeflag: tar.TypeChar},
 	})
 
 	_, err := archive.ExtractTarGz(bytes.NewReader(data), t.TempDir())
@@ -271,6 +289,7 @@ func TestRejectUnsupportedEntryType(t *testing.T) {
 	}
 }
 
+// TestRejectFileLargerThanLimit verifies files exceeding the size limit are rejected.
 func TestRejectFileLargerThanLimit(t *testing.T) {
 	t.Parallel()
 
@@ -284,11 +303,12 @@ func TestRejectFileLargerThanLimit(t *testing.T) {
 	}
 }
 
+// TestRejectTraversal verifies path traversal entries are rejected with an unsafe path error.
 func TestRejectTraversal(t *testing.T) {
 	t.Parallel()
 
 	data := buildTarGz(t, map[string][]byte{
-		"repo-main/../../etc/passwd": []byte("nope"),
+		"repo-main/../../etc/passwd": []byte(testContentNope),
 	})
 	dest := t.TempDir()
 
@@ -302,6 +322,7 @@ func TestRejectTraversal(t *testing.T) {
 	}
 }
 
+// TestRejectSymlink verifies symlink entries are rejected during extraction.
 func TestRejectSymlink(t *testing.T) {
 	t.Parallel()
 
@@ -312,19 +333,19 @@ func TestRejectSymlink(t *testing.T) {
 
 	header := &tar.Header{
 		Name:       "repo-main/link",
-		Mode:       0,
-		Size:       0,
+		Mode:       consts.IndexZero,
+		Size:       consts.IndexZero,
 		Typeflag:   tar.TypeSymlink,
 		Linkname:   "/etc/passwd",
-		Uid:        0,
-		Gid:        0,
-		Uname:      "",
-		Gname:      "",
+		Uid:        consts.IndexZero,
+		Gid:        consts.IndexZero,
+		Uname:      consts.Empty,
+		Gname:      consts.Empty,
 		ModTime:    time.Time{},
 		AccessTime: time.Time{},
 		ChangeTime: time.Time{},
-		Devmajor:   0,
-		Devminor:   0,
+		Devmajor:   consts.IndexZero,
+		Devminor:   consts.IndexZero,
 		Xattrs:     nil,
 		PAXRecords: nil,
 		Format:     tar.FormatUnknown,
@@ -335,8 +356,15 @@ func TestRejectSymlink(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_ = tarWriter.Close()
-	_ = gzipWriter.Close()
+	err = tarWriter.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = gzipWriter.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	dest := t.TempDir()
 
@@ -346,6 +374,7 @@ func TestRejectSymlink(t *testing.T) {
 	}
 }
 
+// TestSkipPAXGlobalHeader verifies PAX global header entries are skipped during extraction.
 func TestSkipPAXGlobalHeader(t *testing.T) {
 	t.Parallel()
 
@@ -361,7 +390,7 @@ func TestSkipPAXGlobalHeader(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = os.Stat(filepath.Join(dest, "taskfiles/go/Taskfile.yml"))
+	_, err = os.Stat(filepath.Join(dest, testTaskfileGoPath))
 	if err != nil {
 		t.Fatal(err)
 	}

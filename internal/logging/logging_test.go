@@ -7,25 +7,17 @@ import (
 	"bytes"
 	"testing"
 
+	"github.com/task-otter/Taskotter/internal/consts"
 	"github.com/task-otter/Taskotter/internal/logging"
 )
 
+// TestLoggerWritesGitHubActionsCommands verifies log levels emit GitHub Actions workflow commands.
 func TestLoggerWritesGitHubActionsCommands(t *testing.T) {
 	t.Parallel()
 
-	var buf bytes.Buffer
+	got := capturedLogOutput()
 
-	log := logging.NewWithWriter(&buf)
-
-	log.Printf("plain %s", "line")
-	log.Noticef("notice %d", 1)
-	log.Warningf("warning %d", 2)
-	log.Errorf("error %d", 3)
-	log.Group("sync", func() {
-		log.Printf("inside")
-	})
-
-	want := "" +
+	want := consts.Empty +
 		"plain line\n" +
 		"::notice::notice 1\n" +
 		"::warning::warning 2\n" +
@@ -34,11 +26,28 @@ func TestLoggerWritesGitHubActionsCommands(t *testing.T) {
 		"inside\n" +
 		"::endgroup::\n"
 
-	if buf.String() != want {
-		t.Fatalf("log output = %q, want %q", buf.String(), want)
+	if got != want {
+		t.Fatalf("log output = %q, want %q", got, want)
 	}
 }
 
+func capturedLogOutput() string {
+	var buf bytes.Buffer
+
+	log := logging.NewWithWriter(&buf)
+
+	log.Printf("plain %s", "line")
+	log.Noticef("notice %d", consts.IndexOne)
+	log.Warningf("warning %d", consts.IndexTwo)
+	log.Errorf("error %d", consts.IndexThree)
+	log.Group("sync", func() {
+		log.Printf("inside")
+	})
+
+	return buf.String()
+}
+
+// TestNew verifies New returns a non-nil logger.
 func TestNew(t *testing.T) {
 	t.Parallel()
 
@@ -47,6 +56,7 @@ func TestNew(t *testing.T) {
 	}
 }
 
+// TestRedact verifies secret values are masked while empty input stays empty.
 func TestRedact(t *testing.T) {
 	t.Parallel()
 
@@ -54,11 +64,12 @@ func TestRedact(t *testing.T) {
 		input string
 		want  string
 	}{
-		{"", ""},
+		{consts.Empty, consts.Empty},
 		{"token", "*****"},
 	}
 
-	for _, testCase := range cases {
+	for i := range cases {
+		testCase := &cases[i]
 		got := logging.Redact(testCase.input)
 
 		if got != testCase.want {

@@ -1,6 +1,7 @@
 // Taskotter 2026.
 // SPDX-License-Identifier: Apache-2.0.
 
+// Package resolver maps logical task names to their resolved source modules.
 package resolver
 
 import (
@@ -9,7 +10,43 @@ import (
 	"strings"
 
 	"github.com/task-otter/Taskotter/internal/config"
+	"github.com/task-otter/Taskotter/internal/consts"
 	"github.com/task-otter/Taskotter/internal/variants"
+)
+
+type (
+
+	// Resolution records the resolved source module for a logical task.
+	Resolution struct {
+		LogicalTask  string
+		SourceModule string
+	}
+
+	// ResolveError reports task resolution failures with optional close matches.
+	ResolveError struct {
+		LogicalTask  string
+		Attempted    string
+		Message      string
+		CloseMatches []string
+	}
+
+	// resolveContext bundles the catalog and JS settings shared across one task resolution.
+	resolveContext struct {
+		catalog        map[string]struct{}
+		packageManager config.PackageManager
+		versionManager config.VersionManager
+	}
+
+	scoredCandidate struct {
+		name  string
+		score int
+	}
+
+	// dpState holds the rolling Levenshtein distance rows shared across computeRow calls.
+	dpState struct {
+		left, right string
+		prev, curr  []int
+	}
 )
 
 const (
@@ -17,23 +54,9 @@ const (
 	scoreExactMatch      = 1000
 	scorePrefixMatchBase = 500
 	scoreIdenticalString = 100
-	maxSimilarityScore   = 100
 )
 
-// Resolution records the resolved source module for a logical task.
-type Resolution struct {
-	LogicalTask  string
-	SourceModule string
-}
-
-// ResolveError reports task resolution failures with optional close matches.
-type ResolveError struct {
-	LogicalTask  string
-	Attempted    string
-	Message      string
-	CloseMatches []string
-}
-
+// Error implements the error interface, returning the task resolution failure message.
 func (e *ResolveError) Error() string {
 	msg := fmt.Sprintf(`task %q`, e.LogicalTask)
 
@@ -43,7 +66,7 @@ func (e *ResolveError) Error() string {
 
 	msg += ": " + e.Message
 
-	if len(e.CloseMatches) > 0 {
+	if len(e.CloseMatches) > consts.IndexZero {
 		msg += "; close matches: " + strings.Join(e.CloseMatches, ", ")
 	}
 
@@ -59,10 +82,10 @@ func ResolveAll(
 ) ([]Resolution, error) {
 	var out []Resolution
 
-	for _, task := range tasks {
-		res, err := Resolve(task, catalog, packageManager, versionManager)
+	for i := range tasks {
+		res, err := Resolve(tasks[i], catalog, packageManager, versionManager)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("resolve task %q: %w", tasks[i], err)
 		}
 
 		out = append(out, res)
@@ -78,25 +101,49 @@ func Resolve(
 	packageManager config.PackageManager,
 	versionManager config.VersionManager,
 ) (Resolution, error) {
-	nodeVariants := findVariants(task, catalog)
-
-	if len(nodeVariants) == 0 {
-		if _, ok := catalog[task]; ok {
-			return Resolution{LogicalTask: task, SourceModule: task}, nil
-		}
-
-		return Resolution{}, &ResolveError{
-			LogicalTask:  task,
-			Attempted:    "",
-			Message:      "task not found in store",
-			CloseMatches: closeMatches(task, catalogKeys(catalog), maxCloseMatches),
-		}
+	rc := resolveContext{
+		catalog:        catalog,
+		packageManager: packageManager,
+		versionManager: versionManager,
 	}
 
-	if packageManager == "" {
+	nodeVariants := findVariants(task, rc.catalog)
+
+	if len(nodeVariants) == consts.IndexZero {
+		res, err := resolvePlainTask(task, rc.catalog)
+		if err != nil {
+			return Resolution{}, fmt.Errorf("resolve plain task: %w", err)
+		}
+
+		return res, nil
+	}
+
+	res, err := resolveNodeVariant(task, &rc)
+	if err != nil {
+		return Resolution{}, fmt.Errorf("resolve node variant: %w", err)
+	}
+
+	return res, nil
+}
+
+func resolvePlainTask(task string, catalog map[string]struct{}) (Resolution, error) {
+	if _, ok := catalog[task]; ok {
+		return Resolution{LogicalTask: task, SourceModule: task}, nil
+	}
+
+	return Resolution{}, &ResolveError{
+		LogicalTask:  task,
+		Attempted:    consts.Empty,
+		Message:      "task not found in store",
+		CloseMatches: closeMatches(task, catalogKeys(catalog), maxCloseMatches),
+	}
+}
+
+func resolveNodeVariant(task string, rc *resolveContext) (Resolution, error) {
+	if rc.packageManager == consts.Empty {
 		return Resolution{}, &ResolveError{
 			LogicalTask: task,
-			Attempted:   "",
+			Attempted:   consts.Empty,
 			Message: fmt.Sprintf(
 				`Task %q requires js configuration for Node tasks. Set js.runtime to bun or nodejs.`,
 				task,
@@ -105,22 +152,22 @@ func Resolve(
 		}
 	}
 
-	attempted, err := variants.BuildSourceModule(task, packageManager, versionManager)
+	attempted, err := variants.BuildSourceModule(task, rc.packageManager, rc.versionManager)
 	if err != nil {
 		return Resolution{}, &ResolveError{
 			LogicalTask:  task,
-			Attempted:    "",
+			Attempted:    consts.Empty,
 			Message:      err.Error(),
 			CloseMatches: nil,
 		}
 	}
 
-	if _, ok := catalog[attempted]; !ok {
+	if _, ok := rc.catalog[attempted]; !ok {
 		return Resolution{}, &ResolveError{
 			LogicalTask:  task,
 			Attempted:    attempted,
 			Message:      "source module not found in store",
-			CloseMatches: closeMatches(attempted, catalogKeys(catalog), maxCloseMatches),
+			CloseMatches: closeMatches(attempted, catalogKeys(rc.catalog), maxCloseMatches),
 		}
 	}
 
@@ -142,7 +189,7 @@ func findVariants(task string, catalog map[string]struct{}) []string {
 }
 
 func catalogKeys(catalog map[string]struct{}) []string {
-	keys := make([]string, 0, len(catalog))
+	keys := make([]string, consts.IndexZero, len(catalog))
 
 	for key := range catalog {
 		keys = append(keys, key)
@@ -154,21 +201,28 @@ func catalogKeys(catalog map[string]struct{}) []string {
 }
 
 func closeMatches(query string, candidates []string, limit int) []string {
-	type scored struct {
-		name  string
-		score int
-	}
+	scores := scoreCandidates(query, candidates)
+	sortByScoreDesc(scores)
 
-	var scores []scored
+	return topNames(scores, limit)
+}
 
-	for _, candidate := range candidates {
+func scoreCandidates(query string, candidates []string) []scoredCandidate {
+	var scores []scoredCandidate
+
+	for i := range candidates {
+		candidate := candidates[i]
 		score := similarity(query, candidate)
 
-		if score > 0 {
-			scores = append(scores, scored{name: candidate, score: score})
+		if score > consts.IndexZero {
+			scores = append(scores, scoredCandidate{name: candidate, score: score})
 		}
 	}
 
+	return scores
+}
+
+func sortByScoreDesc(scores []scoredCandidate) {
 	sort.Slice(scores, func(i, j int) bool {
 		if scores[i].score == scores[j].score {
 			return scores[i].name < scores[j].name
@@ -176,10 +230,12 @@ func closeMatches(query string, candidates []string, limit int) []string {
 
 		return scores[i].score > scores[j].score
 	})
+}
 
+func topNames(scores []scoredCandidate, limit int) []string {
 	var out []string
 
-	for i := 0; i < len(scores) && i < limit; i++ {
+	for i := consts.IndexZero; i < len(scores) && i < limit; i++ {
 		out = append(out, scores[i].name)
 	}
 
@@ -205,38 +261,50 @@ func levenshtein(left, right string) int {
 
 	leftLen, rightLen := len(left), len(right)
 
-	if leftLen == 0 || rightLen == 0 {
-		return 0
+	if leftLen == consts.IndexZero || rightLen == consts.IndexZero {
+		return consts.IndexZero
 	}
 
-	prev := make([]int, rightLen+1)
-
-	curr := make([]int, rightLen+1)
-
-	for col := 0; col <= rightLen; col++ {
-		prev[col] = col
-	}
-
-	for row := 1; row <= leftLen; row++ {
-		curr[0] = row
-
-		for col := 1; col <= rightLen; col++ {
-			cost := 1
-
-			if left[row-1] == right[col-1] {
-				cost = 0
-			}
-
-			curr[col] = minInt3(curr[col-1]+1, prev[col]+1, prev[col-1]+cost)
-		}
-
-		prev, curr = curr, prev
-	}
-
-	dist := prev[rightLen]
+	dist := editDistance(left, right)
 	maxLen := max(leftLen, rightLen)
 
-	return max(0, maxSimilarityScore-(dist*maxSimilarityScore/maxLen))
+	return max(consts.IndexZero, scoreIdenticalString-(dist*scoreIdenticalString/maxLen))
+}
+
+func editDistance(left, right string) int {
+	rightLen := len(right)
+	state := &dpState{
+		left:  left,
+		right: right,
+		prev:  make([]int, rightLen+1),
+		curr:  make([]int, rightLen+1),
+	}
+
+	for col := consts.IndexZero; col <= rightLen; col++ {
+		state.prev[col] = col
+	}
+
+	for row := consts.IndexOne; row <= len(left); row++ {
+		state.computeRow(row)
+	}
+
+	return state.prev[rightLen]
+}
+
+func (s *dpState) computeRow(row int) {
+	s.curr[consts.IndexZero] = row
+
+	for col := consts.IndexOne; col <= len(s.right); col++ {
+		cost := consts.IndexOne
+
+		if s.left[row-consts.IndexOne] == s.right[col-consts.IndexOne] {
+			cost = consts.IndexZero
+		}
+
+		s.curr[col] = minInt3(s.curr[col-1]+1, s.prev[col]+1, s.prev[col-1]+cost)
+	}
+
+	s.prev, s.curr = s.curr, s.prev
 }
 
 func minInt3(first, second, third int) int {

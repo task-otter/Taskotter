@@ -14,3 +14,4 @@
 .gocache
 coverage.out
 junit.xml
+taskotter-sync

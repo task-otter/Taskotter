@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/task-otter/Taskotter/internal/consts"
 	"github.com/task-otter/Taskotter/internal/pathutil"
 )
 
@@ -19,8 +20,14 @@ const (
 	pathTaskfileYML = "Taskfile.yml"
 	pathGoTaskfile  = "taskfiles/go/Taskfile.yml"
 	pathErrorMsgBad = "bad"
+
+	testOutsidePath    = "../outside"
+	testWindowsAbsPath = `C:\taskfiles`
+	fmtErrorEquals     = "Error() = %q"
+	testTaskfilesGo    = "taskfiles/go"
 )
 
+// TestIsTestPath verifies test file paths are identified regardless of directory nesting.
 func TestIsTestPath(t *testing.T) {
 	t.Parallel()
 
@@ -32,11 +39,12 @@ func TestIsTestPath(t *testing.T) {
 		{"eslint_test.ts", true},
 		{"nested/pkg/foo_test.go", true},
 		{pathTaskfileYML, false},
-		{"README.md", false},
+		{consts.ReadmeMD, false},
 		{"latest.txt", false},
 	}
 
-	for _, testCase := range cases {
+	for i := range cases {
+		testCase := &cases[i]
 		got := pathutil.IsTestPath(testCase.path)
 
 		if got != testCase.want {
@@ -45,6 +53,7 @@ func TestIsTestPath(t *testing.T) {
 	}
 }
 
+// TestIsModuleMetadataPath verifies only the top-level metadata.yml path is recognized.
 func TestIsModuleMetadataPath(t *testing.T) {
 	t.Parallel()
 
@@ -55,10 +64,11 @@ func TestIsModuleMetadataPath(t *testing.T) {
 		{"metadata.yml", true},
 		{"docs/metadata.yml", false},
 		{"metadata.yaml", false},
-		{"Taskfile.yml", false},
+		{pathTaskfileYML, false},
 	}
 
-	for _, testCase := range cases {
+	for i := range cases {
+		testCase := &cases[i]
 		got := pathutil.IsModuleMetadataPath(testCase.path)
 
 		if got != testCase.want {
@@ -67,6 +77,7 @@ func TestIsModuleMetadataPath(t *testing.T) {
 	}
 }
 
+// TestHasFolderPrefix verifies exact and child-path folder prefix matching.
 func TestHasFolderPrefix(t *testing.T) {
 	t.Parallel()
 
@@ -75,15 +86,16 @@ func TestHasFolderPrefix(t *testing.T) {
 		folder string
 		want   bool
 	}{
-		{"taskfiles/go", folderTaskfiles, true},
+		{testTaskfilesGo, folderTaskfiles, true},
 		{pathGoTaskfile, folderTaskfiles, true},
 		{folderTask, folderTask, true},
 		{"taskfiles-extra/foo", folderTask, false},
 		{"task/extra", folderTaskfiles, false},
-		{"", folderTaskfiles, false},
+		{consts.Empty, folderTaskfiles, false},
 	}
 
-	for _, testCase := range cases {
+	for i := range cases {
+		testCase := &cases[i]
 		got := pathutil.HasFolderPrefix(testCase.path, testCase.folder)
 
 		if got != testCase.want {
@@ -98,29 +110,31 @@ func TestHasFolderPrefix(t *testing.T) {
 	}
 }
 
+// TestValidateRelativePathRejectsTraversal verifies unsafe or escaping relative paths are rejected.
 func TestValidateRelativePathRejectsTraversal(t *testing.T) {
 	t.Parallel()
 
 	root := t.TempDir()
 
 	cases := []string{
-		"",
+		consts.Empty,
 		"///",
-		"..",
-		"../outside",
+		consts.PathParent,
+		testOutsidePath,
 		"taskfiles/../../outside",
 		"/etc/passwd",
-		`C:\taskfiles`,
+		testWindowsAbsPath,
 	}
 
-	for _, rel := range cases {
-		_, err := pathutil.ValidateRelativePath(root, rel)
+	for i := range cases {
+		_, err := pathutil.ValidateRelativePath(root, cases[i])
 		if err == nil {
-			t.Fatalf("ValidateRelativePath(%q) expected error", rel)
+			t.Fatalf("ValidateRelativePath(%q) expected error", cases[i])
 		}
 	}
 }
 
+// TestReadRelativeFileMissingReturnsNotExist verifies a missing file returns an [os.ErrNotExist] error.
 func TestReadRelativeFileMissingReturnsNotExist(t *testing.T) {
 	t.Parallel()
 
@@ -133,23 +147,29 @@ func TestReadRelativeFileMissingReturnsNotExist(t *testing.T) {
 	}
 }
 
+func writeTaskfileFixture(t *testing.T, root, rel string, data []byte) {
+	t.Helper()
+
+	err := os.MkdirAll(filepath.Join(root, folderTaskfiles, consts.Go), consts.FilePerm755)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = os.WriteFile(filepath.Join(root, filepath.FromSlash(rel)), data, consts.FilePerm644)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+// TestReadRelativeFile verifies a file's contents are read via a validated relative path.
 func TestReadRelativeFile(t *testing.T) {
 	t.Parallel()
 
 	root := t.TempDir()
 	rel := pathGoTaskfile
-
 	want := []byte("version: \"3\"\n")
 
-	err := os.MkdirAll(filepath.Join(root, "taskfiles", "go"), 0o755)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = os.WriteFile(filepath.Join(root, filepath.FromSlash(rel)), want, 0o644)
-	if err != nil {
-		t.Fatal(err)
-	}
+	writeTaskfileFixture(t, root, rel, want)
 
 	got, err := pathutil.ReadRelativeFile(root, rel)
 	if err != nil {
@@ -161,6 +181,7 @@ func TestReadRelativeFile(t *testing.T) {
 	}
 }
 
+// TestNormalizeSlashes verifies mixed and redundant separators normalize to a clean path.
 func TestNormalizeSlashes(t *testing.T) {
 	t.Parallel()
 
@@ -171,44 +192,61 @@ func TestNormalizeSlashes(t *testing.T) {
 	}
 }
 
+// TestPathErrorString verifies Error() includes the field prefix when set and omits it otherwise.
 func TestPathErrorString(t *testing.T) {
 	t.Parallel()
 
-	withField := (&pathutil.PathError{Field: "tasks", Value: "", Message: pathErrorMsgBad}).Error()
+	withField := (&pathutil.PathError{Field: "tasks", Value: consts.Empty, Message: pathErrorMsgBad}).Error()
 
 	if withField != "tasks: bad" {
-		t.Fatalf("Error() = %q", withField)
+		t.Fatalf(fmtErrorEquals, withField)
 	}
 
-	withoutField := (&pathutil.PathError{Field: "", Value: "", Message: pathErrorMsgBad}).Error()
+	withoutField := (&pathutil.PathError{
+		Field:   consts.Empty,
+		Value:   consts.Empty,
+		Message: pathErrorMsgBad,
+	}).Error()
 
 	if withoutField != pathErrorMsgBad {
-		t.Fatalf("Error() = %q", withoutField)
+		t.Fatalf(fmtErrorEquals, withoutField)
 	}
 }
 
+// TestValidateTaskName verifies safe task names are accepted and unsafe ones are rejected.
 func TestValidateTaskName(t *testing.T) {
 	t.Parallel()
 
-	valid := []string{"go", "eslint-config", "a1"}
+	valid := []string{consts.Go, "eslint-config", "a1"}
+	assertAllTaskNamesValid(t, valid)
 
-	for _, name := range valid {
-		err := pathutil.ValidateTaskName(name)
+	invalid := []string{consts.Empty, "Go", "go/test", `go\test`, "go..test", "-go"}
+	assertAllTaskNamesInvalid(t, invalid)
+}
+
+func assertAllTaskNamesValid(t *testing.T, names []string) {
+	t.Helper()
+
+	for i := range names {
+		err := pathutil.ValidateTaskName(names[i])
 		if err != nil {
-			t.Fatalf("ValidateTaskName(%q) error = %v", name, err)
-		}
-	}
-
-	invalid := []string{"", "Go", "go/test", `go\test`, "go..test", "-go"}
-
-	for _, name := range invalid {
-		err := pathutil.ValidateTaskName(name)
-		if err == nil {
-			t.Fatalf("ValidateTaskName(%q) expected error", name)
+			t.Fatalf("ValidateTaskName(%q) error = %v", names[i], err)
 		}
 	}
 }
 
+func assertAllTaskNamesInvalid(t *testing.T, names []string) {
+	t.Helper()
+
+	for i := range names {
+		err := pathutil.ValidateTaskName(names[i])
+		if err == nil {
+			t.Fatalf("ValidateTaskName(%q) expected error", names[i])
+		}
+	}
+}
+
+// TestValidateTargetFolder verifies a messy target folder input normalizes to a clean path.
 func TestValidateTargetFolder(t *testing.T) {
 	t.Parallel()
 
@@ -219,19 +257,20 @@ func TestValidateTargetFolder(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if got != "taskfiles/go" {
+	if got != testTaskfilesGo {
 		t.Fatalf("ValidateTargetFolder() = %q", got)
 	}
 }
 
+// TestValidateTargetFolderRejectsUnsafePaths verifies absolute, traversal, and reserved paths are rejected.
 func TestValidateTargetFolderRejectsUnsafePaths(t *testing.T) {
 	t.Parallel()
 
 	workspace := t.TempDir()
 	cases := []string{
-		"",
+		consts.Empty,
 		"/tmp/taskfiles",
-		`C:\taskfiles`,
+		testWindowsAbsPath,
 		"../taskfiles",
 		".git",
 		".git/hooks",
@@ -239,14 +278,15 @@ func TestValidateTargetFolderRejectsUnsafePaths(t *testing.T) {
 		".github/actions/taskotter",
 	}
 
-	for _, raw := range cases {
-		_, err := pathutil.ValidateTargetFolder(raw, workspace)
+	for i := range cases {
+		_, err := pathutil.ValidateTargetFolder(cases[i], workspace)
 		if err == nil {
-			t.Fatalf("ValidateTargetFolder(%q) expected error", raw)
+			t.Fatalf("ValidateTargetFolder(%q) expected error", cases[i])
 		}
 	}
 }
 
+// TestValidateTargetFolderRejectsEscapingSymlink verifies a symlink escaping the workspace is rejected.
 func TestValidateTargetFolderRejectsEscapingSymlink(t *testing.T) {
 	t.Parallel()
 
@@ -264,10 +304,11 @@ func TestValidateTargetFolderRejectsEscapingSymlink(t *testing.T) {
 	}
 }
 
+// TestJoinRelativeAndWorkspacePath verifies relative and workspace-absolute path joining.
 func TestJoinRelativeAndWorkspacePath(t *testing.T) {
 	t.Parallel()
 
-	got := pathutil.JoinRelative("taskfiles", "go", pathTaskfileYML)
+	got := pathutil.JoinRelative(folderTaskfiles, consts.Go, pathTaskfileYML)
 
 	if got != pathGoTaskfile {
 		t.Fatalf("JoinRelative() = %q", got)
@@ -275,13 +316,14 @@ func TestJoinRelativeAndWorkspacePath(t *testing.T) {
 
 	workspace := t.TempDir()
 
-	want := filepath.Join(workspace, "taskfiles", "go")
+	want := filepath.Join(workspace, folderTaskfiles, consts.Go)
 
-	if got := pathutil.WorkspacePath(workspace, "taskfiles/go"); got != want {
+	if got := pathutil.WorkspacePath(workspace, testTaskfilesGo); got != want {
 		t.Fatalf("WorkspacePath() = %q, want %q", got, want)
 	}
 }
 
+// TestValidateRelativePathNormalizesValidPath verifies a messy but valid relative path is normalized.
 func TestValidateRelativePathNormalizesValidPath(t *testing.T) {
 	t.Parallel()
 
@@ -297,25 +339,14 @@ func TestValidateRelativePathNormalizesValidPath(t *testing.T) {
 	}
 }
 
+// TestOpenRelativeFile verifies a file is opened successfully via a validated relative path.
 func TestOpenRelativeFile(t *testing.T) {
 	t.Parallel()
 
 	root := t.TempDir()
 	rel := pathGoTaskfile
 
-	err := os.MkdirAll(filepath.Join(root, "taskfiles", "go"), 0o755)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = os.WriteFile(
-		filepath.Join(root, filepath.FromSlash(rel)),
-		[]byte("version: \"3\"\n"),
-		0o644,
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	writeTaskfileFixture(t, root, rel, []byte("version: \"3\"\n"))
 
 	file, err := pathutil.OpenRelativeFile(root, rel)
 	if err != nil {
@@ -328,15 +359,17 @@ func TestOpenRelativeFile(t *testing.T) {
 	}
 }
 
+// TestOpenRelativeFileRejectsUnsafePath verifies an unsafe relative path is rejected before opening.
 func TestOpenRelativeFileRejectsUnsafePath(t *testing.T) {
 	t.Parallel()
 
-	_, err := pathutil.OpenRelativeFile(t.TempDir(), "../outside")
+	_, err := pathutil.OpenRelativeFile(t.TempDir(), testOutsidePath)
 	if err == nil {
 		t.Fatal("expected unsafe path rejection")
 	}
 }
 
+// TestIsDocPath verifies README and docs-folder paths are identified as documentation.
 func TestIsDocPath(t *testing.T) {
 	t.Parallel()
 
@@ -344,14 +377,15 @@ func TestIsDocPath(t *testing.T) {
 		path string
 		want bool
 	}{
-		{"README.md", true},
+		{consts.ReadmeMD, true},
 		{"docs/setup.md", true},
 		{"go/docs/setup.md", true},
 		{"go/README.md", false},
 		{pathTaskfileYML, false},
 	}
 
-	for _, testCase := range cases {
+	for i := range cases {
+		testCase := &cases[i]
 		got := pathutil.IsDocPath(testCase.path)
 
 		if got != testCase.want {

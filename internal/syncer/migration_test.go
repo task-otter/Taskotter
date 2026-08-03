@@ -9,63 +9,45 @@ import (
 	"testing"
 
 	"github.com/task-otter/Taskotter/internal/config"
+	"github.com/task-otter/Taskotter/internal/consts"
 	"github.com/task-otter/Taskotter/internal/normalizer"
 	"github.com/task-otter/Taskotter/internal/syncer"
 )
 
-func TestTargetFolderMigration(t *testing.T) {
-	t.Parallel()
+func writeTaskGoManagedLock(t *testing.T, workspace string) {
+	t.Helper()
 
-	workspace := t.TempDir()
-	writeRootTaskfile(t, workspace)
-
-	oldManaged := filepath.Join(workspace, "task/go/Taskfile.yml")
-
-	err := os.MkdirAll(filepath.Dir(oldManaged), 0o755)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = os.WriteFile(oldManaged, []byte("version: '3'\n"), 0o644)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	oldUser := filepath.Join(workspace, "task/go/user.txt")
-
-	err = os.WriteFile(oldUser, []byte("keep"), 0o644)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	writeMinimalLock(t, workspace, "task", []syncer.ManagedFile{
+	writeMinimalLock(t, workspace, targetFolderTask, []syncer.ManagedFile{
 		{
-			SourceModule:      "",
-			DestinationModule: "go",
-			SourcePath:        "",
-			Path:              "task/go/Taskfile.yml",
-			SHA256:            "",
+			SourceModule:      consts.Empty,
+			DestinationModule: consts.Go,
+			SourcePath:        consts.Empty,
+			Path:              taskGoTaskfilePath,
+			SHA256:            consts.Empty,
 		},
 	})
+}
 
-	cfg := testConfig(workspace, func(cfg *config.Config) {
-		cfg.Tasks = []string{"go"}
-		cfg.IncludesDoc = true
-	})
+func writeOldTargetFixture(t *testing.T, workspace string) (string, string) {
+	t.Helper()
 
-	syncInput, plan := preparePlan(t, workspace, cfg)
+	oldManaged := filepath.Join(workspace, taskGoTaskfilePath)
+	writeFileWithDir(t, oldManaged, []byte("version: '3'\n"), consts.FilePerm644)
 
-	err = runApplyPlan(t, plan, syncInput)
-	if err != nil {
-		t.Fatal(err)
-	}
+	oldUser := filepath.Join(workspace, "task/go/user.txt")
+	writeFileWithDir(t, oldUser, []byte(contentKeep), consts.FilePerm644)
 
-	_, err = os.Stat(filepath.Join(workspace, config.DefaultTargetFolder, "go/Taskfile.yml"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	writeTaskGoManagedLock(t, workspace)
 
-	_, err = os.Stat(oldManaged)
+	return oldManaged, oldUser
+}
+
+func assertMigrationResult(t *testing.T, workspace, oldManaged, oldUser string) {
+	t.Helper()
+
+	assertFileExists(t, filepath.Join(workspace, config.DefaultTargetFolder, testGoTaskfilePath))
+
+	_, err := os.Stat(oldManaged)
 	if err == nil {
 		t.Fatal("old managed file under previous target folder should be removed")
 	}
@@ -76,52 +58,56 @@ func TestTargetFolderMigration(t *testing.T) {
 	}
 }
 
+// TestTargetFolderMigration verifies files migrate to the new target folder while unmanaged files stay.
+func TestTargetFolderMigration(t *testing.T) {
+	t.Parallel()
+
+	workspace := t.TempDir()
+	oldManaged, oldUser := writeOldTargetFixture(t, workspace)
+
+	_, syncInput, plan := setupPlan(t, workspace, mutateGoWithDocs)
+
+	err := runApplyPlan(t, plan, &syncInput)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assertMigrationResult(t, workspace, oldManaged, oldUser)
+}
+
+// TestPrefixSafetyPreservesUnrelatedPaths verifies paths sharing a prefix with the target folder are untouched.
 func TestPrefixSafetyPreservesUnrelatedPaths(t *testing.T) {
 	t.Parallel()
 
 	workspace := t.TempDir()
-	writeRootTaskfile(t, workspace)
-
 	extra := filepath.Join(workspace, "taskfiles-extra/foo.txt")
+	writeFileWithDir(t, extra, []byte("stay"), consts.FilePerm644)
+	writeTaskGoManagedLock(t, workspace)
 
-	err := os.MkdirAll(filepath.Dir(extra), 0o755)
+	_, syncInput, plan := setupPlan(t, workspace, mutateGoWithDocs)
+
+	err := runApplyPlan(t, plan, &syncInput)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = os.WriteFile(extra, []byte("stay"), 0o644)
+	assertFileExists(t, extra)
+}
+
+func assertNormalizesToEslint(t *testing.T, mod string) {
+	t.Helper()
+
+	sourceToDest, err := normalizer.BuildDestinationMap([]string{mod})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	writeMinimalLock(t, workspace, "task", []syncer.ManagedFile{
-		{
-			SourceModule:      "",
-			DestinationModule: "go",
-			SourcePath:        "",
-			Path:              "task/go/Taskfile.yml",
-			SHA256:            "",
-		},
-	})
-
-	cfg := testConfig(workspace, func(cfg *config.Config) {
-		cfg.Tasks = []string{"go"}
-		cfg.IncludesDoc = true
-	})
-
-	syncInput, plan := preparePlan(t, workspace, cfg)
-
-	err = runApplyPlan(t, plan, syncInput)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	_, err = os.Stat(extra)
-	if err != nil {
-		t.Fatal("taskfiles-extra must not match old folder prefix task")
+	if sourceToDest[mod] != testModuleEslint {
+		t.Fatalf("%s should normalize to eslint, got %q", mod, sourceToDest[mod])
 	}
 }
 
+// TestPackageManagerSwitchSameDestination verifies different package manager variants normalize to eslint.
 func TestPackageManagerSwitchSameDestination(t *testing.T) {
 	t.Parallel()
 
@@ -129,14 +115,7 @@ func TestPackageManagerSwitchSameDestination(t *testing.T) {
 		t.Run(mod, func(t *testing.T) {
 			t.Parallel()
 
-			sourceToDest, err := normalizer.BuildDestinationMap([]string{mod})
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			if sourceToDest[mod] != testModuleEslint {
-				t.Fatalf("%s should normalize to eslint, got %q", mod, sourceToDest[mod])
-			}
+			assertNormalizesToEslint(t, mod)
 		})
 	}
 }

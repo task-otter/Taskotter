@@ -15,15 +15,30 @@ import (
 
 	gogithub "github.com/google/go-github/v69/github"
 	"github.com/task-otter/Taskotter/internal/config"
+	"github.com/task-otter/Taskotter/internal/consts"
 	"github.com/task-otter/Taskotter/internal/syncer"
 )
 
 const (
-	outputKeyChanged = "changed"
-	outputFalse      = "false"
+	outputKeyChanged     = "changed"
+	outputFalse          = "false"
+	errBodyNope          = "nope"
+	testSyncBranch       = "taskotter/sync-abc"
+	testMainBranch       = "main"
+	testPRBody           = "body"
+	testStoreVersionV123 = "v1.2.3"
+	testAddedTaskfile    = "taskfiles/go/Taskfile.yml"
+	testRemovedTaskfile  = "taskfiles/old.yml"
+	dirOutput            = "output"
+	testOwner            = "owner"
+	testRepoName         = "repo"
+	testToken            = "token"
+	pathReposPulls       = "/repos/owner/repo/pulls"
+	queryHead            = "head"
+	queryBase            = "base"
 )
 
-func newTestClient(t *testing.T, handler http.HandlerFunc) (*Client, func()) {
+func newTestClient(t *testing.T, handler http.HandlerFunc) (client *Client, cleanup func()) {
 	t.Helper()
 
 	srv := httptest.NewServer(handler)
@@ -37,135 +52,163 @@ func newTestClient(t *testing.T, handler http.HandlerFunc) (*Client, func()) {
 	api.BaseURL = baseURL
 	api.UploadURL = baseURL
 
-	return &Client{api: api, owner: "owner", repo: "repo"}, srv.Close
+	return &Client{api: api, owner: testOwner, repo: testRepoName}, srv.Close
 }
 
+// TestNewClientParsesRepository verifies the owner and repo name are parsed from the coordinate.
 func TestNewClientParsesRepository(t *testing.T) {
 	t.Parallel()
 
-	client, err := NewClient(t.Context(), "token", "owner/repo")
+	client, err := NewClient(t.Context(), testToken, "owner/repo")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if client.owner != "owner" || client.repo != "repo" {
+	if client.owner != testOwner || client.repo != testRepoName {
 		t.Fatalf("NewClient() = %#v", client)
 	}
 }
 
+// TestNewClientRejectsInvalidRepository verifies an invalid repository coordinate returns an error.
 func TestNewClientRejectsInvalidRepository(t *testing.T) {
 	t.Parallel()
 
-	_, err := NewClient(t.Context(), "token", "owner")
+	_, err := NewClient(t.Context(), testToken, testOwner)
 	if err == nil {
 		t.Fatal("expected invalid repository error")
 	}
 }
 
-func TestFindOpenPR(t *testing.T) {
-	t.Parallel()
+func assertOpenPRQuery(t *testing.T, req *http.Request) {
+	t.Helper()
 
-	client, cleanup := newTestClient(t, func(writer http.ResponseWriter, req *http.Request) {
-		if req.Method != http.MethodGet || req.URL.Path != "/repos/owner/repo/pulls" {
+	if req.URL.Query().Get(queryHead) != "owner:taskotter/sync-abc" {
+		t.Fatalf("head query = %q", req.URL.Query().Get(queryHead))
+	}
+
+	if req.URL.Query().Get(queryBase) != testMainBranch {
+		t.Fatalf("base query = %q", req.URL.Query().Get(queryBase))
+	}
+}
+
+func openPRHandler(t *testing.T) http.HandlerFunc {
+	t.Helper()
+
+	return func(writer http.ResponseWriter, req *http.Request) {
+		if req.Method != http.MethodGet || req.URL.Path != pathReposPulls {
 			http.NotFound(writer, req)
 
 			return
 		}
 
-		if req.URL.Query().Get("head") != "owner:taskotter/sync-abc" {
-			t.Fatalf("head query = %q", req.URL.Query().Get("head"))
-		}
+		assertOpenPRQuery(t, req)
 
-		if req.URL.Query().Get("base") != "main" {
-			t.Fatalf("base query = %q", req.URL.Query().Get("base"))
-		}
+		_, _ = writer.Write(
+			[]byte(`[{"number":42,"html_url":"https://example.test/pr/42"}]`),
+		)
+	}
+}
 
-		_, _ = writer.Write([]byte(`[{"number":42,"html_url":"https://example.test/pr/42"}]`))
-	})
+// TestFindOpenPR verifies an existing open pull request is found by branch and base.
+func TestFindOpenPR(t *testing.T) {
+	t.Parallel()
+
+	client, cleanup := newTestClient(t, openPRHandler(t))
 
 	defer cleanup()
 
-	pullRequest, err := client.FindOpenPR(t.Context(), "taskotter/sync-abc", "main")
+	pullRequest, err := client.FindOpenPR(t.Context(), testSyncBranch, testMainBranch)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if pullRequest.Number != 42 || pullRequest.URL != "https://example.test/pr/42" {
+	if pullRequest.Number != consts.Index42 || pullRequest.URL != "https://example.test/pr/42" {
 		t.Fatalf("FindOpenPR() = %#v", pullRequest)
 	}
 }
 
+// TestFindOpenPRNotFound verifies ErrPullRequestNotFound is returned when no PR matches.
 func TestFindOpenPRNotFound(t *testing.T) {
 	t.Parallel()
 
 	client, cleanup := newTestClient(t, func(writer http.ResponseWriter, _ *http.Request) {
-		_, _ = writer.Write([]byte(`[]`))
+		_, _ = writer.Write([]byte(`[]`)) //nolint:errcheck // test stub write cannot fail
 	})
 
 	defer cleanup()
 
-	_, err := client.FindOpenPR(t.Context(), "taskotter/sync-abc", "main")
+	_, err := client.FindOpenPR(t.Context(), testSyncBranch, testMainBranch)
 
 	if !errors.Is(err, ErrPullRequestNotFound) {
 		t.Fatalf("FindOpenPR() error = %v, want ErrPullRequestNotFound", err)
 	}
 }
 
+// TestFindOpenPRError verifies a server error response is surfaced as an error.
 func TestFindOpenPRError(t *testing.T) {
 	t.Parallel()
 
 	client, cleanup := newTestClient(t, func(writer http.ResponseWriter, _ *http.Request) {
-		http.Error(writer, "nope", http.StatusInternalServerError)
+		http.Error(writer, errBodyNope, http.StatusInternalServerError)
 	})
 
 	defer cleanup()
 
-	_, err := client.FindOpenPR(t.Context(), "taskotter/sync-abc", "main")
+	_, err := client.FindOpenPR(t.Context(), testSyncBranch, testMainBranch)
 	if err == nil {
 		t.Fatal("expected FindOpenPR error")
 	}
 }
 
-func TestCreatePR(t *testing.T) {
-	t.Parallel()
-
-	client, cleanup := newTestClient(t, func(writer http.ResponseWriter, req *http.Request) {
-		if req.Method != http.MethodPost || req.URL.Path != "/repos/owner/repo/pulls" {
+func createPRHandler() http.HandlerFunc {
+	return func(writer http.ResponseWriter, req *http.Request) {
+		if req.Method != http.MethodPost || req.URL.Path != pathReposPulls {
 			http.NotFound(writer, req)
 
 			return
 		}
 
-		_, _ = writer.Write([]byte(`{"number":7,"html_url":"https://example.test/pr/7"}`))
-	})
+		_, _ = writer.Write(
+			[]byte(`{"number":7,"html_url":"https://example.test/pr/7"}`),
+		)
+	}
+}
+
+// TestCreatePR verifies a new pull request is created and its number and URL returned.
+func TestCreatePR(t *testing.T) {
+	t.Parallel()
+
+	client, cleanup := newTestClient(t, createPRHandler())
 
 	defer cleanup()
 
-	pullRequest, err := client.CreatePR(t.Context(), "taskotter/sync-abc", "main", "body")
+	pullRequest, err := client.CreatePR(t.Context(), testSyncBranch, testMainBranch, testPRBody)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if pullRequest.Number != 7 || pullRequest.URL != "https://example.test/pr/7" {
+	if pullRequest.Number != consts.IndexSeven || pullRequest.URL != "https://example.test/pr/7" {
 		t.Fatalf("CreatePR() = %#v", pullRequest)
 	}
 }
 
+// TestCreatePRError verifies a server error response during PR creation is surfaced.
 func TestCreatePRError(t *testing.T) {
 	t.Parallel()
 
 	client, cleanup := newTestClient(t, func(writer http.ResponseWriter, _ *http.Request) {
-		http.Error(writer, "nope", http.StatusInternalServerError)
+		http.Error(writer, errBodyNope, http.StatusInternalServerError)
 	})
 
 	defer cleanup()
 
-	_, err := client.CreatePR(t.Context(), "taskotter/sync-abc", "main", "body")
+	_, err := client.CreatePR(t.Context(), testSyncBranch, testMainBranch, testPRBody)
 	if err == nil {
 		t.Fatal("expected CreatePR error")
 	}
 }
 
+// TestUpdatePRBody verifies the pull request body is updated via a PATCH request.
 func TestUpdatePRBody(t *testing.T) {
 	t.Parallel()
 
@@ -176,91 +219,109 @@ func TestUpdatePRBody(t *testing.T) {
 			return
 		}
 
-		_, _ = writer.Write([]byte(`{"number":7}`))
+		_, _ = writer.Write([]byte(`{"number":7}`)) //nolint:errcheck // test stub write cannot fail
 	})
 
 	defer cleanup()
 
-	err := client.UpdatePRBody(t.Context(), 7, "body")
+	err := client.UpdatePRBody(t.Context(), consts.IndexSeven, testPRBody)
 	if err != nil {
 		t.Fatal(err)
 	}
 }
 
+// TestUpdatePRBodyError verifies a server error response during body update is surfaced.
 func TestUpdatePRBodyError(t *testing.T) {
 	t.Parallel()
 
 	client, cleanup := newTestClient(t, func(writer http.ResponseWriter, _ *http.Request) {
-		http.Error(writer, "nope", http.StatusInternalServerError)
+		http.Error(writer, errBodyNope, http.StatusInternalServerError)
 	})
 
 	defer cleanup()
 
-	err := client.UpdatePRBody(t.Context(), 7, "body")
+	err := client.UpdatePRBody(t.Context(), consts.IndexSeven, testPRBody)
 	if err == nil {
 		t.Fatal("expected UpdatePRBody error")
 	}
 }
 
-func TestBuildPRBodyWithoutNodeRuntimeIncludesFileLists(t *testing.T) {
-	t.Parallel()
-
+func buildNonNodeConfig() *config.Config {
 	cfg := new(config.Config)
 
-	cfg.Tasks = []string{"go"}
+	cfg.Tasks = []string{consts.Go}
 	cfg.IncludesDoc = false
 	cfg.SyncRoot = false
 	cfg.TargetFolder = "taskfiles"
-	cfg.StoreVersion = "v1.2.3"
+	cfg.StoreVersion = testStoreVersionV123
 
+	return cfg
+}
+
+func buildNonNodeTestPlanData() *syncer.Plan {
 	plan := new(syncer.Plan)
 
 	plan.Requested = map[string]syncer.ModuleRecord{
-		"go": {
-			SourceModule:      "go",
-			DestinationModule: "",
+		consts.Go: {
+			SourceModule:      consts.Go,
+			DestinationModule: consts.Empty,
 			Path:              "taskfiles/go",
 		},
 	}
-	plan.Added = []string{"taskfiles/go/Taskfile.yml"}
+	plan.Added = []string{testAddedTaskfile}
 	plan.Updated = []string{"taskfiles/Taskfile.yml"}
-	plan.Removed = []string{"taskfiles/old.yml"}
+	plan.Removed = []string{testRemovedTaskfile}
 
-	body := BuildPRBody(cfg, plan, StoreRef{
-		SourceRef:      "",
-		ResolvedCommit: "",
-		DefaultBranch:  "",
+	return plan
+}
+
+func assertBodyContainsAll(t *testing.T, body string, wants []string) {
+	t.Helper()
+
+	for i := range wants {
+		if !strings.Contains(body, wants[i]) {
+			t.Fatalf("body missing %q: %s", wants[i], body)
+		}
+	}
+}
+
+// TestBuildPRBodyWithoutNodeRuntimeIncludesFileLists verifies non-node bodies list files without package manager info.
+func TestBuildPRBodyWithoutNodeRuntimeIncludesFileLists(t *testing.T) {
+	t.Parallel()
+
+	cfg := buildNonNodeConfig()
+	plan := buildNonNodeTestPlanData()
+
+	body := BuildPRBody(cfg, plan, &StoreRef{
+		SourceRef:      consts.Empty,
+		ResolvedCommit: consts.Empty,
+		DefaultBranch:  consts.Empty,
 	})
 
 	if strings.Contains(body, "Package manager") {
 		t.Fatalf("non-node body should not include package manager: %s", body)
 	}
 
-	for _, want := range []string{"v1.2.3", "taskfiles/go/Taskfile.yml", "taskfiles/old.yml"} {
-		if !strings.Contains(body, want) {
-			t.Fatalf("body missing %q: %s", want, body)
-		}
-	}
+	assertBodyContainsAll(
+		t,
+		body,
+		[]string{testStoreVersionV123, testAddedTaskfile, testRemovedTaskfile},
+	)
 }
 
-func TestWriteOutputs(t *testing.T) {
-	t.Parallel()
+func assertWriteOutputsFails(t *testing.T, outputPath string) {
+	t.Helper()
 
-	err := WriteOutputs("", map[string]string{outputKeyChanged: outputFalse})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	outputPath := filepath.Join(t.TempDir(), "missing", "output")
-
-	err = WriteOutputs(outputPath, map[string]string{outputKeyChanged: outputFalse})
+	err := WriteOutputs(outputPath, map[string]string{outputKeyChanged: outputFalse})
 	if err == nil {
 		t.Fatal("expected write error")
 	}
+}
 
-	outputPath = filepath.Join(t.TempDir(), "output")
+func assertWriteOutputsSucceeds(t *testing.T, outputPath string) {
+	t.Helper()
 
-	err = WriteOutputs(outputPath, map[string]string{outputKeyChanged: outputFalse})
+	err := WriteOutputs(outputPath, map[string]string{outputKeyChanged: outputFalse})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -273,4 +334,17 @@ func TestWriteOutputs(t *testing.T) {
 	if string(data) != "changed=false\n" {
 		t.Fatalf("output = %q", data)
 	}
+}
+
+// TestWriteOutputs verifies outputs write successfully or fail for an invalid path.
+func TestWriteOutputs(t *testing.T) {
+	t.Parallel()
+
+	err := WriteOutputs(consts.Empty, map[string]string{outputKeyChanged: outputFalse})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assertWriteOutputsFails(t, filepath.Join(t.TempDir(), "missing", dirOutput))
+	assertWriteOutputsSucceeds(t, filepath.Join(t.TempDir(), dirOutput))
 }

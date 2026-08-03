@@ -1,6 +1,7 @@
 // Taskotter 2026.
 // SPDX-License-Identifier: Apache-2.0.
 
+// Package syncer plans and applies taskfile synchronization changes to the workspace.
 package syncer
 
 import (
@@ -12,6 +13,7 @@ import (
 	"syscall"
 
 	"github.com/task-otter/Taskotter/internal/config"
+	"github.com/task-otter/Taskotter/internal/consts"
 	"github.com/task-otter/Taskotter/internal/pathutil"
 	"github.com/task-otter/Taskotter/internal/yamlfmt"
 	yaml "go.yaml.in/yaml/v3"
@@ -22,28 +24,15 @@ type stagedFile struct {
 	entry    FileEntry
 }
 
-func buildStagedFiles(plan *Plan, syncInput SyncInput) ([]stagedFile, error) {
-	var staged []stagedFile
+const (
+	lockFileName          = ".taskotter-lock.yml"
+	legacyMetadataDirName = ".taskotter"
+	legacyMetadataRelPath = ".taskotter/metadata.yml"
+	errCreateStagingDir   = "create staging directory: %w"
+)
 
-	for _, mod := range sortedModuleRecords(plan.Requested, plan.Dependencies) {
-		contents := plan.ModuleContents[mod.SourceModule]
-
-		rels := make([]string, 0, len(contents))
-
-		for rel := range contents {
-			rels = append(rels, rel)
-		}
-
-		sort.Strings(rels)
-
-		destDirRel := pathutil.JoinRelative(syncInput.Config.TargetFolder, mod.DestinationModule)
-
-		for _, rel := range rels {
-			finalRel := pathutil.JoinRelative(destDirRel, rel)
-
-			staged = append(staged, stagedFile{finalRel: finalRel, entry: contents[rel]})
-		}
-	}
+func buildStagedFiles(plan *Plan, syncInput *SyncInput) ([]stagedFile, error) {
+	staged := stageModuleFiles(plan, syncInput.Config.TargetFolder)
 
 	if syncInput.Config.SyncRoot {
 		staged = append(staged, stagedFile{
@@ -52,67 +41,168 @@ func buildStagedFiles(plan *Plan, syncInput SyncInput) ([]stagedFile, error) {
 		})
 	}
 
+	lockAndMeta, err := stageLockAndMetadata(plan, syncInput.Config.MetadataPath())
+	if err != nil {
+		return nil, fmt.Errorf("stage lock and metadata: %w", err)
+	}
+
+	return append(staged, lockAndMeta...), nil
+}
+
+func stageModuleFiles(plan *Plan, targetFolder string) []stagedFile {
+	var staged []stagedFile
+
+	records := sortedModuleRecords(plan.Requested, plan.Dependencies)
+
+	for i := range records {
+		mod := &records[i]
+
+		staged = append(
+			staged,
+			stageOneModule(mod, plan.ModuleContents[mod.SourceModule], targetFolder)...,
+		)
+	}
+
+	return staged
+}
+
+func stageOneModule(
+	mod *ModuleRecord,
+	contents map[string]FileEntry,
+	targetFolder string,
+) []stagedFile {
+	rels := make([]string, consts.IndexZero, len(contents))
+
+	for rel := range contents {
+		rels = append(rels, rel)
+	}
+
+	sort.Strings(rels)
+
+	destDirRel := pathutil.JoinRelative(targetFolder, mod.DestinationModule)
+	staged := make([]stagedFile, consts.IndexZero, len(rels))
+
+	for i := range rels {
+		rel := rels[i]
+		finalRel := pathutil.JoinRelative(destDirRel, rel)
+
+		staged = append(staged, stagedFile{finalRel: finalRel, entry: contents[rel]})
+	}
+
+	return staged
+}
+
+func stageLockAndMetadata(plan *Plan, metadataPath string) ([]stagedFile, error) {
 	lockBytes, err := yamlfmt.Marshal(plan.Lock)
 	if err != nil {
 		return nil, fmt.Errorf("marshal lock file: %w", err)
 	}
-
-	staged = append(staged, stagedFile{
-		finalRel: plan.Metadata.LockFile,
-		entry:    FileEntry{Data: lockBytes, Mode: fileModeRegular},
-	})
 
 	metaBytes, err := yamlfmt.Marshal(plan.Metadata)
 	if err != nil {
 		return nil, fmt.Errorf("marshal metadata: %w", err)
 	}
 
-	staged = append(staged, stagedFile{
-		finalRel: syncInput.Config.MetadataPath(),
-		entry:    FileEntry{Data: metaBytes, Mode: fileModeRegular},
-	})
-
-	return staged, nil
+	return []stagedFile{
+		{
+			finalRel: plan.Metadata.LockFile,
+			entry:    FileEntry{Data: lockBytes, Mode: fileModeRegular},
+		},
+		{
+			finalRel: metadataPath,
+			entry:    FileEntry{Data: metaBytes, Mode: fileModeRegular},
+		},
+	}, nil
 }
 
 // ApplyPlan writes planned files atomically and removes obsolete managed paths.
-func ApplyPlan(plan *Plan, syncInput SyncInput) error {
+func ApplyPlan(plan *Plan, syncInput *SyncInput) (err error) {
 	workspace := syncInput.Config.Workspace
 
-	staged, err := buildStagedFiles(plan, syncInput)
+	staged, copyFile, stagingRoot, err := prepareStaging(plan, syncInput, workspace)
 	if err != nil {
-		return err
+		return fmt.Errorf("prepare staging: %w", err)
 	}
 
-	copyFile := plan.copyFileTo
+	defer func() {
+		removeErr := os.RemoveAll(stagingRoot)
 
-	if copyFile == nil {
-		copyFile = copyFileTo
+		if removeErr != nil && err == nil {
+			err = fmt.Errorf("clean up staging directory %q: %w", stagingRoot, removeErr)
+		}
+	}()
+
+	err = validateAndWriteStaged(staged, plan.RootTaskfilePath, workspace, copyFile)
+	if err != nil {
+		return fmt.Errorf("validate and write staged files: %w", err)
 	}
 
-	stagingRoot, err := stagePlanFiles(staged, workspace, syncInput.Config.TargetFolder, copyFile)
+	err = cleanupAfterApply(plan, workspace, syncInput.Config.MetadataPath())
 	if err != nil {
-		return err
+		return fmt.Errorf("clean up after apply: %w", err)
 	}
 
-	defer func() { _ = os.RemoveAll(stagingRoot) }()
+	return nil
+}
 
-	err = validateGeneratedYAML(staged, plan.RootTaskfilePath)
+func prepareStaging(
+	plan *Plan,
+	syncInput *SyncInput,
+	workspace string,
+) (staged []stagedFile, copyFile func(string, FileEntry) error, stagingRoot string, err error) {
+	staged, err = buildStagedFiles(plan, syncInput)
 	if err != nil {
-		return err
+		return nil, nil, consts.Empty, fmt.Errorf("build staged files: %w", err)
+	}
+
+	copyFile = resolveCopyHook(plan)
+
+	stagingRoot, err = stagePlanFiles(staged, workspace, syncInput.Config.TargetFolder, copyFile)
+	if err != nil {
+		return nil, nil, consts.Empty, fmt.Errorf("stage plan files: %w", err)
+	}
+
+	return staged, copyFile, stagingRoot, nil
+}
+
+func resolveCopyHook(plan *Plan) func(string, FileEntry) error {
+	if plan.copyFileTo != nil {
+		return plan.copyFileTo
+	}
+
+	return copyFileTo
+}
+
+func validateAndWriteStaged(
+	staged []stagedFile,
+	rootPath, workspace string,
+	copyFile func(string, FileEntry) error,
+) error {
+	err := validateGeneratedYAML(staged, rootPath)
+	if err != nil {
+		return fmt.Errorf("validate generated yaml: %w", err)
 	}
 
 	err = writeStagedFiles(staged, workspace, copyFile)
 	if err != nil {
-		return err
+		return fmt.Errorf("write staged files: %w", err)
 	}
 
-	err = removeObsolete(plan, workspace)
+	return nil
+}
+
+func cleanupAfterApply(plan *Plan, workspace, metadataPath string) error {
+	err := removeObsolete(plan, workspace)
 	if err != nil {
-		return err
+		return fmt.Errorf("remove obsolete files: %w", err)
 	}
 
-	return cleanupLegacyMetadata(workspace, syncInput.Config.MetadataPath())
+	err = cleanupLegacyMetadata(workspace, metadataPath)
+	if err != nil {
+		return fmt.Errorf("clean up legacy metadata: %w", err)
+	}
+
+	return nil
 }
 
 func stagePlanFiles(
@@ -120,6 +210,30 @@ func stagePlanFiles(
 	workspace, targetFolder string,
 	copyFile func(string, FileEntry) error,
 ) (string, error) {
+	stagingRoot, err := prepareStagingRoot(workspace, targetFolder)
+	if err != nil {
+		return consts.Empty, fmt.Errorf("prepare staging root: %w", err)
+	}
+
+	err = copyStagedFiles(stagingRoot, staged, copyFile)
+	if err != nil {
+		copyErr := fmt.Errorf("copy staged files: %w", err)
+
+		removeErr := os.RemoveAll(stagingRoot)
+		if removeErr != nil {
+			return consts.Empty, errors.Join(
+				copyErr,
+				fmt.Errorf("clean up staging directory %q: %w", stagingRoot, removeErr),
+			)
+		}
+
+		return consts.Empty, copyErr
+	}
+
+	return stagingRoot, nil
+}
+
+func prepareStagingRoot(workspace, targetFolder string) (string, error) {
 	stagingParent := pathutil.WorkspacePath(
 		workspace,
 		pathutil.JoinRelative(targetFolder, ".taskotter/staging"),
@@ -127,26 +241,33 @@ func stagePlanFiles(
 
 	err := os.MkdirAll(stagingParent, dirModePerm)
 	if err != nil {
-		return "", fmt.Errorf("create staging directory: %w", err)
+		return consts.Empty, fmt.Errorf(errCreateStagingDir, err)
 	}
 
 	stagingRoot, err := os.MkdirTemp(stagingParent, "apply-*")
 	if err != nil {
-		return "", fmt.Errorf("create staging directory: %w", err)
-	}
-
-	for _, stagedEntry := range staged {
-		stagePath := filepath.Join(stagingRoot, filepath.FromSlash(stagedEntry.finalRel))
-
-		err = copyFile(stagePath, stagedEntry.entry)
-		if err != nil {
-			_ = os.RemoveAll(stagingRoot)
-
-			return "", fmt.Errorf("stage %q: %w", stagedEntry.finalRel, err)
-		}
+		return consts.Empty, fmt.Errorf(errCreateStagingDir, err)
 	}
 
 	return stagingRoot, nil
+}
+
+func copyStagedFiles(
+	stagingRoot string,
+	staged []stagedFile,
+	copyFile func(string, FileEntry) error,
+) error {
+	for i := range staged {
+		stagedEntry := &staged[i]
+		stagePath := filepath.Join(stagingRoot, filepath.FromSlash(stagedEntry.finalRel))
+
+		err := copyFile(stagePath, stagedEntry.entry)
+		if err != nil {
+			return fmt.Errorf("stage %q: %w", stagedEntry.finalRel, err)
+		}
+	}
+
+	return nil
 }
 
 func writeStagedFiles(
@@ -154,7 +275,8 @@ func writeStagedFiles(
 	workspace string,
 	copyFile func(string, FileEntry) error,
 ) error {
-	for _, stagedEntry := range staged {
+	for i := range staged {
+		stagedEntry := &staged[i]
 		finalPath := pathutil.WorkspacePath(workspace, stagedEntry.finalRel)
 
 		err := os.MkdirAll(filepath.Dir(finalPath), dirModePerm)
@@ -172,88 +294,170 @@ func writeStagedFiles(
 }
 
 func validateGeneratedYAML(staged []stagedFile, rootPath string) error {
-	for _, stagedEntry := range staged {
-		switch {
-		case stagedEntry.finalRel == rootPath:
-			var node yaml.Node
+	for i := range staged {
+		stagedEntry := &staged[i]
 
-			err := yaml.Unmarshal(stagedEntry.entry.Data, &node)
-			if err != nil {
-				return fmt.Errorf("validate root Taskfile.yml: %w", err)
-			}
-		case filepath.Base(stagedEntry.finalRel) == ".taskotter-lock.yml":
-			var lock LockFile
-
-			err := yaml.Unmarshal(stagedEntry.entry.Data, &lock)
-			if err != nil {
-				return fmt.Errorf("validate lock file: %w", err)
-			}
-		case filepath.Base(stagedEntry.finalRel) == "metadata.yml":
-			var meta Metadata
-
-			err := yaml.Unmarshal(stagedEntry.entry.Data, &meta)
-			if err != nil {
-				return fmt.Errorf("validate metadata: %w", err)
-			}
+		err := validateStagedYAML(stagedEntry, rootPath)
+		if err != nil {
+			return fmt.Errorf("validate staged yaml %q: %w", stagedEntry.finalRel, err)
 		}
 	}
 
 	return nil
 }
 
-func removeObsolete(plan *Plan, workspace string) error {
-	currentPaths := make(map[string]struct{}, len(plan.ManagedFiles))
+func validateStagedYAML(stagedEntry *stagedFile, rootPath string) error {
+	var err error
 
-	for _, managed := range plan.ManagedFiles {
-		currentPaths[managed.Path] = struct{}{}
+	switch {
+	case stagedEntry.finalRel == rootPath:
+		err = validateRootTaskfileYAML(stagedEntry.entry.Data)
+	case filepath.Base(stagedEntry.finalRel) == lockFileName:
+		err = validateLockFileYAML(stagedEntry.entry.Data)
+	case filepath.Base(stagedEntry.finalRel) == storeMetadataFileName:
+		err = validateMetadataYAML(stagedEntry.entry.Data)
+	default:
+		return nil
 	}
+
+	if err != nil {
+		return fmt.Errorf("validate: %w", err)
+	}
+
+	return nil
+}
+
+func validateRootTaskfileYAML(data []byte) error {
+	var node yaml.Node
+
+	err := yaml.Unmarshal(data, &node)
+	if err != nil {
+		return fmt.Errorf("validate root Taskfile.yml: %w", err)
+	}
+
+	return nil
+}
+
+func validateLockFileYAML(data []byte) error {
+	var lock LockFile
+
+	err := yaml.Unmarshal(data, &lock)
+	if err != nil {
+		return fmt.Errorf("validate lock file: %w", err)
+	}
+
+	return nil
+}
+
+func validateMetadataYAML(data []byte) error {
+	var meta Metadata
+
+	err := yaml.Unmarshal(data, &meta)
+	if err != nil {
+		return fmt.Errorf("validate metadata: %w", err)
+	}
+
+	return nil
+}
+
+func removeObsolete(plan *Plan, workspace string) error {
+	currentPaths := buildCurrentPathSet(plan)
 
 	if plan.OldLock == nil {
 		return nil
 	}
 
-	for _, old := range plan.OldLock.ManagedFiles {
+	err := removeStaleManagedFiles(plan.OldLock, currentPaths, workspace)
+	if err != nil {
+		return fmt.Errorf("remove stale managed files: %w", err)
+	}
+
+	err = cleanupOldTarget(plan, workspace)
+	if err != nil {
+		return fmt.Errorf("clean up old target: %w", err)
+	}
+
+	return nil
+}
+
+func buildCurrentPathSet(plan *Plan) map[string]struct{} {
+	currentPaths := make(map[string]struct{}, len(plan.ManagedFiles))
+
+	for i := range plan.ManagedFiles {
+		currentPaths[plan.ManagedFiles[i].Path] = struct{}{}
+	}
+
+	return currentPaths
+}
+
+func removeStaleManagedFiles(
+	oldLock *LockFile,
+	currentPaths map[string]struct{},
+	workspace string,
+) error {
+	for i := range oldLock.ManagedFiles {
+		old := &oldLock.ManagedFiles[i]
+
 		if _, ok := currentPaths[old.Path]; ok {
 			continue
 		}
 
-		abs := pathutil.WorkspacePath(workspace, old.Path)
-
-		err := os.Remove(abs)
-
-		if err != nil && !os.IsNotExist(err) {
+		err := removeObsoleteFile(workspace, old.Path)
+		if err != nil {
 			return fmt.Errorf("remove obsolete file %q: %w", old.Path, err)
 		}
 	}
 
-	return cleanupOldTarget(plan, workspace)
+	return nil
+}
+
+func removeObsoleteFile(workspace, path string) error {
+	abs := pathutil.WorkspacePath(workspace, path)
+
+	err := os.Remove(abs)
+
+	if err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("remove obsolete file %q: %w", path, err)
+	}
+
+	return nil
 }
 
 func cleanupOldTarget(plan *Plan, workspace string) error {
-	if plan.OldLock == nil || plan.OldTargetFolder == "" ||
-		plan.OldTargetFolder == plan.Metadata.TargetFolder {
-
+	if oldTargetUnchanged(plan) {
 		return nil
 	}
 
 	err := removeOldTargetFiles(plan, workspace)
 	if err != nil {
-		return err
+		return fmt.Errorf("remove old target files: %w", err)
 	}
 
 	err = removeIfExists(
 		workspace,
-		pathutil.JoinRelative(plan.OldTargetFolder, ".taskotter-lock.yml"),
+		pathutil.JoinRelative(plan.OldTargetFolder, lockFileName),
 	)
 	if err != nil {
 		return fmt.Errorf("remove old lock file: %w", err)
 	}
 
-	return removeOldTargetMetadata(plan, workspace)
+	err = removeOldTargetMetadata(plan, workspace)
+	if err != nil {
+		return fmt.Errorf("remove old target metadata: %w", err)
+	}
+
+	return nil
+}
+
+func oldTargetUnchanged(plan *Plan) bool {
+	return plan.OldLock == nil || plan.OldTargetFolder == "" ||
+		plan.OldTargetFolder == plan.Metadata.TargetFolder
 }
 
 func removeOldTargetFiles(plan *Plan, workspace string) error {
-	for _, old := range plan.OldLock.ManagedFiles {
+	for i := range plan.OldLock.ManagedFiles {
+		old := &plan.OldLock.ManagedFiles[i]
+
 		if !pathutil.HasFolderPrefix(old.Path, plan.OldTargetFolder) {
 			continue
 		}
@@ -268,7 +472,7 @@ func removeOldTargetFiles(plan *Plan, workspace string) error {
 }
 
 func removeOldTargetMetadata(plan *Plan, workspace string) error {
-	oldMetadataRel := pathutil.JoinRelative(plan.OldTargetFolder, ".taskotter/metadata.yml")
+	oldMetadataRel := pathutil.JoinRelative(plan.OldTargetFolder, legacyMetadataRelPath)
 
 	err := removeIfExists(workspace, oldMetadataRel)
 	if err != nil {
@@ -277,10 +481,9 @@ func removeOldTargetMetadata(plan *Plan, workspace string) error {
 
 	oldMetadata := pathutil.WorkspacePath(workspace, oldMetadataRel)
 
-	err = os.Remove(filepath.Dir(oldMetadata))
-
-	if err != nil && !os.IsNotExist(err) && !errorsIsDirectoryNotEmpty(err) {
-		return fmt.Errorf("remove old metadata directory: %w", err)
+	err = removeDirIfEmpty(filepath.Dir(oldMetadata), "remove old metadata directory")
+	if err != nil {
+		return fmt.Errorf("clean up old metadata directory: %w", err)
 	}
 
 	return nil
@@ -309,10 +512,21 @@ func cleanupLegacyMetadata(workspace, metadataPath string) error {
 		return fmt.Errorf("remove legacy metadata: %w", err)
 	}
 
-	err = os.Remove(pathutil.WorkspacePath(workspace, ".taskotter"))
+	legacyDir := pathutil.WorkspacePath(workspace, legacyMetadataDirName)
+
+	err = removeDirIfEmpty(legacyDir, "remove legacy metadata directory")
+	if err != nil {
+		return fmt.Errorf("clean up legacy metadata directory: %w", err)
+	}
+
+	return nil
+}
+
+func removeDirIfEmpty(dir, context string) error {
+	err := os.Remove(dir)
 
 	if err != nil && !os.IsNotExist(err) && !errorsIsDirectoryNotEmpty(err) {
-		return fmt.Errorf("remove legacy metadata directory: %w", err)
+		return fmt.Errorf("%s: %w", context, err)
 	}
 
 	return nil

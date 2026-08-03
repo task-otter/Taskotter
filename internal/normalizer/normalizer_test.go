@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/task-otter/Taskotter/internal/consts"
 	"github.com/task-otter/Taskotter/internal/normalizer"
 )
 
@@ -14,8 +15,16 @@ const (
 	destCorepack = "corepack"
 	destESLint   = "eslint"
 	srcESLint    = "eslint/node/fnm/pnpm"
+	srcESLintBun = "eslint/bun"
+	destPnpm     = "pnpm"
+	destNpm      = "npm"
+	destYarn     = "yarn"
+	destFnm      = "fnm"
+	destNvm      = "nvm"
+	destBun      = "bun"
 )
 
+// TestNormalizeExamples verifies variant module source names normalize to expected destinations.
 func TestNormalizeExamples(t *testing.T) {
 	t.Parallel()
 
@@ -26,10 +35,10 @@ func TestNormalizeExamples(t *testing.T) {
 		"eslint/node/nvm/npm":  destESLint,
 		"eslint/node/fnm/yarn": destESLint,
 		"eslint/node/nvm/yarn": destESLint,
-		"eslint/bun":           destESLint,
-		"pnpm/fnm":             "pnpm",
-		"npm/nvm":              "npm",
-		"yarn/fnm":             "yarn",
+		srcESLintBun:           destESLint,
+		"pnpm/fnm":             destPnpm,
+		"npm/nvm":              destNpm,
+		"yarn/fnm":             destYarn,
 		"corepack/fnm":         destCorepack,
 		"corepack/nvm":         destCorepack,
 		"eslint-pnpm-fnm":      destESLint,
@@ -39,18 +48,20 @@ func TestNormalizeExamples(t *testing.T) {
 		"eslint-yarn-fnm":      destESLint,
 		"eslint-yarn-nvm":      destESLint,
 		"eslint-bun":           destESLint,
-		"pnpm-fnm":             "pnpm",
-		"npm-nvm":              "npm",
-		"yarn-fnm":             "yarn",
+		"pnpm-fnm":             destPnpm,
+		"npm-nvm":              destNpm,
+		"yarn-fnm":             destYarn,
 		"corepack-fnm":         destCorepack,
 		"corepack-nvm":         destCorepack,
-		"fnm":                  "fnm",
-		"nvm":                  "nvm",
-		"bun":                  "bun",
-		"go":                   "go",
+		destFnm:                destFnm,
+		destNvm:                destNvm,
+		destBun:                destBun,
+		consts.Go:              consts.Go,
 	}
 
-	for source, want := range cases {
+	for source := range cases {
+		want := cases[source]
+
 		got, err := normalizer.Normalize(source)
 		if err != nil {
 			t.Fatalf("Normalize(%q) error = %v", source, err)
@@ -62,6 +73,7 @@ func TestNormalizeExamples(t *testing.T) {
 	}
 }
 
+// TestLongestSuffixFirst verifies the longest matching suffix is normalized first.
 func TestLongestSuffixFirst(t *testing.T) {
 	t.Parallel()
 
@@ -75,6 +87,7 @@ func TestLongestSuffixFirst(t *testing.T) {
 	}
 }
 
+// TestNormalizeRejectsEmptySource verifies an empty source name returns an error.
 func TestNormalizeRejectsEmptySource(t *testing.T) {
 	t.Parallel()
 
@@ -84,6 +97,7 @@ func TestNormalizeRejectsEmptySource(t *testing.T) {
 	}
 }
 
+// TestBuildDestinationMapPropagatesNormalizeError verifies a normalize failure propagates from the map builder.
 func TestBuildDestinationMapPropagatesNormalizeError(t *testing.T) {
 	t.Parallel()
 
@@ -93,10 +107,11 @@ func TestBuildDestinationMapPropagatesNormalizeError(t *testing.T) {
 	}
 }
 
+// TestDestinationCollision verifies two sources normalizing to the same destination error.
 func TestDestinationCollision(t *testing.T) {
 	t.Parallel()
 
-	_, err := normalizer.BuildDestinationMap([]string{srcESLint, "eslint/bun"})
+	_, err := normalizer.BuildDestinationMap([]string{srcESLint, srcESLintBun})
 	if err == nil {
 		t.Fatal("expected collision error")
 	}
@@ -106,17 +121,18 @@ func TestDestinationCollision(t *testing.T) {
 	}
 }
 
+// TestBuildDestinationMapSortsSources verifies sources are returned sorted by destination.
 func TestBuildDestinationMapSortsSources(t *testing.T) {
 	t.Parallel()
 
-	mapping, err := normalizer.BuildDestinationMap([]string{"go", srcESLint})
+	mapping, err := normalizer.BuildDestinationMap([]string{consts.Go, srcESLint})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	got := normalizer.SortedSources(mapping)
 
-	want := []string{srcESLint, "go"}
+	want := []string{srcESLint, consts.Go}
 
 	for i := range want {
 		if got[i] != want[i] {

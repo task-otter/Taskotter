@@ -7,72 +7,113 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/task-otter/Taskotter/internal/consts"
 	yaml "go.yaml.in/yaml/v3"
+)
+
+type (
+
+	// JSRuntime selects the JavaScript runtime for Node-oriented task resolution.
+	JSRuntime string
+
+	jsInput struct {
+		Runtime        string
+		PackageManager string
+		VersionManager string
+	}
+
+	jsConfig struct {
+		Runtime            JSRuntime
+		NodePackageManager PackageManager
+		NodeVersionManager VersionManager
+	}
 )
 
 const (
 	fieldJSPackageManager = "js.package-manager"
 	fieldJSVersionManager = "js.version-manager"
-)
 
-// JSRuntime selects the JavaScript runtime for Node-oriented task resolution.
-type JSRuntime string
-
-const (
 	// JSRuntimeBun selects Bun as the JS runtime.
-	JSRuntimeBun JSRuntime = "bun"
+	JSRuntimeBun JSRuntime = JSRuntime(consts.Bun)
+
 	// JSRuntimeNodeJS selects Node.js as the JS runtime.
 	JSRuntimeNodeJS JSRuntime = "nodejs"
 )
 
-type jsInput struct {
-	Runtime        string
-	PackageManager string
-	VersionManager string
-}
-
-type jsConfig struct {
-	Runtime            JSRuntime
-	NodePackageManager PackageManager
-	NodeVersionManager VersionManager
-}
-
 func parseJS(raw string) (*jsConfig, error) {
 	raw = strings.TrimSpace(raw)
 
-	if raw == "" {
-		return &jsConfig{
-			Runtime:            "",
-			NodePackageManager: "",
-			NodeVersionManager: "",
-		}, nil
+	if raw == consts.Empty {
+		return emptyJSConfig(), nil
 	}
 
+	yamlInput, err := parseJSYAML(raw)
+	if err != nil {
+		return nil, fmt.Errorf("parse js yaml: %w", err)
+	}
+
+	jsCfg, err := dispatchJSRuntime(&yamlInput)
+	if err != nil {
+		return nil, fmt.Errorf("dispatch js runtime: %w", err)
+	}
+
+	return jsCfg, nil
+}
+
+func emptyJSConfig() *jsConfig {
+	return &jsConfig{
+		Runtime:            consts.Empty,
+		NodePackageManager: consts.Empty,
+		NodeVersionManager: consts.Empty,
+	}
+}
+
+func parseJSYAML(raw string) (jsInput, error) {
 	yamlInput, err := parseJSInput(raw)
 	if err != nil {
-		return nil, &ValidationError{
-			Field:   "js",
+		return jsInput{}, &ValidationError{
+			Field:   consts.FieldJS,
 			Message: fmt.Sprintf("invalid YAML: %v", err),
 		}
 	}
 
-	runtime := strings.TrimSpace(yamlInput.Runtime)
+	return yamlInput, nil
+}
 
-	if runtime == "" {
-		runtime = string(JSRuntimeNodeJS)
-	}
+func dispatchJSRuntime(yamlInput *jsInput) (*jsConfig, error) {
+	runtime := defaultedJSRuntime(yamlInput.Runtime)
 
 	switch JSRuntime(runtime) {
 	case JSRuntimeBun:
-		return parseJSBun(yamlInput)
+		jsCfg, err := parseJSBun(yamlInput)
+		if err != nil {
+			return nil, fmt.Errorf("parse bun config: %w", err)
+		}
+
+		return jsCfg, nil
 	case JSRuntimeNodeJS:
-		return parseJSNodeJS(yamlInput)
+		jsCfg, err := parseJSNodeJS(yamlInput)
+		if err != nil {
+			return nil, fmt.Errorf("parse nodejs config: %w", err)
+		}
+
+		return jsCfg, nil
 	default:
 		return nil, &ValidationError{
 			Field:   "js.runtime",
 			Message: fmt.Sprintf("invalid value %q: allowed values are bun or nodejs", runtime),
 		}
 	}
+}
+
+func defaultedJSRuntime(rawRuntime string) string {
+	runtime := strings.TrimSpace(rawRuntime)
+
+	if runtime == consts.Empty {
+		runtime = string(JSRuntimeNodeJS)
+	}
+
+	return runtime
 }
 
 func parseJSInput(raw string) (jsInput, error) {
@@ -90,56 +131,40 @@ func parseJSInput(raw string) (jsInput, error) {
 	}, nil
 }
 
-func parseJSBun(yamlInput jsInput) (*jsConfig, error) {
-	if strings.TrimSpace(yamlInput.PackageManager) != "" {
+func parseJSBun(yamlInput *jsInput) (*jsConfig, error) {
+	if strings.TrimSpace(yamlInput.PackageManager) != consts.Empty {
 		return nil, &ValidationError{
 			Field:   fieldJSPackageManager,
-			Message: "is only valid when js.runtime is nodejs",
+			Message: consts.JSValidOnlyForNodejs,
 		}
 	}
 
-	if strings.TrimSpace(yamlInput.VersionManager) != "" {
+	if strings.TrimSpace(yamlInput.VersionManager) != consts.Empty {
 		return nil, &ValidationError{
 			Field:   fieldJSVersionManager,
-			Message: "is only valid when js.runtime is nodejs",
+			Message: consts.JSValidOnlyForNodejs,
 		}
 	}
 
 	return &jsConfig{
 		Runtime:            JSRuntimeBun,
 		NodePackageManager: PMBun,
-		NodeVersionManager: "",
+		NodeVersionManager: consts.Empty,
 	}, nil
 }
 
-func parseJSNodeJS(yamlInput jsInput) (*jsConfig, error) {
-	packageManagerRaw := strings.TrimSpace(yamlInput.PackageManager)
+func parseJSNodeJS(yamlInput *jsInput) (*jsConfig, error) {
+	packageManagerRaw := defaultedRaw(yamlInput.PackageManager, string(PMNPM))
+	versionManagerRaw := defaultedRaw(yamlInput.VersionManager, string(VMFnm))
 
-	if packageManagerRaw == "" {
-		packageManagerRaw = string(PMNPM)
-	}
-
-	versionManagerRaw := strings.TrimSpace(yamlInput.VersionManager)
-
-	if versionManagerRaw == "" {
-		versionManagerRaw = string(VMFnm)
-	}
-
-	packageManager, err := parseNodePackageManager(packageManagerRaw)
+	packageManager, err := validatePackageManager(packageManagerRaw)
 	if err != nil {
-		return nil, err
-	}
-
-	if packageManager == PMBun {
-		return nil, &ValidationError{
-			Field:   fieldJSPackageManager,
-			Message: `use js.runtime "bun" instead of package-manager "bun"`,
-		}
+		return nil, fmt.Errorf("validate package manager: %w", err)
 	}
 
 	versionManager, err := parseNodeVersionManager(versionManagerRaw)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("parse node version manager: %w", err)
 	}
 
 	return &jsConfig{
@@ -147,6 +172,32 @@ func parseJSNodeJS(yamlInput jsInput) (*jsConfig, error) {
 		NodePackageManager: packageManager,
 		NodeVersionManager: versionManager,
 	}, nil
+}
+
+func defaultedRaw(raw, fallback string) string {
+	trimmed := strings.TrimSpace(raw)
+
+	if trimmed == consts.Empty {
+		return fallback
+	}
+
+	return trimmed
+}
+
+func validatePackageManager(raw string) (PackageManager, error) {
+	packageManager, err := parseNodePackageManager(raw)
+	if err != nil {
+		return "", fmt.Errorf("parse node package manager: %w", err)
+	}
+
+	if packageManager == PMBun {
+		return "", &ValidationError{
+			Field:   fieldJSPackageManager,
+			Message: `use js.runtime "bun" instead of package-manager "bun"`,
+		}
+	}
+
+	return packageManager, nil
 }
 
 func parseNodePackageManager(raw string) (PackageManager, error) {

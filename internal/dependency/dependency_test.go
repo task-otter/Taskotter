@@ -15,6 +15,10 @@ const (
 	modPnpmFnm       = "pnpm/fnm"
 	modCorepackFnm   = "corepack/fnm"
 	modFnm           = "fnm"
+	fmtGotWant       = "got %#v, want %#v"
+	nodeA            = "a"
+	nodeB            = "b"
+	nodeC            = "c"
 )
 
 func deps() map[string][]string {
@@ -27,6 +31,7 @@ func deps() map[string][]string {
 	}
 }
 
+// TestResolveTransitive verifies transitive dependencies resolve in dependency order.
 func TestResolveTransitive(t *testing.T) {
 	t.Parallel()
 
@@ -38,16 +43,17 @@ func TestResolveTransitive(t *testing.T) {
 	want := []string{modCorepackFnm, modFnm, modPnpmFnm}
 
 	if len(got) != len(want) {
-		t.Fatalf("got %#v, want %#v", got, want)
+		t.Fatalf(fmtGotWant, got, want)
 	}
 
 	for i := range want {
 		if got[i] != want[i] {
-			t.Fatalf("got %#v, want %#v", got, want)
+			t.Fatalf(fmtGotWant, got, want)
 		}
 	}
 }
 
+// TestDuplicateDependencyDeduped verifies a module already requested is excluded from its own deps.
 func TestDuplicateDependencyDeduped(t *testing.T) {
 	t.Parallel()
 
@@ -56,14 +62,15 @@ func TestDuplicateDependencyDeduped(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	for _, dep := range got {
-		if dep == modPnpmFnm {
+	for i := range got {
+		if got[i] == modPnpmFnm {
 			t.Fatal("requested module should not appear in dependencies")
 		}
 	}
 }
 
-func TestMissingDependency(t *testing.T) {
+// TestMissingDependency verifies a dependency missing from .deps.yml returns an error.
+func TestMissingDependncy(t *testing.T) {
 	t.Parallel()
 
 	depMap := deps()
@@ -79,21 +86,21 @@ func TestMissingDependency(t *testing.T) {
 		err.Error(),
 		`module "eslint/node/fnm/pnpm" depends on missing module "missing-mod"`,
 	) {
-
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
+// TestDependencyCycle verifies a circular dependency chain returns a cycle error.
 func TestDependencyCycle(t *testing.T) {
 	t.Parallel()
 
 	depMap := map[string][]string{
-		"a": {"b"},
-		"b": {"c"},
-		"c": {"a"},
+		nodeA: {nodeB},
+		nodeB: {nodeC},
+		nodeC: {nodeA},
 	}
 
-	_, err := dependency.ResolveTransitive([]string{"a"}, depMap)
+	_, err := dependency.ResolveTransitive([]string{nodeA}, depMap)
 	if err == nil {
 		t.Fatal("expected cycle error")
 	}
@@ -103,6 +110,7 @@ func TestDependencyCycle(t *testing.T) {
 	}
 }
 
+// TestRequestedModuleMissingFromDependencyFile verifies a requested module absent from the file errors.
 func TestRequestedModuleMissingFromDependencyFile(t *testing.T) {
 	t.Parallel()
 

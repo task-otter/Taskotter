@@ -4,16 +4,16 @@
 package syncer_test
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
 
-	"github.com/task-otter/Taskotter/internal/app"
 	"github.com/task-otter/Taskotter/internal/config"
+	"github.com/task-otter/Taskotter/internal/consts"
 	"github.com/task-otter/Taskotter/internal/dependency"
-	"github.com/task-otter/Taskotter/internal/normalizer"
 	"github.com/task-otter/Taskotter/internal/resolver"
 	"github.com/task-otter/Taskotter/internal/store"
 	"github.com/task-otter/Taskotter/internal/syncer"
@@ -22,11 +22,11 @@ import (
 func fixtureStore(t *testing.T) *store.Snapshot {
 	t.Helper()
 
-	root := filepath.Join("..", "..", "tests", "fixtures", "store")
+	root := filepath.Join(consts.PathParent, consts.PathParent, dirTests, dirFixtures, dirStore)
 
-	snap, err := store.LocalSnapshot(root, store.RefInfo{
+	snap, err := store.LocalSnapshot(root, &store.RefInfo{
 		Repository:       config.StoreRepository,
-		RequestedVersion: "",
+		RequestedVersion: consts.Empty,
 		SourceRef:        "refs/heads/main",
 		ResolvedCommit:   "abc123",
 		DefaultBranch:    "main",
@@ -49,7 +49,7 @@ tasks:
       - echo hello
 `)
 
-	err := os.WriteFile(filepath.Join(workspace, testTaskfileName), content, 0o644)
+	err := os.WriteFile(filepath.Join(workspace, testTaskfileName), content, consts.FilePerm644)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -58,27 +58,23 @@ tasks:
 func dependencySources(t *testing.T, sources []string, snap *store.Snapshot) ([]string, error) {
 	t.Helper()
 
-	return dependency.ResolveTransitive(sources, snap.Deps)
+	deps, err := dependency.ResolveTransitive(sources, snap.Deps)
+	if err != nil {
+		return nil, fmt.Errorf("resolve transitive deps: %w", err)
+	}
+
+	return deps, nil
 }
 
-func TestBuildPlanInitialSync(t *testing.T) {
-	t.Parallel()
+func mutateEslintGoPnpmFnm(cfg *config.Config) {
+	cfg.Tasks = []string{testModuleEslint, consts.Go}
+	cfg.NodePackageManager = config.PMPnpm
+	cfg.NodeVersionManager = config.VMFnm
+	cfg.IncludesDoc = true
+}
 
-	workspace := t.TempDir()
-	writeRootTaskfile(t, workspace)
-
-	cfg := testConfig(workspace, func(cfg *config.Config) {
-		cfg.Tasks = []string{testModuleEslint, "go"}
-		cfg.NodePackageManager = config.PMPnpm
-		cfg.NodeVersionManager = config.VMFnm
-		cfg.IncludesDoc = true
-	})
-
-	_, plan := preparePlan(t, workspace, cfg)
-
-	if !plan.Changed {
-		t.Fatal("expected changes on initial sync")
-	}
+func assertGeneratedRootTasks(t *testing.T, plan *syncer.Plan) {
+	t.Helper()
 
 	rootText := string(plan.RootTaskfile)
 
@@ -108,50 +104,36 @@ func TestBuildPlanInitialSync(t *testing.T) {
 	}
 }
 
+// TestBuildPlanInitialSync verifies an initial sync marks the plan changed and generates root tasks.
+func TestBuildPlanInitialSync(t *testing.T) {
+	t.Parallel()
+
+	workspace := t.TempDir()
+	writeRootTaskfile(t, workspace)
+
+	cfg := testConfig(workspace, mutateEslintGoPnpmFnm)
+	_, plan := preparePlan(t, workspace, cfg)
+
+	if !plan.Changed {
+		t.Fatal(errExpectedChangesInitial)
+	}
+
+	assertGeneratedRootTasks(t, plan)
+}
+
+// TestBuildPlanCreatesRootTaskfile verifies the root Taskfile.yml is added on initial sync.
 func TestBuildPlanCreatesRootTaskfile(t *testing.T) {
 	t.Parallel()
 
 	workspace := t.TempDir()
 	snap := fixtureStore(t)
+	cfg := testConfig(workspace, mutateGoWithDocs)
 
-	cfg := testConfig(workspace, func(cfg *config.Config) {
-		cfg.Tasks = []string{"go"}
-		cfg.IncludesDoc = true
-	})
-
-	resolutions, err := resolver.ResolveAll(
-		cfg.Tasks,
-		snap.Catalog,
-		cfg.NodePackageManager,
-		cfg.NodeVersionManager,
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	sources := make([]string, 0, len(resolutions))
-
-	for _, res := range resolutions {
-		sources = append(sources, res.SourceModule)
-	}
-
-	depSources, err := dependency.ResolveTransitive(sources, snap.Deps)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	syncInput, err := app.PrepareSyncInput(cfg, snap, resolutions, depSources)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	plan, err := syncer.BuildPlan(syncInput)
-	if err != nil {
-		t.Fatal(err)
-	}
+	resolutions, depSources := resolveModulesForTest(t, cfg, snap)
+	plan := buildPlanFrom(t, cfg, snap, resolutions, depSources)
 
 	if !plan.Changed {
-		t.Fatal("expected changes on initial sync")
+		t.Fatal(errExpectedChangesInitial)
 	}
 
 	if !containsRootTaskfile(plan.Added) {
@@ -170,7 +152,7 @@ func writeUnmanagedFile(t *testing.T, workspace string) {
 
 	err := os.MkdirAll(
 		filepath.Join(workspace, config.DefaultTargetFolder, testModuleEslint),
-		0o755,
+		consts.FilePerm755,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -178,29 +160,16 @@ func writeUnmanagedFile(t *testing.T, workspace string) {
 
 	err = os.WriteFile(
 		filepath.Join(workspace, config.DefaultTargetFolder, testModuleEslint, "user.txt"),
-		[]byte("keep"),
-		0o644,
+		[]byte(contentKeep),
+		consts.FilePerm644,
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
 }
 
-func TestUnmanagedDestinationConflict(t *testing.T) {
-	t.Parallel()
-
-	workspace := t.TempDir()
-	writeRootTaskfile(t, workspace)
-
-	writeUnmanagedFile(t, workspace)
-
-	snap := fixtureStore(t)
-	cfg := testConfig(workspace, func(cfg *config.Config) {
-		cfg.Tasks = []string{testModuleEslint}
-		cfg.NodePackageManager = config.PMPnpm
-		cfg.NodeVersionManager = config.VMFnm
-		cfg.IncludesDoc = true
-	})
+func buildEslintSyncInput(t *testing.T, cfg *config.Config, snap *store.Snapshot) syncer.SyncInput {
+	t.Helper()
 
 	res, err := resolver.Resolve(
 		testModuleEslint,
@@ -212,32 +181,66 @@ func TestUnmanagedDestinationConflict(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	sourceToDest, err := normalizer.BuildDestinationMap([]string{res.SourceModule})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	eslintPath := config.DefaultTargetFolder + "/" + testModuleEslint
-
-	_, err = syncer.BuildPlan(syncer.SyncInput{
+	return syncer.SyncInput{
 		Config:   cfg,
 		Snapshot: snap,
 		Requested: map[string]syncer.ModuleRecord{
 			testModuleEslint: {
 				SourceModule:      res.SourceModule,
 				DestinationModule: testModuleEslint,
-				Path:              eslintPath,
+				Path:              config.DefaultTargetFolder + "/" + testModuleEslint,
 			},
 		},
 		Dependencies: nil,
-		SourceToDest: sourceToDest,
+		SourceToDest: map[string]string{res.SourceModule: testModuleEslint},
 		DestByTask:   map[string]string{testModuleEslint: testModuleEslint},
-	})
+	}
+}
+
+func mutateEslintPnpmFnm(cfg *config.Config) {
+	cfg.Tasks = []string{testModuleEslint}
+	cfg.NodePackageManager = config.PMPnpm
+	cfg.NodeVersionManager = config.VMFnm
+	cfg.IncludesDoc = true
+}
+
+// TestUnmanagedDestinationConflict verifies planning refuses to overwrite an unmanaged existing file.
+func TestUnmanagedDestinationConflict(t *testing.T) {
+	t.Parallel()
+
+	workspace := t.TempDir()
+	writeRootTaskfile(t, workspace)
+	writeUnmanagedFile(t, workspace)
+
+	snap := fixtureStore(t)
+	cfg := testConfig(workspace, mutateEslintPnpmFnm)
+
+	si := buildEslintSyncInput(t, cfg, snap)
+
+	_, err := syncer.BuildPlan(&si)
 	if err == nil {
 		t.Fatal("expected unmanaged destination conflict")
 	}
 }
 
+func mutateEslintPnpmFnmNoDocs(cfg *config.Config) {
+	cfg.Tasks = []string{testModuleEslint}
+	cfg.NodePackageManager = config.PMPnpm
+	cfg.NodeVersionManager = config.VMFnm
+	cfg.IncludesDoc = false
+}
+
+func assertNoReadmeManaged(t *testing.T, plan *syncer.Plan) {
+	t.Helper()
+
+	for _, managed := range plan.ManagedFiles {
+		if filepath.Base(managed.Path) == testReadmeName {
+			t.Fatal("README should be excluded when includes-doc=false")
+		}
+	}
+}
+
+// TestIncludesDocFalseSkipsReadme verifies README is excluded from managed files when includes-doc is false.
 func TestIncludesDocFalseSkipsReadme(t *testing.T) {
 	t.Parallel()
 
@@ -245,48 +248,14 @@ func TestIncludesDocFalseSkipsReadme(t *testing.T) {
 	writeRootTaskfile(t, workspace)
 
 	snap := fixtureStore(t)
-	cfg := testConfig(workspace, func(cfg *config.Config) {
-		cfg.Tasks = []string{testModuleEslint}
-		cfg.NodePackageManager = config.PMPnpm
-		cfg.NodeVersionManager = config.VMFnm
-		cfg.IncludesDoc = false
-	})
+	cfg := testConfig(workspace, mutateEslintPnpmFnmNoDocs)
 
-	res, err := resolver.Resolve(
-		testModuleEslint,
-		snap.Catalog,
-		cfg.NodePackageManager,
-		cfg.NodeVersionManager,
-	)
+	si := buildEslintSyncInput(t, cfg, snap)
+
+	plan, err := syncer.BuildPlan(&si)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	sourceToDest := map[string]string{res.SourceModule: testModuleEslint}
-
-	eslintPath := config.DefaultTargetFolder + "/" + testModuleEslint
-
-	plan, err := syncer.BuildPlan(syncer.SyncInput{
-		Config:   cfg,
-		Snapshot: snap,
-		Requested: map[string]syncer.ModuleRecord{
-			testModuleEslint: {
-				SourceModule:      res.SourceModule,
-				DestinationModule: testModuleEslint,
-				Path:              eslintPath,
-			},
-		},
-		Dependencies: nil,
-		SourceToDest: sourceToDest,
-		DestByTask:   map[string]string{testModuleEslint: testModuleEslint},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	for _, managed := range plan.ManagedFiles {
-		if filepath.Base(managed.Path) == testReadmeName {
-			t.Fatal("README should be excluded when includes-doc=false")
-		}
-	}
+	assertNoReadmeManaged(t, plan)
 }

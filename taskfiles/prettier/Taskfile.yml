@@ -1,0 +1,158 @@
+---
+version: "3.5"
+output:
+  group:
+    begin: "::group::{{.TASK}}"
+    end: "::endgroup::"
+    error_only: false
+silent: true
+includes:
+  pnpm:
+    taskfile: ../../../../pnpm/Taskfile.yml
+vars:
+  PRETTIER_FMT_SKIP_PATTERN: ""
+  TARGETS: ""
+  PRETTIER_DEFAULT_TARGETS: "."
+  CONFIG: ""
+  IGNORE_PATH: ""
+  PRETTIER_DEFAULT_IGNORE_PATH: ".prettierignore"
+  EXTRA_ARGS: ""
+  VERSION: ""
+tasks:
+  default:
+    run: once
+    desc: Show available Prettier tasks
+    cmds:
+      - task --list
+  install:
+    run: once
+    desc: Install Prettier as a local devDependency
+    summary: |
+      Install prettier as a local devDependency. Pass VERSION=x.y.z to pin a
+      specific release instead of the package manager's default resolution.
+    vars:
+      RESOLVED_VERSION: '{{default .VERSION .VERSION_OVERRIDE}}'
+      RESOLVED_EXTRA_ARGS: '{{default .EXTRA_ARGS .EXTRA_ARGS_OVERRIDE}}'
+    status:
+      - >-
+        node -e "const installed = require('./node_modules/prettier/package.json'); const requested = '{{.RESOLVED_VERSION}}'; process.exit(!requested || installed.version === requested ? 0 : 1)"
+    cmds:
+      - task: pnpm:add
+        vars:
+          PACKAGES: 'prettier{{if .RESOLVED_VERSION}}@{{.RESOLVED_VERSION}}{{end}}'
+          EXTRA_ARGS: '{{.RESOLVED_EXTRA_ARGS}}{{if .CLI_ARGS}} {{.CLI_ARGS}}{{end}}'
+  install:undo:
+    run: once
+    desc: Remove the locally installed Prettier devDependency
+    summary: Remove prettier from local devDependencies via the active package manager.
+    prompt:
+      - This will remove prettier from local devDependencies.
+      - Continue?
+    cmds:
+      - task: pnpm:remove
+        vars:
+          PACKAGES: prettier
+          EXTRA_ARGS: '{{default .EXTRA_ARGS .EXTRA_ARGS_OVERRIDE}}'
+  upgrade:
+    run: once
+    desc: Upgrade Prettier to the latest release
+    summary: Reinstall prettier at the latest version as a local devDependency.
+    cmds:
+      - task: pnpm:add
+        vars:
+          PACKAGES: prettier@latest
+          EXTRA_ARGS: '{{default .EXTRA_ARGS .EXTRA_ARGS_OVERRIDE}}'
+  config:init:
+    run: once
+    desc: Create a starter Prettier config when none exists
+    vars:
+      PRETTIER_CONFIG_PATH: '{{or .CONFIG_OVERRIDE .CONFIG ".prettierrc.json"}}'
+    status:
+      - test -f "{{.PRETTIER_CONFIG_PATH}}"
+    cmds:
+      - "printf '{\\n' > \"{{.PRETTIER_CONFIG_PATH}}\""
+      - "printf '  \"singleQuote\": true,\\n' >> \"{{.PRETTIER_CONFIG_PATH}}\""
+      - "printf '  \"semi\": true\\n' >> \"{{.PRETTIER_CONFIG_PATH}}\""
+      - "printf '}\\n' >> \"{{.PRETTIER_CONFIG_PATH}}\""
+      - echo 'Created {{.PRETTIER_CONFIG_PATH}}.'
+  # Shared implementation of fmt:check / fmt. Each override is resolved exactly
+  # once here; the two public tasks differ only by MODE_ARGS.
+  _run:
+    internal: true
+    run: when_changed
+    vars:
+      RESOLVED_TARGETS: '{{or .PRETTIER_TARGETS_OVERRIDE .TARGETS .PRETTIER_DEFAULT_TARGETS}}'
+      RESOLVED_SKIP: '{{default .PRETTIER_FMT_SKIP_PATTERN .PRETTIER_FMT_SKIP_PATTERN_OVERRIDE}}'
+      RESOLVED_CONFIG: '{{default .CONFIG .CONFIG_OVERRIDE}}'
+      RESOLVED_IGNORE_PATH: '{{or .IGNORE_PATH_OVERRIDE .IGNORE_PATH .PRETTIER_DEFAULT_IGNORE_PATH}}'
+      RESOLVED_EXTRA_ARGS: '{{default .EXTRA_ARGS .EXTRA_ARGS_OVERRIDE}}'
+    cmds:
+      - task: _exec:ignore
+        vars:
+          BINARY: prettier
+          ARGS: >-
+            {{.RESOLVED_TARGETS}} {{- if .RESOLVED_SKIP}} "!{{.RESOLVED_SKIP}}"{{end}} {{.MODE_ARGS}} {{- if .RESOLVED_CONFIG}} --config "{{.RESOLVED_CONFIG}}"{{end}}
+          IGNORE_PATH: '{{.RESOLVED_IGNORE_PATH}}'
+          EXTRA_ARGS: '{{.RESOLVED_EXTRA_ARGS}}{{if .CLI_ARGS}} {{.CLI_ARGS}}{{end}}'
+  fmt:check:
+    run: once
+    desc: Check formatting with Prettier
+    cmds:
+      - task: _run
+        vars:
+          MODE_ARGS: "--check"
+      - echo "✅ prettier passed"
+  fmt:
+    run: once
+    desc: Format files with Prettier
+    cmds:
+      - task: _run
+        vars:
+          MODE_ARGS: "--write"
+      - echo "✅ prettier fixes applied"
+  fix:
+    run: once
+    desc: Alias for prettier:fmt
+    cmds:
+      - task: fmt
+  ci:
+    run: once
+    desc: Alias for prettier:fmt:check
+    cmds:
+      - task: fmt:check
+  version:
+    run: once
+    desc: Show the locally resolved Prettier version
+    cmds:
+      - task: pnpm:exec
+        vars:
+          BINARY: prettier
+          ARGS: "--version"
+  help:
+    run: once
+    desc: Show Prettier CLI help
+    cmds:
+      - task: pnpm:exec
+        vars:
+          BINARY: prettier
+          ARGS: "--help"
+          EXTRA_ARGS: '{{default .EXTRA_ARGS .EXTRA_ARGS_OVERRIDE}}{{if .CLI_ARGS}} {{.CLI_ARGS}}{{end}}'
+  _exec:ignore:
+    run: once
+    internal: true
+    desc: Execute a local project binary and include an ignore file when present
+    requires:
+      vars: [BINARY]
+    vars:
+      IGNORE_FLAG: "--ignore-path"
+      _IGNORE_ARGS:
+        sh: |
+          if [ -n "{{.IGNORE_PATH}}" ] && [ -f "{{.IGNORE_PATH}}" ]; then
+            echo "{{.IGNORE_FLAG}} {{.IGNORE_PATH}}"
+          fi
+    cmds:
+      - task: pnpm:exec
+        vars:
+          BINARY: "{{.BINARY}}"
+          ARGS: "{{.ARGS}} {{._IGNORE_ARGS}}"
+          EXTRA_ARGS: "{{.EXTRA_ARGS}}{{if .CLI_ARGS}} {{.CLI_ARGS}}{{end}}"

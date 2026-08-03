@@ -1,0 +1,507 @@
+---
+version: "3.5"
+output:
+  group:
+    begin: "::group::{{.TASK}}"
+    end: "::endgroup::"
+    error_only: false
+silent: true
+includes:
+  corepack:
+    taskfile: ../../corepack/Taskfile.yml
+  fnm:
+    taskfile: ../../fnm/Taskfile.yml
+vars:
+  FNM_INSTALL_DIR: "$HOME/.local/share/fnm"
+  FNM_LOAD: 'export PATH="{{.FNM_INSTALL_DIR}}:$HOME/.local/bin:$PATH"; eval "$(fnm env --shell bash)"'
+  FNM_USE: >-
+    {{if .NODE_VERSION}}fnm use "{{.NODE_VERSION}}" {{- else}}if [ -f .node-version ] || [ -f .nvmrc ]; then fnm use; fi{{end}}
+  NODE_VERSION: ""
+  WINDOWS_NODE_ACTIVATE: |
+    fnm env --shell powershell | Out-String | Invoke-Expression
+    if ($env:NODE_VERSION) {
+      fnm use $env:NODE_VERSION
+    } elseif ((Test-Path '.node-version') -or (Test-Path '.nvmrc')) {
+      fnm use
+    }
+tasks:
+  default:
+    run: once
+    desc: Show available pnpm automation tasks
+    summary: Display the list of available pnpm-related tasks defined in this Taskfile.
+    cmds:
+      - task --list
+  node:setup:
+    run: once
+    desc: Install Node.js using the selected node manager
+    summary: Install Node.js through fnm.
+    cmds:
+      - task: _node:setup:unix
+      - task: _node:setup:windows
+  manager:setup:
+    run: once
+    desc: Enable Corepack for pnpm commands
+    summary: Ensure Corepack is installed and enable its package manager shims for pnpm projects.
+    cmds:
+      - task: corepack:setup
+  manager:pin:
+    run: once
+    desc: Pin pnpm in package.json with Corepack
+    summary: Use Corepack to write pnpm@PACKAGE_MANAGER_VERSION to the current project's packageManager field.
+    requires:
+      vars: [PACKAGE_MANAGER_VERSION]
+    cmds:
+      - task: corepack:use
+        vars:
+          PACKAGE_MANAGER: pnpm
+          VERSION: "{{.PACKAGE_MANAGER_VERSION}}"
+  version:
+    run: once
+    desc: Show the active Node.js and pnpm versions
+    summary: Print Node.js and pnpm versions after loading the selected Node.js runtime.
+    cmds:
+      - task: _version:unix
+      - task: _version:windows
+  install:
+    run: once
+    desc: Install project dependencies with pnpm
+    summary: Run pnpm install from a project root that contains package.json.
+    cmds:
+      - task: _pnpm:unix
+        vars: {ARGS: install}
+      - task: _pnpm:windows
+        vars: {ARGS: install}
+  ci:
+    run: once
+    desc: Install dependencies from the pnpm lockfile
+    summary: Run pnpm install --frozen-lockfile and require pnpm-lock.yaml for CI.
+    cmds:
+      - task: _ci:unix
+      - task: _ci:windows
+  add:
+    run: once
+    desc: Install packages globally with pnpm (PACKAGES=<pkgs>)
+    requires:
+      vars: [PACKAGES]
+    cmds:
+      - task: _pnpm:unix
+        vars:
+          ARGS: "add -g {{.PACKAGES}} {{.EXTRA_ARGS}}"
+      - task: _pnpm:windows
+        vars:
+          ARGS: "add -g {{.PACKAGES}} {{.EXTRA_ARGS}}"
+  remove:
+    run: once
+    desc: Remove globally-installed packages with pnpm (PACKAGES=<pkgs>)
+    requires:
+      vars: [PACKAGES]
+    cmds:
+      - task: _pnpm:unix
+        vars:
+          ARGS: "remove -g {{.PACKAGES}} {{.EXTRA_ARGS}}"
+      - task: _pnpm:windows
+        vars:
+          ARGS: "remove -g {{.PACKAGES}} {{.EXTRA_ARGS}}"
+  install:undo:
+    run: once
+    desc: Disable the pnpm Corepack shim
+    summary: |
+      Run corepack disable pnpm to remove the Corepack-managed pnpm shim
+      from the active Node.js runtime.
+    prompt:
+      - This will disable the pnpm shim provided by Corepack.
+      - Continue?
+    cmds:
+      - task: corepack:_corepack:unix
+        vars: {ARGS: "disable pnpm"}
+      - task: corepack:_corepack:windows
+        vars: {ARGS: "disable pnpm"}
+  upgrade:
+    run: once
+    desc: Upgrade pnpm to the latest release
+    summary: |
+      Run corepack prepare pnpm@latest --activate to upgrade the
+      Corepack-managed pnpm shim to the latest release.
+    cmds:
+      - task: corepack:_corepack:unix
+        vars: {ARGS: "prepare pnpm@latest --activate"}
+      - task: corepack:_corepack:windows
+        vars: {ARGS: "prepare pnpm@latest --activate"}
+  exec:
+    run: once
+    desc: Execute a global binary via pnpm (BINARY=<name>)
+    requires:
+      vars: [BINARY]
+    cmds:
+      - task: _exec:unix
+        vars:
+          BINARY: "{{.BINARY}}"
+          ARGS: "{{.ARGS}}"
+          EXTRA_ARGS: "{{.EXTRA_ARGS}}"
+      - task: _exec:windows
+        vars:
+          BINARY: "{{.BINARY}}"
+          ARGS: "{{.ARGS}}"
+          EXTRA_ARGS: "{{.EXTRA_ARGS}}"
+  run:
+    run: once
+    desc: Run a package.json script with pnpm
+    summary: Run SCRIPT through pnpm run and forward arguments passed after --.
+    requires:
+      vars: [SCRIPT]
+    cmds:
+      - task: _run:unix
+        vars:
+          SCRIPT: "{{.SCRIPT}}"
+          CLI_ARGS: "{{.CLI_ARGS}}"
+      - task: _run:windows
+        vars:
+          SCRIPT: "{{.SCRIPT}}"
+          CLI_ARGS: "{{.CLI_ARGS}}"
+  dev:
+    run: once
+    desc: Start the development script with pnpm
+    summary: Execute the dev script defined in package.json through pnpm run dev.
+    cmds:
+      - task: _pnpm:unix
+        vars: {ARGS: run dev}
+      - task: _pnpm:windows
+        vars: {ARGS: run dev}
+  test:
+    run: once
+    desc: Run the project test script with pnpm
+    summary: Execute the test script defined in package.json through pnpm test.
+    cmds:
+      - task: _pnpm:unix
+        vars: {ARGS: test}
+      - task: _pnpm:windows
+        vars: {ARGS: test}
+  build:
+    run: once
+    desc: Build the project with pnpm
+    summary: Execute the build script defined in package.json through pnpm run build.
+    cmds:
+      - task: _pnpm:unix
+        vars: {ARGS: run build}
+      - task: _pnpm:windows
+        vars: {ARGS: run build}
+  lint:
+    run: once
+    desc: Lint the project with pnpm
+    summary: Execute the lint script defined in package.json through pnpm run lint.
+    cmds:
+      - task: _pnpm:unix
+        vars: {ARGS: run lint}
+      - task: _pnpm:windows
+        vars: {ARGS: run lint}
+  format:
+    run: once
+    desc: Format source files with pnpm
+    summary: Execute the format script defined in package.json through pnpm run format.
+    cmds:
+      - task: _pnpm:unix
+        vars: {ARGS: run format}
+      - task: _pnpm:windows
+        vars: {ARGS: run format}
+  typecheck:
+    run: once
+    desc: Type check the project with pnpm
+    summary: Execute the typecheck script defined in package.json through pnpm run typecheck.
+    cmds:
+      - task: _pnpm:unix
+        vars: {ARGS: run typecheck}
+      - task: _pnpm:windows
+        vars: {ARGS: run typecheck}
+  outdated:
+    run: once
+    desc: List outdated pnpm packages locally
+    summary: Run pnpm outdated for review and ignore its non-zero outdated result.
+    cmds:
+      - task: _pnpm:unix
+        vars: {ARGS: outdated}
+        ignore_error: true
+      - task: _pnpm:windows
+        vars: {ARGS: outdated}
+        ignore_error: true
+  outdated:strict:
+    run: once
+    desc: List outdated pnpm packages strictly
+    summary: Run pnpm outdated and propagate the pnpm exit code for CI enforcement.
+    cmds:
+      - task: _pnpm:unix
+        vars: {ARGS: outdated}
+      - task: _pnpm:windows
+        vars: {ARGS: outdated}
+  update:
+    run: once
+    desc: Update dependencies with pnpm
+    summary: Run pnpm update to update installed dependencies within declared ranges.
+    cmds:
+      - task: _pnpm:unix
+        vars: {ARGS: update}
+      - task: _pnpm:windows
+        vars: {ARGS: update}
+  audit:
+    run: once
+    desc: Run a strict pnpm vulnerability audit
+    summary: Run pnpm audit and propagate vulnerability findings for CI enforcement.
+    cmds:
+      - task: _pnpm:unix
+        vars: {ARGS: audit}
+      - task: _pnpm:windows
+        vars: {ARGS: audit}
+  audit:report:
+    run: once
+    desc: Report pnpm vulnerabilities locally
+    summary: Run pnpm audit for local review while ignoring its vulnerability exit code.
+    cmds:
+      - task: _pnpm:unix
+        vars: {ARGS: audit}
+        ignore_error: true
+      - task: _pnpm:windows
+        vars: {ARGS: audit}
+        ignore_error: true
+  audit:fix:
+    run: once
+    desc: Fix pnpm audit findings when possible
+    summary: Run pnpm audit --fix to apply available dependency vulnerability fixes.
+    cmds:
+      - task: _pnpm:unix
+        vars: {ARGS: audit --fix}
+      - task: _pnpm:windows
+        vars: {ARGS: audit --fix}
+  audit:json:
+    run: once
+    desc: Output pnpm audit results as JSON
+    summary: Run pnpm audit --json for tooling and propagate the pnpm audit exit code.
+    cmds:
+      - task: _pnpm:unix
+        vars: {ARGS: audit --json}
+      - task: _pnpm:windows
+        vars: {ARGS: audit --json}
+  store:prune:
+    run: once
+    desc: Prune the pnpm content-addressable store
+    summary: Run pnpm store prune to remove unreferenced packages from the pnpm store.
+    cmds:
+      - task: _pnpm:unix
+        vars: {ARGS: store prune}
+      - task: _pnpm:windows
+        vars: {ARGS: store prune}
+  clean:
+    run: once
+    desc: Remove the node_modules directory
+    summary: Delete the project node_modules directory before a fresh pnpm install.
+    prompt:
+      - This will delete the node_modules directory.
+      - Continue?
+    cmds:
+      - task: _clean:unix
+      - task: _clean:windows
+  clean:all:
+    run: once
+    desc: Remove node_modules and pnpm-lock.yaml
+    summary: Delete node_modules and pnpm-lock.yaml so a later pnpm install regenerates the lockfile.
+    prompt:
+      - "WARNING: This will permanently delete node_modules AND pnpm-lock.yaml."
+      - Continue?
+    cmds:
+      - task: _clean:all:unix
+      - task: _clean:all:windows
+  _exec:unix:
+    run: once
+    internal: true
+    platforms: [linux, darwin]
+    dir: "{{.USER_WORKING_DIR}}"
+    set: [errexit, nounset, pipefail]
+    requires:
+      vars: [BINARY]
+    cmds:
+      - bash -c "{{.BINARY}} {{.ARGS}} {{.EXTRA_ARGS}}"
+  _exec:windows:
+    run: once
+    internal: true
+    platforms: [windows]
+    dir: "{{.USER_WORKING_DIR}}"
+    requires:
+      vars: [BINARY]
+    cmds:
+      - powershell -NoProfile -ExecutionPolicy Bypass -Command "& {{.BINARY}} {{.ARGS}} {{.EXTRA_ARGS}}"
+  _node:setup:unix:
+    run: once
+    internal: true
+    platforms: [linux, darwin]
+    set: [errexit, nounset, pipefail]
+    env:
+      NODE_VERSION: "{{.NODE_VERSION}}"
+    preconditions:
+      - sh: 'task --list-all 2>/dev/null | grep -q "fnm:node:install"'
+        msg: >-
+          node:setup requires the fnm taskfile included in the root Taskfile. Add: fnm: taskfile: taskfiles/fnm/Taskfile.yml
+    cmds:
+      - |
+        if [ -n "$NODE_VERSION" ]; then
+          task fnm:node:install VERSION="$NODE_VERSION"
+        else
+          task fnm:node:install
+        fi
+  _node:setup:windows:
+    run: once
+    internal: true
+    platforms: [windows]
+    env:
+      NODE_VERSION: "{{.NODE_VERSION}}"
+    preconditions:
+      - sh: >-
+          powershell -NoProfile -ExecutionPolicy Bypass -Command "if ((task --list-all 2>$null | Out-String) -match 'fnm:node:install') { exit 0 } else { exit 1 }"
+        msg: >-
+          node:setup requires the fnm taskfile included in the root Taskfile. Add: fnm: taskfile: taskfiles/fnm/Taskfile.yml
+    cmds:
+      - >-
+        powershell -NoProfile -ExecutionPolicy Bypass -Command "if ($env:NODE_VERSION) { task fnm:node:install \"VERSION=$env:NODE_VERSION\" } else { task fnm:node:install }""
+  _pnpm:unix:
+    run: when_changed
+    internal: true
+    platforms: [linux, darwin]
+    dir: "{{.USER_WORKING_DIR}}"
+    set: [errexit, nounset, pipefail]
+    requires:
+      vars: [ARGS]
+    env:
+      COREPACK_ENABLE_AUTO_PIN: "1"
+      COREPACK_ENABLE_STRICT: "0"
+    preconditions:
+      - sh: >-
+          test -f "{{.FNM_INSTALL_DIR}}/fnm" || command -v fnm >/dev/null 2>&1 || test -f "$HOME/.local/bin/fnm"
+        msg: 'fnm is not installed. Run: task node:setup'
+      - sh: 'test -f "{{.USER_WORKING_DIR}}/package.json"'
+        msg: "package.json not found. Run this task from the pnpm project root."
+    cmds:
+      - >-
+        bash -c '{{.FNM_LOAD}}; {{.FNM_USE}}; command -v corepack >/dev/null 2>&1 || { echo "corepack is not available. Run: task manager:setup"; exit 1; }; corepack pnpm {{.ARGS}}'
+  _pnpm:windows:
+    run: when_changed
+    internal: true
+    platforms: [windows]
+    dir: "{{.USER_WORKING_DIR}}"
+    requires:
+      vars: [ARGS]
+    env:
+      NODE_VERSION: "{{.NODE_VERSION}}"
+      COREPACK_ENABLE_AUTO_PIN: "1"
+    preconditions:
+      - sh: >-
+          powershell -NoProfile -ExecutionPolicy Bypass -Command "if (Get-Command fnm -ErrorAction SilentlyContinue) { exit 0 } else { exit 1 }"
+        msg: 'fnm is not installed or not available in PATH. Run: task node:setup'
+      - sh: >-
+          powershell -NoProfile -ExecutionPolicy Bypass -Command "if (Test-Path '{{.USER_WORKING_DIR}}\package.json') { exit 0 } else { exit 1 }"
+        msg: "package.json not found. Run this task from the pnpm project root."
+    cmds:
+      - >-
+        powershell -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference = 'Stop'; $env:NODE_VERSION = '{{.NODE_VERSION}}'; {{.WINDOWS_NODE_ACTIVATE}}; if (-not (Get-Command corepack -ErrorAction SilentlyContinue)) { Write-Error 'corepack is not available. Run: task manager:setup'; exit 1 }; corepack pnpm {{.ARGS}}"
+  _ci:unix:
+    run: once
+    internal: true
+    platforms: [linux, darwin]
+    preconditions:
+      - sh: 'test -f "{{.USER_WORKING_DIR}}/pnpm-lock.yaml"'
+        msg: "pnpm-lock.yaml not found. pnpm CI installs require a lockfile."
+    cmds:
+      - task: _pnpm:unix
+        vars: {ARGS: install --frozen-lockfile}
+  _ci:windows:
+    run: once
+    internal: true
+    platforms: [windows]
+    preconditions:
+      - sh: >-
+          powershell -NoProfile -ExecutionPolicy Bypass -Command "if (Test-Path '{{.USER_WORKING_DIR}}\pnpm-lock.yaml') { exit 0 } else { exit 1 }"
+        msg: "pnpm-lock.yaml not found. pnpm CI installs require a lockfile."
+    cmds:
+      - task: _pnpm:windows
+        vars: {ARGS: install --frozen-lockfile}
+  _run:unix:
+    run: when_changed
+    internal: true
+    platforms: [linux, darwin]
+    env:
+      SCRIPT: "{{.SCRIPT}}"
+    preconditions:
+      - sh: 'printf "%s" "$SCRIPT" | grep -qE "^[A-Za-z0-9:_-]+$"'
+        msg: 'SCRIPT "{{.SCRIPT}}" contains invalid characters.'
+    cmds:
+      - task: _pnpm:unix
+        vars:
+          ARGS: "run {{.SCRIPT}}{{if .CLI_ARGS}} -- {{.CLI_ARGS}}{{end}}"
+  _run:windows:
+    run: when_changed
+    internal: true
+    platforms: [windows]
+    env:
+      SCRIPT: "{{.SCRIPT}}"
+    preconditions:
+      - sh: >-
+          powershell -NoProfile -ExecutionPolicy Bypass -Command "if ($env:SCRIPT -match '^[A-Za-z0-9:_-]+$') { exit 0 } else { exit 1 }"
+        msg: 'SCRIPT "{{.SCRIPT}}" contains invalid characters.'
+    cmds:
+      - task: _pnpm:windows
+        vars:
+          ARGS: "run {{.SCRIPT}}{{if .CLI_ARGS}} -- {{.CLI_ARGS}}{{end}}"
+  _version:unix:
+    run: once
+    internal: true
+    platforms: [linux, darwin]
+    set: [errexit, nounset, pipefail]
+    preconditions:
+      - sh: >-
+          test -f "{{.FNM_INSTALL_DIR}}/fnm" || command -v fnm >/dev/null 2>&1 || test -f "$HOME/.local/bin/fnm"
+        msg: 'fnm is not installed. Run: task node:setup'
+    cmds:
+      - >-
+        bash -c '{{.FNM_LOAD}}; {{.FNM_USE}}; command -v corepack >/dev/null 2>&1 || { echo "corepack is not available. Run: task manager:setup"; exit 1; }; node --version; corepack pnpm --version'
+  _version:windows:
+    run: once
+    internal: true
+    platforms: [windows]
+    env:
+      NODE_VERSION: "{{.NODE_VERSION}}"
+    preconditions:
+      - sh: >-
+          powershell -NoProfile -ExecutionPolicy Bypass -Command "if (Get-Command fnm -ErrorAction SilentlyContinue) { exit 0 } else { exit 1 }"
+        msg: 'fnm is not installed or not available in PATH. Run: task node:setup'
+    cmds:
+      - >-
+        powershell -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference = 'Stop'; $env:NODE_VERSION = '{{.NODE_VERSION}}'; {{.WINDOWS_NODE_ACTIVATE}}; node --version; corepack pnpm --version"
+  _clean:unix:
+    run: once
+    internal: true
+    platforms: [linux, darwin]
+    dir: "{{.USER_WORKING_DIR}}"
+    status: ["test ! -d node_modules"]
+    cmds: [rm -rf node_modules]
+  _clean:windows:
+    run: once
+    internal: true
+    platforms: [windows]
+    dir: "{{.USER_WORKING_DIR}}"
+    status:
+      - >-
+        powershell -NoProfile -ExecutionPolicy Bypass -Command "if (Test-Path 'node_modules') { exit 1 } else { exit 0 }"
+    cmds:
+      - powershell -NoProfile -ExecutionPolicy Bypass -Command "Remove-Item -Recurse -Force 'node_modules'"
+  _clean:all:unix:
+    run: once
+    internal: true
+    platforms: [linux, darwin]
+    dir: "{{.USER_WORKING_DIR}}"
+    cmds:
+      - rm -rf node_modules
+      - rm -f pnpm-lock.yaml
+  _clean:all:windows:
+    run: once
+    internal: true
+    platforms: [windows]
+    dir: "{{.USER_WORKING_DIR}}"
+    cmds:
+      - >-
+        powershell -NoProfile -ExecutionPolicy Bypass -Command "if (Test-Path 'node_modules') { Remove-Item -Recurse -Force 'node_modules' }; if (Test-Path 'pnpm-lock.yaml') { Remove-Item -Force 'pnpm-lock.yaml' }"

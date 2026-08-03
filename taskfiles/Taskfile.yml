@@ -3,6 +3,8 @@ version: "3.5"
 vars:
   EXTRA_ARGS: ""
   CONFIG: ""
+  TARGETS: ""
+  VERSION: ""
 includes:
   go:
     taskfile: go/Taskfile.yml
@@ -44,91 +46,82 @@ includes:
           fi
           printf '%s' "$gobin"
       GO_JUNIT_REPORT: ""
-  yamllint:
-    taskfile: yamllint/Taskfile.yml
+  eslint:
+    taskfile: eslint/Taskfile.yml
     vars:
-      YAMLLINT_LINT_SKIP_PATTERN: ""
-      UV_LOAD: 'export PATH="$HOME/.local/bin:$PATH"'
-      TARGETS: "."
+      ESLINT_LINT_SKIP_PATTERN: ""
+      TARGETS: '{{.TARGETS}}'
+      ESLINT_DEFAULT_TARGETS: "src/**/*.{js,jsx,ts,tsx}"
       CONFIG: '{{.CONFIG}}'
+      CACHE: ""
+      ESLINT_DEFAULT_CACHE: "true"
       EXTRA_ARGS: '{{.EXTRA_ARGS}}'
-      YAMLLINT_VERSION: ""
-      YAMLFIX_VERSION: ""
-  actionlint:
-    taskfile: actionlint/Taskfile.yml
+      VERSION: '{{.VERSION}}'
+  prettier:
+    taskfile: prettier/Taskfile.yml
     vars:
-      ACTIONLINT_LINT_SKIP_PATTERN: ""
-      ACTIONLINT_VERSION: "1.7.12"
-      ACTIONLINT_EXTRA_ARGS: ""
-      ACTIONLINT_TARGETS: ""
-  zizmor:
-    taskfile: zizmor/Taskfile.yml
-    vars:
-      ZIZMOR_LINT_SKIP_PATTERN: ""
-      ZIZMOR_EXTRA_ARGS: "--offline"
-      ZIZMOR_TARGETS: ".github"
-      ZIZMOR_VERSION: "1.25.2"
-  adrs:
-    taskfile: adrs/Taskfile.yml
-    vars:
-      CARGO_BIN_UNIX: "$HOME/.cargo/bin"
-      EXTRA_ARGS: '{{.EXTRA_ARGS}}'
-      ADRS_VERSION: ""
-  hadolint:
-    taskfile: hadolint/Taskfile.yml
-    vars:
-      HADOLINT_LINT_SKIP_PATTERN: ""
+      PRETTIER_FMT_SKIP_PATTERN: ""
+      TARGETS: '{{.TARGETS}}'
+      PRETTIER_DEFAULT_TARGETS: "."
       CONFIG: '{{.CONFIG}}'
-      DOCKERFILE: "Dockerfile"
+      IGNORE_PATH: ""
+      PRETTIER_DEFAULT_IGNORE_PATH: ".prettierignore"
       EXTRA_ARGS: '{{.EXTRA_ARGS}}'
-      HADOLINT_VERSION: "2.14.0"
+      VERSION: '{{.VERSION}}'
+  typescript:
+    taskfile: typescript/Taskfile.yml
+    vars:
+      FILE: src/index.ts
+      OUTFILE: dist/index.js
+      OUT_DIR: dist
+      TSCONFIG: tsconfig.json
+      TSX_FLAGS: ""
+      TSC_FLAGS: ""
+      TRACE_DIR: .tsc-trace
+      VERSION: '{{.VERSION}}'
 tasks:
+  ci:
+    desc: Run ci for synced TaskOtter modules
+    cmds:
+      - task: eslint:ci
+      - task: prettier:ci
+      - task: typescript:ci
+  config:init:
+    desc: Run config:init for synced TaskOtter modules
+    cmds:
+      - task: eslint:config:init
+      - task: prettier:config:init
+      - task: typescript:config:init
+  help:
+    desc: Run help for synced TaskOtter modules
+    cmds:
+      - task: eslint:help
+      - task: prettier:help
   install:
     desc: Run install for synced TaskOtter modules
     cmds:
+      - task: eslint:install
+      - task: prettier:install
+      - task: typescript:install
       - task: go:install
-      - task: yamllint:install
-      - task: actionlint:install
-      - task: zizmor:install
-      - task: adrs:install
-      - task: hadolint:install
   install:undo:
     desc: Run install:undo for synced TaskOtter modules
     cmds:
+      - task: eslint:install:undo
+      - task: prettier:install:undo
+      - task: typescript:install:undo
       - task: go:install:undo
-      - task: yamllint:install:undo
-      - task: actionlint:install:undo
-      - task: zizmor:install:undo
-      - task: adrs:install:undo
-      - task: hadolint:install:undo
-  lint:
-    desc: Run lint for synced TaskOtter modules
-    cmds:
-      - task: go:lint
-      - task: yamllint:lint
-      - task: actionlint:lint
-      - task: zizmor:lint
-      - task: hadolint:lint
-  lint:fix:
-    desc: Run lint:fix for synced TaskOtter modules
-    cmds:
-      - task: go:lint:fix
-      - task: yamllint:lint:fix
   upgrade:
     desc: Run upgrade for synced TaskOtter modules
     cmds:
+      - task: eslint:upgrade
+      - task: prettier:upgrade
+      - task: typescript:upgrade
       - task: go:upgrade
-      - task: yamllint:upgrade
-      - task: actionlint:upgrade
-      - task: zizmor:upgrade
-      - task: adrs:upgrade
-      - task: hadolint:upgrade
   version:
     desc: Run version for synced TaskOtter modules
     cmds:
+      - task: eslint:version
+      - task: prettier:version
+      - task: typescript:version
       - task: go:version
-      - task: yamllint:version
-      - task: actionlint:version
-      - task: zizmor:version
-      - task: adrs:version
-      - task: hadolint:version

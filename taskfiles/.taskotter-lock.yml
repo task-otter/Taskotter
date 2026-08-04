@@ -16,7 +16,6 @@ generated_root_tasks:
   - install
   - install:undo
   - lint
-  - lint:fix
   - upgrade
   - version
 managed_files:
@@ -27,7 +26,7 @@ managed_files:
     source_path: taskfiles/actionlint/README.md
   - destination_module: actionlint
     path: taskfiles/actionlint/Taskfile.yml
-    sha256: 4b6991789a967fe5d562bbda7d04b4fc35ed70448f68c33d8f30c3084a15a9c6
+    sha256: 6a6846d5331c88f18e869cdefe0f3c196a8e109ce1c540d6160df9b2291bb613
     source_module: actionlint
     source_path: taskfiles/actionlint/Taskfile.yml
   - destination_module: adrs
@@ -37,7 +36,7 @@ managed_files:
     source_path: taskfiles/adrs/README.md
   - destination_module: adrs
     path: taskfiles/adrs/Taskfile.yml
-    sha256: 8eead782dfecf89950c547b3163b9f205f9131a83399c4e74b46014fac67774d
+    sha256: 7b8cee6c9666c357e9906303866d930d61caa890a961d52c4cc867bfaa2317af
     source_module: adrs
     source_path: taskfiles/adrs/Taskfile.yml
   - destination_module: cargo
@@ -47,17 +46,17 @@ managed_files:
     source_path: taskfiles/cargo/README.md
   - destination_module: cargo
     path: taskfiles/cargo/Taskfile.yml
-    sha256: 61476805b22accc89d1a044005f29ad33340c34f2e8d3f8c3400074a9c5903ea
+    sha256: 6c542982b9f8684d9caaeac709e4fa3a05d3a4b9bfc61d7509e25a20f462ebb4
     source_module: cargo
     source_path: taskfiles/cargo/Taskfile.yml
   - destination_module: go
     path: taskfiles/go/README.md
-    sha256: 0ae7bc5ca19473d7022c617be1d581d3f91f7ae758ec8cf1511b6cc5c0e20e71
+    sha256: 8e39d972e4cf05cc67adff03843ab6be0d22e0e8437d0f37f0a5953719b053c4
     source_module: go
     source_path: taskfiles/go/README.md
   - destination_module: go
     path: taskfiles/go/Taskfile.yml
-    sha256: 5f5fe4c6276ba4b17c429f5800b0db8a71399317805deb88a2ac591fec1a7f9e
+    sha256: 6ecd1cd4be1e561da0490f4bf3b2c12832a5ad96fe619a5cac117e03220c7532
     source_module: go
     source_path: taskfiles/go/Taskfile.yml
   - destination_module: hadolint
@@ -67,7 +66,7 @@ managed_files:
     source_path: taskfiles/hadolint/README.md
   - destination_module: hadolint
     path: taskfiles/hadolint/Taskfile.yml
-    sha256: 7ad71afedfefc097027dff4d501b1884ee21eae598ffacc6427fcc6e0461e703
+    sha256: 6616becaffe871edcf6e8bfde7efeefbd3e4daa7e123535e87fb50f7895147e0
     source_module: hadolint
     source_path: taskfiles/hadolint/Taskfile.yml
   - destination_module: internal/skipfiles
@@ -82,7 +81,7 @@ managed_files:
     source_path: taskfiles/uv/README.md
   - destination_module: uv
     path: taskfiles/uv/Taskfile.yml
-    sha256: 166c0a1f7f712fdd94bf32f77d1cabc6133143e93ff6090ba7ae726231c48bb3
+    sha256: ef0c9520068ecb205062eb35d886d32d19ee26245b487799cb77f4b9dc31985b
     source_module: uv
     source_path: taskfiles/uv/Taskfile.yml
   - destination_module: yamllint
@@ -92,7 +91,7 @@ managed_files:
     source_path: taskfiles/yamllint/README.md
   - destination_module: yamllint
     path: taskfiles/yamllint/Taskfile.yml
-    sha256: 6fe1bd32d96c8a5bcbd1fae907332a6ddbee75d3906737e3c437606dfa1077ee
+    sha256: ec9f60be477cd254cc429a02e36575ae58aa86b313a163a8cd028501387f73cd
     source_module: yamllint
     source_path: taskfiles/yamllint/Taskfile.yml
   - destination_module: zizmor
@@ -102,7 +101,7 @@ managed_files:
     source_path: taskfiles/zizmor/README.md
   - destination_module: zizmor
     path: taskfiles/zizmor/Taskfile.yml
-    sha256: 15de0a19108d0bcbb7c0066733839d7ae9704cd09c84347d4da5518f49fc301d
+    sha256: 4c5315905ceae5072d951473733eb434d80f01fde9e7daf3288a2d4ae6596d15
     source_module: zizmor
     source_path: taskfiles/zizmor/Taskfile.yml
 resolved_modules:
@@ -145,5 +144,5 @@ source:
   default_branch: main
   repository: task-otter/store
   requested_version: ""
-  resolved_commit: 249cdf9c28cdc1a11b23118316d65cf493b49614
+  resolved_commit: 7671997fdccaf68fbb798d83e6bb8a237454b0ba
   source_ref: refs/heads/main

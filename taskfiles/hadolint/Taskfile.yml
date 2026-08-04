@@ -73,7 +73,7 @@ tasks:
       Auto-installs hadolint if missing.
     dir: "{{.USER_WORKING_DIR}}"
     deps:
-      - install
+      - task: install
     cmds:
       - cmd: |
           skip_pattern='{{if .HADOLINT_LINT_SKIP_PATTERN_OVERRIDE}}{{.HADOLINT_LINT_SKIP_PATTERN_OVERRIDE}}
@@ -130,7 +130,7 @@ tasks:
     desc: Show the installed hadolint version
     summary: Print the active hadolint version via hadolint --version. Auto-installs hadolint if missing.
     deps:
-      - install
+      - task: install
     cmds:
       - hadolint --version
   _install:macos:

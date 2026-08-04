@@ -17,6 +17,20 @@ vars:
         gobin="${gopath:-$HOME/go}/bin"
       fi
       printf '%s' "$gobin"
+  GO_GLOBAL_BIN:
+    sh: |
+      gobin="${GOBIN:-}"
+      if [ -z "$gobin" ] && command -v go >/dev/null 2>&1; then
+        gobin="$(go env GOBIN)"
+      fi
+      if [ -z "$gobin" ]; then
+        gopath="${GOPATH:-}"
+        if [ -z "$gopath" ] && command -v go >/dev/null 2>&1; then
+          gopath="$(go env GOPATH)"
+        fi
+        gobin="${gopath:-$HOME/go}/bin"
+      fi
+      printf '%s' "$gobin"
 includes:
   go:
     taskfile: go/Taskfile.yml
@@ -45,6 +59,8 @@ includes:
         -E gci -E gofmt -E gofumpt -E goimports -E golines -E swaggo
       GLOBAL_GO_BIN: '{{.GLOBAL_GO_BIN}}'
       GO_JUNIT_REPORT: ""
+      GO_INSTALL_DIR_UNIX: "/usr/local"
+      GO_GLOBAL_BIN: '{{.GO_GLOBAL_BIN}}'
   yamllint:
     taskfile: yamllint/Taskfile.yml
     vars:
@@ -55,6 +71,9 @@ includes:
       EXTRA_ARGS: '{{.EXTRA_ARGS}}'
       YAMLLINT_VERSION: ""
       YAMLFIX_VERSION: ""
+      YAMLLINT_TARGETS: "."
+      YAMLLINT_CONFIG: ""
+      YAMLLINT_EXTRA_ARGS: ""
   actionlint:
     taskfile: actionlint/Taskfile.yml
     vars:
@@ -75,6 +94,7 @@ includes:
       CARGO_BIN_UNIX: "$HOME/.cargo/bin"
       EXTRA_ARGS: '{{.EXTRA_ARGS}}'
       ADRS_VERSION: ""
+      ADRS_EXTRA_ARGS: ""
   hadolint:
     taskfile: hadolint/Taskfile.yml
     vars:
@@ -83,6 +103,9 @@ includes:
       DOCKERFILE: "Dockerfile"
       EXTRA_ARGS: '{{.EXTRA_ARGS}}'
       HADOLINT_VERSION: "2.14.0"
+      HADOLINT_CONFIG: ""
+      HADOLINT_DOCKERFILE: "Dockerfile"
+      HADOLINT_EXTRA_ARGS: ""
   golangci-lint:
     taskfile: golangci-lint/Taskfile.yml
     vars:
@@ -98,12 +121,14 @@ includes:
       GOLANGCI_LINT_FMT_FORMATTER_FLAGS: >-
         -E gci -E gofmt -E gofumpt -E goimports -E golines -E swaggo
       GLOBAL_GO_BIN: '{{.GLOBAL_GO_BIN}}'
+      GO_GLOBAL_BIN: '{{.GO_GLOBAL_BIN}}'
   govulncheck:
     taskfile: govulncheck/Taskfile.yml
     vars:
       GOVULNCHECK_VERSION: ""
       GOVULNCHECK_LINT_SKIP_PATTERN: ""
       GLOBAL_GO_BIN: '{{.GLOBAL_GO_BIN}}'
+      GO_GLOBAL_BIN: '{{.GO_GLOBAL_BIN}}'
 tasks:
   install:
     desc: Run install for synced TaskOtter modules

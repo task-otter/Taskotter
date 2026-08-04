@@ -24,7 +24,7 @@ vars:
   # four call sites cannot drift apart.
   GOLANGCI_LINT_FMT_FORMATTER_FLAGS: >-
     -E gci -E gofmt -E gofumpt -E goimports -E golines -E swaggo
-  GLOBAL_GO_BIN:
+  GO_GLOBAL_BIN:
     sh: |
       gobin="${GOBIN:-}"
       if [ -z "$gobin" ] && command -v go >/dev/null 2>&1; then
@@ -55,17 +55,17 @@ tasks:
       - task: go:install
     cmds:
       - cmd: |
-          mkdir -p "{{.GLOBAL_GO_BIN}}"
-          GOBIN="{{.GLOBAL_GO_BIN}}" go install \
+          mkdir -p "{{.GO_GLOBAL_BIN}}"
+          GOBIN="{{.GO_GLOBAL_BIN}}" go install \
             github.com/golangci/golangci-lint/v2/cmd/golangci-lint@{{default "latest" .GOLANGCI_LINT_VERSION}}
         platforms: [linux, darwin]
       - cmd: >-
-          powershell -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop'; $globalGoBin = '{{.GLOBAL_GO_BIN}}'; New-Item -ItemType Directory -Force -Path $globalGoBin | Out-Null; $env:GOBIN = $globalGoBin; $installVersion = '{{default "latest" .GOLANGCI_LINT_VERSION}}'; go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$installVersion"
+          powershell -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop'; $globalGoBin = '{{.GO_GLOBAL_BIN}}'; New-Item -ItemType Directory -Force -Path $globalGoBin | Out-Null; $env:GOBIN = $globalGoBin; $installVersion = '{{default "latest" .GOLANGCI_LINT_VERSION}}'; go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$installVersion"
         platforms: [windows]
     status:
-      - test -x "{{.GLOBAL_GO_BIN}}/golangci-lint"
+      - test -x "{{.GO_GLOBAL_BIN}}/golangci-lint"
       - >-
-        { test -z "{{.GOLANGCI_LINT_VERSION}}" || test "{{.GOLANGCI_LINT_VERSION}}" = "latest" || "{{.GLOBAL_GO_BIN}}/golangci-lint" version --short | awk -v want="{{.GOLANGCI_LINT_VERSION}}" '{ got = $1; sub(/^v/, "", got); sub(/^v/, "", want); sub(/[-+].*$/, "", got); if (got == want) { found = 1 } } END { exit !found }'; }
+        { test -z "{{.GOLANGCI_LINT_VERSION}}" || test "{{.GOLANGCI_LINT_VERSION}}" = "latest" || "{{.GO_GLOBAL_BIN}}/golangci-lint" version --short | awk -v want="{{.GOLANGCI_LINT_VERSION}}" '{ got = $1; sub(/^v/, "", got); sub(/^v/, "", want); sub(/[-+].*$/, "", got); if (got == want) { found = 1 } } END { exit !found }'; }
   lint:
     run: once
     desc: Lint Go packages with golangci-lint
@@ -147,7 +147,7 @@ tasks:
     cmds:
       - cmd: |
           pattern="$GO_SKIP_PATTERN"
-          source_config="$("{{.GLOBAL_GO_BIN}}/golangci-lint" config path 2>/dev/null || true)"
+          source_config="$("{{.GO_GLOBAL_BIN}}/golangci-lint" config path 2>/dev/null || true)"
           config_dir=.
           if [[ -n "$source_config" ]]; then
             config_dir="$(dirname "$source_config")"
@@ -361,7 +361,7 @@ tasks:
           powershell -NoProfile -ExecutionPolicy Bypass -Command - <<'POWERSHELL'
           $ErrorActionPreference = 'Stop'
           $pattern = $env:GO_SKIP_PATTERN
-          $sourceConfig = (& '{{.GLOBAL_GO_BIN}}/golangci-lint' config path 2>$null | Select-Object -First 1)
+          $sourceConfig = (& '{{.GO_GLOBAL_BIN}}/golangci-lint' config path 2>$null | Select-Object -First 1)
           if ($LASTEXITCODE -ne 0) { $sourceConfig = '' }
           if ($sourceConfig) {
               $sourceConfig = (Resolve-Path -LiteralPath $sourceConfig).Path
@@ -600,7 +600,7 @@ tasks:
     generates:
       - "{{.CUSTOM_GCL_BINARY}}"
     cmds:
-      - '"{{.GLOBAL_GO_BIN}}/golangci-lint" custom -v'
+      - '"{{.GO_GLOBAL_BIN}}/golangci-lint" custom -v'
   _lint:
     run: once
     internal: true
@@ -620,7 +620,7 @@ tasks:
       CUSTOM_GCL_BINARY: "{{joinPath .CUSTOM_GCL_DESTINATION .CUSTOM_GCL_BINARY_NAME}}"
     cmds:
       - cmd: |
-          lint_binary="{{.GLOBAL_GO_BIN}}/golangci-lint"
+          lint_binary="{{.GO_GLOBAL_BIN}}/golangci-lint"
           if [ "{{.CUSTOM_GCL_ENABLED}}" = "true" ]; then
             case "{{.CUSTOM_GCL_BINARY}}" in
               /*) lint_binary="{{.CUSTOM_GCL_BINARY}}" ;;
@@ -658,7 +658,7 @@ tasks:
           exit "$lint_status"
         platforms: [linux, darwin]
       - cmd: >-
-          powershell -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop'; $lintBinary = '{{.GLOBAL_GO_BIN}}/golangci-lint'; if ('{{.CUSTOM_GCL_ENABLED}}' -eq 'true') {
+          powershell -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop'; $lintBinary = '{{.GO_GLOBAL_BIN}}/golangci-lint'; if ('{{.CUSTOM_GCL_ENABLED}}' -eq 'true') {
 
 
             $lintBinary = '{{.CUSTOM_GCL_BINARY}}'; if (-not [System.IO.Path]::IsPathRooted($lintBinary)) {
@@ -705,7 +705,7 @@ tasks:
           skip_pattern='{{if .GOLANGCI_LINT_FMT_SKIP_PATTERN_OVERRIDE}}{{.GOLANGCI_LINT_FMT_SKIP_PATTERN_OVERRIDE}}
           {{- else}}{{.GOLANGCI_LINT_FMT_SKIP_PATTERN}}{{end}}'
           if [ -z "$skip_pattern" ]; then
-            "{{.GLOBAL_GO_BIN}}/golangci-lint" fmt \
+            "{{.GO_GLOBAL_BIN}}/golangci-lint" fmt \
               {{.GO_FMT_DIFF}} \
               {{.GOLANGCI_LINT_FMT_FORMATTER_FLAGS}} \
               {{.GO_FMT_TARGETS}}
@@ -744,7 +744,7 @@ tasks:
             exit 0
           fi
 
-          xargs -0 "{{.GLOBAL_GO_BIN}}/golangci-lint" fmt \
+          xargs -0 "{{.GO_GLOBAL_BIN}}/golangci-lint" fmt \
               {{.GO_FMT_DIFF}} \
               {{.GOLANGCI_LINT_FMT_FORMATTER_FLAGS}} <"$file_list"
         platforms: [linux, darwin]
@@ -752,7 +752,7 @@ tasks:
           powershell -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop'; $skipPattern = '{{if .GOLANGCI_LINT_FMT_SKIP_PATTERN_OVERRIDE}}{{.GOLANGCI_LINT_FMT_SKIP_PATTERN_OVERRIDE}} {{- else}}{{.GOLANGCI_LINT_FMT_SKIP_PATTERN}}{{end}}'; if (-not $skipPattern) {
 
 
-            & '{{.GLOBAL_GO_BIN}}/golangci-lint' fmt
+            & '{{.GO_GLOBAL_BIN}}/golangci-lint' fmt
               {{.GO_FMT_DIFF}}
               {{.GOLANGCI_LINT_FMT_FORMATTER_FLAGS}}
               {{.GO_FMT_TARGETS}};
@@ -784,7 +784,7 @@ tasks:
           if ($files.Count -gt 0) {
 
 
-            & '{{.GLOBAL_GO_BIN}}/golangci-lint' fmt
+            & '{{.GO_GLOBAL_BIN}}/golangci-lint' fmt
               {{.GO_FMT_DIFF}}
               {{.GOLANGCI_LINT_FMT_FORMATTER_FLAGS}}
               @files;

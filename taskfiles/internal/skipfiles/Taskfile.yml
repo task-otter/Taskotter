@@ -2,7 +2,7 @@
 version: "3.5"
 silent: true
 vars:
-  UNIX_GLOB_HELPERS: |
+  SKIPFILES_UNIX_GLOB_HELPERS: |
     glob_to_regex() {
       local glob="${1//\\//}" regex='^' char next
       local index=0 length=${#glob}
@@ -46,7 +46,7 @@ vars:
       fi
       printf '%s' "$path"
     }
-  POWERSHELL_GLOB_HELPERS: |
+  SKIPFILES_POWERSHELL_GLOB_HELPERS: |
     function ConvertTo-SkipfilesRegex([string]$Pattern) {
       $normalizedPattern = $Pattern.Replace("\", "/")
       $builder = [System.Text.StringBuilder]::new("^")
@@ -164,7 +164,7 @@ tasks:
       SKIPFILES_PATTERN: "{{.SKIPFILES_PATTERN}}"
       SKIPFILES_MATCHING: "{{.SKIPFILES_MATCHING}}"
     cmd: |
-      {{.UNIX_GLOB_HELPERS}}
+      {{.SKIPFILES_UNIX_GLOB_HELPERS}}
 
       pattern="$SKIPFILES_PATTERN"
       regex="$(glob_to_regex "$pattern")"
@@ -197,7 +197,7 @@ tasks:
       powershell -NoProfile -ExecutionPolicy Bypass -Command '
         $ErrorActionPreference = "Stop"
         Set-StrictMode -Version Latest
-        {{.POWERSHELL_GLOB_HELPERS}}
+        {{.SKIPFILES_POWERSHELL_GLOB_HELPERS}}
 
         $pattern = [string]$env:SKIPFILES_PATTERN
         $matching = $env:SKIPFILES_MATCHING -eq "true"
@@ -263,7 +263,7 @@ tasks:
       - sh: command -v go >/dev/null 2>&1
         msg: The go executable is required by go-packages.
     cmd: |
-      {{.UNIX_GLOB_HELPERS}}
+      {{.SKIPFILES_UNIX_GLOB_HELPERS}}
 
       pattern="$SKIPFILES_PATTERN"
       targets="${SKIPFILES_GO_TARGETS:-./...}"
@@ -313,7 +313,7 @@ tasks:
       powershell -NoProfile -ExecutionPolicy Bypass -Command '
         $ErrorActionPreference = "Stop"
         Set-StrictMode -Version Latest
-        {{.POWERSHELL_GLOB_HELPERS}}
+        {{.SKIPFILES_POWERSHELL_GLOB_HELPERS}}
 
         if (-not (Get-Command go -ErrorAction SilentlyContinue)) {
           throw "The go executable is required by go-packages."

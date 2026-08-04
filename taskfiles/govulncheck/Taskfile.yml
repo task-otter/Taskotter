@@ -15,7 +15,7 @@ includes:
 vars:
   GOVULNCHECK_VERSION: ""
   GOVULNCHECK_LINT_SKIP_PATTERN: ""
-  GLOBAL_GO_BIN:
+  GO_GLOBAL_BIN:
     sh: |
       gobin="${GOBIN:-}"
       if [ -z "$gobin" ] && command -v go >/dev/null 2>&1; then
@@ -44,10 +44,10 @@ tasks:
       - task: go:install
     cmds:
       - >-
-        GOBIN="{{.GLOBAL_GO_BIN}}" go install golang.org/x/vuln/cmd/govulncheck@{{default "latest" .GOVULNCHECK_VERSION}}
+        GOBIN="{{.GO_GLOBAL_BIN}}" go install golang.org/x/vuln/cmd/govulncheck@{{default "latest" .GOVULNCHECK_VERSION}}
     status:
       - >-
-        test -x "{{.GLOBAL_GO_BIN}}/govulncheck" && { test -z "{{.GOVULNCHECK_VERSION}}" || test "{{.GOVULNCHECK_VERSION}}" = "latest" || go version -m "{{.GLOBAL_GO_BIN}}/govulncheck" | awk -v want="{{.GOVULNCHECK_VERSION}}" '$1 == "mod" && $3 == want { found = 1 } END { exit !found }'; }
+        test -x "{{.GO_GLOBAL_BIN}}/govulncheck" && { test -z "{{.GOVULNCHECK_VERSION}}" || test "{{.GOVULNCHECK_VERSION}}" = "latest" || go version -m "{{.GO_GLOBAL_BIN}}/govulncheck" | awk -v want="{{.GOVULNCHECK_VERSION}}" '$1 == "mod" && $3 == want { found = 1 } END { exit !found }'; }
   lint:
     run: once
     desc: Scan Go packages with govulncheck
@@ -68,7 +68,7 @@ tasks:
           skip_pattern='{{if .GOVULNCHECK_LINT_SKIP_PATTERN_OVERRIDE}}{{.GOVULNCHECK_LINT_SKIP_PATTERN_OVERRIDE}}
           {{- else}}{{.GOVULNCHECK_LINT_SKIP_PATTERN}}{{end}}'
           if [ -z "$skip_pattern" ]; then
-            "{{.GLOBAL_GO_BIN}}/govulncheck" \
+            "{{.GO_GLOBAL_BIN}}/govulncheck" \
               {{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}./...{{end}}
             exit
           fi
@@ -99,13 +99,13 @@ tasks:
             echo 'No matching Go packages found'
             exit 0
           fi
-          xargs -0 "{{.GLOBAL_GO_BIN}}/govulncheck" $options <"$package_list"
+          xargs -0 "{{.GO_GLOBAL_BIN}}/govulncheck" $options <"$package_list"
         platforms: [linux, darwin]
       - cmd: >-
           powershell -NoProfile -ExecutionPolicy Bypass -Command "$skipPattern='{{if .GOVULNCHECK_LINT_SKIP_PATTERN_OVERRIDE}}{{.GOVULNCHECK_LINT_SKIP_PATTERN_OVERRIDE}} {{- else}}{{.GOVULNCHECK_LINT_SKIP_PATTERN}}{{end}}'; if (-not $skipPattern) {
 
 
-            & '{{.GLOBAL_GO_BIN}}/govulncheck'
+            & '{{.GO_GLOBAL_BIN}}/govulncheck'
               {{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}./...{{end}};
             exit $LASTEXITCODE
           }; $targets=@(); $options=@(); foreach ($argument in '{{.CLI_ARGS}}'.Split(' ', [System.StringSplitOptions]::RemoveEmptyEntries)) {
@@ -120,5 +120,5 @@ tasks:
 
             --taskfile '{{.TASKFILE_DIR}}/../internal/skipfiles/Taskfile.yml'
             go-packages);
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; if (-not $packages) { Write-Host 'No matching Go packages found'; exit 0 }; & '{{.GLOBAL_GO_BIN}}/govulncheck' @options @packages; exit $LASTEXITCODE"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; if (-not $packages) { Write-Host 'No matching Go packages found'; exit 0 }; & '{{.GO_GLOBAL_BIN}}/govulncheck' @options @packages; exit $LASTEXITCODE"
         platforms: [windows]

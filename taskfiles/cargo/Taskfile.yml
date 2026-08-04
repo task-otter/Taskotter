@@ -17,7 +17,7 @@ vars:
   RUSTUP_INSTALL_URL_WINDOWS: "https://win.rustup.rs/x86_64"
   RUST_TOOLCHAIN: ""
   CARGO_BIN_UNIX: "$HOME/.cargo/bin"
-  EXTRA_ARGS: ""
+  CARGO_EXTRA_ARGS: ""
 tasks:
   default:
     run: once
@@ -61,10 +61,10 @@ tasks:
       - task: _upgrade:windows
   build:
     run: once
-    desc: Build the crate with cargo build (EXTRA_ARGS=flags)
+    desc: Build the crate with cargo build (CARGO_EXTRA_ARGS=flags)
     summary: |
       Compile the crate in the current directory with `cargo build`. Pass
-      EXTRA_ARGS for cargo flags such as --release or -p <crate>. Auto-installs
+      CARGO_EXTRA_ARGS for cargo flags such as --release or -p <crate>. Auto-installs
       the Rust toolchain if needed.
     deps:
       - task: install
@@ -77,10 +77,10 @@ tasks:
           CARGO_SUBCMD: "build"
   check:
     run: once
-    desc: Type-check the crate with cargo check (EXTRA_ARGS=flags)
+    desc: Type-check the crate with cargo check (CARGO_EXTRA_ARGS=flags)
     summary: |
       Check the crate in the current directory with `cargo check` without
-      producing binaries. Pass EXTRA_ARGS for cargo flags. Auto-installs the
+      producing binaries. Pass CARGO_EXTRA_ARGS for cargo flags. Auto-installs the
       Rust toolchain if needed.
     deps:
       - task: install
@@ -93,10 +93,10 @@ tasks:
           CARGO_SUBCMD: "check"
   test:
     run: once
-    desc: Run the crate test suite with cargo test (EXTRA_ARGS=flags)
+    desc: Run the crate test suite with cargo test (CARGO_EXTRA_ARGS=flags)
     summary: |
       Run the crate's tests in the current directory with `cargo test`. Pass
-      EXTRA_ARGS for cargo flags or test filters. Auto-installs the Rust
+      CARGO_EXTRA_ARGS for cargo flags or test filters. Auto-installs the Rust
       toolchain if needed.
     deps:
       - task: install
@@ -109,9 +109,9 @@ tasks:
           CARGO_SUBCMD: "test"
   fmt:
     run: once
-    desc: Format Rust code with cargo fmt (EXTRA_ARGS=flags)
+    desc: Format Rust code with cargo fmt (CARGO_EXTRA_ARGS=flags)
     summary: |
-      Reformat Rust code in the current crate with `cargo fmt`. Pass EXTRA_ARGS
+      Reformat Rust code in the current crate with `cargo fmt`. Pass CARGO_EXTRA_ARGS
       for rustfmt options. Auto-installs the Rust toolchain if needed.
     deps:
       - task: install
@@ -128,10 +128,10 @@ tasks:
             {{if .CARGO_FMT_SKIP_PATTERN_OVERRIDE}}{{.CARGO_FMT_SKIP_PATTERN_OVERRIDE}} {{- else}}{{.CARGO_FMT_SKIP_PATTERN}}{{end}}
   fmt:check:
     run: once
-    desc: Check Rust formatting with cargo fmt --check (EXTRA_ARGS=flags)
+    desc: Check Rust formatting with cargo fmt --check (CARGO_EXTRA_ARGS=flags)
     summary: |
       Report formatting differences in the current crate with
-      `cargo fmt --check` without modifying files. Pass EXTRA_ARGS for rustfmt
+      `cargo fmt --check` without modifying files. Pass CARGO_EXTRA_ARGS for rustfmt
       options. Auto-installs the Rust toolchain if needed.
     deps:
       - task: install
@@ -148,9 +148,9 @@ tasks:
             {{if .CARGO_FMT_SKIP_PATTERN_OVERRIDE}}{{.CARGO_FMT_SKIP_PATTERN_OVERRIDE}} {{- else}}{{.CARGO_FMT_SKIP_PATTERN}}{{end}}
   lint:
     run: once
-    desc: Lint Rust code with cargo clippy (EXTRA_ARGS=flags)
+    desc: Lint Rust code with cargo clippy (CARGO_EXTRA_ARGS=flags)
     summary: |
-      Lint the current crate with `cargo clippy`. Pass EXTRA_ARGS for cargo or
+      Lint the current crate with `cargo clippy`. Pass CARGO_EXTRA_ARGS for cargo or
       clippy flags such as -- -D warnings. Auto-installs the Rust toolchain if
       needed.
     deps:
@@ -171,7 +171,7 @@ tasks:
     desc: Auto-fix Rust lint issues with cargo clippy --fix
     summary: |
       Apply clippy's automatic fixes to the current crate with
-      `cargo clippy --fix`. Pass EXTRA_ARGS for cargo or clippy flags such as
+      `cargo clippy --fix`. Pass CARGO_EXTRA_ARGS for cargo or clippy flags such as
       --allow-dirty. Auto-installs the Rust toolchain if needed.
     deps:
       - task: install
@@ -328,8 +328,8 @@ tasks:
         skip_pattern='{{default "" .CARGO_SKIP_PATTERN}}'
         if [ -z "$skip_pattern" ]; then
           "$cargo" {{if .RUST_TOOLCHAIN}}+{{.RUST_TOOLCHAIN}} {{end}}{{.CARGO_SUBCMD}} \
-            {{if .EXTRA_ARGS_OVERRIDE}}{{.EXTRA_ARGS_OVERRIDE}}
-            {{- else}}{{.EXTRA_ARGS}}{{end}}
+            {{if .CARGO_EXTRA_ARGS_OVERRIDE}}{{.CARGO_EXTRA_ARGS_OVERRIDE}}
+            {{- else}}{{.CARGO_EXTRA_ARGS}}{{end}}
           exit
         fi
 
@@ -361,8 +361,8 @@ tasks:
 
         if [ -z "${skipped_packages# }" ]; then
           "$cargo" {{if .RUST_TOOLCHAIN}}+{{.RUST_TOOLCHAIN}} {{end}}{{.CARGO_SUBCMD}} \
-            {{if .EXTRA_ARGS_OVERRIDE}}{{.EXTRA_ARGS_OVERRIDE}}
-            {{- else}}{{.EXTRA_ARGS}}{{end}}
+            {{if .CARGO_EXTRA_ARGS_OVERRIDE}}{{.CARGO_EXTRA_ARGS_OVERRIDE}}
+            {{- else}}{{.CARGO_EXTRA_ARGS}}{{end}}
           exit
         fi
 
@@ -387,8 +387,8 @@ tasks:
           exit 0
         fi
         "$cargo" {{if .RUST_TOOLCHAIN}}+{{.RUST_TOOLCHAIN}} {{end}}{{.CARGO_SUBCMD}} "$@" \
-          {{if .EXTRA_ARGS_OVERRIDE}}{{.EXTRA_ARGS_OVERRIDE}}
-          {{- else}}{{.EXTRA_ARGS}}{{end}}
+          {{if .CARGO_EXTRA_ARGS_OVERRIDE}}{{.CARGO_EXTRA_ARGS_OVERRIDE}}
+          {{- else}}{{.CARGO_EXTRA_ARGS}}{{end}}
   _cargo:windows:
     run: once
     internal: true
@@ -399,8 +399,8 @@ tasks:
         powershell -NoProfile -ExecutionPolicy Bypass -Command "$c = (Get-Command cargo -ErrorAction SilentlyContinue).Source; if (-not $c) { $c = Join-Path $env:USERPROFILE '.cargo\bin\cargo.exe' }; $skipPattern='{{default "" .CARGO_SKIP_PATTERN}}'; if (-not $skipPattern) {
 
           & $c {{if .RUST_TOOLCHAIN}}+{{.RUST_TOOLCHAIN}} {{end}}{{.CARGO_SUBCMD}}
-            {{if .EXTRA_ARGS_OVERRIDE}}{{.EXTRA_ARGS_OVERRIDE}}
-            {{- else}}{{.EXTRA_ARGS}}{{end}};
+            {{if .CARGO_EXTRA_ARGS_OVERRIDE}}{{.CARGO_EXTRA_ARGS_OVERRIDE}}
+            {{- else}}{{.CARGO_EXTRA_ARGS}}{{end}};
           exit $LASTEXITCODE
         }; function Get-PackageName([string]$manifest) {
 
@@ -432,8 +432,8 @@ tasks:
         }; if ($skippedPackages.Count -eq 0) {
 
           & $c {{if .RUST_TOOLCHAIN}}+{{.RUST_TOOLCHAIN}} {{end}}{{.CARGO_SUBCMD}}
-            {{if .EXTRA_ARGS_OVERRIDE}}{{.EXTRA_ARGS_OVERRIDE}}
-            {{- else}}{{.EXTRA_ARGS}}{{end}};
+            {{if .CARGO_EXTRA_ARGS_OVERRIDE}}{{.CARGO_EXTRA_ARGS_OVERRIDE}}
+            {{- else}}{{.CARGO_EXTRA_ARGS}}{{end}};
           exit $LASTEXITCODE
         }; $packageArgs=@(); Get-ChildItem -Recurse -Filter Cargo.toml -File |
 
@@ -444,6 +444,6 @@ tasks:
           };
         if ($packageArgs.Count -eq 0) { Write-Host 'No matching Cargo packages found'; exit 0 }; & $c {{if .RUST_TOOLCHAIN}}+{{.RUST_TOOLCHAIN}} {{end}}{{.CARGO_SUBCMD}} @packageArgs
 
-          {{if .EXTRA_ARGS_OVERRIDE}}{{.EXTRA_ARGS_OVERRIDE}}
-          {{- else}}{{.EXTRA_ARGS}}{{end}};
+          {{if .CARGO_EXTRA_ARGS_OVERRIDE}}{{.CARGO_EXTRA_ARGS_OVERRIDE}}
+          {{- else}}{{.CARGO_EXTRA_ARGS}}{{end}};
         exit $LASTEXITCODE"

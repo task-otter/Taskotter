@@ -60,5 +60,5 @@ Skip patterns support `*` within one path segment, `**` across directories, and 
 - **macOS** installs via Homebrew (`brew install actionlint`). Homebrew must be installed.
 - **Linux** downloads a pinned binary from GitHub Releases into `/usr/local/bin`. Requires `curl`, `tar`, and `install`. Only `x86_64` and `aarch64` architectures are supported.
 - **Windows** installs via Scoop (`scoop install actionlint`). Scoop must be installed.
-- When `TARGETS` is empty, actionlint automatically discovers all files under `.github/workflows/` in the current working directory.
+- When `ACTIONLINT_TARGETS` is empty, actionlint automatically discovers all files under `.github/workflows/` in the current working directory.
 - The `lint` task auto-installs actionlint if it is not already present in `PATH`.

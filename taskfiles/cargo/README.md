@@ -46,11 +46,11 @@ task cargo:version
 ## Building and testing
 
 Cargo tasks run in the directory where you invoke `task`, so run them from a
-crate root (where `Cargo.toml` lives). Pass extra Cargo flags with `EXTRA_ARGS`:
+crate root (where `Cargo.toml` lives). Pass extra Cargo flags with `CARGO_EXTRA_ARGS`:
 
 ```sh
-task cargo:build EXTRA_ARGS=--release
-task cargo:test EXTRA_ARGS="-- --nocapture"
+task cargo:build CARGO_EXTRA_ARGS=--release
+task cargo:test CARGO_EXTRA_ARGS="-- --nocapture"
 task cargo:check
 ```
 
@@ -61,7 +61,7 @@ task cargo:fmt              # cargo fmt
 task cargo:fmt:check        # cargo fmt --check (reports without writing)
 task cargo:lint             # cargo clippy
 task cargo:lint:fix         # cargo clippy --fix
-task cargo:lint EXTRA_ARGS="-- -D warnings"
+task cargo:lint CARGO_EXTRA_ARGS="-- -D warnings"
 ```
 
 ## Toolchains
@@ -72,7 +72,7 @@ a channel or version to pin the toolchain; `install` passes it to rustup as
 
 ```sh
 task cargo:install RUST_TOOLCHAIN=nightly
-task cargo:build RUST_TOOLCHAIN=1.79.0 EXTRA_ARGS=--release
+task cargo:build RUST_TOOLCHAIN=1.79.0 CARGO_EXTRA_ARGS=--release
 ```
 
 ## Public Tasks
@@ -101,7 +101,7 @@ task cargo:build RUST_TOOLCHAIN=1.79.0 EXTRA_ARGS=--release
 | `RUSTUP_INSTALL_URL_WINDOWS` | `https://win.rustup.rs/x86_64` | Base URL for the Windows `rustup-init.exe` |
 | `RUST_TOOLCHAIN` | empty (`stable`) | Optional toolchain channel or version, such as `nightly` or `1.79.0` |
 | `CARGO_BIN_UNIX` | `$HOME/.cargo/bin` | Directory containing the rustup-installed binaries, used as a PATH fallback |
-| `EXTRA_ARGS` | empty | Extra flags appended to Cargo subcommands |
+| `CARGO_EXTRA_ARGS` | empty | Extra flags appended to Cargo subcommands |
 | `CARGO_LINT_SKIP_PATTERN` | _(empty)_ | Forward-slash path glob for files skipped by lint checks and fixes |
 | `CARGO_FMT_SKIP_PATTERN` | _(empty)_ | Forward-slash path glob for files skipped by formatting checks and fixes |
 

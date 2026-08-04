@@ -97,10 +97,10 @@ task go:install:go-junit-report
 
 | Task                        | Description                                           | Key variables      |
 | --------------------------- | ----------------------------------------------------- | ------------------ |
-| `install`                   | Install Go on the current operating system if missing | `INSTALL_DIR_UNIX`, `GO_VERSION` |
-| `install:undo`              | Remove Go from the current operating system            | `INSTALL_DIR_UNIX` |
-| `install:go-junit-report`   | Install go-junit-report into the global Go bin        | `GLOBAL_GO_BIN` |
-| `upgrade`                   | Upgrade Go to the selected or latest stable release    | `INSTALL_DIR_UNIX`, `GO_VERSION` |
+| `install`                   | Install Go on the current operating system if missing | `GO_INSTALL_DIR_UNIX`, `GO_VERSION` |
+| `install:undo`              | Remove Go from the current operating system            | `GO_INSTALL_DIR_UNIX` |
+| `install:go-junit-report`   | Install go-junit-report into the global Go bin        | `GO_GLOBAL_BIN` |
+| `upgrade`                   | Upgrade Go to the selected or latest stable release    | `GO_INSTALL_DIR_UNIX`, `GO_VERSION` |
 | `version`                   | Show the installed Go version                          | none               |
 | `which`                     | Show the path to the Go binary                         | none               |
 | `verify`                    | Print Go version, GOROOT, and GOPATH                   | none               |
@@ -112,8 +112,8 @@ task go:install:go-junit-report
 
 | Variable               | Default                         | Description                                                           |
 | ---------------------- | -------------------------------- | ---------------------------------------------------------------------- |
-| `INSTALL_DIR_UNIX`     | `/usr/local`                    | Parent directory for the Linux tarball install                        |
-| `GO_ROOT_UNIX`         | `{{.INSTALL_DIR_UNIX}}/go`      | Linux Go root directory                                               |
+| `GO_INSTALL_DIR_UNIX`     | `/usr/local`                    | Parent directory for the Linux tarball install                        |
+| `GO_ROOT_UNIX`         | `{{.GO_INSTALL_DIR_UNIX}}/go`      | Linux Go root directory                                               |
 | `GO_BIN_UNIX`          | `{{.GO_ROOT_UNIX}}/bin`         | Linux Go binary directory added to shell profiles                     |
 | `GO_CMD_UNIX`          | `{{.GO_BIN_UNIX}}/go`           | Linux Go binary path used as a fallback before the shell reloads PATH |
 | `GO_VERSION_URL`       | `https://go.dev/VERSION?m=text` | Endpoint used to resolve the latest stable Go version                 |
@@ -122,17 +122,17 @@ task go:install:go-junit-report
 | `GO_JUNIT_REPORT`      | empty (`junit.xml`)             | Output path for the `test` XML report                                 |
 | `GO_COVER_PROFILE`     | empty (`coverage.out`)          | Output path for the `test` coverage profile file                      |
 | `GO_FUZZTIME`          | empty (`30s`)                   | Duration a single `fuzz` target runs before stopping                 |
-| `GLOBAL_GO_BIN`        | `GOBIN` or `GOPATH/bin`         | Destination and lookup directory for installed Go development tools   |
+| `GO_GLOBAL_BIN`        | `GOBIN` or `GOPATH/bin`         | Destination and lookup directory for installed Go development tools   |
 
 ## Notes
 
-Linux installs replace `INSTALL_DIR_UNIX/go`. The task uses `sudo` when it is
+Linux installs replace `GO_INSTALL_DIR_UNIX/go`. The task uses `sudo` when it is
 not already running as root, then adds `GO_BIN_UNIX` to the current user's shell
 profile if Go is not already available on PATH.
 
 Downloaded Go archives are checked against the official `.sha256` published
 alongside each release, and the new toolchain is extracted and smoke-tested in a
-temporary directory before it replaces `INSTALL_DIR_UNIX/go`. A failed download,
+temporary directory before it replaces `GO_INSTALL_DIR_UNIX/go`. A failed download,
 a checksum mismatch, or a bad archive therefore leaves the existing installation
 untouched.
 

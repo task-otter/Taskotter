@@ -128,7 +128,7 @@ already exists.
 
 | Task          | Description                                            | Key variables                       |
 | ------------- | ------------------------------------------------------- | ------------------------------------ |
-| `install`     | Install golangci-lint into the global Go bin            | `GLOBAL_GO_BIN`, `GOLANGCI_LINT_VERSION` |
+| `install`     | Install golangci-lint into the global Go bin            | `GO_GLOBAL_BIN`, `GOLANGCI_LINT_VERSION` |
 | `lint`        | Lint all Go packages with golangci-lint                 | `GOLANGCI_LINT_LINT_SKIP_PATTERN`    |
 | `lint:fix`    | Auto-fix Go lint issues with golangci-lint               | `GOLANGCI_LINT_LINT_SKIP_PATTERN`    |
 | `fmt`         | Format Go files with golangci-lint formatters            | `GOLANGCI_LINT_FMT_SKIP_PATTERN`     |
@@ -144,4 +144,4 @@ already exists.
 | `GOLANGCI_LINT_FMT_SKIP_PATTERN`      | empty                                      | Shell-style path glob for Go files skipped by `fmt` and `fmt:check` |
 | `GOLANGCI_LINT_INTERNAL_SKIP_CONFIG`  | `.golangci-taskotter-skip.yml`             | Filename for the generated skip-pattern config overlay              |
 | `GOLANGCI_LINT_FMT_FORMATTER_FLAGS`   | `-E gci -E gofmt -E gofumpt -E goimports -E golines -E swaggo` | Formatter set passed to `golangci-lint fmt`     |
-| `GLOBAL_GO_BIN`                       | `GOBIN` or `GOPATH/bin`                    | Destination and lookup directory for the installed golangci-lint binary |
+| `GO_GLOBAL_BIN`                       | `GOBIN` or `GOPATH/bin`                    | Destination and lookup directory for the installed golangci-lint binary |

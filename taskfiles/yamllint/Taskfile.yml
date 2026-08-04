@@ -15,9 +15,9 @@ includes:
 vars:
   YAMLLINT_LINT_SKIP_PATTERN: ""
   UV_LOAD: 'export PATH="$HOME/.local/bin:$PATH"'
-  TARGETS: "."
-  CONFIG: ""
-  EXTRA_ARGS: ""
+  YAMLLINT_TARGETS: "."
+  YAMLLINT_CONFIG: ""
+  YAMLLINT_EXTRA_ARGS: ""
   YAMLLINT_VERSION: ""
   YAMLFIX_VERSION: ""
 tasks:
@@ -70,55 +70,55 @@ tasks:
   lint:
     run: once
     dir: "{{.USER_WORKING_DIR}}"
-    desc: Lint YAML files with yamllint (TARGETS=path)
+    desc: Lint YAML files with yamllint (YAMLLINT_TARGETS=path)
     summary: |
-      Run yamllint against TARGETS (default .). Pass CONFIG to use a custom
-      config file via -c, and EXTRA_ARGS for additional flags.
+      Run yamllint against YAMLLINT_TARGETS (default .). Pass YAMLLINT_CONFIG to use a custom
+      config file via -c, and YAMLLINT_EXTRA_ARGS for additional flags.
       Auto-installs yamllint if missing.
     deps:
       - task: install
     vars:
-      TARGETS: "."
-      CONFIG: ""
-      EXTRA_ARGS: ""
+      YAMLLINT_TARGETS: "."
+      YAMLLINT_CONFIG: ""
+      YAMLLINT_EXTRA_ARGS: ""
     cmds:
       - >-
-        bash -lc '{{.UV_LOAD}}; _skip="{{if .YAMLLINT_LINT_SKIP_PATTERN_OVERRIDE}}{{.YAMLLINT_LINT_SKIP_PATTERN_OVERRIDE}} {{- else}}{{.YAMLLINT_LINT_SKIP_PATTERN}}{{end}}"; if [ -z "$_skip" ]; then yamllint {{if .CONFIG_OVERRIDE}}-c "{{.CONFIG_OVERRIDE}}" {{else if .CONFIG}}-c "{{.CONFIG}}" {{end}} {{if .TARGETS_OVERRIDE}}{{.TARGETS_OVERRIDE}}{{else if .TARGETS}}{{.TARGETS}}{{else}}.{{end}} {{if .EXTRA_ARGS_OVERRIDE}}{{.EXTRA_ARGS_OVERRIDE}} {{- else}}{{.EXTRA_ARGS}}{{end}}; else _files="$(mktemp)"; trap '"'"'rm -f "$_files"'"'"' EXIT; for _target in {{if .TARGETS_OVERRIDE}}{{.TARGETS_OVERRIDE}}{{else if .TARGETS}}{{.TARGETS}}{{else}}.{{end}}; do if [ -d "$_target" ]; then find "$_target" -type f \( -name "*.yml" -o -name "*.yaml" \) -print0; elif [ -f "$_target" ]; then printf "%s\000" "$_target"; fi; done | task --silent --taskfile "{{.TASKFILE_DIR}}/../internal/skipfiles/Taskfile.yml" filter "SKIPFILES_PATTERN=$_skip" >"$_files"; if [ -s "$_files" ]; then xargs -0 yamllint {{if .CONFIG_OVERRIDE}}-c "{{.CONFIG_OVERRIDE}}" {{else if .CONFIG}}-c "{{.CONFIG}}" {{end}} {{if .EXTRA_ARGS_OVERRIDE}}{{.EXTRA_ARGS_OVERRIDE}}{{else}}{{.EXTRA_ARGS}}{{end}} <"$_files"; else echo "No matching YAML files found"; fi; fi && echo "✅ yamllint passed" || { echo "❌ yamllint failed"; exit 1; }'
+        bash -lc '{{.UV_LOAD}}; _skip="{{if .YAMLLINT_LINT_SKIP_PATTERN_OVERRIDE}}{{.YAMLLINT_LINT_SKIP_PATTERN_OVERRIDE}} {{- else}}{{.YAMLLINT_LINT_SKIP_PATTERN}}{{end}}"; if [ -z "$_skip" ]; then yamllint {{if .YAMLLINT_CONFIG_OVERRIDE}}-c "{{.YAMLLINT_CONFIG_OVERRIDE}}" {{else if .YAMLLINT_CONFIG}}-c "{{.YAMLLINT_CONFIG}}" {{end}} {{if .YAMLLINT_TARGETS_OVERRIDE}}{{.YAMLLINT_TARGETS_OVERRIDE}}{{else if .YAMLLINT_TARGETS}}{{.YAMLLINT_TARGETS}} {{else}}.{{end}} {{if .YAMLLINT_EXTRA_ARGS_OVERRIDE}}{{.YAMLLINT_EXTRA_ARGS_OVERRIDE}} {{- else}}{{.YAMLLINT_EXTRA_ARGS}}{{end}}; else _files="$(mktemp)"; trap '"'"'rm -f "$_files"'"'"' EXIT; for _target in {{if .YAMLLINT_TARGETS_OVERRIDE}}{{.YAMLLINT_TARGETS_OVERRIDE}} {{else if .YAMLLINT_TARGETS}}{{.YAMLLINT_TARGETS}}{{else}}.{{end}}; do if [ -d "$_target" ]; then find "$_target" -type f \( -name "*.yml" -o -name "*.yaml" \) -print0; elif [ -f "$_target" ]; then printf "%s\000" "$_target"; fi; done | task --silent --taskfile "{{.TASKFILE_DIR}}/../internal/skipfiles/Taskfile.yml" filter "SKIPFILES_PATTERN=$_skip" >"$_files"; if [ -s "$_files" ]; then xargs -0 yamllint {{if .YAMLLINT_CONFIG_OVERRIDE}}-c "{{.YAMLLINT_CONFIG_OVERRIDE}}" {{else if .YAMLLINT_CONFIG}}-c "{{.YAMLLINT_CONFIG}}" {{end}} {{if .YAMLLINT_EXTRA_ARGS_OVERRIDE}}{{.YAMLLINT_EXTRA_ARGS_OVERRIDE}}{{else}}{{.YAMLLINT_EXTRA_ARGS}}{{end}} <"$_files"; else echo "No matching YAML files found"; fi; fi && echo "✅ yamllint passed" || { echo "❌ yamllint failed"; exit 1; }'
   lint:fix:
     run: once
     dir: "{{.USER_WORKING_DIR}}"
-    desc: Auto-fix YAML files with yamlfix (TARGETS=path)
+    desc: Auto-fix YAML files with yamlfix (YAMLLINT_TARGETS=path)
     summary: |
-      Run yamlfix against YAML files found under TARGETS (default .). Excludes
+      Run yamlfix against YAML files found under YAMLLINT_TARGETS (default .). Excludes
       Taskfile.yml files whose Go template syntax is incompatible with yamlfix.
-      Pass EXTRA_ARGS for additional flags. Auto-installs yamlfix if missing.
+      Pass YAMLLINT_EXTRA_ARGS for additional flags. Auto-installs yamlfix if missing.
     deps:
       - task: install
       - task: _install:yamlfix:unix
       - task: _install:yamlfix:windows
     vars:
-      TARGETS: "."
-      EXTRA_ARGS: ""
+      YAMLLINT_TARGETS: "."
+      YAMLLINT_EXTRA_ARGS: ""
     cmds:
       - >-
-        bash -lc '{{.UV_LOAD}}; _t="{{if .TARGETS_OVERRIDE}}{{.TARGETS_OVERRIDE}}{{else if .TARGETS}}{{.TARGETS}}{{else}}.{{end}}"; [ -d "$_t" ] || _t="."; find "$_t" \( -name "*.yml" -o -name "*.yaml" \) ! -name "Taskfile.yml" ! -name "Taskfile.yaml" -print0 | xargs -0 yamlfix {{if .YAMLLINT_LINT_SKIP_PATTERN_OVERRIDE}}--exclude "{{.YAMLLINT_LINT_SKIP_PATTERN_OVERRIDE}}" {{else if .YAMLLINT_LINT_SKIP_PATTERN}}--exclude "{{.YAMLLINT_LINT_SKIP_PATTERN}}" {{end}} {{if .EXTRA_ARGS_OVERRIDE}}{{.EXTRA_ARGS_OVERRIDE}}{{else}}{{.EXTRA_ARGS}}{{end}}'
+        bash -lc '{{.UV_LOAD}}; _t="{{if .YAMLLINT_TARGETS_OVERRIDE}}{{.YAMLLINT_TARGETS_OVERRIDE}}{{else if .YAMLLINT_TARGETS}}{{.YAMLLINT_TARGETS}}{{else}}.{{end}}"; [ -d "$_t" ] || _t="."; find "$_t" \( -name "*.yml" -o -name "*.yaml" \) ! -name "Taskfile.yml" ! -name "Taskfile.yaml" -print0 | xargs -0 yamlfix {{if .YAMLLINT_LINT_SKIP_PATTERN_OVERRIDE}}--exclude "{{.YAMLLINT_LINT_SKIP_PATTERN_OVERRIDE}}" {{else if .YAMLLINT_LINT_SKIP_PATTERN}}--exclude "{{.YAMLLINT_LINT_SKIP_PATTERN}}" {{end}} {{if .YAMLLINT_EXTRA_ARGS_OVERRIDE}}{{.YAMLLINT_EXTRA_ARGS_OVERRIDE}}{{else}}{{.YAMLLINT_EXTRA_ARGS}}{{end}}'
   ci:
     run: once
     dir: "{{.USER_WORKING_DIR}}"
-    desc: Lint YAML files in strict mode for CI (TARGETS=path)
+    desc: Lint YAML files in strict mode for CI (YAMLLINT_TARGETS=path)
     summary: |
-      Run yamllint --strict against TARGETS. Exits non-zero on warnings as
+      Run yamllint --strict against YAMLLINT_TARGETS. Exits non-zero on warnings as
       well as errors, making it suitable for continuous integration pipelines.
       Auto-installs yamllint if missing.
     deps:
       - task: install
     vars:
-      TARGETS: "."
-      CONFIG: ""
-      EXTRA_ARGS: ""
+      YAMLLINT_TARGETS: "."
+      YAMLLINT_CONFIG: ""
+      YAMLLINT_EXTRA_ARGS: ""
     cmds:
       - >-
-        bash -lc '{{.UV_LOAD}}; _skip="{{if .YAMLLINT_LINT_SKIP_PATTERN_OVERRIDE}}{{.YAMLLINT_LINT_SKIP_PATTERN_OVERRIDE}} {{- else}}{{.YAMLLINT_LINT_SKIP_PATTERN}}{{end}}"; if [ -z "$_skip" ]; then yamllint --strict {{if .CONFIG_OVERRIDE}}-c "{{.CONFIG_OVERRIDE}}" {{else if .CONFIG}}-c "{{.CONFIG}}" {{end}} {{if .TARGETS_OVERRIDE}}{{.TARGETS_OVERRIDE}}{{else if .TARGETS}}{{.TARGETS}}{{else}}.{{end}} {{if .EXTRA_ARGS_OVERRIDE}}{{.EXTRA_ARGS_OVERRIDE}} {{- else}}{{.EXTRA_ARGS}}{{end}}; else _files="$(mktemp)"; trap '"'"'rm -f "$_files"'"'"' EXIT; for _target in {{if .TARGETS_OVERRIDE}}{{.TARGETS_OVERRIDE}}{{else if .TARGETS}}{{.TARGETS}}{{else}}.{{end}}; do if [ -d "$_target" ]; then find "$_target" -type f \( -name "*.yml" -o -name "*.yaml" \) -print0; elif [ -f "$_target" ]; then printf "%s\000" "$_target"; fi; done | task --silent --taskfile "{{.TASKFILE_DIR}}/../internal/skipfiles/Taskfile.yml" filter "SKIPFILES_PATTERN=$_skip" >"$_files"; if [ -s "$_files" ]; then xargs -0 yamllint --strict {{if .CONFIG_OVERRIDE}}-c "{{.CONFIG_OVERRIDE}}" {{else if .CONFIG}}-c "{{.CONFIG}}" {{end}} {{if .EXTRA_ARGS_OVERRIDE}}{{.EXTRA_ARGS_OVERRIDE}}{{else}}{{.EXTRA_ARGS}}{{end}} <"$_files"; else echo "No matching YAML files found"; fi; fi && echo "✅ yamllint passed" || { echo "❌ yamllint failed"; exit 1; }'
+        bash -lc '{{.UV_LOAD}}; _skip="{{if .YAMLLINT_LINT_SKIP_PATTERN_OVERRIDE}}{{.YAMLLINT_LINT_SKIP_PATTERN_OVERRIDE}} {{- else}}{{.YAMLLINT_LINT_SKIP_PATTERN}}{{end}}"; if [ -z "$_skip" ]; then yamllint --strict {{if .YAMLLINT_CONFIG_OVERRIDE}}-c "{{.YAMLLINT_CONFIG_OVERRIDE}}" {{else if .YAMLLINT_CONFIG}}-c "{{.YAMLLINT_CONFIG}}" {{end}} {{if .YAMLLINT_TARGETS_OVERRIDE}}{{.YAMLLINT_TARGETS_OVERRIDE}}{{else if .YAMLLINT_TARGETS}}{{.YAMLLINT_TARGETS}} {{else}}.{{end}} {{if .YAMLLINT_EXTRA_ARGS_OVERRIDE}}{{.YAMLLINT_EXTRA_ARGS_OVERRIDE}} {{- else}}{{.YAMLLINT_EXTRA_ARGS}}{{end}}; else _files="$(mktemp)"; trap '"'"'rm -f "$_files"'"'"' EXIT; for _target in {{if .YAMLLINT_TARGETS_OVERRIDE}}{{.YAMLLINT_TARGETS_OVERRIDE}} {{else if .YAMLLINT_TARGETS}}{{.YAMLLINT_TARGETS}}{{else}}.{{end}}; do if [ -d "$_target" ]; then find "$_target" -type f \( -name "*.yml" -o -name "*.yaml" \) -print0; elif [ -f "$_target" ]; then printf "%s\000" "$_target"; fi; done | task --silent --taskfile "{{.TASKFILE_DIR}}/../internal/skipfiles/Taskfile.yml" filter "SKIPFILES_PATTERN=$_skip" >"$_files"; if [ -s "$_files" ]; then xargs -0 yamllint --strict {{if .YAMLLINT_CONFIG_OVERRIDE}}-c "{{.YAMLLINT_CONFIG_OVERRIDE}}" {{else if .YAMLLINT_CONFIG}}-c "{{.YAMLLINT_CONFIG}}" {{end}} {{if .YAMLLINT_EXTRA_ARGS_OVERRIDE}}{{.YAMLLINT_EXTRA_ARGS_OVERRIDE}}{{else}}{{.YAMLLINT_EXTRA_ARGS}}{{end}} <"$_files"; else echo "No matching YAML files found"; fi; fi && echo "✅ yamllint passed" || { echo "❌ yamllint failed"; exit 1; }'
   config:init:
     run: once
     dir: "{{.USER_WORKING_DIR}}"

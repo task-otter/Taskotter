@@ -42,18 +42,18 @@ task yamllint:ci
 | `install:undo` | Remove yamllint from the current OS             | none                              |
 | `upgrade`      | Upgrade yamllint to the latest release          | none                              |
 | `version`      | Show the installed yamllint version             | none                              |
-| `lint`         | Lint YAML files                                 | `TARGETS`, `CONFIG`, `EXTRA_ARGS` |
-| `lint:fix`     | Auto-fix YAML files with yamlfix                | `TARGETS`, `EXTRA_ARGS`           |
-| `ci`           | Strict lint for CI (fails on warnings)          | `TARGETS`, `CONFIG`, `EXTRA_ARGS` |
+| `lint`         | Lint YAML files                                 | `YAMLLINT_TARGETS`, `YAMLLINT_CONFIG`, `YAMLLINT_EXTRA_ARGS` |
+| `lint:fix`     | Auto-fix YAML files with yamlfix                | `YAMLLINT_TARGETS`, `YAMLLINT_EXTRA_ARGS`           |
+| `ci`           | Strict lint for CI (fails on warnings)          | `YAMLLINT_TARGETS`, `YAMLLINT_CONFIG`, `YAMLLINT_EXTRA_ARGS` |
 | `config:init`  | Create a default `.yamllint` configuration file | none                              |
 
 ## Variables
 
 | Variable     | Default   | Description                                      |
 | ------------ | --------- | ------------------------------------------------ |
-| `TARGETS`    | `.`       | Files or directories to lint                     |
-| `CONFIG`     | _(empty)_ | Path to a yamllint config file passed via `-c`   |
-| `EXTRA_ARGS` | _(empty)_ | Extra flags forwarded to `yamllint` or `yamlfix` |
+| `YAMLLINT_TARGETS`    | `.`       | Files or directories to lint                     |
+| `YAMLLINT_CONFIG`     | _(empty)_ | Path to a yamllint config file passed via `-c`   |
+| `YAMLLINT_EXTRA_ARGS` | _(empty)_ | Extra flags forwarded to `yamllint` or `yamlfix` |
 | `YAMLLINT_VERSION` | _(empty)_ | Pin a specific yamllint release for `install`/`upgrade`; empty installs latest |
 | `YAMLFIX_VERSION` | _(empty)_ | Pin a specific yamlfix release for `lint:fix`; empty installs latest |
 | `YAMLLINT_LINT_SKIP_PATTERN` | _(empty)_ | Forward-slash path glob for files skipped by lint checks and fixes |

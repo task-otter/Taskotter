@@ -71,7 +71,7 @@ already exists.
 
 | Task      | Description                                | Key variables                    |
 | --------- | -------------------------------------------- | ----------------------------------- |
-| `install` | Install govulncheck into the global Go bin   | `GLOBAL_GO_BIN`, `GOVULNCHECK_VERSION` |
+| `install` | Install govulncheck into the global Go bin   | `GO_GLOBAL_BIN`, `GOVULNCHECK_VERSION` |
 | `lint`    | Scan Go packages for known vulnerabilities   | `GOVULNCHECK_LINT_SKIP_PATTERN`     |
 
 ## Variables
@@ -80,4 +80,4 @@ already exists.
 | --------------------------------- | -------------------------- | ------------------------------------------------------------------ |
 | `GOVULNCHECK_VERSION`            | empty (`latest`)          | Optional govulncheck module version                                |
 | `GOVULNCHECK_LINT_SKIP_PATTERN`  | empty                     | Shell-style path glob for Go files skipped by `lint`                |
-| `GLOBAL_GO_BIN`                  | `GOBIN` or `GOPATH/bin`   | Destination and lookup directory for the installed govulncheck binary |
+| `GO_GLOBAL_BIN`                  | `GOBIN` or `GOPATH/bin`   | Destination and lookup directory for the installed govulncheck binary |

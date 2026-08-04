@@ -36,7 +36,7 @@ tasks:
       ZIZMOR_LINT_SKIP_PATTERN remains active. Auto-installs zizmor if missing.
     dir: "{{.USER_WORKING_DIR}}"
     deps:
-      - install
+      - task: install
     cmds:
       - cmd: |
           skip_pattern='{{if .ZIZMOR_LINT_SKIP_PATTERN_OVERRIDE}}{{.ZIZMOR_LINT_SKIP_PATTERN_OVERRIDE}}
@@ -137,7 +137,7 @@ tasks:
     desc: Show the installed zizmor version
     summary: Print the active zizmor version via zizmor --version. Auto-installs zizmor if missing.
     deps:
-      - install
+      - task: install
     cmds:
       - zizmor --version
   _install:macos:

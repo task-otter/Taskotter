@@ -25,6 +25,8 @@ jobs:
           fail-on-changes: true
           tasks: |
             go
+            golangci-lint
+            govulncheck
             yamllint
             actionlint
             zizmor

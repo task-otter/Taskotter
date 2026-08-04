@@ -35,6 +35,7 @@ func collectOptions(dir string, policy syncsvc.DocPolicy) *syncsvc.CollectOption
 		SourceDir:    dir,
 		DocPolicy:    policy,
 		SourceToDest: nil,
+		FromDest:     "",
 	}
 }
 

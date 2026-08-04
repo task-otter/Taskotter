@@ -101,6 +101,13 @@ type (
 	yamlNodeMap = map[string]*yaml.Node
 	strSet      = map[string]struct{}
 	rootUpdIn   = rootUpdateInput
+
+	rewriteParams struct {
+		path         string
+		sourceToDest map[string]string
+		fromDest     string
+		dir          string
+	}
 )
 
 const (
@@ -108,12 +115,13 @@ const (
 	rootTemplate            = "---\nversion: \"" + rootTaskfileVersion + "\"\n"
 	yamlMappingPairKeyValue = consts.IndexTwo
 
-	dotSlash    = "./"
-	dotDotSlash = "../"
-	keyIncludes = "includes"
-	keyTaskfile = "taskfile"
-	keyVars     = "vars"
-	keyTasks    = "tasks"
+	dotSlash       = "./"
+	dotDotSlash    = "../"
+	keyIncludes    = "includes"
+	keyTaskfile    = "taskfile"
+	keyVars        = "vars"
+	keyTasks       = "tasks"
+	taskfileSuffix = "Taskfile.yml"
 
 	errParseTaskfileRoot  = "parse taskfile root: %w"
 	errMarshalAndValidate = "marshal and validate: %w"
@@ -135,7 +143,11 @@ func (e *RewriteError) Error() string {
 // fromDest is the destination module directory of the Taskfile being rewritten
 // (for example "eslint" or "internal/skipfiles"), used to recompute relative
 // include paths after destination normalization.
-func RewriteIncludes(content []byte, sourceToDest map[string]string, fromDest string) ([]byte, error) {
+func RewriteIncludes(
+	content []byte,
+	sourceToDest map[string]string,
+	fromDest string,
+) ([]byte, error) {
 	node, root, err := parseTaskfileRoot(content, "parse Taskfile YAML: %v", "empty Taskfile YAML")
 	if err != nil {
 		return nil, fmt.Errorf(errParseTaskfileRoot, err)
@@ -255,19 +267,29 @@ func rewriteIncludePath(path string, sourceToDest map[string]string, fromDest st
 		return path
 	}
 
-	_, dir := splitRelativePrefix(strings.TrimSuffix(normalized, consts.TaskfileSuffix))
+	prefix, dir := splitRelativePrefix(strings.TrimSuffix(normalized, consts.TaskfileSuffix))
+	iox.Discard(prefix)
 
 	if dir == consts.Empty {
 		return path
 	}
 
-	dest, ok := sourceToDest[dir]
+	return rewriteWithDest(&rewriteParams{
+		path:         path,
+		sourceToDest: sourceToDest,
+		fromDest:     fromDest,
+		dir:          dir,
+	})
+}
+
+func rewriteWithDest(params *rewriteParams) string {
+	dest, ok := params.sourceToDest[params.dir]
 
 	if !ok {
-		return path
+		return params.path
 	}
 
-	return destinationIncludePath(fromDest, dest, path)
+	return destinationIncludePath(params.fromDest, dest, params.path)
 }
 
 // destinationIncludePath returns the include path from fromDest to dest's
@@ -277,7 +299,7 @@ func destinationIncludePath(fromDest, dest, original string) string {
 		return original
 	}
 
-	target := filepath.Join(filepath.FromSlash(dest), "Taskfile.yml")
+	target := filepath.Join(filepath.FromSlash(dest), taskfileSuffix)
 
 	rel, err := filepath.Rel(filepath.FromSlash(fromDest), target)
 	if err != nil {

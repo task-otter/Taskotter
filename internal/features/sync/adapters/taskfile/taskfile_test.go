@@ -30,7 +30,11 @@ const (
 	wantPnpmRewrite         = "../pnpm/Taskfile.yml"
 	moduleInternalSkipfiles = "internal/skipfiles"
 	moduleJQ                = "jq"
-	destESLint              = "eslint"
+	srcBunLatest            = "bun-latest"
+	destBun                 = "bun"
+	pathUnknownTaskfile     = "../unknown/Taskfile.yml"
+	fmtExpectedInRewritten  = "expected %q in rewritten Taskfile: %s"
+	pathTaskfileYML         = "Taskfile.yml"
 )
 
 func rewriteIncludesInput() []byte {
@@ -144,6 +148,14 @@ func goOnlyRootInput() *rootupd.RootUpdateInput {
 	})
 }
 
+func rewriteNamespacedSourceToDest() map[string]string {
+	return map[string]string{
+		moduleInternalSkipfiles: moduleInternalSkipfiles,
+		srcBunLatest:            destBun,
+		moduleJQ:                moduleJQ,
+	}
+}
+
 func assertRewriteIncludesOutput(t *testing.T, text string) {
 	t.Helper()
 
@@ -163,7 +175,7 @@ func TestRewriteIncludes(t *testing.T) {
 	out, err := taskfile.RewriteIncludes(
 		rewriteIncludesInput(),
 		map[string]string{srcPnpmFnm: destPnpm},
-		destESLint,
+		taskESLint,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -178,18 +190,19 @@ func TestRewriteIncludesNamespacedModule(t *testing.T) {
 
 	out, err := taskfile.RewriteIncludes(
 		rewriteNamespacedInput(),
-		map[string]string{
-			moduleInternalSkipfiles: moduleInternalSkipfiles,
-			"bun-latest":            "bun",
-			moduleJQ:                moduleJQ,
-		},
+		rewriteNamespacedSourceToDest(),
 		moduleInternalSkipfiles,
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	assertNamespacedRewriteOutput(t, string(out))
+	assertRewriteOutput(t, string(out), []string{
+		"taskfile: " + pathTaskfileYML,
+		"../../bun/Taskfile.yml",
+		"../../jq/Taskfile.yml",
+		pathUnknownTaskfile,
+	})
 }
 
 // TestRewriteIncludesFlatDestination verifies sibling deps use a single ../ after normalize.
@@ -198,50 +211,27 @@ func TestRewriteIncludesFlatDestination(t *testing.T) {
 
 	out, err := taskfile.RewriteIncludes(
 		rewriteNamespacedInput(),
-		map[string]string{
-			moduleInternalSkipfiles: moduleInternalSkipfiles,
-			"bun-latest":            "bun",
-			moduleJQ:                moduleJQ,
-		},
-		destESLint,
+		rewriteNamespacedSourceToDest(),
+		taskESLint,
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	assertFlatDestinationRewriteOutput(t, string(out))
-}
-
-func assertNamespacedRewriteOutput(t *testing.T, text string) {
-	t.Helper()
-
-	wants := []string{
-		"taskfile: Taskfile.yml",
-		"../../bun/Taskfile.yml",
-		"../../jq/Taskfile.yml",
-		"../unknown/Taskfile.yml",
-	}
-
-	for i := range wants {
-		if !strings.Contains(text, wants[i]) {
-			t.Fatalf("expected %q in rewritten Taskfile: %s", wants[i], text)
-		}
-	}
-}
-
-func assertFlatDestinationRewriteOutput(t *testing.T, text string) {
-	t.Helper()
-
-	wants := []string{
+	assertRewriteOutput(t, string(out), []string{
 		"../internal/skipfiles/Taskfile.yml",
 		"../bun/Taskfile.yml",
 		"../jq/Taskfile.yml",
-		"../unknown/Taskfile.yml",
-	}
+		pathUnknownTaskfile,
+	})
+}
+
+func assertRewriteOutput(t *testing.T, text string, wants []string) {
+	t.Helper()
 
 	for i := range wants {
 		if !strings.Contains(text, wants[i]) {
-			t.Fatalf("expected %q in rewritten Taskfile: %s", wants[i], text)
+			t.Fatalf(fmtExpectedInRewritten, wants[i], text)
 		}
 	}
 }
@@ -544,7 +534,7 @@ func TestRewriteUsesRealStoreSnippet(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	out, err := taskfile.RewriteIncludes(data, map[string]string{srcPnpmFnm: destPnpm}, destESLint)
+	out, err := taskfile.RewriteIncludes(data, map[string]string{srcPnpmFnm: destPnpm}, taskESLint)
 	if err != nil {
 		t.Fatal(err)
 	}

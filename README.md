@@ -254,6 +254,10 @@ taskfiles/fnm/Taskfile.yml         ← fnm
 | Unmanaged existing destination directory | Fail |
 | Destination name collision | Fail |
 
+## Architecture decisions
+
+Product and architecture decisions are recorded as ADRs under [`doc/adr/`](doc/adr/) (see the [TOC](doc/adr/README.md)).
+
 ## Development
 
 ```bash

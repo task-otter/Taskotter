@@ -48,6 +48,7 @@ type (
 		entry        os.DirEntry
 		sourceToDest map[string]string
 		sourceDir    string
+		fromDest     string
 		rel          string
 		absPath      string
 	}
@@ -168,6 +169,7 @@ func buildFileEntry(args *fileEntryArgs) (domain.FileEntry, error) {
 	data, err := readAndMaybeRewriteModuleFile(&rewriteModuleArgs{
 		ops:          args.ops,
 		sourceDir:    args.sourceDir,
+		fromDest:     args.fromDest,
 		rel:          args.rel,
 		absPath:      args.absPath,
 		sourceToDest: args.sourceToDest,
@@ -311,6 +313,7 @@ func collectAndTrackModuleFiles(args *collectModuleArgs) (fMap, []managedFile, e
 	contents, err := scanModuleFiles(&collectOptions{
 		ops:          args.syncInput.TaskfileOps,
 		sourceDir:    args.sourceDir,
+		fromDest:     args.mod.DestinationModule,
 		docPolicy:    docPolicyFromConfig(args.syncInput.Config),
 		sourceToDest: args.syncInput.SourceToDest,
 	})
@@ -401,6 +404,7 @@ func collectWalkedModuleFile(args *walkCollectArgs) error {
 	err := collectModuleFile(&moduleCollectArgs{
 		ops:          args.opts.ops,
 		sourceDir:    args.opts.sourceDir,
+		fromDest:     args.opts.fromDest,
 		absPath:      args.absPath,
 		entry:        args.entry,
 		docPolicy:    args.opts.docPolicy,
@@ -690,7 +694,7 @@ func maybeRewriteRootTaskfile(args *rewriteModuleArgs, data []byte) ([]byte, err
 		return data, nil
 	}
 
-	rewritten, err := args.ops.RewriteIncludes(data, args.sourceToDest)
+	rewritten, err := args.ops.RewriteIncludes(data, args.sourceToDest, args.fromDest)
 	if err != nil {
 		return nil, fmt.Errorf("rewrite includes in %q: %w", args.absPath, err)
 	}
@@ -823,6 +827,7 @@ func storeCollectedModuleFile(args *moduleCollectArgs, rel string) error {
 	entry, err := buildFileEntry(&fileEntryArgs{
 		ops:          args.ops,
 		sourceDir:    args.sourceDir,
+		fromDest:     args.fromDest,
 		rel:          rel,
 		absPath:      args.absPath,
 		entry:        args.entry,

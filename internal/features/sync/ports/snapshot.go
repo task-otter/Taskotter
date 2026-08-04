@@ -21,7 +21,7 @@ type (
 	// TaskfileOps rewrites and updates Taskfile YAML without the sync service importing adapters.
 	TaskfileOps interface {
 		NewRootTemplate() []byte
-		RewriteIncludes(content []byte, sourceToDest map[string]string) ([]byte, error)
+		RewriteIncludes(content []byte, sourceToDest map[string]string, fromDest string) ([]byte, error)
 		UpdateRootTaskfile(content []byte, input *rootupd.RootUpdateInput) ([]byte, error)
 	}
 )

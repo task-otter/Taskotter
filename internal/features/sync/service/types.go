@@ -87,6 +87,7 @@ type (
 		ops          ports.TaskfileOps
 		sourceToDest map[string]string
 		sourceDir    string
+		fromDest     string
 		docPolicy    docPolicy
 	}
 
@@ -95,6 +96,7 @@ type (
 		TaskfileOps  ports.TaskfileOps
 		SourceToDest map[string]string
 		SourceDir    string
+		FromDest     string
 		DocPolicy    DocPolicy
 	}
 
@@ -104,6 +106,7 @@ type (
 		sourceToDest map[string]string
 		contents     map[string]domain.FileEntry
 		sourceDir    string
+		fromDest     string
 		absPath      string
 		docPolicy    docPolicy
 	}
@@ -275,6 +278,7 @@ type (
 		ops          ports.TaskfileOps
 		sourceToDest map[string]string
 		sourceDir    string
+		fromDest     string
 		rel          string
 		absPath      string
 	}
@@ -353,6 +357,7 @@ func collectOptionsFrom(opts *CollectOptions) *collectOptions {
 	return &collectOptions{
 		ops:          opts.TaskfileOps,
 		sourceDir:    opts.SourceDir,
+		fromDest:     opts.FromDest,
 		docPolicy:    docPolicyFromExported(opts.DocPolicy),
 		sourceToDest: opts.SourceToDest,
 	}

@@ -19,9 +19,13 @@ func (Ops) NewRootTemplate() []byte {
 	return NewRootTemplate()
 }
 
-// RewriteIncludes rewrites module include paths using sourceToDest.
-func (Ops) RewriteIncludes(content []byte, sourceToDest map[string]string) ([]byte, error) {
-	data, err := RewriteIncludes(content, sourceToDest)
+// RewriteIncludes rewrites module include paths using sourceToDest and fromDest.
+func (Ops) RewriteIncludes(
+	content []byte,
+	sourceToDest map[string]string,
+	fromDest string,
+) ([]byte, error) {
+	data, err := RewriteIncludes(content, sourceToDest, fromDest)
 	if err != nil {
 		return nil, fmt.Errorf("rewrite includes: %w", err)
 	}

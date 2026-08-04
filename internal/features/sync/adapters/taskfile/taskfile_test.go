@@ -27,9 +27,10 @@ const (
 	varGoCmdUnix            = "GO_CMD_UNIX"
 	destPnpm                = "pnpm"
 	srcPnpmFnm              = "pnpm/fnm"
-	wantPnpmRewrite         = "../../../../pnpm/Taskfile.yml"
+	wantPnpmRewrite         = "../pnpm/Taskfile.yml"
 	moduleInternalSkipfiles = "internal/skipfiles"
 	moduleJQ                = "jq"
+	destESLint              = "eslint"
 )
 
 func rewriteIncludesInput() []byte {
@@ -162,6 +163,7 @@ func TestRewriteIncludes(t *testing.T) {
 	out, err := taskfile.RewriteIncludes(
 		rewriteIncludesInput(),
 		map[string]string{srcPnpmFnm: destPnpm},
+		destESLint,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -174,11 +176,15 @@ func TestRewriteIncludes(t *testing.T) {
 func TestRewriteIncludesNamespacedModule(t *testing.T) {
 	t.Parallel()
 
-	out, err := taskfile.RewriteIncludes(rewriteNamespacedInput(), map[string]string{
-		moduleInternalSkipfiles: moduleInternalSkipfiles,
-		"bun-latest":            "bun",
-		moduleJQ:                moduleJQ,
-	})
+	out, err := taskfile.RewriteIncludes(
+		rewriteNamespacedInput(),
+		map[string]string{
+			moduleInternalSkipfiles: moduleInternalSkipfiles,
+			"bun-latest":            "bun",
+			moduleJQ:                moduleJQ,
+		},
+		moduleInternalSkipfiles,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -186,13 +192,50 @@ func TestRewriteIncludesNamespacedModule(t *testing.T) {
 	assertNamespacedRewriteOutput(t, string(out))
 }
 
+// TestRewriteIncludesFlatDestination verifies sibling deps use a single ../ after normalize.
+func TestRewriteIncludesFlatDestination(t *testing.T) {
+	t.Parallel()
+
+	out, err := taskfile.RewriteIncludes(
+		rewriteNamespacedInput(),
+		map[string]string{
+			moduleInternalSkipfiles: moduleInternalSkipfiles,
+			"bun-latest":            "bun",
+			moduleJQ:                moduleJQ,
+		},
+		destESLint,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assertFlatDestinationRewriteOutput(t, string(out))
+}
+
 func assertNamespacedRewriteOutput(t *testing.T, text string) {
+	t.Helper()
+
+	wants := []string{
+		"taskfile: Taskfile.yml",
+		"../../bun/Taskfile.yml",
+		"../../jq/Taskfile.yml",
+		"../unknown/Taskfile.yml",
+	}
+
+	for i := range wants {
+		if !strings.Contains(text, wants[i]) {
+			t.Fatalf("expected %q in rewritten Taskfile: %s", wants[i], text)
+		}
+	}
+}
+
+func assertFlatDestinationRewriteOutput(t *testing.T, text string) {
 	t.Helper()
 
 	wants := []string{
 		"../internal/skipfiles/Taskfile.yml",
 		"../bun/Taskfile.yml",
-		"../../jq/Taskfile.yml",
+		"../jq/Taskfile.yml",
 		"../unknown/Taskfile.yml",
 	}
 
@@ -501,7 +544,7 @@ func TestRewriteUsesRealStoreSnippet(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	out, err := taskfile.RewriteIncludes(data, map[string]string{srcPnpmFnm: destPnpm})
+	out, err := taskfile.RewriteIncludes(data, map[string]string{srcPnpmFnm: destPnpm}, destESLint)
 	if err != nil {
 		t.Fatal(err)
 	}

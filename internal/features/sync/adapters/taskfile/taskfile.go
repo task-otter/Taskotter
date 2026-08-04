@@ -132,13 +132,16 @@ func (e *RewriteError) Error() string {
 }
 
 // RewriteIncludes updates include taskfile paths using sourceToDest mappings.
-func RewriteIncludes(content []byte, sourceToDest map[string]string) ([]byte, error) {
+// fromDest is the destination module directory of the Taskfile being rewritten
+// (for example "eslint" or "internal/skipfiles"), used to recompute relative
+// include paths after destination normalization.
+func RewriteIncludes(content []byte, sourceToDest map[string]string, fromDest string) ([]byte, error) {
 	node, root, err := parseTaskfileRoot(content, "parse Taskfile YAML: %v", "empty Taskfile YAML")
 	if err != nil {
 		return nil, fmt.Errorf(errParseTaskfileRoot, err)
 	}
 
-	rewriteIncludesInRoot(root, sourceToDest)
+	rewriteIncludesInRoot(root, sourceToDest, fromDest)
 
 	out, err := marshalRewrittenTaskfile(node)
 	if err != nil {
@@ -148,11 +151,11 @@ func RewriteIncludes(content []byte, sourceToDest map[string]string) ([]byte, er
 	return out, nil
 }
 
-func rewriteIncludesInRoot(root *yaml.Node, sourceToDest map[string]string) {
+func rewriteIncludesInRoot(root *yaml.Node, sourceToDest map[string]string, fromDest string) {
 	includesNode := findMappingValue(root, keyIncludes)
 
 	if includesNode != nil {
-		rewriteIncludesNode(includesNode, sourceToDest)
+		rewriteIncludesNode(includesNode, sourceToDest, fromDest)
 	}
 }
 
@@ -221,17 +224,17 @@ func validateMarshaledYAML(out []byte, errMsg string) error {
 	return nil
 }
 
-func rewriteIncludesNode(includes *yaml.Node, sourceToDest map[string]string) {
+func rewriteIncludesNode(includes *yaml.Node, sourceToDest map[string]string, fromDest string) {
 	if includes.Kind != yaml.MappingNode {
 		return
 	}
 
 	for idx := consts.IndexZero; idx < len(includes.Content); idx += yamlMappingPairKeyValue {
-		rewriteOneIncludeEntry(includes.Content[idx+consts.IndexOne], sourceToDest)
+		rewriteOneIncludeEntry(includes.Content[idx+consts.IndexOne], sourceToDest, fromDest)
 	}
 }
 
-func rewriteOneIncludeEntry(entry *yaml.Node, sourceToDest map[string]string) {
+func rewriteOneIncludeEntry(entry *yaml.Node, sourceToDest map[string]string, fromDest string) {
 	if entry.Kind != yaml.MappingNode {
 		return
 	}
@@ -242,17 +245,17 @@ func rewriteOneIncludeEntry(entry *yaml.Node, sourceToDest map[string]string) {
 		return
 	}
 
-	taskfileNode.Value = rewriteIncludePath(taskfileNode.Value, sourceToDest)
+	taskfileNode.Value = rewriteIncludePath(taskfileNode.Value, sourceToDest, fromDest)
 }
 
-func rewriteIncludePath(path string, sourceToDest map[string]string) string {
+func rewriteIncludePath(path string, sourceToDest map[string]string, fromDest string) string {
 	normalized := filepath.ToSlash(path)
 
 	if !strings.HasSuffix(normalized, consts.TaskfileSuffix) {
 		return path
 	}
 
-	prefix, dir := splitRelativePrefix(strings.TrimSuffix(normalized, consts.TaskfileSuffix))
+	_, dir := splitRelativePrefix(strings.TrimSuffix(normalized, consts.TaskfileSuffix))
 
 	if dir == consts.Empty {
 		return path
@@ -264,7 +267,24 @@ func rewriteIncludePath(path string, sourceToDest map[string]string) string {
 		return path
 	}
 
-	return prefix + dest + consts.TaskfileSuffix
+	return destinationIncludePath(fromDest, dest, path)
+}
+
+// destinationIncludePath returns the include path from fromDest to dest's
+// Taskfile.yml. On Rel failure it falls back to the original store path.
+func destinationIncludePath(fromDest, dest, original string) string {
+	if fromDest == consts.Empty {
+		return original
+	}
+
+	target := filepath.Join(filepath.FromSlash(dest), "Taskfile.yml")
+
+	rel, err := filepath.Rel(filepath.FromSlash(fromDest), target)
+	if err != nil {
+		return original
+	}
+
+	return filepath.ToSlash(rel)
 }
 
 // splitRelativePrefix separates the leading ./ or ../ segments from the module

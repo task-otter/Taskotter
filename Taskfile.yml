@@ -8,11 +8,11 @@ tasks:
   ci:
     desc: Run CI checks
     cmds:
-      - task: taskotter:go:fmt:check
+      - task: taskotter:golangci-lint:fmt:check
       - task: taskotter:lint
 
   ci:fix:
     desc: Run CI fixs
     cmds:
-      - task: taskotter:go:fmt
+      - task: taskotter:golangci-lint:fmt
       - task: taskotter:lint:fix

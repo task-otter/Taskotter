@@ -621,7 +621,7 @@ linters:
       ignore-decls: []
     whitespace:
       multi-if: true
-      multi-func: true
+      multi-func: false
     wrapcheck:
       extra-ignore-sigs: []
       ignore-sigs: []

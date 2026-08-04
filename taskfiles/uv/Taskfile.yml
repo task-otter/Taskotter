@@ -55,7 +55,7 @@ tasks:
     desc: Upgrade uv to the latest release
     summary: Run uv self update to upgrade the uv binary to the latest release. Auto-installs uv if missing.
     deps:
-      - install
+      - task: install
     cmds:
       - task: _upgrade:unix
       - task: _upgrade:windows
@@ -64,7 +64,7 @@ tasks:
     desc: Show the installed uv version
     summary: Print the active uv version via uv --version. Auto-installs uv if missing.
     deps:
-      - install
+      - task: install
     cmds:
       - task: _version:unix
       - task: _version:windows
@@ -76,7 +76,7 @@ tasks:
       Pass PYTHON_VERSION to select the version, e.g. PYTHON_VERSION=3.12.
       Auto-installs uv if missing.
     deps:
-      - install
+      - task: install
     requires:
       vars:
         - PYTHON_VERSION
@@ -99,7 +99,7 @@ tasks:
       Create a virtual environment at VENV (default .venv) using uv venv.
       Auto-installs uv if missing.
     deps:
-      - install
+      - task: install
     cmds:
       - task: _uv:unix
         vars:
@@ -115,7 +115,7 @@ tasks:
       Pass EXTRA_ARGS for additional flags such as --upgrade or --no-cache.
       Auto-installs uv if missing.
     deps:
-      - install
+      - task: install
     cmds:
       - task: _uv:unix
         vars:
@@ -131,7 +131,7 @@ tasks:
       Pass ARGS for positional arguments and EXTRA_ARGS for uv flags.
       Auto-installs uv if missing.
     deps:
-      - install
+      - task: install
     requires:
       vars:
         - FILE
@@ -156,7 +156,7 @@ tasks:
       Pass EXTRA_ARGS for additional flags such as --upgrade.
       Auto-installs uv if missing.
     deps:
-      - install
+      - task: install
     requires:
       vars:
         - TOOL
@@ -180,7 +180,7 @@ tasks:
       latest release. Pass EXTRA_ARGS for additional flags.
       Auto-installs uv if missing.
     deps:
-      - install
+      - task: install
     requires:
       vars:
         - TOOL

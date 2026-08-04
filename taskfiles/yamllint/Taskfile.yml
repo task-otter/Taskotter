@@ -64,7 +64,7 @@ tasks:
     desc: Show the installed yamllint version
     summary: Print the active yamllint version via yamllint --version. Auto-installs yamllint if missing.
     deps:
-      - install
+      - task: install
     cmds:
       - bash -lc '{{.UV_LOAD}}; yamllint --version'
   lint:
@@ -76,7 +76,7 @@ tasks:
       config file via -c, and EXTRA_ARGS for additional flags.
       Auto-installs yamllint if missing.
     deps:
-      - install
+      - task: install
     vars:
       TARGETS: "."
       CONFIG: ""
@@ -93,9 +93,9 @@ tasks:
       Taskfile.yml files whose Go template syntax is incompatible with yamlfix.
       Pass EXTRA_ARGS for additional flags. Auto-installs yamlfix if missing.
     deps:
-      - install
-      - _install:yamlfix:unix
-      - _install:yamlfix:windows
+      - task: install
+      - task: _install:yamlfix:unix
+      - task: _install:yamlfix:windows
     vars:
       TARGETS: "."
       EXTRA_ARGS: ""
@@ -111,7 +111,7 @@ tasks:
       well as errors, making it suitable for continuous integration pipelines.
       Auto-installs yamllint if missing.
     deps:
-      - install
+      - task: install
     vars:
       TARGETS: "."
       CONFIG: ""
@@ -146,7 +146,7 @@ tasks:
       - >-
         bash -lc '{{.UV_LOAD}}; command -v yamllint >/dev/null 2>&1 && { [ -z "{{.YAMLLINT_VERSION}}" ] || yamllint --version | grep -Fq "{{.YAMLLINT_VERSION}}"; }'
     deps:
-      - uv:install
+      - task: uv:install
     cmds:
       - echo 'Installing yamllint via uv...'
       - >-
@@ -161,7 +161,7 @@ tasks:
       - >-
         bash -lc '{{.UV_LOAD}}; command -v yamlfix >/dev/null 2>&1 && { [ -z "{{.YAMLFIX_VERSION}}" ] || yamlfix --version | grep -Fq "{{.YAMLFIX_VERSION}}"; }'
     deps:
-      - uv:install
+      - task: uv:install
     cmds:
       - echo 'Installing yamlfix via uv...'
       - >-
@@ -175,7 +175,7 @@ tasks:
       - >-
         powershell -NoProfile -ExecutionPolicy Bypass -Command "$yamlfix = Get-Command yamlfix -ErrorAction SilentlyContinue; if (-not $yamlfix) { exit 1 }; $requested = '{{.YAMLFIX_VERSION}}'; if ([string]::IsNullOrWhiteSpace($requested) -or ((& $yamlfix.Source --version) -like ('*' + $requested + '*'))) { exit 0 }; exit 1"
     deps:
-      - uv:install
+      - task: uv:install
     cmds:
       - echo Installing yamlfix via uv...
       - uv tool install --force "yamlfix{{if .YAMLFIX_VERSION}}=={{.YAMLFIX_VERSION}}{{end}}"
@@ -188,7 +188,7 @@ tasks:
       - >-
         powershell -NoProfile -ExecutionPolicy Bypass -Command "$yamllint = Get-Command yamllint -ErrorAction SilentlyContinue; if (-not $yamllint) { exit 1 }; $requested = '{{.YAMLLINT_VERSION}}'; if ([string]::IsNullOrWhiteSpace($requested) -or ((& $yamllint.Source --version) -like ('*' + $requested + '*'))) { exit 0 }; exit 1"
     deps:
-      - uv:install
+      - task: uv:install
     cmds:
       - echo Installing yamllint via uv...
       - uv tool install --force "yamllint{{if .YAMLLINT_VERSION}}=={{.YAMLLINT_VERSION}}{{end}}"

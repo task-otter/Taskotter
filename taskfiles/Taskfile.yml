@@ -104,16 +104,10 @@ tasks:
   lint:
     desc: Run lint for synced TaskOtter modules
     cmds:
-      - task: go:lint
       - task: yamllint:lint
       - task: actionlint:lint
       - task: zizmor:lint
       - task: hadolint:lint
-  lint:fix:
-    desc: Run lint:fix for synced TaskOtter modules
-    cmds:
-      - task: go:lint:fix
-      - task: yamllint:lint:fix
   upgrade:
     desc: Run upgrade for synced TaskOtter modules
     cmds:

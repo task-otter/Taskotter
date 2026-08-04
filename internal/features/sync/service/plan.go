@@ -39,6 +39,7 @@ type (
 	appendManagedArgs struct {
 		mod        *moduleRecord
 		contents   map[string]domain.FileEntry
+		parentDocs map[string]struct{}
 		destDirRel string
 		planned    []managedFile
 	}
@@ -122,13 +123,23 @@ func appendManagedFiles(args *appendManagedArgs) []managedFile {
 		args.planned = append(args.planned, managedFile{
 			SourceModule:      args.mod.SourceModule,
 			DestinationModule: args.mod.DestinationModule,
-			SourcePath:        pathutil.JoinRelative(taskfilesDirName, args.mod.SourceModule, rel),
+			SourcePath:        managedSourcePath(args, rel),
 			Path:              pathutil.JoinRelative(args.destDirRel, rel),
 			SHA256:            hex.EncodeToString(sum[:]),
 		})
 	}
 
 	return args.planned
+}
+
+func managedSourcePath(args *appendManagedArgs, rel string) string {
+	sourceModule := args.mod.SourceModule
+
+	if _, fromParent := args.parentDocs[rel]; fromParent {
+		sourceModule = args.mod.DestinationModule
+	}
+
+	return pathutil.JoinRelative(taskfilesDirName, sourceModule, rel)
 }
 
 func applyDiffResults(plan *domain.Plan, lists *diffLists, input *stagePathsInput) {
@@ -310,15 +321,22 @@ func prepareRootTaskfileInputs(args *buildRootArgs) (*updateRootArgs, error) {
 }
 
 func collectAndTrackModuleFiles(args *collectModuleArgs) (fMap, []managedFile, error) {
+	policy := docPolicyFromConfig(args.syncInput.Config)
+
 	contents, err := scanModuleFiles(&collectOptions{
 		ops:          args.syncInput.TaskfileOps,
 		sourceDir:    args.sourceDir,
 		fromDest:     args.mod.DestinationModule,
-		docPolicy:    docPolicyFromConfig(args.syncInput.Config),
+		docPolicy:    policy,
 		sourceToDest: args.syncInput.SourceToDest,
 	})
 	if err != nil {
 		return nil, nil, fmt.Errorf("collect module files: %w", err)
+	}
+
+	parentDocs, err := mergeLogicalRootDocs(args, contents, policy)
+	if err != nil {
+		return nil, nil, fmt.Errorf("merge logical root docs: %w", err)
 	}
 
 	managed := appendManagedFiles(&appendManagedArgs{
@@ -326,9 +344,74 @@ func collectAndTrackModuleFiles(args *collectModuleArgs) (fMap, []managedFile, e
 		mod:        args.mod,
 		destDirRel: args.destDirRel,
 		contents:   contents,
+		parentDocs: parentDocs,
 	})
 
 	return contents, managed, nil
+}
+
+func mergeLogicalRootDocs(
+	args *collectModuleArgs,
+	contents fMap,
+	policy docPolicy,
+) (map[string]struct{}, error) {
+	parentDocs := make(map[string]struct{})
+
+	if policy != docPolicyInclude {
+		return parentDocs, nil
+	}
+
+	destRoot := args.syncInput.Snapshot.ModuleDir(args.mod.DestinationModule)
+	if filepath.Clean(destRoot) == filepath.Clean(args.sourceDir) {
+		return parentDocs, nil
+	}
+
+	err := mergeParentDocFiles(args, destRoot, contents, parentDocs)
+	if err != nil {
+		return nil, fmt.Errorf("merge parent doc files: %w", err)
+	}
+
+	return parentDocs, nil
+}
+
+func mergeParentDocFiles(
+	args *collectModuleArgs,
+	destRoot string,
+	contents fMap,
+	parentDocs map[string]struct{},
+) error {
+	info, err := os.Stat(destRoot)
+	iox.Discard(info)
+
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+
+		return fmt.Errorf("stat logical root %q: %w", destRoot, err)
+	}
+
+	rootContents, err := scanModuleFiles(&collectOptions{
+		ops:          args.syncInput.TaskfileOps,
+		sourceDir:    destRoot,
+		fromDest:     args.mod.DestinationModule,
+		docPolicy:    docPolicyInclude,
+		sourceToDest: args.syncInput.SourceToDest,
+	})
+	if err != nil {
+		return fmt.Errorf("scan logical root %q: %w", destRoot, err)
+	}
+
+	for rel, entry := range rootContents {
+		if !pathutil.IsDocPath(rel) {
+			continue
+		}
+
+		contents[rel] = entry
+		parentDocs[rel] = struct{}{}
+	}
+
+	return nil
 }
 
 func collectModuleFile(args *moduleCollectArgs) error {

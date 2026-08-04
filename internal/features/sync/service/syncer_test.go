@@ -338,6 +338,51 @@ func TestIncludesDocFalseSkipsReadme(t *testing.T) {
 	assertNoReadmeManaged(t, plan)
 }
 
+func eslintManagedReadmePath() string {
+	return pathutil.JoinRelative(config.DefaultTargetFolder, testModuleEslint, testReadmeName)
+}
+
+func assertEslintReadmeManaged(t *testing.T, plan *syncdomain.Plan) {
+	t.Helper()
+
+	wantPath := eslintManagedReadmePath()
+
+	for i := range plan.ManagedFiles {
+		file := &plan.ManagedFiles[i]
+
+		if file.Path != wantPath {
+			continue
+		}
+
+		if file.SourcePath != wantPath {
+			t.Fatalf("README SourcePath = %q, want %q", file.SourcePath, wantPath)
+		}
+
+		return
+	}
+
+	t.Fatalf("expected managed path %q", wantPath)
+}
+
+// TestIncludesDocTrueIncludesEslintReadme verifies nested eslint pulls README from the logical module root.
+func TestIncludesDocTrueIncludesEslintReadme(t *testing.T) {
+	t.Parallel()
+
+	workspace := t.TempDir()
+	writeRootTaskfile(t, workspace)
+
+	snap := fixtureStore(t)
+	cfg := testConfig(workspace, mutateEslintPnpmFnm)
+	si := buildEslintSyncInput(t, cfg, snap)
+
+	plan, err := syncsvc.BuildPlan(&si)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assertEslintReadmeManaged(t, plan)
+}
+
 // TestIncludesDocFalseSkipsFixtureDocs verifies go fixture README and docs/ are excluded when includes-doc is false.
 func TestIncludesDocFalseSkipsFixtureDocs(t *testing.T) {
 	t.Parallel()

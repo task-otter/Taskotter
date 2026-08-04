@@ -1,6 +1,6 @@
 ---
 schema: taskotter.store/v1
-module: eslint/node/fnm/pnpm
+module: eslint
 taskfile: Taskfile.yml
 exported_tasks: [install, lint, lint:fix, version]
 variants: [runtime:node, package-manager:pnpm, version-manager:fnm]

@@ -28,6 +28,8 @@ const (
 
 	testFalseValue = "false"
 
+	testTrueValue = "true"
+
 	testBuildTaskfile = "build/Taskfile.yml"
 
 	testBadInputMsg = "bad input"
@@ -51,6 +53,8 @@ const (
 	fmtJSRuntimeWantNodeJS = "JSRuntime = %q, want nodejs"
 
 	testJSBunWithFnm = "runtime: bun\nversion-manager: fnm\n"
+
+	inputIncludesDoc = "INPUT_INCLUDES_DOC"
 )
 
 func targetFolderCases() []targetFolderCase {
@@ -99,7 +103,7 @@ func TestFailOnChangesTrue(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
 
-	env["INPUT_FAIL-ON-CHANGES"] = "true"
+	env["INPUT_FAIL-ON-CHANGES"] = testTrueValue
 	setEnv(t, env)
 
 	cfg, err := config.LoadFromEnv()
@@ -130,7 +134,7 @@ func TestInvalidIncludesDoc(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
 
-	env["INPUT_INCLUDES_DOC"] = testInvalidBool
+	env[inputIncludesDoc] = testInvalidBool
 	loadEnvExpectError(t, env, "expected invalid includes-doc error")
 }
 
@@ -186,6 +190,45 @@ func TestLoadFromEnvDefaults(t *testing.T) {
 
 	if len(cfg.Tasks) != consts.IndexOne || cfg.Tasks[consts.IndexZero] != consts.Go {
 		t.Fatalf("Tasks = %#v", cfg.Tasks)
+	}
+}
+
+// TestIncludesDocFlipChangesConfigurationHash verifies flipping includes-doc changes hash and branch.
+//
+//nolint:paralleltest // LoadFromEnv uses t.Setenv; cannot run in parallel
+func TestIncludesDocFlipChangesConfigurationHash(t *testing.T) {
+	dir := t.TempDir()
+	cfgTrue := loadIncludesDocConfig(t, dir, testTrueValue)
+	cfgFalse := loadIncludesDocConfig(t, dir, testFalseValue)
+
+	assertIncludesDocHashFlip(t, cfgTrue, cfgFalse)
+}
+
+func loadIncludesDocConfig(t *testing.T, dir, value string) *config.Config {
+	t.Helper()
+
+	env := baseEnv(dir)
+
+	env[inputIncludesDoc] = value
+
+	return loadEnvOK(t, env)
+}
+
+func assertIncludesDocHashFlip(t *testing.T, cfgTrue, cfgFalse *config.Config) {
+	t.Helper()
+
+	if cfgTrue.ConfigurationHash == cfgFalse.ConfigurationHash {
+		t.Fatal("ConfigurationHash should change when includes_doc flips")
+	}
+
+	if cfgTrue.BranchName == cfgFalse.BranchName {
+		t.Fatal("BranchName should change when includes_doc flips")
+	}
+
+	wantBranch := "taskotter/sync-" + cfgTrue.ConfigurationHash[:consts.HashPrefixLen]
+
+	if cfgTrue.BranchName != wantBranch {
+		t.Fatalf("BranchName = %q, want %q", cfgTrue.BranchName, wantBranch)
 	}
 }
 
@@ -533,7 +576,7 @@ func baseEnv(workspace string) map[string]string {
 	return map[string]string{
 		consts.InputTasks:        consts.Go,
 		consts.InputJS:           consts.Empty,
-		"INPUT_INCLUDES_DOC":     consts.Empty,
+		inputIncludesDoc:         consts.Empty,
 		"INPUT_SYNC_ROOT":        consts.Empty,
 		consts.InputStoreVersion: consts.Empty,
 		consts.InputTargetFolder: consts.Empty,

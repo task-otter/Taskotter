@@ -431,8 +431,12 @@ func isDocPathCases() []boolCase {
 	return []boolCase{
 		{consts.ReadmeMD, true},
 		{"docs/setup.md", true},
+		{"docs/a/b.md", true},
 		{"go/docs/setup.md", true},
 		{"go/README.md", false},
+		{"mydocs/x", false},
+		{"docs", false},
+		{"readme.md", false},
 		{pathTaskfileYML, false},
 	}
 }

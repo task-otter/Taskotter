@@ -15,6 +15,7 @@ import (
 	"github.com/task-otter/Taskotter/internal/features/sync/domain"
 	"github.com/task-otter/Taskotter/internal/shared/config"
 	"github.com/task-otter/Taskotter/internal/shared/consts"
+	"github.com/task-otter/Taskotter/internal/shared/iox"
 	"github.com/task-otter/Taskotter/internal/shared/pathutil"
 	yaml "go.yaml.in/yaml/v3"
 )
@@ -23,6 +24,13 @@ type (
 	stagedFile struct {
 		finalRel string
 		entry    domain.FileEntry
+	}
+
+	removeStaleFileArgs struct {
+		old          *managedFile
+		current      map[string]struct{}
+		workspace    string
+		targetFolder string
 	}
 )
 
@@ -44,6 +52,8 @@ const (
 	errFmtCleanupStagingDir = "clean up staging directory %q: %w"
 
 	errFmtRemoveObsoleteFile = "remove obsolete file %q: %w"
+
+	errFmtRemoveStaleManaged = "remove stale managed file: %w"
 )
 
 // ApplyPlan writes planned files atomically and removes obsolete managed paths.
@@ -440,24 +450,108 @@ func removeOldTargetMetadata(plan *domain.Plan, workspace string) error {
 	return nil
 }
 
-func removeStaleManagedFile(old *managedFile, cur map[string]struct{}, ws string) error {
-	if _, managed := cur[old.Path]; managed {
+func pruneEmptyParentDirs(workspace, fileRel, stopRel string) error {
+	if stopRel == consts.Empty {
 		return nil
 	}
 
-	err := removeObsoleteFile(ws, old.Path)
+	err := pruneDirsUntilStop(
+		filepath.Dir(pathutil.WorkspacePath(workspace, fileRel)),
+		pathutil.WorkspacePath(workspace, stopRel),
+	)
 	if err != nil {
-		return fmt.Errorf("remove stale managed file: %w", err)
+		return fmt.Errorf("prune empty parent dirs: %w", err)
 	}
 
 	return nil
 }
 
-func removeStaleManagedFiles(l *syncLock, cur map[string]struct{}, ws string) error {
-	for i := range l.ManagedFiles {
-		err := removeStaleManagedFile(&l.ManagedFiles[i], cur, ws)
+func pruneDirsUntilStop(dir, stop string) error {
+	for shouldPruneParent(dir, stop) {
+		stillExists, err := removeEmptyParentDir(dir)
 		if err != nil {
-			return fmt.Errorf(errFmtRemoveObsoleteFile, l.ManagedFiles[i].Path, err)
+			return fmt.Errorf("prune dirs until stop: %w", err)
+		}
+
+		if stillExists {
+			return nil
+		}
+
+		dir = filepath.Dir(dir)
+	}
+
+	return nil
+}
+
+func shouldPruneParent(dir, stop string) bool {
+	if dir == stop || filepath.Dir(dir) == dir {
+		return false
+	}
+
+	rel, relErr := filepath.Rel(stop, dir)
+
+	return relErr == nil && filepath.IsLocal(rel)
+}
+
+func removeEmptyParentDir(dir string) (bool, error) {
+	err := removeDirIfEmpty(dir, "remove empty parent directory")
+	if err != nil {
+		return false, fmt.Errorf("prune empty parents: %w", err)
+	}
+
+	return pathPresent(dir), nil
+}
+
+func pathPresent(path string) bool {
+	info, err := os.Stat(path)
+	iox.Discard(info)
+
+	return err == nil
+}
+
+func removeStaleManagedFile(args *removeStaleFileArgs) error {
+	if _, managed := args.current[args.old.Path]; managed {
+		return nil
+	}
+
+	err := removeObsoleteFile(args.workspace, args.old.Path)
+	if err != nil {
+		return fmt.Errorf(errFmtRemoveStaleManaged, err)
+	}
+
+	err = pruneModuleParents(args)
+	if err != nil {
+		return fmt.Errorf(errFmtRemoveStaleManaged, err)
+	}
+
+	return nil
+}
+
+func pruneModuleParents(args *removeStaleFileArgs) error {
+	moduleRoot := pathutil.JoinRelative(args.targetFolder, args.old.DestinationModule)
+
+	err := pruneEmptyParentDirs(args.workspace, args.old.Path, moduleRoot)
+	if err != nil {
+		return fmt.Errorf("prune empty parents after removing %q: %w", args.old.Path, err)
+	}
+
+	return nil
+}
+
+func removeStaleManagedFiles(
+	lock *syncLock,
+	current map[string]struct{},
+	workspace string,
+) error {
+	for i := range lock.ManagedFiles {
+		err := removeStaleManagedFile(&removeStaleFileArgs{
+			old:          &lock.ManagedFiles[i],
+			current:      current,
+			workspace:    workspace,
+			targetFolder: lock.Configuration.TargetFolder,
+		})
+		if err != nil {
+			return fmt.Errorf(errFmtRemoveObsoleteFile, lock.ManagedFiles[i].Path, err)
 		}
 	}
 

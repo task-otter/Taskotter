@@ -104,6 +104,8 @@ const (
 	contentKeep                = "keep"
 	targetFolderTask           = "task"
 	docGuideMD                 = "docs/guide.md"
+	docNestedNoteMD            = "docs/nested/note.md"
+	docsDirName                = "docs"
 	fileGoTestGo               = "go_test.go"
 	docMetadataYML             = "docs/metadata.yml"
 	errExpectedChangesInitial  = "expected changes on initial sync"

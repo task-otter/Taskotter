@@ -4,7 +4,9 @@
 package service_test
 
 import (
+	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	resolvesvc "github.com/task-otter/Taskotter/internal/features/resolve/service"
@@ -13,6 +15,8 @@ import (
 	syncdomain "github.com/task-otter/Taskotter/internal/features/sync/domain"
 	syncsvc "github.com/task-otter/Taskotter/internal/features/sync/service"
 	"github.com/task-otter/Taskotter/internal/shared/config"
+	"github.com/task-otter/Taskotter/internal/shared/consts"
+	"github.com/task-otter/Taskotter/internal/shared/iox"
 )
 
 type (
@@ -174,9 +178,49 @@ func TestSHAOnlyLockChangeNotChanged(t *testing.T) {
 	}
 }
 
-// TestConfigurationChangeMarksUpdated verifies a config field change marks the plan updated.
-func TestConfigurationChangeMarksUpdated(t *testing.T) {
-	t.Parallel()
+func assertRemovedContains(t *testing.T, removed []string, rel string) {
+	t.Helper()
+
+	want := goManagedPath(rel)
+
+	if !slices.Contains(removed, want) {
+		t.Fatalf("Removed missing %q: %v", want, removed)
+	}
+}
+
+func assertPathAbsent(t *testing.T, path string) {
+	t.Helper()
+
+	stat, err := os.Stat(path)
+	iox.Discard(stat)
+
+	if !os.IsNotExist(err) {
+		t.Fatalf("path %q should be absent, stat returned: %v", path, err)
+	}
+}
+
+func assertDocsRemovedFromWorkspace(t *testing.T, workspace string) {
+	t.Helper()
+
+	moduleRoot := filepath.Join(workspace, config.DefaultTargetFolder, consts.Go)
+
+	assertPathAbsent(t, filepath.Join(moduleRoot, testReadmeName))
+	assertPathAbsent(t, filepath.Join(moduleRoot, filepath.FromSlash(docGuideMD)))
+	assertPathAbsent(t, filepath.Join(moduleRoot, filepath.FromSlash(docNestedNoteMD)))
+	assertPathAbsent(t, filepath.Join(moduleRoot, docsDirName))
+	assertFileExists(t, filepath.Join(moduleRoot, testTaskfileName))
+}
+
+func assertRemovedDocPaths(t *testing.T, removed []string) {
+	t.Helper()
+
+	assertRemovedContains(t, removed, testReadmeName)
+	assertRemovedContains(t, removed, docGuideMD)
+	assertRemovedContains(t, removed, docNestedNoteMD)
+}
+
+func applyGoWithDocsPlan(t *testing.T) (string, *config.Config) {
+	t.Helper()
 
 	workspace := t.TempDir()
 	cfg, syncInput, plan := setupPlan(
@@ -188,11 +232,39 @@ func TestConfigurationChangeMarksUpdated(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	assertFileExists(
+		t,
+		filepath.Join(workspace, config.DefaultTargetFolder, consts.Go, docsDirName, "guide.md"),
+	)
+
+	return workspace, cfg
+}
+
+func assertIncludesDocToggleRemovesDocs(t *testing.T, workspace string, cfg *config.Config) {
+	t.Helper()
+
 	cfg.IncludesDoc = false
 
-	plan2 := replan(t, workspace, cfg)
+	syncInput2, plan2 := preparePlan(t, workspace, cfg)
 
 	if !plan2.Changed {
 		t.Fatal("expected changes when includes-doc toggles")
 	}
+
+	assertRemovedDocPaths(t, plan2.Removed)
+
+	err := runApplyPlan(t, plan2, &syncInput2)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assertDocsRemovedFromWorkspace(t, workspace)
+}
+
+// TestConfigurationChangeMarksUpdated verifies a config field change marks the plan updated.
+func TestConfigurationChangeMarksUpdated(t *testing.T) {
+	t.Parallel()
+
+	workspace, cfg := applyGoWithDocsPlan(t)
+	assertIncludesDocToggleRemovesDocs(t, workspace, cfg)
 }

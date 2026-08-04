@@ -10,6 +10,7 @@ import (
 	"github.com/task-otter/Taskotter/internal/features/sync/domain"
 	"github.com/task-otter/Taskotter/internal/features/sync/ports"
 	"github.com/task-otter/Taskotter/internal/shared/config"
+	"github.com/task-otter/Taskotter/internal/shared/consts"
 	"github.com/task-otter/Taskotter/internal/shared/pathutil"
 )
 
@@ -31,10 +32,6 @@ type (
 
 	modRec = moduleRecord
 	recMap = map[string]modRec
-)
-
-const (
-	zeroCapacity = 0
 )
 
 // PrepareSyncInput maps resolved modules and dependencies into syncer input records.
@@ -73,7 +70,7 @@ func assembleSyncInput(args *PrepareSyncInputArgs, allSources []string) (domain.
 }
 
 func buildDepRecords(cfg *config.Config, deps []string, src map[string]string) []modRec {
-	dependencyRecords := make([]modRec, zeroCapacity, len(deps))
+	dependencyRecords := make([]modRec, consts.IndexZero, len(deps))
 
 	for i := range deps {
 		dep := deps[i]
@@ -110,7 +107,7 @@ func buildReqRecords(args *buildReqArgs) (recMap, map[string]string) {
 }
 
 func collectRequestedSources(resolutions []resolvesvc.Resolution) []string {
-	requestedSources := make([]string, zeroCapacity, len(resolutions))
+	requestedSources := make([]string, consts.IndexZero, len(resolutions))
 
 	for i := range resolutions {
 		requestedSources = append(requestedSources, resolutions[i].SourceModule)

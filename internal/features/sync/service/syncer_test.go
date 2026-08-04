@@ -20,6 +20,7 @@ import (
 	syncsvc "github.com/task-otter/Taskotter/internal/features/sync/service"
 	"github.com/task-otter/Taskotter/internal/shared/config"
 	"github.com/task-otter/Taskotter/internal/shared/consts"
+	"github.com/task-otter/Taskotter/internal/shared/pathutil"
 )
 
 func fixtureStore(t *testing.T) *storedomain.Snapshot {
@@ -264,6 +265,60 @@ func assertNoReadmeManaged(t *testing.T, plan *syncdomain.Plan) {
 	}
 }
 
+func goManagedPath(rel string) string {
+	return pathutil.JoinRelative(config.DefaultTargetFolder, consts.Go, rel)
+}
+
+func managedPathSet(plan *syncdomain.Plan) map[string]struct{} {
+	out := make(map[string]struct{}, len(plan.ManagedFiles))
+
+	for i := range plan.ManagedFiles {
+		out[plan.ManagedFiles[i].Path] = struct{}{}
+	}
+
+	return out
+}
+
+func assertManagedHasPath(t *testing.T, paths map[string]struct{}, rel string) {
+	t.Helper()
+
+	full := goManagedPath(rel)
+
+	if _, ok := paths[full]; !ok {
+		t.Fatalf("expected managed path %q", full)
+	}
+}
+
+func assertManagedLacksPath(t *testing.T, paths map[string]struct{}, rel string) {
+	t.Helper()
+
+	full := goManagedPath(rel)
+
+	if _, ok := paths[full]; ok {
+		t.Fatalf("managed path %q should be excluded when includes-doc=false", full)
+	}
+}
+
+func assertNoDocPathsManaged(t *testing.T, plan *syncdomain.Plan) {
+	t.Helper()
+
+	paths := managedPathSet(plan)
+
+	assertNoReadmeManaged(t, plan)
+	assertManagedLacksPath(t, paths, docGuideMD)
+	assertManagedLacksPath(t, paths, docNestedNoteMD)
+}
+
+func assertDocPathsManaged(t *testing.T, plan *syncdomain.Plan) {
+	t.Helper()
+
+	paths := managedPathSet(plan)
+
+	assertManagedHasPath(t, paths, testReadmeName)
+	assertManagedHasPath(t, paths, docGuideMD)
+	assertManagedHasPath(t, paths, docNestedNoteMD)
+}
+
 // TestIncludesDocFalseSkipsReadme verifies README is excluded from managed files when includes-doc is false.
 func TestIncludesDocFalseSkipsReadme(t *testing.T) {
 	t.Parallel()
@@ -281,4 +336,43 @@ func TestIncludesDocFalseSkipsReadme(t *testing.T) {
 	}
 
 	assertNoReadmeManaged(t, plan)
+}
+
+// TestIncludesDocFalseSkipsFixtureDocs verifies go fixture README and docs/ are excluded when includes-doc is false.
+func TestIncludesDocFalseSkipsFixtureDocs(t *testing.T) {
+	t.Parallel()
+
+	workspace := t.TempDir()
+	writeRootTaskfile(t, workspace)
+
+	cfg := testConfig(workspace, func(cfg *config.Config) {
+		cfg.Tasks = []string{consts.Go}
+		cfg.IncludesDoc = false
+	})
+	si := buildSingleSyncIn(&moduleTestInput{t: t, cfg: cfg, snap: fixtureStore(t)})
+
+	plan, err := syncsvc.BuildPlan(&si)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assertNoDocPathsManaged(t, plan)
+}
+
+// TestIncludesDocTrueIncludesFixtureDocs verifies go fixture README and docs/ are managed when includes-doc is true.
+func TestIncludesDocTrueIncludesFixtureDocs(t *testing.T) {
+	t.Parallel()
+
+	workspace := t.TempDir()
+	writeRootTaskfile(t, workspace)
+
+	cfg := testConfig(workspace, mutateGoWithDocs)
+	si := buildSingleSyncIn(&moduleTestInput{t: t, cfg: cfg, snap: fixtureStore(t)})
+
+	plan, err := syncsvc.BuildPlan(&si)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assertDocPathsManaged(t, plan)
 }

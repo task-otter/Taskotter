@@ -31,17 +31,58 @@ vars:
         gobin="${gopath:-$HOME/go}/bin"
       fi
       printf '%s' "$gobin"
+  ACTIONLINT_EXTRA_ARGS: ""
+  ACTIONLINT_LINT_SKIP_PATTERN: ""
+  ACTIONLINT_TARGETS: ""
+  ACTIONLINT_VERSION: "1.7.12"
+  ADRS_EXTRA_ARGS: ""
+  ADRS_VERSION: ""
+  CARGO_BIN_UNIX: "$HOME/.cargo/bin"
+  GOLANGCI_LINT_FMT_FORMATTER_FLAGS: >-
+    -E gci -E gofmt -E gofumpt -E goimports -E golines -E swaggo
+  GOLANGCI_LINT_FMT_SKIP_PATTERN: ""
+  GOLANGCI_LINT_INTERNAL_SKIP_CONFIG: ".golangci-taskotter-skip.yml"
+  GOLANGCI_LINT_LINT_SKIP_PATTERN: ""
+  GOLANGCI_LINT_VERSION: ""
+  GOVULNCHECK_LINT_SKIP_PATTERN: ""
+  GOVULNCHECK_VERSION: ""
+  GO_BIN_UNIX: "{{.GO_ROOT_UNIX}}/bin"
+  GO_CMD_UNIX: "{{.GO_BIN_UNIX}}/go"
+  GO_COVER_PROFILE: ""
+  GO_DOWNLOAD_BASE_URL: https://go.dev/dl
+  GO_FUZZTIME: ""
+  GO_INSTALL_DIR_UNIX: "/usr/local"
+  GO_JUNIT_REPORT: ""
+  GO_ROOT_UNIX: "{{.GO_INSTALL_DIR_UNIX}}/go"
+  GO_VERSION: ""
+  GO_VERSION_URL: https://go.dev/VERSION?m=text
+  HADOLINT_CONFIG: ""
+  HADOLINT_DOCKERFILE: "Dockerfile"
+  HADOLINT_EXTRA_ARGS: ""
+  HADOLINT_LINT_SKIP_PATTERN: ""
+  HADOLINT_VERSION: "2.14.0"
+  UV_LOAD: 'export PATH="$HOME/.local/bin:$PATH"'
+  YAMLFIX_VERSION: ""
+  YAMLLINT_CONFIG: ""
+  YAMLLINT_EXTRA_ARGS: ""
+  YAMLLINT_LINT_SKIP_PATTERN: ""
+  YAMLLINT_TARGETS: "."
+  YAMLLINT_VERSION: ""
+  ZIZMOR_EXTRA_ARGS: "--offline"
+  ZIZMOR_LINT_SKIP_PATTERN: ""
+  ZIZMOR_TARGETS: ".github"
+  ZIZMOR_VERSION: "1.25.2"
 includes:
   go:
     taskfile: go/Taskfile.yml
     vars:
       INSTALL_DIR_UNIX: "/usr/local"
-      GO_ROOT_UNIX: "{{.INSTALL_DIR_UNIX}}/go"
-      GO_BIN_UNIX: "{{.GO_ROOT_UNIX}}/bin"
-      GO_CMD_UNIX: "{{.GO_BIN_UNIX}}/go"
-      GO_VERSION_URL: https://go.dev/VERSION?m=text
-      GO_DOWNLOAD_BASE_URL: https://go.dev/dl
-      GO_VERSION: ""
+      GO_ROOT_UNIX: '{{.GO_ROOT_UNIX}}'
+      GO_BIN_UNIX: '{{.GO_BIN_UNIX}}'
+      GO_CMD_UNIX: '{{.GO_CMD_UNIX}}'
+      GO_VERSION_URL: '{{.GO_VERSION_URL}}'
+      GO_DOWNLOAD_BASE_URL: '{{.GO_DOWNLOAD_BASE_URL}}'
+      GO_VERSION: '{{.GO_VERSION}}'
       GOLANGCI_LINT_VERSION: ""
       GOVULNCHECK_VERSION: ""
       GOSEC_VERSION: ""
@@ -50,83 +91,82 @@ includes:
       # Written next to the project's golangci-lint config so relative paths inside
       # the merged copy keep resolving. Overwritten on every run, never deleted.
       GO_INTERNAL_SKIP_CONFIG: ".golangci-taskotter-skip.yml"
-      GO_COVER_PROFILE: ""
-      GO_FUZZTIME: ""
+      GO_COVER_PROFILE: '{{.GO_COVER_PROFILE}}'
+      GO_FUZZTIME: '{{.GO_FUZZTIME}}'
       # Formatter selection shared by every golangci-lint fmt invocation (both the
       # skip-pattern and plain paths, on Unix and Windows). Kept in one place so the
       # four call sites cannot drift apart.
       GO_FMT_FORMATTER_FLAGS: >-
         -E gci -E gofmt -E gofumpt -E goimports -E golines -E swaggo
       GLOBAL_GO_BIN: '{{.GLOBAL_GO_BIN}}'
-      GO_JUNIT_REPORT: ""
-      GO_INSTALL_DIR_UNIX: "/usr/local"
+      GO_JUNIT_REPORT: '{{.GO_JUNIT_REPORT}}'
+      GO_INSTALL_DIR_UNIX: '{{.GO_INSTALL_DIR_UNIX}}'
       GO_GLOBAL_BIN: '{{.GO_GLOBAL_BIN}}'
   yamllint:
     taskfile: yamllint/Taskfile.yml
     vars:
-      YAMLLINT_LINT_SKIP_PATTERN: ""
-      UV_LOAD: 'export PATH="$HOME/.local/bin:$PATH"'
+      YAMLLINT_LINT_SKIP_PATTERN: '{{.YAMLLINT_LINT_SKIP_PATTERN}}'
+      UV_LOAD: '{{.UV_LOAD}}'
       TARGETS: "."
       CONFIG: '{{.CONFIG}}'
       EXTRA_ARGS: '{{.EXTRA_ARGS}}'
-      YAMLLINT_VERSION: ""
-      YAMLFIX_VERSION: ""
-      YAMLLINT_TARGETS: "."
-      YAMLLINT_CONFIG: ""
-      YAMLLINT_EXTRA_ARGS: ""
+      YAMLLINT_VERSION: '{{.YAMLLINT_VERSION}}'
+      YAMLFIX_VERSION: '{{.YAMLFIX_VERSION}}'
+      YAMLLINT_TARGETS: '{{.YAMLLINT_TARGETS}}'
+      YAMLLINT_CONFIG: '{{.YAMLLINT_CONFIG}}'
+      YAMLLINT_EXTRA_ARGS: '{{.YAMLLINT_EXTRA_ARGS}}'
   actionlint:
     taskfile: actionlint/Taskfile.yml
     vars:
-      ACTIONLINT_LINT_SKIP_PATTERN: ""
-      ACTIONLINT_VERSION: "1.7.12"
-      ACTIONLINT_EXTRA_ARGS: ""
-      ACTIONLINT_TARGETS: ""
+      ACTIONLINT_LINT_SKIP_PATTERN: '{{.ACTIONLINT_LINT_SKIP_PATTERN}}'
+      ACTIONLINT_VERSION: '{{.ACTIONLINT_VERSION}}'
+      ACTIONLINT_EXTRA_ARGS: '{{.ACTIONLINT_EXTRA_ARGS}}'
+      ACTIONLINT_TARGETS: '{{.ACTIONLINT_TARGETS}}'
   zizmor:
     taskfile: zizmor/Taskfile.yml
     vars:
-      ZIZMOR_LINT_SKIP_PATTERN: ""
-      ZIZMOR_EXTRA_ARGS: "--offline"
-      ZIZMOR_TARGETS: ".github"
-      ZIZMOR_VERSION: "1.25.2"
+      ZIZMOR_LINT_SKIP_PATTERN: '{{.ZIZMOR_LINT_SKIP_PATTERN}}'
+      ZIZMOR_EXTRA_ARGS: '{{.ZIZMOR_EXTRA_ARGS}}'
+      ZIZMOR_TARGETS: '{{.ZIZMOR_TARGETS}}'
+      ZIZMOR_VERSION: '{{.ZIZMOR_VERSION}}'
   adrs:
     taskfile: adrs/Taskfile.yml
     vars:
-      CARGO_BIN_UNIX: "$HOME/.cargo/bin"
+      CARGO_BIN_UNIX: '{{.CARGO_BIN_UNIX}}'
       EXTRA_ARGS: '{{.EXTRA_ARGS}}'
-      ADRS_VERSION: ""
-      ADRS_EXTRA_ARGS: ""
+      ADRS_VERSION: '{{.ADRS_VERSION}}'
+      ADRS_EXTRA_ARGS: '{{.ADRS_EXTRA_ARGS}}'
   hadolint:
     taskfile: hadolint/Taskfile.yml
     vars:
-      HADOLINT_LINT_SKIP_PATTERN: ""
+      HADOLINT_LINT_SKIP_PATTERN: '{{.HADOLINT_LINT_SKIP_PATTERN}}'
       CONFIG: '{{.CONFIG}}'
       DOCKERFILE: "Dockerfile"
       EXTRA_ARGS: '{{.EXTRA_ARGS}}'
-      HADOLINT_VERSION: "2.14.0"
-      HADOLINT_CONFIG: ""
-      HADOLINT_DOCKERFILE: "Dockerfile"
-      HADOLINT_EXTRA_ARGS: ""
+      HADOLINT_VERSION: '{{.HADOLINT_VERSION}}'
+      HADOLINT_CONFIG: '{{.HADOLINT_CONFIG}}'
+      HADOLINT_DOCKERFILE: '{{.HADOLINT_DOCKERFILE}}'
+      HADOLINT_EXTRA_ARGS: '{{.HADOLINT_EXTRA_ARGS}}'
   golangci-lint:
     taskfile: golangci-lint/Taskfile.yml
     vars:
-      GOLANGCI_LINT_VERSION: ""
-      GOLANGCI_LINT_LINT_SKIP_PATTERN: ""
-      GOLANGCI_LINT_FMT_SKIP_PATTERN: ""
+      GOLANGCI_LINT_VERSION: '{{.GOLANGCI_LINT_VERSION}}'
+      GOLANGCI_LINT_LINT_SKIP_PATTERN: '{{.GOLANGCI_LINT_LINT_SKIP_PATTERN}}'
+      GOLANGCI_LINT_FMT_SKIP_PATTERN: '{{.GOLANGCI_LINT_FMT_SKIP_PATTERN}}'
       # Written next to the project's golangci-lint config so relative paths inside
       # the merged copy keep resolving. Overwritten on every run, never deleted.
-      GOLANGCI_LINT_INTERNAL_SKIP_CONFIG: ".golangci-taskotter-skip.yml"
+      GOLANGCI_LINT_INTERNAL_SKIP_CONFIG: '{{.GOLANGCI_LINT_INTERNAL_SKIP_CONFIG}}'
       # Formatter selection shared by every golangci-lint fmt invocation (both the
       # skip-pattern and plain paths, on Unix and Windows). Kept in one place so the
       # four call sites cannot drift apart.
-      GOLANGCI_LINT_FMT_FORMATTER_FLAGS: >-
-        -E gci -E gofmt -E gofumpt -E goimports -E golines -E swaggo
+      GOLANGCI_LINT_FMT_FORMATTER_FLAGS: '{{.GOLANGCI_LINT_FMT_FORMATTER_FLAGS}}'
       GLOBAL_GO_BIN: '{{.GLOBAL_GO_BIN}}'
       GO_GLOBAL_BIN: '{{.GO_GLOBAL_BIN}}'
   govulncheck:
     taskfile: govulncheck/Taskfile.yml
     vars:
-      GOVULNCHECK_VERSION: ""
-      GOVULNCHECK_LINT_SKIP_PATTERN: ""
+      GOVULNCHECK_VERSION: '{{.GOVULNCHECK_VERSION}}'
+      GOVULNCHECK_LINT_SKIP_PATTERN: '{{.GOVULNCHECK_LINT_SKIP_PATTERN}}'
       GLOBAL_GO_BIN: '{{.GLOBAL_GO_BIN}}'
       GO_GLOBAL_BIN: '{{.GO_GLOBAL_BIN}}'
 tasks:

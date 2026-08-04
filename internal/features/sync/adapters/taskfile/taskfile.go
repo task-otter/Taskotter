@@ -172,11 +172,12 @@ func marshalRewrittenTaskfile(node *yaml.Node) ([]byte, error) {
 // parseTaskfileRoot unmarshals content into a YAML document node and returns its
 // root mapping node. parseErrMsg and emptyErrMsg format the respective failures.
 //
-//nolint:gocritic,revive // single-line sig for whitespace
-func parseTaskfileRoot(content []byte, parseErr, emptyErr string) (*yaml.Node, *yaml.Node, error) {
-	var doc yaml.Node
-
-	err := yaml.Unmarshal(content, &doc)
+//nolint:gocritic // single-line sig for whitespace
+func parseTaskfileRoot(
+	content []byte,
+	parseErr, emptyErr string,
+) (doc *yaml.Node, docContent *yaml.Node, err error) {
+	err = yaml.Unmarshal(content, &doc)
 	if err != nil {
 		return nil, nil, &RewriteError{Message: fmt.Sprintf(parseErr, err)}
 	}
@@ -185,7 +186,9 @@ func parseTaskfileRoot(content []byte, parseErr, emptyErr string) (*yaml.Node, *
 		return nil, nil, &RewriteError{Message: emptyErr}
 	}
 
-	return &doc, doc.Content[consts.IndexZero], nil
+	docContent = doc.Content[consts.IndexZero]
+
+	return doc, docContent, nil
 }
 
 // marshalAndValidate serializes node to YAML and re-parses the result to confirm

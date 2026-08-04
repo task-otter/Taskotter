@@ -3,6 +3,20 @@ version: "3.5"
 vars:
   EXTRA_ARGS: ""
   CONFIG: ""
+  GLOBAL_GO_BIN:
+    sh: |
+      gobin="${GOBIN:-}"
+      if [ -z "$gobin" ] && command -v go >/dev/null 2>&1; then
+        gobin="$(go env GOBIN)"
+      fi
+      if [ -z "$gobin" ]; then
+        gopath="${GOPATH:-}"
+        if [ -z "$gopath" ] && command -v go >/dev/null 2>&1; then
+          gopath="$(go env GOPATH)"
+        fi
+        gobin="${gopath:-$HOME/go}/bin"
+      fi
+      printf '%s' "$gobin"
 includes:
   go:
     taskfile: go/Taskfile.yml
@@ -29,20 +43,7 @@ includes:
       # four call sites cannot drift apart.
       GO_FMT_FORMATTER_FLAGS: >-
         -E gci -E gofmt -E gofumpt -E goimports -E golines -E swaggo
-      GLOBAL_GO_BIN:
-        sh: |
-          gobin="${GOBIN:-}"
-          if [ -z "$gobin" ] && command -v go >/dev/null 2>&1; then
-            gobin="$(go env GOBIN)"
-          fi
-          if [ -z "$gobin" ]; then
-            gopath="${GOPATH:-}"
-            if [ -z "$gopath" ] && command -v go >/dev/null 2>&1; then
-              gopath="$(go env GOPATH)"
-            fi
-            gobin="${gopath:-$HOME/go}/bin"
-          fi
-          printf '%s' "$gobin"
+      GLOBAL_GO_BIN: '{{.GLOBAL_GO_BIN}}'
       GO_JUNIT_REPORT: ""
   yamllint:
     taskfile: yamllint/Taskfile.yml
@@ -82,11 +83,34 @@ includes:
       DOCKERFILE: "Dockerfile"
       EXTRA_ARGS: '{{.EXTRA_ARGS}}'
       HADOLINT_VERSION: "2.14.0"
+  golangci-lint:
+    taskfile: golangci-lint/Taskfile.yml
+    vars:
+      GOLANGCI_LINT_VERSION: ""
+      GOLANGCI_LINT_LINT_SKIP_PATTERN: ""
+      GOLANGCI_LINT_FMT_SKIP_PATTERN: ""
+      # Written next to the project's golangci-lint config so relative paths inside
+      # the merged copy keep resolving. Overwritten on every run, never deleted.
+      GOLANGCI_LINT_INTERNAL_SKIP_CONFIG: ".golangci-taskotter-skip.yml"
+      # Formatter selection shared by every golangci-lint fmt invocation (both the
+      # skip-pattern and plain paths, on Unix and Windows). Kept in one place so the
+      # four call sites cannot drift apart.
+      GOLANGCI_LINT_FMT_FORMATTER_FLAGS: >-
+        -E gci -E gofmt -E gofumpt -E goimports -E golines -E swaggo
+      GLOBAL_GO_BIN: '{{.GLOBAL_GO_BIN}}'
+  govulncheck:
+    taskfile: govulncheck/Taskfile.yml
+    vars:
+      GOVULNCHECK_VERSION: ""
+      GOVULNCHECK_LINT_SKIP_PATTERN: ""
+      GLOBAL_GO_BIN: '{{.GLOBAL_GO_BIN}}'
 tasks:
   install:
     desc: Run install for synced TaskOtter modules
     cmds:
       - task: go:install
+      - task: golangci-lint:install
+      - task: govulncheck:install
       - task: yamllint:install
       - task: actionlint:install
       - task: zizmor:install
@@ -104,10 +128,17 @@ tasks:
   lint:
     desc: Run lint for synced TaskOtter modules
     cmds:
+      - task: golangci-lint:lint
+      - task: govulncheck:lint
       - task: yamllint:lint
       - task: actionlint:lint
       - task: zizmor:lint
       - task: hadolint:lint
+  lint:fix:
+    desc: Run lint:fix for synced TaskOtter modules
+    cmds:
+      - task: golangci-lint:lint:fix
+      - task: yamllint:lint:fix
   upgrade:
     desc: Run upgrade for synced TaskOtter modules
     cmds:

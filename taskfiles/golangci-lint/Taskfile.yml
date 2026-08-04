@@ -1,0 +1,793 @@
+---
+version: "3.5"
+output:
+  group:
+    begin: "::group::{{.TASK}}"
+    end: "::endgroup::"
+    error_only: false
+silent: true
+includes:
+  go:
+    taskfile: ../go/Taskfile.yml
+  skipfiles:
+    taskfile: ../internal/skipfiles/Taskfile.yml
+    internal: true
+vars:
+  GOLANGCI_LINT_VERSION: ""
+  GOLANGCI_LINT_LINT_SKIP_PATTERN: ""
+  GOLANGCI_LINT_FMT_SKIP_PATTERN: ""
+  # Written next to the project's golangci-lint config so relative paths inside
+  # the merged copy keep resolving. Overwritten on every run, never deleted.
+  GOLANGCI_LINT_INTERNAL_SKIP_CONFIG: ".golangci-taskotter-skip.yml"
+  # Formatter selection shared by every golangci-lint fmt invocation (both the
+  # skip-pattern and plain paths, on Unix and Windows). Kept in one place so the
+  # four call sites cannot drift apart.
+  GOLANGCI_LINT_FMT_FORMATTER_FLAGS: >-
+    -E gci -E gofmt -E gofumpt -E goimports -E golines -E swaggo
+  GLOBAL_GO_BIN:
+    sh: |
+      gobin="${GOBIN:-}"
+      if [ -z "$gobin" ] && command -v go >/dev/null 2>&1; then
+        gobin="$(go env GOBIN)"
+      fi
+      if [ -z "$gobin" ]; then
+        gopath="${GOPATH:-}"
+        if [ -z "$gopath" ] && command -v go >/dev/null 2>&1; then
+          gopath="$(go env GOPATH)"
+        fi
+        gobin="${gopath:-$HOME/go}/bin"
+      fi
+      printf '%s' "$gobin"
+tasks:
+  default:
+    run: once
+    desc: Show available golangci-lint automation tasks
+    summary: Display the list of available golangci-lint-related tasks defined in this Taskfile.
+    cmds:
+      - task --list
+  install:
+    run: once
+    desc: Install golangci-lint globally
+    summary: |
+      Install GOLANGCI_LINT_VERSION, defaulting to latest, into the global Go
+      bin.
+    deps:
+      - task: go:install
+    cmds:
+      - cmd: |
+          mkdir -p "{{.GLOBAL_GO_BIN}}"
+          GOBIN="{{.GLOBAL_GO_BIN}}" go install \
+            github.com/golangci/golangci-lint/v2/cmd/golangci-lint@{{default "latest" .GOLANGCI_LINT_VERSION}}
+        platforms: [linux, darwin]
+      - cmd: >-
+          powershell -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop'; $globalGoBin = '{{.GLOBAL_GO_BIN}}'; New-Item -ItemType Directory -Force -Path $globalGoBin | Out-Null; $env:GOBIN = $globalGoBin; $installVersion = '{{default "latest" .GOLANGCI_LINT_VERSION}}'; go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$installVersion"
+        platforms: [windows]
+    status:
+      - test -x "{{.GLOBAL_GO_BIN}}/golangci-lint"
+      - >-
+        { test -z "{{.GOLANGCI_LINT_VERSION}}" || test "{{.GOLANGCI_LINT_VERSION}}" = "latest" || "{{.GLOBAL_GO_BIN}}/golangci-lint" version --short | awk -v want="{{.GOLANGCI_LINT_VERSION}}" '{ got = $1; sub(/^v/, "", got); sub(/^v/, "", want); sub(/[-+].*$/, "", got); if (got == want) { found = 1 } } END { exit !found }'; }
+  lint:
+    run: once
+    desc: Lint Go packages with golangci-lint
+    summary: |
+      Run golangci-lint against all Go packages by default. Set
+      GOLANGCI_LINT_LINT_SKIP_PATTERN to a shell-style path glob for files to
+      skip. Pass CLI arguments after -- to override the default ./... target.
+      Auto-installs golangci-lint if missing. When .custom-gcl.yml exists in the
+      working directory, builds or reuses its custom binary instead.
+    deps:
+      - task: install
+    cmds:
+      - task: _lint
+        vars:
+          GO_LINT_FIX: ""
+          GO_LINT_ARGS: "{{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}./...{{end}}"
+  lint:fix:
+    run: once
+    desc: Auto-fix Go lint issues with golangci-lint
+    summary: |
+      Run golangci-lint with --fix against all Go packages by default. Set
+      GOLANGCI_LINT_LINT_SKIP_PATTERN to a shell-style path glob for files that
+      must not be modified. Pass CLI arguments after -- to override the default
+      ./... target. Auto-installs golangci-lint if missing. When
+      .custom-gcl.yml exists in the working directory, builds or reuses its
+      custom binary instead.
+    deps:
+      - task: install
+    cmds:
+      - task: _lint
+        vars:
+          GO_LINT_FIX: "--fix"
+          GO_LINT_ARGS: "{{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}./...{{end}}"
+  fmt:
+    run: once
+    desc: Format Go files with golangci-lint formatters
+    summary: |
+      Rewrite Go files with golangci-lint's gci, gofmt, gofumpt, goimports,
+      golines, and swaggo formatters. Set GOLANGCI_LINT_FMT_SKIP_PATTERN to a
+      shell-style path glob for files to skip. Pass CLI arguments after -- to
+      override the default target. Auto-installs golangci-lint if missing.
+    deps:
+      - task: install
+    cmds:
+      - task: _fmt
+        vars:
+          GO_FMT_DIFF: ""
+          GO_FMT_TARGETS: "{{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}.{{end}}"
+  fmt:check:
+    run: once
+    desc: Check Go formatting with golangci-lint formatters
+    summary: |
+      Check Go files with golangci-lint's gci, gofmt, gofumpt, goimports,
+      golines, and swaggo formatters by printing diffs instead of rewriting
+      files. Set GOLANGCI_LINT_FMT_SKIP_PATTERN to a shell-style path glob for
+      files to skip. Pass CLI arguments after -- to override the default
+      target. Auto-installs golangci-lint if missing.
+    deps:
+      - task: install
+    cmds:
+      - task: _fmt
+        vars:
+          GO_FMT_DIFF: "--diff"
+          GO_FMT_TARGETS: "{{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}.{{end}}"
+  config:skip:
+    desc: Write a golangci-lint config overlay that excludes the skip pattern
+    summary: |
+      Generate a golangci-lint config that merges the project config with
+      GOLANGCI_LINT_LINT_SKIP_PATTERN translated into a linters.exclusions.paths
+      regex. The overlay is written next to the project's golangci-lint config
+      so relative paths inside it keep resolving; lint and lint:fix run this
+      first. It is rewritten on every run and is not removed afterwards, so add
+      it to .gitignore. Running with no skip pattern set deletes it.
+    dir: "{{.USER_WORKING_DIR}}"
+    set: [errexit, nounset, pipefail]
+    env:
+      GO_SKIP_PATTERN: >-
+        {{if .GOLANGCI_LINT_LINT_SKIP_PATTERN_OVERRIDE}}{{.GOLANGCI_LINT_LINT_SKIP_PATTERN_OVERRIDE}} {{- else}}{{.GOLANGCI_LINT_LINT_SKIP_PATTERN}}{{end}}
+    cmds:
+      - cmd: |
+          pattern="$GO_SKIP_PATTERN"
+          source_config="$("{{.GLOBAL_GO_BIN}}/golangci-lint" config path 2>/dev/null || true)"
+          config_dir=.
+          if [[ -n "$source_config" ]]; then
+            config_dir="$(dirname "$source_config")"
+          fi
+          output="$config_dir/{{.GOLANGCI_LINT_INTERNAL_SKIP_CONFIG}}"
+
+          # Nothing to skip: drop the overlay a previous run left behind so the
+          # next task falls back to the project config instead of a stale one.
+          if [[ -z "$pattern" ]]; then
+            rm -f "$output"
+            exit 0
+          fi
+
+          path_regex="$(printf '%s' "$pattern" | awk '
+            {
+              glob = $0
+              gsub(/\\/, "/", glob)
+              regex = "^"
+              for (position = 1; position <= length(glob); position++) {
+                character = substr(glob, position, 1)
+                following = substr(glob, position + 1, 1)
+                if (character == "*") {
+                  if (following == "*") {
+                    if (substr(glob, position + 2, 1) == "/") {
+                      regex = regex "(?:.*/)?"
+                      position += 2
+                    } else {
+                      regex = regex ".*"
+                      position += 1
+                    }
+                  } else {
+                    regex = regex "[^/]*"
+                  }
+                } else if (character == "?") {
+                  regex = regex "[^/]"
+                } else if (index(".+()[]{}^$|\\", character) > 0) {
+                  regex = regex "\\" character
+                } else {
+                  regex = regex character
+                }
+              }
+              printf "%s$", regex
+            }
+          ')"
+          export GO_SKIP_REGEX="$path_regex"
+          if [[ -z "$source_config" || ! -f "$source_config" ]]; then
+            printf "version: \"2\"\nlinters:\n  exclusions:\n    paths:\n      - |-\n        %s\n" \
+              "$path_regex" >"$output"
+            exit 0
+          fi
+
+          first_content="$(awk '
+            /^[[:space:]]*(#.*)?$/ { next }
+            { sub(/^[[:space:]]*/, ""); print substr($0, 1, 1); exit }
+          ' "$source_config")"
+          if [[ "$first_content" == '{' ]]; then
+            printf '%s\n' \
+              'GOLANGCI_LINT_LINT_SKIP_PATTERN requires a YAML golangci-lint config on macOS and Linux.' \
+              'Convert the JSON config to YAML or add the exclusion to linters.exclusions.paths.' >&2
+            exit 2
+          fi
+
+          awk '
+            function indentation(value) {
+              match(value, /^ */)
+              return RLENGTH
+            }
+            function ignorable(value) {
+              return value ~ /^ *($|#)/
+            }
+            function trimmed(value, result) {
+              result = value
+              sub(/^ */, "", result)
+              sub(/ *$/, "", result)
+              return result
+            }
+            function mapping_key_kind(value, key, result) {
+              result = trimmed(value)
+              if (result ~ ("^" key ":[ ]*(#.*)?$")) return 1
+              if (result ~ ("^" key ":[ ]*\\{\\}[ ]*(#.*)?$")) return 2
+              if (result ~ ("^" key ":")) return 3
+              return 0
+            }
+            function block_end(start, base_indent, total, cursor) {
+              for (cursor = start + 1; cursor <= total; cursor++) {
+                if (!ignorable(lines[cursor]) && indentation(lines[cursor]) <= base_indent) {
+                  return cursor
+                }
+              }
+              return total + 1
+            }
+            function child_indent(start, finish, base_indent, cursor, current, minimum) {
+              minimum = 0
+              for (cursor = start + 1; cursor < finish; cursor++) {
+                if (ignorable(lines[cursor])) continue
+                current = indentation(lines[cursor])
+                if (current > base_indent && (minimum == 0 || current < minimum)) minimum = current
+              }
+              return minimum == 0 ? base_indent + 2 : minimum
+            }
+            function spaces(count) {
+              return sprintf("%*s", count, "")
+            }
+            function fail(message) {
+              print "prepare golangci-lint overlay: " message > "/dev/stderr"
+              failed = 1
+            }
+            {
+              lines[NR] = $0
+            }
+            END {
+              regex = ENVIRON["GO_SKIP_REGEX"]
+              gsub(/\047/, "\047\047", regex)
+              quoted_regex = "\047" regex "\047"
+              total = NR
+
+              linters = 0
+              for (cursor = 1; cursor <= total; cursor++) {
+                if (indentation(lines[cursor]) != 0) continue
+                kind = mapping_key_kind(lines[cursor], "linters")
+                if (kind == 0) continue
+                if (kind == 3) {
+                  fail("linters must be a YAML mapping")
+                  exit 2
+                }
+                linters = cursor
+                if (kind == 2) lines[cursor] = "linters:"
+                break
+              }
+
+              if (linters == 0) {
+                for (cursor = 1; cursor <= total; cursor++) print lines[cursor]
+                if (total > 0 && lines[total] !~ /^ *$/) print ""
+                print "linters:"
+                print "  exclusions:"
+                print "    paths:"
+                print "      - " quoted_regex
+                exit
+              }
+
+              linters_end = block_end(linters, 0, total)
+              linters_child = child_indent(linters, linters_end, 0)
+              exclusions = 0
+              for (cursor = linters + 1; cursor < linters_end; cursor++) {
+                if (indentation(lines[cursor]) != linters_child) continue
+                kind = mapping_key_kind(lines[cursor], "exclusions")
+                if (kind == 0) continue
+                if (kind == 3) {
+                  fail("linters.exclusions must be a YAML mapping")
+                  exit 2
+                }
+                exclusions = cursor
+                if (kind == 2) lines[cursor] = spaces(linters_child) "exclusions:"
+                break
+              }
+
+              if (exclusions == 0) {
+                for (cursor = 1; cursor <= total + 1; cursor++) {
+                  if (cursor == linters_end) {
+                    print spaces(linters_child) "exclusions:"
+                    print spaces(linters_child + 2) "paths:"
+                    print spaces(linters_child + 4) "- " quoted_regex
+                  }
+                  if (cursor <= total) print lines[cursor]
+                }
+                exit
+              }
+
+              exclusions_end = block_end(exclusions, linters_child, total)
+              exclusions_child = child_indent(exclusions, exclusions_end, linters_child)
+              paths = 0
+              empty_paths = 0
+              for (cursor = exclusions + 1; cursor < exclusions_end; cursor++) {
+                if (indentation(lines[cursor]) != exclusions_child) continue
+                value = trimmed(lines[cursor])
+                if (value ~ /^paths:[ ]*(#.*)?$/) {
+                  paths = cursor
+                  break
+                }
+                if (value ~ /^paths:[ ]*\[\][ ]*(#.*)?$/) {
+                  paths = cursor
+                  empty_paths = 1
+                  break
+                }
+                if (value ~ /^paths:/) {
+                  fail("linters.exclusions.paths must be a block YAML sequence")
+                  exit 2
+                }
+              }
+
+              if (paths == 0) {
+                for (cursor = 1; cursor <= total + 1; cursor++) {
+                  if (cursor == exclusions_end) {
+                    print spaces(exclusions_child) "paths:"
+                    print spaces(exclusions_child + 2) "- " quoted_regex
+                  }
+                  if (cursor <= total) print lines[cursor]
+                }
+                exit
+              }
+
+              if (empty_paths) lines[paths] = spaces(exclusions_child) "paths:"
+              for (cursor = 1; cursor <= total; cursor++) {
+                print lines[cursor]
+                if (cursor == paths) print spaces(exclusions_child + 2) "- " quoted_regex
+              }
+            }
+          ' "$source_config" >"$output"
+        platforms: [linux, darwin]
+      - cmd: |
+          powershell -NoProfile -ExecutionPolicy Bypass -Command - <<'POWERSHELL'
+          $ErrorActionPreference = 'Stop'
+          $pattern = $env:GO_SKIP_PATTERN
+          $sourceConfig = (& '{{.GLOBAL_GO_BIN}}/golangci-lint' config path 2>$null | Select-Object -First 1)
+          if ($LASTEXITCODE -ne 0) { $sourceConfig = '' }
+          if ($sourceConfig) {
+              $sourceConfig = (Resolve-Path -LiteralPath $sourceConfig).Path
+              $configDir = Split-Path -Parent $sourceConfig
+          } else {
+              $configDir = (Get-Location).Path
+          }
+          $output = Join-Path $configDir '{{.GOLANGCI_LINT_INTERNAL_SKIP_CONFIG}}'
+
+          if ([string]::IsNullOrWhiteSpace($pattern)) {
+              Remove-Item -LiteralPath $output -Force -ErrorAction SilentlyContinue
+              exit 0
+          }
+
+          $normalizedPattern = $pattern.Replace('\', '/')
+          $builder = [System.Text.StringBuilder]::new('^')
+          for ($index = 0; $index -lt $normalizedPattern.Length; $index++) {
+              $character = $normalizedPattern[$index]
+              if ($character -eq '*') {
+                  if (($index + 1) -lt $normalizedPattern.Length -and
+                      $normalizedPattern[$index + 1] -eq '*') {
+                      if (($index + 2) -lt $normalizedPattern.Length -and
+                          $normalizedPattern[$index + 2] -eq '/') {
+                          [void]$builder.Append('(?:.*/)?')
+                          $index += 2
+                      } else {
+                          [void]$builder.Append('.*')
+                          $index += 1
+                      }
+                  } else {
+                      [void]$builder.Append('[^/]*')
+                  }
+              } elseif ($character -eq '?') {
+                  [void]$builder.Append('[^/]')
+              } else {
+                  [void]$builder.Append([regex]::Escape([string]$character))
+              }
+          }
+          [void]$builder.Append('$')
+          $pathRegex = $builder.ToString()
+          $quotedRegex = "'" + $pathRegex.Replace("'", "''") + "'"
+
+          if ([string]::IsNullOrWhiteSpace($sourceConfig) -or
+              -not (Test-Path -LiteralPath $sourceConfig -PathType Leaf)) {
+              @(
+                  'version: "2"',
+                  'linters:',
+                  '  exclusions:',
+                  '    paths:',
+                  "      - $quotedRegex"
+              ) | Set-Content -LiteralPath $output -Encoding UTF8
+              exit 0
+          }
+
+          $firstContent = Get-Content -LiteralPath $sourceConfig |
+              Where-Object { $_ -notmatch '^\s*(?:#.*)?$' } |
+              Select-Object -First 1
+          if ($firstContent.TrimStart().StartsWith('{')) {
+              $config = Get-Content -LiteralPath $sourceConfig -Raw | ConvertFrom-Json
+
+              function Get-Or-AddObjectProperty([object]$parent, [string]$name) {
+                  $property = $parent.PSObject.Properties[$name]
+                  if ($null -eq $property) {
+                      $value = [pscustomobject]@{}
+                      $parent | Add-Member -MemberType NoteProperty -Name $name -Value $value
+                      return $value
+                  }
+                  if ($property.Value -isnot [pscustomobject]) {
+                      throw "$name must be an object"
+                  }
+                  return $property.Value
+              }
+
+              $linters = Get-Or-AddObjectProperty $config 'linters'
+              $exclusions = Get-Or-AddObjectProperty $linters 'exclusions'
+              $pathsProperty = $exclusions.PSObject.Properties['paths']
+              if ($null -eq $pathsProperty) {
+                  $exclusions | Add-Member -MemberType NoteProperty -Name 'paths' -Value @($pathRegex)
+              } elseif ($pathsProperty.Value -is [string]) {
+                  throw 'linters.exclusions.paths must be an array'
+              } else {
+                  $paths = @($pathsProperty.Value)
+                  if ($pathRegex -notin $paths) {
+                      $pathsProperty.Value = @($paths + $pathRegex)
+                  }
+              }
+              $config | ConvertTo-Json -Depth 100 |
+                  Set-Content -LiteralPath $output -Encoding UTF8
+              exit 0
+          }
+
+          function Get-YamlIndent([string]$line) {
+              return $line.Length - $line.TrimStart([char]' ').Length
+          }
+          function Test-YamlIgnorable([string]$line) {
+              return $line -match '^\s*(?:#.*)?$'
+          }
+          function Get-YamlMappingKeyKind([string]$line, [string]$key) {
+              $value = $line.Trim()
+              $escapedKey = [regex]::Escape($key)
+              if ($value -match "^${escapedKey}:\s*(?:#.*)?$") { return 1 }
+              if ($value -match "^${escapedKey}:\s*\{\}\s*(?:#.*)?$") { return 2 }
+              if ($value -match "^${escapedKey}:") { return 3 }
+              return 0
+          }
+          function Get-YamlBlockEnd(
+              [System.Collections.Generic.List[string]]$items,
+              [int]$start,
+              [int]$baseIndent
+          ) {
+              for ($index = $start + 1; $index -lt $items.Count; $index++) {
+                  if (-not (Test-YamlIgnorable $items[$index]) -and
+                      (Get-YamlIndent $items[$index]) -le $baseIndent) {
+                      return $index
+                  }
+              }
+              return $items.Count
+          }
+          function Get-YamlChildIndent(
+              [System.Collections.Generic.List[string]]$items,
+              [int]$start,
+              [int]$finish,
+              [int]$baseIndent
+          ) {
+              $minimum = 0
+              for ($index = $start + 1; $index -lt $finish; $index++) {
+                  if (Test-YamlIgnorable $items[$index]) { continue }
+                  $current = Get-YamlIndent $items[$index]
+                  if ($current -gt $baseIndent -and
+                      ($minimum -eq 0 -or $current -lt $minimum)) {
+                      $minimum = $current
+                  }
+              }
+              if ($minimum -eq 0) { return $baseIndent + 2 }
+              return $minimum
+          }
+
+          $lines = [System.Collections.Generic.List[string]]::new()
+          foreach ($line in (Get-Content -LiteralPath $sourceConfig)) { $lines.Add($line) }
+          $lintersIndex = -1
+          for ($index = 0; $index -lt $lines.Count; $index++) {
+              if ((Get-YamlIndent $lines[$index]) -ne 0) { continue }
+              $kind = Get-YamlMappingKeyKind $lines[$index] 'linters'
+              if ($kind -eq 0) { continue }
+              if ($kind -eq 3) { throw 'linters must be a YAML mapping' }
+              $lintersIndex = $index
+              if ($kind -eq 2) { $lines[$index] = 'linters:' }
+              break
+          }
+
+          if ($lintersIndex -lt 0) {
+              if ($lines.Count -gt 0 -and -not [string]::IsNullOrWhiteSpace($lines[$lines.Count - 1])) {
+                  $lines.Add('')
+              }
+              $lines.Add('linters:')
+              $lines.Add('  exclusions:')
+              $lines.Add('    paths:')
+              $lines.Add("      - $quotedRegex")
+              $lines | Set-Content -LiteralPath $output -Encoding UTF8
+              exit 0
+          }
+
+          $lintersEnd = Get-YamlBlockEnd $lines $lintersIndex 0
+          $lintersIndent = Get-YamlChildIndent $lines $lintersIndex $lintersEnd 0
+          $exclusionsIndex = -1
+          for ($index = $lintersIndex + 1; $index -lt $lintersEnd; $index++) {
+              if ((Get-YamlIndent $lines[$index]) -ne $lintersIndent) { continue }
+              $kind = Get-YamlMappingKeyKind $lines[$index] 'exclusions'
+              if ($kind -eq 0) { continue }
+              if ($kind -eq 3) { throw 'linters.exclusions must be a YAML mapping' }
+              $exclusionsIndex = $index
+              if ($kind -eq 2) { $lines[$index] = (' ' * $lintersIndent) + 'exclusions:' }
+              break
+          }
+
+          if ($exclusionsIndex -lt 0) {
+              $lines.InsertRange($lintersEnd, [string[]]@(
+                  (' ' * $lintersIndent) + 'exclusions:',
+                  (' ' * ($lintersIndent + 2)) + 'paths:',
+                  (' ' * ($lintersIndent + 4)) + "- $quotedRegex"
+              ))
+              $lines | Set-Content -LiteralPath $output -Encoding UTF8
+              exit 0
+          }
+
+          $exclusionsEnd = Get-YamlBlockEnd $lines $exclusionsIndex $lintersIndent
+          $pathsIndent = Get-YamlChildIndent $lines $exclusionsIndex $exclusionsEnd $lintersIndent
+          $pathsIndex = -1
+          $emptyPaths = $false
+          for ($index = $exclusionsIndex + 1; $index -lt $exclusionsEnd; $index++) {
+              if ((Get-YamlIndent $lines[$index]) -ne $pathsIndent) { continue }
+              $value = $lines[$index].Trim()
+              if ($value -match '^paths:\s*(?:#.*)?$') {
+                  $pathsIndex = $index
+                  break
+              }
+              if ($value -match '^paths:\s*\[\]\s*(?:#.*)?$') {
+                  $pathsIndex = $index
+                  $emptyPaths = $true
+                  break
+              }
+              if ($value -match '^paths:') {
+                  throw 'linters.exclusions.paths must be a block YAML sequence'
+              }
+          }
+
+          if ($pathsIndex -lt 0) {
+              $lines.InsertRange($exclusionsEnd, [string[]]@(
+                  (' ' * $pathsIndent) + 'paths:',
+                  (' ' * ($pathsIndent + 2)) + "- $quotedRegex"
+              ))
+          } else {
+              if ($emptyPaths) { $lines[$pathsIndex] = (' ' * $pathsIndent) + 'paths:' }
+              $lines.Insert($pathsIndex + 1, (' ' * ($pathsIndent + 2)) + "- $quotedRegex")
+          }
+          $lines | Set-Content -LiteralPath $output -Encoding UTF8
+          POWERSHELL
+        platforms: [windows]
+  _custom:
+    run: once
+    internal: true
+    dir: "{{.USER_WORKING_DIR}}"
+    if: test -f .custom-gcl.yml
+    method: checksum
+    vars:
+      CUSTOM_GCL_YAML:
+        sh: if [ -f .custom-gcl.yml ]; then cat .custom-gcl.yml; else printf '{}'; fi
+      CUSTOM_GCL:
+        ref: fromYaml .CUSTOM_GCL_YAML
+      CUSTOM_GCL_NAME: '{{default "custom-gcl" .CUSTOM_GCL.name}}'
+      CUSTOM_GCL_DESTINATION: '{{default "." .CUSTOM_GCL.destination}}'
+      CUSTOM_GCL_BINARY_NAME: "{{.CUSTOM_GCL_NAME}}{{exeExt}}"
+      CUSTOM_GCL_BINARY: "{{joinPath .CUSTOM_GCL_DESTINATION .CUSTOM_GCL_BINARY_NAME}}"
+    sources:
+      - .custom-gcl.yml
+    generates:
+      - "{{.CUSTOM_GCL_BINARY}}"
+    cmds:
+      - '"{{.GLOBAL_GO_BIN}}/golangci-lint" custom -v'
+  _lint:
+    run: once
+    internal: true
+    dir: "{{.USER_WORKING_DIR}}"
+    deps:
+      - task: _custom
+    vars:
+      CUSTOM_GCL_ENABLED:
+        sh: if [ -f .custom-gcl.yml ]; then printf true; else printf false; fi
+      CUSTOM_GCL_YAML:
+        sh: if [ -f .custom-gcl.yml ]; then cat .custom-gcl.yml; else printf '{}'; fi
+      CUSTOM_GCL:
+        ref: fromYaml .CUSTOM_GCL_YAML
+      CUSTOM_GCL_NAME: '{{default "custom-gcl" .CUSTOM_GCL.name}}'
+      CUSTOM_GCL_DESTINATION: '{{default "." .CUSTOM_GCL.destination}}'
+      CUSTOM_GCL_BINARY_NAME: "{{.CUSTOM_GCL_NAME}}{{exeExt}}"
+      CUSTOM_GCL_BINARY: "{{joinPath .CUSTOM_GCL_DESTINATION .CUSTOM_GCL_BINARY_NAME}}"
+    cmds:
+      - cmd: |
+          lint_binary="{{.GLOBAL_GO_BIN}}/golangci-lint"
+          if [ "{{.CUSTOM_GCL_ENABLED}}" = "true" ]; then
+            case "{{.CUSTOM_GCL_BINARY}}" in
+              /*) lint_binary="{{.CUSTOM_GCL_BINARY}}" ;;
+              *) lint_binary="./{{.CUSTOM_GCL_BINARY}}" ;;
+            esac
+          fi
+
+          skip_pattern='{{if .GOLANGCI_LINT_LINT_SKIP_PATTERN_OVERRIDE}}{{.GOLANGCI_LINT_LINT_SKIP_PATTERN_OVERRIDE}}
+          {{- else}}{{.GOLANGCI_LINT_LINT_SKIP_PATTERN}}{{end}}'
+          if [ -z "$skip_pattern" ]; then
+            "$lint_binary" run {{.GO_LINT_FIX}} {{.GO_LINT_ARGS}}
+            exit
+          fi
+
+          config_path="$("$lint_binary" config path 2>/dev/null || true)"
+          config_dir=.
+          if [ -n "$config_path" ]; then
+            config_dir="$(dirname "$config_path")"
+          fi
+
+          # config:skip resolves the config directory the same way, so both sides
+          # agree on where the overlay lands. It is left in place afterwards and
+          # overwritten by the next run.
+          overlay_config="$config_dir/{{.GOLANGCI_LINT_INTERNAL_SKIP_CONFIG}}"
+          if ! task --silent --taskfile "{{.TASKFILE_DIR}}/Taskfile.yml" config:skip \
+            "GOLANGCI_LINT_LINT_SKIP_PATTERN_OVERRIDE=$skip_pattern"; then
+            exit 1
+          fi
+
+          lint_status=0
+          "$lint_binary" run \
+            {{.GO_LINT_FIX}} \
+            {{.GO_LINT_ARGS}} \
+            --config "$overlay_config" || lint_status=$?
+          exit "$lint_status"
+        platforms: [linux, darwin]
+      - cmd: >-
+          powershell -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop'; $lintBinary = '{{.GLOBAL_GO_BIN}}/golangci-lint'; if ('{{.CUSTOM_GCL_ENABLED}}' -eq 'true') {
+
+
+            $lintBinary = '{{.CUSTOM_GCL_BINARY}}'; if (-not [System.IO.Path]::IsPathRooted($lintBinary)) {
+
+              $lintBinary = Join-Path (Get-Location) $lintBinary;
+            }
+          }; $skipPattern = '{{if .GOLANGCI_LINT_LINT_SKIP_PATTERN_OVERRIDE}}{{.GOLANGCI_LINT_LINT_SKIP_PATTERN_OVERRIDE}} {{- else}}{{.GOLANGCI_LINT_LINT_SKIP_PATTERN}}{{end}}'; if (-not $skipPattern) {
+
+
+            & $lintBinary run
+              {{.GO_LINT_FIX}}
+              {{.GO_LINT_ARGS}};
+            exit $LASTEXITCODE;
+          }; $configPath = (& $lintBinary config path 2>$null | Select-Object -First 1); if ($LASTEXITCODE -ne 0) {
+
+
+            $configPath = '';
+          }; if ($configPath) {
+
+
+            $configPath = (Resolve-Path -LiteralPath $configPath).Path;
+            $configDir = Split-Path -Parent $configPath;
+          } else {
+
+
+            $configDir = (Get-Location).Path;
+          }; $overlayConfig = Join-Path $configDir '{{.GOLANGCI_LINT_INTERNAL_SKIP_CONFIG}}'; & task --silent --taskfile '{{.TASKFILE_DIR}}/Taskfile.yml' config:skip
+
+            "GOLANGCI_LINT_LINT_SKIP_PATTERN_OVERRIDE=$skipPattern"; if ($LASTEXITCODE -ne 0) {
+
+            exit $LASTEXITCODE;
+          }; & $lintBinary run
+
+            {{.GO_LINT_FIX}}
+            {{.GO_LINT_ARGS}}
+            --config $overlayConfig; exit $LASTEXITCODE"
+        platforms: [windows]
+  _fmt:
+    run: once
+    internal: true
+    dir: "{{.USER_WORKING_DIR}}"
+    cmds:
+      - cmd: |
+          skip_pattern='{{if .GOLANGCI_LINT_FMT_SKIP_PATTERN_OVERRIDE}}{{.GOLANGCI_LINT_FMT_SKIP_PATTERN_OVERRIDE}}
+          {{- else}}{{.GOLANGCI_LINT_FMT_SKIP_PATTERN}}{{end}}'
+          if [ -z "$skip_pattern" ]; then
+            "{{.GLOBAL_GO_BIN}}/golangci-lint" fmt \
+              {{.GO_FMT_DIFF}} \
+              {{.GOLANGCI_LINT_FMT_FORMATTER_FLAGS}} \
+              {{.GO_FMT_TARGETS}}
+            exit
+          fi
+
+          file_list="$(mktemp)"
+          trap 'rm -f "$file_list"' EXIT
+          set --
+          for target in {{.GO_FMT_TARGETS}}; do
+            target="${target%...}"
+            target="${target%/}"
+            if [ -z "$target" ]; then
+              target=.
+            fi
+            set -- "$@" "$target"
+          done
+
+          for target in "$@"; do
+            if [ -d "$target" ]; then
+              find "$target" \
+                -type f \
+                -name '*.go' \
+                ! -path '*/node_modules/*' \
+                ! -path '*/testdata/*' \
+                ! -path '*/vendor/*' \
+                -print0
+            elif [ -f "$target" ]; then
+              printf '%s\000' "$target"
+            fi
+          done | task --silent --taskfile "{{.TASKFILE_DIR}}/../internal/skipfiles/Taskfile.yml" \
+            filter "SKIPFILES_PATTERN=$skip_pattern" >"$file_list"
+
+          if [ ! -s "$file_list" ]; then
+            echo 'No matching Go files found'
+            exit 0
+          fi
+
+          xargs -0 "{{.GLOBAL_GO_BIN}}/golangci-lint" fmt \
+              {{.GO_FMT_DIFF}} \
+              {{.GOLANGCI_LINT_FMT_FORMATTER_FLAGS}} <"$file_list"
+        platforms: [linux, darwin]
+      - cmd: >-
+          powershell -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop'; $skipPattern = '{{if .GOLANGCI_LINT_FMT_SKIP_PATTERN_OVERRIDE}}{{.GOLANGCI_LINT_FMT_SKIP_PATTERN_OVERRIDE}} {{- else}}{{.GOLANGCI_LINT_FMT_SKIP_PATTERN}}{{end}}'; if (-not $skipPattern) {
+
+
+            & '{{.GLOBAL_GO_BIN}}/golangci-lint' fmt
+              {{.GO_FMT_DIFF}}
+              {{.GOLANGCI_LINT_FMT_FORMATTER_FLAGS}}
+              {{.GO_FMT_TARGETS}};
+            exit $LASTEXITCODE;
+          }; $targets = '{{.GO_FMT_TARGETS}}' -split '\s+'; $files = @($targets | ForEach-Object {
+
+
+            $target = $_ -replace '\.\.\.$', '';
+            $target = $target.TrimEnd('/').TrimEnd('\');
+            if (-not $target) { $target = '.' };
+            if (Test-Path -LiteralPath $target -PathType Leaf) {
+              Get-Item -LiteralPath $target;
+            } else {
+              Get-ChildItem -LiteralPath $target -Recurse -Filter '*.go' -File;
+            };
+          } | Where-Object {
+
+
+            $path = [string](Resolve-Path -LiteralPath $_.FullName -Relative);
+            $path = $path.Replace('\', '/');
+            $path -notlike '*/node_modules/*' -and
+              $path -notlike '*/testdata/*' -and
+              $path -notlike '*/vendor/*';
+          } | ForEach-Object FullName |
+
+
+            task --silent --taskfile '{{.TASKFILE_DIR}}/../internal/skipfiles/Taskfile.yml'
+              filter ('SKIPFILES_PATTERN=' + $skipPattern));
+          if ($files.Count -gt 0) {
+
+
+            & '{{.GLOBAL_GO_BIN}}/golangci-lint' fmt
+              {{.GO_FMT_DIFF}}
+              {{.GOLANGCI_LINT_FMT_FORMATTER_FLAGS}}
+              @files;
+            exit $LASTEXITCODE;
+          }"
+        platforms: [windows]

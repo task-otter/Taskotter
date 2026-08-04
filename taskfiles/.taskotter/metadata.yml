@@ -1,4 +1,4 @@
 ---
-configuration_hash: 9b2a64cb3c2d08b5c937dd649f9ea823b7c8e728cc32eb2aed453e88c748d3a8
+configuration_hash: 67d41568ee4c200db1702638e2609389a4c7bd4c21c4b154c3dc2bae229c0896
 lock_file: taskfiles/.taskotter-lock.yml
 target_folder: taskfiles

@@ -7,8 +7,8 @@ output:
     error_only: false
 silent: true
 vars:
-  INSTALL_DIR_UNIX: "/usr/local"
-  GO_ROOT_UNIX: "{{.INSTALL_DIR_UNIX}}/go"
+  GO_INSTALL_DIR_UNIX: "/usr/local"
+  GO_ROOT_UNIX: "{{.GO_INSTALL_DIR_UNIX}}/go"
   GO_BIN_UNIX: "{{.GO_ROOT_UNIX}}/bin"
   GO_CMD_UNIX: "{{.GO_BIN_UNIX}}/go"
   GO_VERSION_URL: https://go.dev/VERSION?m=text
@@ -17,7 +17,7 @@ vars:
   GO_JUNIT_REPORT: ""
   GO_COVER_PROFILE: ""
   GO_FUZZTIME: ""
-  GLOBAL_GO_BIN:
+  GO_GLOBAL_BIN:
     sh: |
       gobin="${GOBIN:-}"
       if [ -z "$gobin" ] && command -v go >/dev/null 2>&1; then
@@ -59,7 +59,7 @@ tasks:
       Remove the Go toolchain for the current platform.
       macOS uses Homebrew if Go was installed that way, otherwise removes
       /usr/local/go directly (the official package installer's location).
-      Linux removes INSTALL_DIR_UNIX/go (default /usr/local/go).
+      Linux removes GO_INSTALL_DIR_UNIX/go (default /usr/local/go).
       Windows uses the Programs and Features uninstaller via PowerShell.
     prompt:
       - This will remove Go from this machine.
@@ -75,10 +75,10 @@ tasks:
     deps:
       - task: install
     cmds:
-      - GOBIN="{{.GLOBAL_GO_BIN}}" go install github.com/jstemmer/go-junit-report/v2@v2.1.0
+      - GOBIN="{{.GO_GLOBAL_BIN}}" go install github.com/jstemmer/go-junit-report/v2@v2.1.0
     status:
       - >-
-        test -x "{{.GLOBAL_GO_BIN}}/go-junit-report" && go version -m "{{.GLOBAL_GO_BIN}}/go-junit-report" | awk -v want="v2.1.0" '$1 == "mod" && $3 == want { found = 1 } END { exit !found }'
+        test -x "{{.GO_GLOBAL_BIN}}/go-junit-report" && go version -m "{{.GO_GLOBAL_BIN}}/go-junit-report" | awk -v want="v2.1.0" '$1 == "mod" && $3 == want { found = 1 } END { exit !found }'
   upgrade:
     run: once
     desc: Upgrade Go to the selected or latest stable release
@@ -146,7 +146,7 @@ tasks:
       GO_COVER_OUT: '{{if .GO_COVER_PROFILE}}{{.GO_COVER_PROFILE}}{{else}}coverage.out{{end}}'
     cmds:
       - >-
-        go test -v -covermode atomic -coverprofile "{{.GO_COVER_OUT}}" {{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}./...{{end}} 2>&1 | "{{.GLOBAL_GO_BIN}}/go-junit-report" -set-exit-code -iocopy -out "{{.GO_JUNIT_REPORT_OUT}}"
+        go test -v -covermode atomic -coverprofile "{{.GO_COVER_OUT}}" {{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}./...{{end}} 2>&1 | "{{.GO_GLOBAL_BIN}}/go-junit-report" -set-exit-code -iocopy -out "{{.GO_JUNIT_REPORT_OUT}}"
   bench:
     run: once
     dir: "{{.USER_WORKING_DIR}}"
@@ -276,7 +276,7 @@ tasks:
     desc: Install Go on Linux using the official tarball
     summary: |
       Download GO_VERSION, defaulting to the latest stable Go Linux tarball,
-      replace INSTALL_DIR_UNIX/go, and extract the new toolchain. Requires sudo
+      replace GO_INSTALL_DIR_UNIX/go, and extract the new toolchain. Requires sudo
       when not running as root.
     platforms: [linux]
     set: [errexit, nounset, pipefail]
@@ -306,7 +306,7 @@ tasks:
       - sh: '[ "{{.GO_LINUX_ARCH_SUPPORTED}}" = "true" ]'
         msg: Unsupported Linux architecture {{.GO_UNAME_ARCH}}.
       - sh: 'test "$(id -u)" -eq 0 || command -v sudo >/dev/null 2>&1'
-        msg: sudo is required to install Go under INSTALL_DIR_UNIX when not running as root.
+        msg: sudo is required to install Go under GO_INSTALL_DIR_UNIX when not running as root.
     cmds:
       - cmd: |
           # Everything happens in a private temp directory removed by the trap,
@@ -449,7 +449,7 @@ tasks:
       - '! test -d "{{.GO_ROOT_UNIX}}"'
     preconditions:
       - sh: 'test "$(id -u)" -eq 0 || command -v sudo >/dev/null 2>&1'
-        msg: sudo is required to remove Go under INSTALL_DIR_UNIX when not running as root.
+        msg: sudo is required to remove Go under GO_INSTALL_DIR_UNIX when not running as root.
     cmds:
       - echo 'Removing Go from {{.GO_ROOT_UNIX}}...'
       - cmd: rm -rf "{{.GO_ROOT_UNIX}}"

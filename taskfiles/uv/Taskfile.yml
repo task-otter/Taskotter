@@ -10,13 +10,13 @@ vars:
   UV_INSTALL_URL: https://astral.sh/uv/install.sh
   UV_INSTALL_URL_WINDOWS: https://astral.sh/uv/install.ps1
   UV_LOAD: 'export PATH="$HOME/.local/bin:$PATH"'
-  VENV: ".venv"
-  REQUIREMENTS: "requirements.txt"
-  FILE: ""
-  ARGS: ""
-  EXTRA_ARGS: ""
+  UV_VENV: ".venv"
+  UV_REQUIREMENTS: "requirements.txt"
+  UV_FILE: ""
+  UV_ARGS: ""
+  UV_EXTRA_ARGS: ""
   PYTHON_VERSION: ""
-  TOOL: ""
+  UV_TOOL: ""
   UV_VERSION: ""
 tasks:
   default:
@@ -86,133 +86,133 @@ tasks:
     cmds:
       - task: _uv:unix
         vars:
-          ARGS: >-
+          UV_ARGS: >-
             python install {{if .PYTHON_VERSION_OVERRIDE}}{{.PYTHON_VERSION_OVERRIDE}} {{- else}}{{.PYTHON_VERSION}}{{end}}
       - task: _uv:windows
         vars:
-          ARGS: >-
+          UV_ARGS: >-
             python install {{if .PYTHON_VERSION_OVERRIDE}}{{.PYTHON_VERSION_OVERRIDE}} {{- else}}{{.PYTHON_VERSION}}{{end}}
   venv:
     run: once
-    desc: Create a Python virtual environment with uv (VENV=path)
+    desc: Create a Python virtual environment with uv (UV_VENV=path)
     summary: |
-      Create a virtual environment at VENV (default .venv) using uv venv.
+      Create a virtual environment at UV_VENV (default .venv) using uv venv.
       Auto-installs uv if missing.
     deps:
       - task: install
     cmds:
       - task: _uv:unix
         vars:
-          ARGS: 'venv "{{.VENV}}" {{.EXTRA_ARGS}}'
+          UV_ARGS: 'venv "{{.UV_VENV}}" {{.UV_EXTRA_ARGS}}'
       - task: _uv:windows
         vars:
-          ARGS: 'venv "{{.VENV}}" {{.EXTRA_ARGS}}'
+          UV_ARGS: 'venv "{{.UV_VENV}}" {{.UV_EXTRA_ARGS}}'
   pip:install:
     run: once
-    desc: Install packages from a requirements file with uv (REQUIREMENTS=path)
+    desc: Install packages from a requirements file with uv (UV_REQUIREMENTS=path)
     summary: |
-      Run uv pip install -r REQUIREMENTS (default requirements.txt).
-      Pass EXTRA_ARGS for additional flags such as --upgrade or --no-cache.
+      Run uv pip install -r UV_REQUIREMENTS (default requirements.txt).
+      Pass UV_EXTRA_ARGS for additional flags such as --upgrade or --no-cache.
       Auto-installs uv if missing.
     deps:
       - task: install
     cmds:
       - task: _uv:unix
         vars:
-          ARGS: 'pip install -r "{{.REQUIREMENTS}}" {{.EXTRA_ARGS}}'
+          UV_ARGS: 'pip install -r "{{.UV_REQUIREMENTS}}" {{.UV_EXTRA_ARGS}}'
       - task: _uv:windows
         vars:
-          ARGS: 'pip install -r "{{.REQUIREMENTS}}" {{.EXTRA_ARGS}}'
+          UV_ARGS: 'pip install -r "{{.UV_REQUIREMENTS}}" {{.UV_EXTRA_ARGS}}'
   run:
     run: once
-    desc: Run a script or command with uv (FILE=path)
+    desc: Run a script or command with uv (UV_FILE=path)
     summary: |
-      Execute FILE via uv run, which automatically manages the virtual environment.
-      Pass ARGS for positional arguments and EXTRA_ARGS for uv flags.
+      Execute UV_FILE via uv run, which automatically manages the virtual environment.
+      Pass UV_ARGS for positional arguments and UV_EXTRA_ARGS for uv flags.
       Auto-installs uv if missing.
     deps:
       - task: install
     requires:
       vars:
-        - FILE
+        - UV_FILE
     preconditions:
-      - sh: test -n "{{.FILE_OVERRIDE}}{{.FILE}}"
-        msg: FILE is required. Pass FILE=path/to/script.py when running this task.
+      - sh: test -n "{{.UV_FILE_OVERRIDE}}{{.UV_FILE}}"
+        msg: UV_FILE is required. Pass UV_FILE=path/to/script.py when running this task.
     cmds:
       - task: _uv:unix
         vars:
-          ARGS: >-
-            run "{{if .FILE_OVERRIDE}}{{.FILE_OVERRIDE}}{{else}}{{.FILE}}{{end}}" {{.ARGS}} {{if .EXTRA_ARGS_OVERRIDE}}{{.EXTRA_ARGS_OVERRIDE}}{{else}}{{.EXTRA_ARGS}}{{end}}
+          UV_ARGS: >-
+            run "{{if .UV_FILE_OVERRIDE}}{{.UV_FILE_OVERRIDE}}{{else}}{{.UV_FILE}}{{end}}" {{.UV_ARGS}} {{if .UV_EXTRA_ARGS_OVERRIDE}}{{.UV_EXTRA_ARGS_OVERRIDE}}{{else}}{{.UV_EXTRA_ARGS}}{{end}}
       - task: _uv:windows
         vars:
-          ARGS: >-
-            run "{{if .FILE_OVERRIDE}}{{.FILE_OVERRIDE}}{{else}}{{.FILE}}{{end}}" {{.ARGS}} {{if .EXTRA_ARGS_OVERRIDE}}{{.EXTRA_ARGS_OVERRIDE}}{{else}}{{.EXTRA_ARGS}}{{end}}
+          UV_ARGS: >-
+            run "{{if .UV_FILE_OVERRIDE}}{{.UV_FILE_OVERRIDE}}{{else}}{{.UV_FILE}}{{end}}" {{.UV_ARGS}} {{if .UV_EXTRA_ARGS_OVERRIDE}}{{.UV_EXTRA_ARGS_OVERRIDE}}{{else}}{{.UV_EXTRA_ARGS}}{{end}}
   tool:install:
     run: once
-    desc: Install a tool into an isolated environment with uv (TOOL=name)
+    desc: Install a tool into an isolated environment with uv (UV_TOOL=name)
     summary: |
       Run uv tool install TOOL to install a Python tool (e.g. yamllint, ruff)
       into an isolated environment with its shim added to PATH.
-      Pass EXTRA_ARGS for additional flags such as --upgrade.
+      Pass UV_EXTRA_ARGS for additional flags such as --upgrade.
       Auto-installs uv if missing.
     deps:
       - task: install
     requires:
       vars:
-        - TOOL
+        - UV_TOOL
     preconditions:
-      - sh: test -n "{{.TOOL_OVERRIDE}}{{.TOOL}}"
-        msg: TOOL is required. Pass TOOL=name when running this task.
+      - sh: test -n "{{.UV_TOOL_OVERRIDE}}{{.UV_TOOL}}"
+        msg: TOOL is required. Pass UV_TOOL=name when running this task.
     cmds:
       - task: _uv:unix
         vars:
-          ARGS: >-
-            tool install "{{if .TOOL_OVERRIDE}}{{.TOOL_OVERRIDE}}{{else}}{{.TOOL}}{{end}}" {{if .EXTRA_ARGS_OVERRIDE}}{{.EXTRA_ARGS_OVERRIDE}}{{else}}{{.EXTRA_ARGS}}{{end}}
+          UV_ARGS: >-
+            tool install "{{if .UV_TOOL_OVERRIDE}}{{.UV_TOOL_OVERRIDE}}{{else}}{{.UV_TOOL}}{{end}}" {{if .UV_EXTRA_ARGS_OVERRIDE}}{{.UV_EXTRA_ARGS_OVERRIDE}}{{else}}{{.UV_EXTRA_ARGS}}{{end}}
       - task: _uv:windows
         vars:
-          ARGS: >-
-            tool install "{{if .TOOL_OVERRIDE}}{{.TOOL_OVERRIDE}}{{else}}{{.TOOL}}{{end}}" {{if .EXTRA_ARGS_OVERRIDE}}{{.EXTRA_ARGS_OVERRIDE}}{{else}}{{.EXTRA_ARGS}}{{end}}
+          UV_ARGS: >-
+            tool install "{{if .UV_TOOL_OVERRIDE}}{{.UV_TOOL_OVERRIDE}}{{else}}{{.UV_TOOL}}{{end}}" {{if .UV_EXTRA_ARGS_OVERRIDE}}{{.UV_EXTRA_ARGS_OVERRIDE}}{{else}}{{.UV_EXTRA_ARGS}}{{end}}
   tool:upgrade:
     run: once
-    desc: Upgrade an installed uv tool (TOOL=name)
+    desc: Upgrade an installed uv tool (UV_TOOL=name)
     summary: |
       Run uv tool upgrade TOOL to upgrade a previously installed tool to its
-      latest release. Pass EXTRA_ARGS for additional flags.
+      latest release. Pass UV_EXTRA_ARGS for additional flags.
       Auto-installs uv if missing.
     deps:
       - task: install
     requires:
       vars:
-        - TOOL
+        - UV_TOOL
     preconditions:
-      - sh: test -n "{{.TOOL_OVERRIDE}}{{.TOOL}}"
-        msg: TOOL is required. Pass TOOL=name when running this task.
+      - sh: test -n "{{.UV_TOOL_OVERRIDE}}{{.UV_TOOL}}"
+        msg: TOOL is required. Pass UV_TOOL=name when running this task.
     cmds:
       - task: _uv:unix
         vars:
-          ARGS: >-
-            tool upgrade "{{if .TOOL_OVERRIDE}}{{.TOOL_OVERRIDE}}{{else}}{{.TOOL}}{{end}}" {{if .EXTRA_ARGS_OVERRIDE}}{{.EXTRA_ARGS_OVERRIDE}}{{else}}{{.EXTRA_ARGS}}{{end}}
+          UV_ARGS: >-
+            tool upgrade "{{if .UV_TOOL_OVERRIDE}}{{.UV_TOOL_OVERRIDE}}{{else}}{{.UV_TOOL}}{{end}}" {{if .UV_EXTRA_ARGS_OVERRIDE}}{{.UV_EXTRA_ARGS_OVERRIDE}}{{else}}{{.UV_EXTRA_ARGS}}{{end}}
       - task: _uv:windows
         vars:
-          ARGS: >-
-            tool upgrade "{{if .TOOL_OVERRIDE}}{{.TOOL_OVERRIDE}}{{else}}{{.TOOL}}{{end}}" {{if .EXTRA_ARGS_OVERRIDE}}{{.EXTRA_ARGS_OVERRIDE}}{{else}}{{.EXTRA_ARGS}}{{end}}
+          UV_ARGS: >-
+            tool upgrade "{{if .UV_TOOL_OVERRIDE}}{{.UV_TOOL_OVERRIDE}}{{else}}{{.UV_TOOL}}{{end}}" {{if .UV_EXTRA_ARGS_OVERRIDE}}{{.UV_EXTRA_ARGS_OVERRIDE}}{{else}}{{.UV_EXTRA_ARGS}}{{end}}
   _uv:unix:
     run: once
     internal: true
     platforms: [linux, darwin]
     set: [errexit, nounset, pipefail]
     requires:
-      vars: [ARGS]
+      vars: [UV_ARGS]
     cmds:
-      - bash -lc '{{.UV_LOAD}}; uv {{.ARGS}}'
+      - bash -lc '{{.UV_LOAD}}; uv {{.UV_ARGS}}'
   _uv:windows:
     run: once
     internal: true
     platforms: [windows]
     requires:
-      vars: [ARGS]
+      vars: [UV_ARGS]
     cmds:
-      - uv {{.ARGS}}
+      - uv {{.UV_ARGS}}
   _install:unix:
     run: once
     internal: true

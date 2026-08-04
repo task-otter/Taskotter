@@ -33,7 +33,7 @@ task adrs:generate -- toc
 task adrs:exec -- search postgres
 ```
 
-Pass arguments and flags with `EXTRA_ARGS=...` or after `--`. Pin a release
+Pass arguments and flags with `ADRS_EXTRA_ARGS=...` or after `--`. Pin a release
 with `ADRS_VERSION` (e.g. `task adrs:install ADRS_VERSION=0.4.0`).
 
 ## Public Tasks
@@ -43,11 +43,11 @@ with `ADRS_VERSION` (e.g. `task adrs:install ADRS_VERSION=0.4.0`).
 | `install` | Install adrs on the current operating system | `ADRS_VERSION` |
 | `install:undo` | Remove adrs (alias: `uninstall`) | |
 | `upgrade` | Reinstall adrs at the requested version | `ADRS_VERSION` |
-| `init` | Initialize an ADR repository | `EXTRA_ARGS` |
-| `new` | Create a new ADR | `EXTRA_ARGS` |
-| `list` | List all ADRs | `EXTRA_ARGS` |
-| `generate` | Generate ADR docs (`toc`, `graph`, or `book`) | `EXTRA_ARGS` |
-| `exec` | Run any adrs subcommand | `EXTRA_ARGS` |
+| `init` | Initialize an ADR repository | `ADRS_EXTRA_ARGS` |
+| `new` | Create a new ADR | `ADRS_EXTRA_ARGS` |
+| `list` | List all ADRs | `ADRS_EXTRA_ARGS` |
+| `generate` | Generate ADR docs (`toc`, `graph`, or `book`) | `ADRS_EXTRA_ARGS` |
+| `exec` | Run any adrs subcommand | `ADRS_EXTRA_ARGS` |
 | `version` | Show the installed adrs version | |
 
 ## Variables
@@ -55,7 +55,7 @@ with `ADRS_VERSION` (e.g. `task adrs:install ADRS_VERSION=0.4.0`).
 | Variable | Default | Description |
 |---|---|---|
 | `ADRS_VERSION` | `""` (latest) | Optional crate version passed to `cargo install --version` |
-| `EXTRA_ARGS` | `""` | Arguments and flags appended to the adrs subcommand |
+| `ADRS_EXTRA_ARGS` | `""` | Arguments and flags appended to the adrs subcommand |
 | `CARGO_BIN_UNIX` | `$HOME/.cargo/bin` | Fallback cargo bin directory on macOS and Linux |
 
 ## Notes

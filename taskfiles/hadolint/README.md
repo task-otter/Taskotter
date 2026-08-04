@@ -22,7 +22,7 @@ task -t taskfiles/hadolint/Taskfile.yml version
 Lint a specific Dockerfile:
 
 ```sh
-task -t taskfiles/hadolint/Taskfile.yml lint DOCKERFILE=path/to/Dockerfile
+task -t taskfiles/hadolint/Taskfile.yml lint HADOLINT_DOCKERFILE=path/to/Dockerfile
 ```
 
 Pass hadolint arguments after `--`:
@@ -42,7 +42,7 @@ Then run:
 
 ```sh
 task hadolint:lint
-task hadolint:lint DOCKERFILE=services/api/Dockerfile
+task hadolint:lint HADOLINT_DOCKERFILE=services/api/Dockerfile
 task hadolint:version
 ```
 
@@ -52,7 +52,7 @@ task hadolint:version
 | -------------- | ------------------------------------------------- | ------------------------------------ |
 | `install`      | Install hadolint on the current operating system  | none                                 |
 | `install:undo` | Remove hadolint from the current operating system | none                                 |
-| `lint`         | Lint a Dockerfile with hadolint                   | `DOCKERFILE`, `CONFIG`, `EXTRA_ARGS` |
+| `lint`         | Lint a Dockerfile with hadolint                   | `HADOLINT_DOCKERFILE`, `HADOLINT_CONFIG`, `HADOLINT_EXTRA_ARGS` |
 | `upgrade`      | Upgrade hadolint to the latest release            | none                                 |
 | `version`      | Show the installed hadolint version               | none                                 |
 
@@ -60,9 +60,9 @@ task hadolint:version
 
 | Variable     | Default      | Description                                            |
 | ------------ | ------------ | ------------------------------------------------------ |
-| `DOCKERFILE` | `Dockerfile` | Path to the Dockerfile to lint                         |
-| `CONFIG`     | empty        | Path to a hadolint config file passed via `--config`   |
-| `EXTRA_ARGS` | empty        | Extra arguments appended when CLI_ARGS is not provided |
+| `HADOLINT_DOCKERFILE` | `Dockerfile` | Path to the Dockerfile to lint                         |
+| `HADOLINT_CONFIG`     | empty        | Path to a hadolint config file passed via `--config`   |
+| `HADOLINT_EXTRA_ARGS` | empty        | Extra arguments appended when CLI_ARGS is not provided |
 | `HADOLINT_LINT_SKIP_PATTERN` | _(empty)_ | Forward-slash path glob for files skipped by lint checks and fixes |
 
 Skip patterns support `*` within one path segment, `**` across directories, and `?` for one character. Paths are matched relative to the task working directory; for example, `**/generated/**`.

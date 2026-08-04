@@ -177,16 +177,19 @@ func parseTaskfileRoot(
 	content []byte,
 	parseErr, emptyErr string,
 ) (doc *yaml.Node, docContent *yaml.Node, err error) {
-	err = yaml.Unmarshal(content, &doc)
+	node := new(yaml.Node)
+
+	err = yaml.Unmarshal(content, node)
 	if err != nil {
 		return nil, nil, &RewriteError{Message: fmt.Sprintf(parseErr, err)}
 	}
 
-	if len(doc.Content) == consts.IndexZero {
+	if len(node.Content) == consts.IndexZero {
 		return nil, nil, &RewriteError{Message: emptyErr}
 	}
 
-	docContent = doc.Content[consts.IndexZero]
+	doc = node
+	docContent = node.Content[consts.IndexZero]
 
 	return doc, docContent, nil
 }

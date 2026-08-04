@@ -1,7 +1,7 @@
 // Taskotter 2026.
 // SPDX-License-Identifier: Apache-2.0.
 
-// Package taskfile reads and rewrites Taskfile YAML includes and shared vars.
+// Package taskfile reads and rewrites Taskfile YAML includes and promoted root vars.
 package taskfile
 
 import (
@@ -32,7 +32,6 @@ type (
 		includesNode *yaml.Node
 		existing     map[string]*yaml.Node
 		moduleVars   map[string]*yaml.Node
-		sharedVars   map[string]struct{}
 		input        *rootUpdateInput
 	}
 
@@ -41,7 +40,6 @@ type (
 		includesNode *yaml.Node
 		existing     map[string]*yaml.Node
 		moduleVars   map[string]*yaml.Node
-		sharedVars   map[string]struct{}
 		input        *rootUpdateInput
 		task         string
 	}
@@ -50,7 +48,6 @@ type (
 	existingIncludeParams struct {
 		entry        *yaml.Node
 		moduleVars   *yaml.Node
-		sharedVars   map[string]struct{}
 		path         string
 		task         string
 		managedTasks []string
@@ -72,16 +69,16 @@ type (
 		managedTasks []string
 	}
 
-	// sharedVarParams carries state for promoting shared module vars to the root.
-	sharedVarParams struct {
-		root       *yaml.Node
-		moduleVars map[string]*yaml.Node
-		sharedVars map[string]struct{}
-		tasks      []string
+	// promotedVarParams carries state for promoting module vars to the root.
+	promotedVarParams struct {
+		root         *yaml.Node
+		moduleVars   map[string]*yaml.Node
+		promotedVars map[string]struct{}
+		tasks        []string
 	}
 
-	// addSharedVarParams carries state for adding one shared var to the root.
-	addSharedVarParams struct {
+	// addPromotedVarParams carries state for adding one promoted var to the root.
+	addPromotedVarParams struct {
 		rootVars   *yaml.Node
 		moduleVars map[string]*yaml.Node
 		existing   map[string]struct{}
@@ -92,10 +89,7 @@ type (
 	// mergeModuleVarParams carries state for merging one module var into an include.
 	mergeModuleVarParams struct {
 		existingVars *yaml.Node
-		keyNode      *yaml.Node
-		valueNode    *yaml.Node
-		sharedVars   map[string]struct{}
-		existingKeys map[string]struct{}
+		key          string
 	}
 
 	yamlNodeMap = map[string]*yaml.Node
@@ -440,7 +434,7 @@ func marshalRootTaskfile(node *yaml.Node) ([]byte, error) {
 }
 
 func applyRootUpdates(root *yaml.Node, input *rootUpdateInput) error {
-	moduleVars, sharedVars, err := applyRootVars(root, input)
+	moduleVars, err := applyRootVars(root, input)
 	if err != nil {
 		return fmt.Errorf("apply root vars: %w", err)
 	}
@@ -450,7 +444,6 @@ func applyRootUpdates(root *yaml.Node, input *rootUpdateInput) error {
 		existing:     nil,
 		input:        input,
 		moduleVars:   moduleVars,
-		sharedVars:   sharedVars,
 	})
 	if err != nil {
 		return fmt.Errorf("apply root includes and tasks: %w", err)
@@ -459,23 +452,22 @@ func applyRootUpdates(root *yaml.Node, input *rootUpdateInput) error {
 	return nil
 }
 
-//nolint:gocritic // single-line sig for whitespace
-func applyRootVars(root *yaml.Node, input *rootUpdIn) (yamlNodeMap, strSet, error) {
+func applyRootVars(root *yaml.Node, input *rootUpdIn) (yamlNodeMap, error) {
 	moduleVars, err := moduleVarsByTask(input)
 	if err != nil {
-		return nil, nil, fmt.Errorf("module vars by task: %w", err)
+		return nil, fmt.Errorf("module vars by task: %w", err)
 	}
 
-	sharedVars := sharedModuleVarNames(input.Tasks, moduleVars)
+	promotedVars := promotedModuleVarNames(input.Tasks, moduleVars)
 
-	err = upsertRootSharedVars(&sharedVarParams{
-		root: root, tasks: input.Tasks, moduleVars: moduleVars, sharedVars: sharedVars,
+	err = upsertRootPromotedVars(&promotedVarParams{
+		root: root, tasks: input.Tasks, moduleVars: moduleVars, promotedVars: promotedVars,
 	})
 	if err != nil {
-		return nil, nil, fmt.Errorf("upsert root shared vars: %w", err)
+		return nil, fmt.Errorf("upsert root promoted vars: %w", err)
 	}
 
-	return moduleVars, sharedVars, nil
+	return moduleVars, nil
 }
 
 func applyRootIncludesAndTasks(root *yaml.Node, params *includesUpdateParams) error {
@@ -597,7 +589,6 @@ func upsertManagedIncludes(params *includesUpdateParams) error {
 			input:        params.input,
 			existing:     params.existing,
 			moduleVars:   params.moduleVars,
-			sharedVars:   params.sharedVars,
 			task:         task,
 		})
 		if err != nil {
@@ -658,7 +649,6 @@ func updateExistingIncludeEntry(params *includeUpsertParams, entry *yaml.Node, p
 		entry:        entry,
 		path:         path,
 		moduleVars:   params.moduleVars[params.task],
-		sharedVars:   params.sharedVars,
 		managedTasks: params.input.ManagedTasks,
 		task:         params.task,
 	})
@@ -670,7 +660,7 @@ func updateExistingIncludeEntry(params *includeUpsertParams, entry *yaml.Node, p
 }
 
 func appendNewInclude(params *includeUpsertParams, path string, moduleVars *yaml.Node) {
-	entry := newIncludeEntry(path, moduleVars, params.sharedVars)
+	entry := newIncludeEntry(path, moduleVars)
 	appendMappingPair(params.includesNode, yamlScalar(params.task), entry)
 }
 
@@ -681,7 +671,7 @@ func updateExistingInclude(params *existingIncludeParams) error {
 	}
 
 	setIncludePath(params.entry, params.path)
-	mergeIncludeVars(params.entry, params.moduleVars, params.sharedVars)
+	mergeIncludeVars(params.entry, params.moduleVars)
 
 	return nil
 }
@@ -831,29 +821,16 @@ func tryExtractVarsNode(content []byte) (*yaml.Node, bool, error) {
 	return nil, false, fmt.Errorf("extract vars node: %w", err)
 }
 
-func sharedModuleVarNames(tasks []string, modVars yamlNodeMap) strSet {
-	counts := countVarKeysPerTask(tasks, modVars)
-	shared := make(map[string]struct{})
-
-	for key := range counts {
-		if counts[key] >= yamlMappingPairKeyValue {
-			shared[key] = struct{}{}
-		}
-	}
-
-	return shared
-}
-
-func countVarKeysPerTask(tasks []string, moduleVarsByTask map[string]*yaml.Node) map[string]int {
-	counts := make(map[string]int)
+func promotedModuleVarNames(tasks []string, modVars yamlNodeMap) strSet {
+	promoted := make(map[string]struct{})
 
 	for i := range tasks {
-		for key := range varKeySet(moduleVarsByTask[tasks[i]]) {
-			counts[key]++
+		for key := range varKeySet(modVars[tasks[i]]) {
+			promoted[key] = struct{}{}
 		}
 	}
 
-	return counts
+	return promoted
 }
 
 func varKeySet(varsNode *yaml.Node) map[string]struct{} {
@@ -870,8 +847,8 @@ func varKeySet(varsNode *yaml.Node) map[string]struct{} {
 	return keys
 }
 
-func upsertRootSharedVars(params *sharedVarParams) error {
-	if len(params.sharedVars) == consts.IndexZero {
+func upsertRootPromotedVars(params *promotedVarParams) error {
+	if len(params.promotedVars) == consts.IndexZero {
 		return nil
 	}
 
@@ -880,7 +857,7 @@ func upsertRootSharedVars(params *sharedVarParams) error {
 		return fmt.Errorf("root vars mapping node: %w", err)
 	}
 
-	addSharedVarsToRoot(rootVars, params)
+	addPromotedVarsToRoot(rootVars, params)
 
 	return nil
 }
@@ -894,20 +871,20 @@ func rootVarsMappingNode(root *yaml.Node) (*yaml.Node, error) {
 	return rootVars, nil
 }
 
-func addSharedVarsToRoot(rootVars *yaml.Node, params *sharedVarParams) {
+func addPromotedVarsToRoot(rootVars *yaml.Node, params *promotedVarParams) {
 	existing := mappingKeys(rootVars)
 
-	keys := sortedKeys(params.sharedVars)
+	keys := sortedKeys(params.promotedVars)
 
 	for i := range keys {
-		addMissingSharedVar(&addSharedVarParams{
+		addMissingPromotedVar(&addPromotedVarParams{
 			rootVars: rootVars, tasks: params.tasks, moduleVars: params.moduleVars,
 			key: keys[i], existing: existing,
 		})
 	}
 }
 
-func addMissingSharedVar(params *addSharedVarParams) {
+func addMissingPromotedVar(params *addPromotedVarParams) {
 	existingVal, ok := params.existing[params.key]
 	iox.Discard(existingVal)
 
@@ -950,30 +927,25 @@ func varValueIn(varsNode *yaml.Node, key string) *yaml.Node {
 	return nil
 }
 
-func mergeIncludeVars(entry, moduleVars *yaml.Node, sharedVars map[string]struct{}) {
+func mergeIncludeVars(entry, moduleVars *yaml.Node) {
 	if moduleVars == nil || moduleVars.Kind != yaml.MappingNode {
 		return
 	}
 
-	existingVars, ok := resolveExistingVars(entry, moduleVars, sharedVars)
+	existingVars, ok := resolveExistingVars(entry, moduleVars)
 
 	if !ok {
 		return
 	}
 
-	mergeModuleVarsInto(existingVars, moduleVars, sharedVars)
+	mergeModuleVarsInto(existingVars, moduleVars)
 }
 
-func mergeModuleVarsInto(existVars, modVars *yaml.Node, shr strSet) {
-	existingKeys := mappingKeys(existVars)
-
+func mergeModuleVarsInto(existVars, modVars *yaml.Node) {
 	for idx := consts.IndexZero; idx < len(modVars.Content); idx += yamlMappingPairKeyValue {
 		mergeOneModuleVar(&mergeModuleVarParams{
 			existingVars: existVars,
-			keyNode:      modVars.Content[idx],
-			valueNode:    modVars.Content[idx+consts.IndexOne],
-			sharedVars:   shr,
-			existingKeys: existingKeys,
+			key:          modVars.Content[idx].Value,
 		})
 	}
 }
@@ -981,11 +953,11 @@ func mergeModuleVarsInto(existVars, modVars *yaml.Node, shr strSet) {
 // resolveExistingVars returns the entry's existing vars mapping, creating one from
 // moduleVars when absent. ok is false when there is nothing left to merge (either a
 // fresh vars node was just created, or the existing one isn't a mapping).
-func resolveExistingVars(entry, modVars *yaml.Node, shr strSet) (*yaml.Node, bool) {
+func resolveExistingVars(entry, modVars *yaml.Node) (*yaml.Node, bool) {
 	existingVars := findMappingValue(entry, keyVars)
 
 	if existingVars == nil {
-		appendMappingPair(entry, yamlScalar(keyVars), includeVarsNode(modVars, shr))
+		appendMappingPair(entry, yamlScalar(keyVars), includeVarsNode(modVars))
 
 		return nil, false
 	}
@@ -998,59 +970,20 @@ func resolveExistingVars(entry, modVars *yaml.Node, shr strSet) (*yaml.Node, boo
 }
 
 func mergeOneModuleVar(params *mergeModuleVarParams) {
-	key := params.keyNode.Value
-
-	if mergeSharedModuleVar(params, key) {
-		return
-	}
-
-	if skipExistingModuleVar(params, key) {
-		return
-	}
-
-	appendMappingPair(
-		params.existingVars,
-		cloneYAMLNode(params.keyNode),
-		cloneYAMLNode(params.valueNode),
-	)
+	setMappingValue(params.existingVars, params.key, rootVarReference(params.key))
 }
 
-func mergeSharedModuleVar(params *mergeModuleVarParams, key string) bool {
-	sharedVal, shared := params.sharedVars[key]
-	iox.Discard(sharedVal)
-
-	if !shared {
-		return false
-	}
-
-	setMappingValue(params.existingVars, key, rootVarReference(key))
-
-	return true
-}
-
-func skipExistingModuleVar(params *mergeModuleVarParams, key string) bool {
-	existingKeyVal, ok := params.existingKeys[key]
-	iox.Discard(existingKeyVal)
-
-	return ok
-}
-
-func includeVarsNode(moduleVars *yaml.Node, sharedVars map[string]struct{}) *yaml.Node {
+func includeVarsNode(moduleVars *yaml.Node) *yaml.Node {
 	out := newYAMLMappingNode()
 
 	for idx := consts.IndexZero; idx < len(moduleVars.Content); idx += yamlMappingPairKeyValue {
 		key := moduleVars.Content[idx].Value
 
-		value := cloneYAMLNode(moduleVars.Content[idx+consts.IndexOne])
-
-		sharedVal, shared := sharedVars[key]
-		iox.Discard(sharedVal)
-
-		if shared {
-			value = rootVarReference(key)
-		}
-
-		appendMappingPair(out, cloneYAMLNode(moduleVars.Content[idx]), value)
+		appendMappingPair(
+			out,
+			cloneYAMLNode(moduleVars.Content[idx]),
+			rootVarReference(key),
+		)
 	}
 
 	return out
@@ -1081,12 +1014,12 @@ func cloneYAMLNode(node *yaml.Node) *yaml.Node {
 	return out.Content[consts.IndexZero]
 }
 
-func newIncludeEntry(path string, modVars *yaml.Node, shr strSet) *yaml.Node {
+func newIncludeEntry(path string, modVars *yaml.Node) *yaml.Node {
 	entry := newYAMLMappingNode()
 	appendMappingPair(entry, yamlScalar(keyTaskfile), yamlScalar(path))
 
 	if modVars != nil {
-		appendMappingPair(entry, yamlScalar(keyVars), includeVarsNode(modVars, shr))
+		appendMappingPair(entry, yamlScalar(keyVars), includeVarsNode(modVars))
 	}
 
 	return entry

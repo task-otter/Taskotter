@@ -23,8 +23,6 @@ const (
 	fmtWantVersion35        = "expected root Taskfile version 3.5: %s"
 	pathTaskfilesGoYML      = "taskfiles/go/Taskfile.yml"
 	fmtMissingGoInclude     = "missing go include: %s"
-	fmtMissingIncludeVars   = "missing include vars: %s"
-	varGoCmdUnix            = "GO_CMD_UNIX"
 	destPnpm                = "pnpm"
 	srcPnpmFnm              = "pnpm/fnm"
 	wantPnpmRewrite         = "../pnpm/Taskfile.yml"
@@ -239,21 +237,14 @@ func assertRewriteOutput(t *testing.T, text string, wants []string) {
 func assertTemplateOutput(t *testing.T, text string) {
 	t.Helper()
 
-	if !strings.Contains(text, wantVersion35) {
-		t.Fatalf(fmtWantVersion35, text)
-	}
-
-	if !strings.Contains(text, pathTaskfilesGoYML) {
-		t.Fatalf(fmtMissingGoInclude, text)
-	}
-
-	if !strings.Contains(text, "GO_VERSION") {
-		t.Fatalf(fmtMissingIncludeVars, text)
-	}
-
-	if !strings.Contains(text, varGoCmdUnix) {
-		t.Fatalf(fmtMissingIncludeVars, text)
-	}
+	assertContainsAll(t, text, []string{
+		wantVersion35,
+		pathTaskfilesGoYML,
+		"GO_VERSION: \"\"",
+		"GO_CMD_UNIX: /usr/local/go/bin/go",
+		"GO_VERSION: '{{.GO_VERSION}}'",
+		"GO_CMD_UNIX: '{{.GO_CMD_UNIX}}'",
+	})
 }
 
 // TestUpdateRootTaskfileFromTemplate verifies a fresh template gains the expected includes and vars.
@@ -311,8 +302,9 @@ func TestUpdateRootTaskfileUpdatesVersion(t *testing.T) {
 	}
 }
 
-// TestUpdateRootTaskfilePreservesExistingIncludeVars verifies user-set include vars survive an update.
-func TestUpdateRootTaskfilePreservesExistingIncludeVars(t *testing.T) {
+// TestUpdateRootTaskfileForcesManagedIncludeVarsToRootRefs verifies include-level
+// literals for managed module keys are rewritten to {{.KEY}} root references.
+func TestUpdateRootTaskfileForcesManagedIncludeVarsToRootRefs(t *testing.T) {
 	t.Parallel()
 
 	input := goOnlyRootInput()
@@ -325,19 +317,20 @@ func TestUpdateRootTaskfilePreservesExistingIncludeVars(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	assertPreservedIncludeVars(t, string(out))
+	assertForcedIncludeRootRefs(t, string(out))
 }
 
-func assertPreservedIncludeVars(t *testing.T, text string) {
+func assertForcedIncludeRootRefs(t *testing.T, text string) {
 	t.Helper()
 
-	if !strings.Contains(text, "go1.22.0") {
-		t.Fatalf("existing include var override removed: %s", text)
-	}
+	assertContainsAll(t, text, []string{
+		"GO_VERSION: \"\"",
+		"GO_CMD_UNIX: /usr/local/go/bin/go",
+		"GO_VERSION: '{{.GO_VERSION}}'",
+		"GO_CMD_UNIX: '{{.GO_CMD_UNIX}}'",
+	})
 
-	if !strings.Contains(text, varGoCmdUnix) {
-		t.Fatalf("missing newly added module var: %s", text)
-	}
+	assertContainsNone(t, text, []string{"go1.22.0"})
 }
 
 // TestUpdateRootTaskfile verifies managed includes are added while user includes are preserved.
@@ -379,16 +372,17 @@ func assertUpdateRootTaskfileOutput(t *testing.T, text string) {
 	}
 }
 
-// TestUpdateRootTaskfileGeneratedTasksAndSharedVars verifies generated tasks and shared vars are merged in.
-func TestUpdateRootTaskfileGeneratedTasksAndSharedVars(t *testing.T) {
+// TestUpdateRootTaskfileGeneratedTasksAndPromotedVars verifies generated tasks and
+// all module vars are promoted to root with include {{.KEY}} references.
+func TestUpdateRootTaskfileGeneratedTasksAndPromotedVars(t *testing.T) {
 	t.Parallel()
 
-	out, err := taskfile.UpdateRootTaskfile(sharedVarsRootFixture(), generatedTasksInput())
+	out, err := taskfile.UpdateRootTaskfile(promotedVarsRootFixture(), generatedTasksInput())
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	assertGeneratedTasksAndSharedVars(t, string(out))
+	assertGeneratedTasksAndPromotedVars(t, string(out))
 }
 
 func generatedTasksInput() *rootupd.RootUpdateInput {
@@ -398,7 +392,7 @@ func generatedTasksInput() *rootupd.RootUpdateInput {
 		RootTaskfileDir: consts.Empty,
 		DestByTask:      map[string]string{consts.Go: consts.Go, taskESLint: taskESLint},
 		ManagedTasks:    []string{consts.Go, taskESLint},
-		ModuleTaskfiles: sharedVarsModuleTaskfiles(),
+		ModuleTaskfiles: promotedVarsModuleTaskfiles(),
 		GeneratedTasks: []rootupd.GeneratedRootTask{
 			{Name: "lint", Modules: []string{consts.Go, taskESLint}},
 		},
@@ -406,14 +400,16 @@ func generatedTasksInput() *rootupd.RootUpdateInput {
 	})
 }
 
-func assertGeneratedTasksAndSharedVars(t *testing.T, text string) {
+func assertGeneratedTasksAndPromotedVars(t *testing.T, text string) {
 	t.Helper()
 
 	assertContainsAll(t, text, []string{
 		"VERSION: 1.2.3",
 		"VERSION: '{{.VERSION}}'",
 		"GO_VERSION: \"\"",
+		"GO_VERSION: '{{.GO_VERSION}}'",
 		"CONFIG: \"\"",
+		"CONFIG: '{{.CONFIG}}'",
 		"task: go:lint",
 		"task: eslint:lint",
 		"echo custom",
@@ -442,7 +438,7 @@ func assertContainsNone(t *testing.T, text string, notWants []string) {
 	}
 }
 
-func sharedVarsRootFixture() []byte {
+func promotedVarsRootFixture() []byte {
 	return []byte(`version: "3"
 vars:
   VERSION: 1.2.3
@@ -462,7 +458,7 @@ tasks:
 `)
 }
 
-func sharedVarsModuleTaskfiles() map[string][]byte {
+func promotedVarsModuleTaskfiles() map[string][]byte {
 	return map[string][]byte{
 		consts.Go: []byte(`version: "3"
 vars:
@@ -475,6 +471,34 @@ vars:
   CONFIG: ""
 `),
 	}
+}
+
+// TestUpdateRootTaskfilePromotesSingleModuleVars verifies a var present in only one
+// module is still promoted to root and referenced from that include.
+func TestUpdateRootTaskfilePromotesSingleModuleVars(t *testing.T) {
+	t.Parallel()
+
+	out, err := taskfile.UpdateRootTaskfile(
+		taskfile.NewRootTemplate(),
+		rootUpdateInput(&rootupd.RootUpdateInput{
+			Tasks:           []string{consts.Go},
+			TargetFolder:    targetFolderTaskfiles,
+			RootTaskfileDir: consts.Empty,
+			DestByTask:      map[string]string{consts.Go: consts.Go},
+			ManagedTasks:    []string{consts.Go},
+			ModuleTaskfiles: map[string][]byte{consts.Go: goModuleTaskfile()},
+		}),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assertContainsAll(t, string(out), []string{
+		"GO_VERSION: \"\"",
+		"GO_CMD_UNIX: /usr/local/go/bin/go",
+		"GO_VERSION: '{{.GO_VERSION}}'",
+		"GO_CMD_UNIX: '{{.GO_CMD_UNIX}}'",
+	})
 }
 
 // TestManagedIncludeDifferentPathConflict verifies a managed alias with a mismatched path errors.

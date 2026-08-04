@@ -7,6 +7,8 @@ configuration:
   target_folder: taskfiles
   tasks:
     - go
+    - golangci-lint
+    - govulncheck
     - yamllint
     - actionlint
     - zizmor
@@ -16,6 +18,7 @@ generated_root_tasks:
   - install
   - install:undo
   - lint
+  - lint:fix
   - upgrade
   - version
 managed_files:
@@ -59,6 +62,26 @@ managed_files:
     sha256: 6ecd1cd4be1e561da0490f4bf3b2c12832a5ad96fe619a5cac117e03220c7532
     source_module: go
     source_path: taskfiles/go/Taskfile.yml
+  - destination_module: golangci-lint
+    path: taskfiles/golangci-lint/README.md
+    sha256: be0c77236aa390398bdc615284443103dde959e11bdcbf97b83717772789b0b6
+    source_module: golangci-lint
+    source_path: taskfiles/golangci-lint/README.md
+  - destination_module: golangci-lint
+    path: taskfiles/golangci-lint/Taskfile.yml
+    sha256: 599c60e6896261d90f1295c8e458f5065e9f0f93e57259f56b6c81e588eae358
+    source_module: golangci-lint
+    source_path: taskfiles/golangci-lint/Taskfile.yml
+  - destination_module: govulncheck
+    path: taskfiles/govulncheck/README.md
+    sha256: af34fd01e8ef6c1c836e3136c8bd151d4e035e4747426b448ef13004480323fe
+    source_module: govulncheck
+    source_path: taskfiles/govulncheck/README.md
+  - destination_module: govulncheck
+    path: taskfiles/govulncheck/Taskfile.yml
+    sha256: 8616ece2edeee6996bdfa3b727b6fa82911d96040c88366891ac3ec8c1f3edb9
+    source_module: govulncheck
+    source_path: taskfiles/govulncheck/Taskfile.yml
   - destination_module: hadolint
     path: taskfiles/hadolint/README.md
     sha256: 18c5abb85f82db78f054d21cd0575180dbdcb3d5aca185d28c570686c0beb1c0
@@ -128,6 +151,14 @@ resolved_modules:
       destination_module: go
       path: taskfiles/go
       source_module: go
+    golangci-lint:
+      destination_module: golangci-lint
+      path: taskfiles/golangci-lint
+      source_module: golangci-lint
+    govulncheck:
+      destination_module: govulncheck
+      path: taskfiles/govulncheck
+      source_module: govulncheck
     hadolint:
       destination_module: hadolint
       path: taskfiles/hadolint

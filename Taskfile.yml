@@ -10,6 +10,7 @@ tasks:
     cmds:
       - task: taskotter:golangci-lint:fmt:check
       - task: taskotter:lint
+      - task: taskotter:go:test
 
   ci:fix:
     desc: Run CI fixs

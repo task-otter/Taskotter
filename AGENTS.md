@@ -17,8 +17,8 @@
 - Sync skips `*_test.*` files; docs (`README.md`, `docs/`) are copied only when `includes-doc: true`; root `Taskfile.yml` includes merge each module's top-level `vars`.
 - The action `js` input (YAML: `runtime`, `package-manager`, `version-manager`) replaces separate node-package-manager inputs for Node task resolution.
 - Root `Taskfile.yml` defines aggregate `lint`, `lint:fix`, `fmt`, and `fmt:check` tasks delegating to included module taskfiles.
-- Core packages: `internal/config`, `internal/store`, `internal/resolver`, `internal/syncer` (split across model/load/plan/diff/apply/fs), `internal/app`, `internal/git`, `internal/github`.
+- Core packages: `internal/features/{sync,resolve,store,git,pr,syncrun}` (each with `ports/` and `adapters/`, plus domain/service as needed), `internal/shared/{config,consts,iox,pathutil,logging,yamlfmt,archive,githubapi,repo}`; adapters are wired from `cmd/taskotter-sync`.
 - `DefaultBranch()` falls back through symbolic-ref → rev-parse → remote set-head → remote show when `origin/HEAD` is missing (common on GHA Git 2.50+); `Stage()` uses `git add -f` for gitignored `.taskotter/metadata.yml`.
-- Docker container actions expose hyphenated `INPUT_*` env vars; `internal/config` reads both hyphen and underscore forms and falls back to `GITHUB_TOKEN`.
+- Docker container actions expose hyphenated `INPUT_*` env vars; `internal/shared/config` reads both hyphen and underscore forms and falls back to `GITHUB_TOKEN`.
 - CI in `.github/workflows/test.yml` runs gofmt, `go vet`, `go test -race`, binary/Docker builds, and integration tests under `tests/integration/`; integration sets `setup-go` `cache: false`; the `itself` job sets `fail-on-changes: true` so the action exits non-zero with `::error` when a sync PR is opened and emits `::notice` when taskfiles are up to date.
 - Test fixtures mirror the store layout under `tests/fixtures/store/`.

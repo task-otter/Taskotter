@@ -75,6 +75,13 @@ type (
 		cfg  *config.Config
 		snap *storedomain.Snapshot
 	}
+
+	variantModuleSyncArgs struct {
+		cfg    *config.Config
+		snap   *storedomain.Snapshot
+		task   string
+		source string
+	}
 )
 
 const (
@@ -109,6 +116,11 @@ const (
 	fileGoTestGo               = "go_test.go"
 	docMetadataYML             = "docs/metadata.yml"
 	errExpectedChangesInitial  = "expected changes on initial sync"
+	testStoreSourceRef         = "refs/heads/main"
+	testStoreResolvedCommit    = "abc123"
+	testStoreDefaultBranch     = "main"
+	errFmtExpectedManagedPath  = "expected managed path %q"
+	testEmptyTaskfileYAML      = "version: \"3\"\ntasks: {}\n"
 )
 
 func fatalOnErr(t *testing.T, err error) {
@@ -137,29 +149,41 @@ func resolveGoModule(t *testing.T, snap *storedomain.Snapshot) resolvesvc.Resolu
 	})
 }
 
-func goModuleRecord(sourceModule string) lockmodel.ModuleRecord {
-	return lockmodel.ModuleRecord{
-		SourceModule:      sourceModule,
-		DestinationModule: consts.Go,
-		Path:              config.DefaultTargetFolder + "/go",
-	}
-}
-
 func buildSingleSyncIn(input *moduleTestInput) syncdomain.SyncInput {
 	input.t.Helper()
 
 	res := resolveGoModule(input.t, input.snap)
 
+	return variantModuleSyncInput(&variantModuleSyncArgs{
+		cfg: input.cfg, snap: input.snap, task: consts.Go, source: res.SourceModule,
+	})
+}
+
+func variantModuleSyncInput(args *variantModuleSyncArgs) syncdomain.SyncInput {
 	return syncdomain.SyncInput{
-		Config:      input.cfg,
+		Config:      args.cfg,
 		TaskfileOps: synctaskfile.Ops{},
-		Snapshot:    input.snap,
+		Snapshot:    args.snap,
 		Requested: map[string]lockmodel.ModuleRecord{
-			consts.Go: goModuleRecord(res.SourceModule),
+			args.task: {
+				SourceModule:      args.source,
+				DestinationModule: args.task,
+				Path:              config.DefaultTargetFolder + "/" + args.task,
+			},
 		},
 		Dependencies: nil,
-		SourceToDest: map[string]string{res.SourceModule: consts.Go},
-		DestByTask:   map[string]string{consts.Go: consts.Go},
+		SourceToDest: map[string]string{args.source: args.task},
+		DestByTask:   map[string]string{args.task: args.task},
+	}
+}
+
+func testStoreRefInfo() *storedomain.RefInfo {
+	return &storedomain.RefInfo{
+		Repository:       config.StoreRepository,
+		RequestedVersion: consts.Empty,
+		SourceRef:        testStoreSourceRef,
+		ResolvedCommit:   testStoreResolvedCommit,
+		DefaultBranch:    testStoreDefaultBranch,
 	}
 }
 

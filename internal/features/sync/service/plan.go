@@ -44,6 +44,13 @@ type (
 		planned    []managedFile
 	}
 
+	mergeParentDocsArgs struct {
+		collect    *collectModuleArgs
+		contents   fMap
+		parentDocs map[string]struct{}
+		destRoot   string
+	}
+
 	fileEntryArgs struct {
 		ops          ports.TaskfileOps
 		entry        os.DirEntry
@@ -321,22 +328,9 @@ func prepareRootTaskfileInputs(args *buildRootArgs) (*updateRootArgs, error) {
 }
 
 func collectAndTrackModuleFiles(args *collectModuleArgs) (fMap, []managedFile, error) {
-	policy := docPolicyFromConfig(args.syncInput.Config)
-
-	contents, err := scanModuleFiles(&collectOptions{
-		ops:          args.syncInput.TaskfileOps,
-		sourceDir:    args.sourceDir,
-		fromDest:     args.mod.DestinationModule,
-		docPolicy:    policy,
-		sourceToDest: args.syncInput.SourceToDest,
-	})
+	contents, parentDocs, err := collectModuleContents(args)
 	if err != nil {
-		return nil, nil, fmt.Errorf("collect module files: %w", err)
-	}
-
-	parentDocs, err := mergeLogicalRootDocs(args, contents, policy)
-	if err != nil {
-		return nil, nil, fmt.Errorf("merge logical root docs: %w", err)
+		return nil, nil, fmt.Errorf("collect module contents: %w", err)
 	}
 
 	managed := appendManagedFiles(&appendManagedArgs{
@@ -350,68 +344,20 @@ func collectAndTrackModuleFiles(args *collectModuleArgs) (fMap, []managedFile, e
 	return contents, managed, nil
 }
 
-func mergeLogicalRootDocs(
-	args *collectModuleArgs,
-	contents fMap,
-	policy docPolicy,
-) (map[string]struct{}, error) {
-	parentDocs := make(map[string]struct{})
+func collectModuleContents(args *collectModuleArgs) (fMap, map[string]struct{}, error) {
+	policy := docPolicyFromConfig(args.syncInput.Config)
 
-	if policy != docPolicyInclude {
-		return parentDocs, nil
-	}
-
-	destRoot := args.syncInput.Snapshot.ModuleDir(args.mod.DestinationModule)
-	if filepath.Clean(destRoot) == filepath.Clean(args.sourceDir) {
-		return parentDocs, nil
-	}
-
-	err := mergeParentDocFiles(args, destRoot, contents, parentDocs)
+	contents, err := scanModuleFiles(moduleCollectOptions(args, policy))
 	if err != nil {
-		return nil, fmt.Errorf("merge parent doc files: %w", err)
+		return nil, nil, fmt.Errorf("collect module files: %w", err)
 	}
 
-	return parentDocs, nil
-}
-
-func mergeParentDocFiles(
-	args *collectModuleArgs,
-	destRoot string,
-	contents fMap,
-	parentDocs map[string]struct{},
-) error {
-	info, err := os.Stat(destRoot)
-	iox.Discard(info)
-
+	parentDocs, err := mergeLogicalRootDocs(args, contents, policy)
 	if err != nil {
-		if os.IsNotExist(err) {
-			return nil
-		}
-
-		return fmt.Errorf("stat logical root %q: %w", destRoot, err)
+		return nil, nil, fmt.Errorf("merge logical root docs: %w", err)
 	}
 
-	rootContents, err := scanModuleFiles(&collectOptions{
-		ops:          args.syncInput.TaskfileOps,
-		sourceDir:    destRoot,
-		fromDest:     args.mod.DestinationModule,
-		docPolicy:    docPolicyInclude,
-		sourceToDest: args.syncInput.SourceToDest,
-	})
-	if err != nil {
-		return fmt.Errorf("scan logical root %q: %w", destRoot, err)
-	}
-
-	for rel, entry := range rootContents {
-		if !pathutil.IsDocPath(rel) {
-			continue
-		}
-
-		contents[rel] = entry
-		parentDocs[rel] = struct{}{}
-	}
-
-	return nil
+	return contents, parentDocs, nil
 }
 
 func collectModuleFile(args *moduleCollectArgs) error {
@@ -499,6 +445,140 @@ func collectWalkedModuleFile(args *walkCollectArgs) error {
 	}
 
 	return nil
+}
+
+func copyDocPathsInto(rootContents, contents fMap, parentDocs map[string]struct{}) {
+	for rel := range rootContents {
+		entry := rootContents[rel]
+
+		if !pathutil.IsDocPath(rel) {
+			continue
+		}
+
+		contents[rel] = entry
+		parentDocs[rel] = struct{}{}
+	}
+}
+
+func logicalRootReady(dir string) (bool, error) {
+	info, err := os.Stat(dir)
+	iox.Discard(info)
+
+	if err == nil {
+		return true, nil
+	}
+
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+
+	return false, fmt.Errorf("stat logical root %q: %w", dir, err)
+}
+
+func mergeLogicalRootDocs(
+	args *collectModuleArgs,
+	contents fMap,
+	policy docPolicy,
+) (map[string]struct{}, error) {
+	parentDocs := make(map[string]struct{})
+
+	if policy != docPolicyInclude {
+		return parentDocs, nil
+	}
+
+	docs, err := mergeParentDocsIfDistinct(args, contents, parentDocs)
+	if err != nil {
+		return nil, fmt.Errorf("merge parent docs if distinct: %w", err)
+	}
+
+	return docs, nil
+}
+
+func mergeParentDocsIfDistinct(
+	args *collectModuleArgs,
+	contents fMap,
+	parentDocs map[string]struct{},
+) (map[string]struct{}, error) {
+	mergeArgs := parentDocsMergeArgs(args, contents, parentDocs)
+
+	if mergeArgs == nil {
+		return parentDocs, nil
+	}
+
+	err := mergeParentDocFiles(mergeArgs)
+	if err != nil {
+		return nil, fmt.Errorf("merge parent doc files: %w", err)
+	}
+
+	return parentDocs, nil
+}
+
+func parentDocsMergeArgs(
+	args *collectModuleArgs,
+	contents fMap,
+	parentDocs map[string]struct{},
+) *mergeParentDocsArgs {
+	destRoot := args.syncInput.Snapshot.ModuleDir(args.mod.DestinationModule)
+
+	if sameModuleRoot(destRoot, args.sourceDir) {
+		return nil
+	}
+
+	return &mergeParentDocsArgs{
+		collect:    args,
+		destRoot:   destRoot,
+		contents:   contents,
+		parentDocs: parentDocs,
+	}
+}
+
+func sameModuleRoot(destRoot, sourceDir string) bool {
+	return filepath.Clean(destRoot) == filepath.Clean(sourceDir)
+}
+
+func mergeParentDocFiles(args *mergeParentDocsArgs) error {
+	ready, err := logicalRootReady(args.destRoot)
+	if err != nil {
+		return fmt.Errorf("logical root ready: %w", err)
+	}
+
+	if !ready {
+		return nil
+	}
+
+	rootContents, err := scanLogicalRootDocs(args)
+	if err != nil {
+		return fmt.Errorf("scan logical root docs: %w", err)
+	}
+
+	copyDocPathsInto(rootContents, args.contents, args.parentDocs)
+
+	return nil
+}
+
+func moduleCollectOptions(args *collectModuleArgs, policy docPolicy) *collectOptions {
+	return &collectOptions{
+		ops:          args.syncInput.TaskfileOps,
+		sourceDir:    args.sourceDir,
+		fromDest:     args.mod.DestinationModule,
+		docPolicy:    policy,
+		sourceToDest: args.syncInput.SourceToDest,
+	}
+}
+
+func scanLogicalRootDocs(args *mergeParentDocsArgs) (fMap, error) {
+	rootContents, err := scanModuleFiles(&collectOptions{
+		ops:          args.collect.syncInput.TaskfileOps,
+		sourceDir:    args.destRoot,
+		fromDest:     args.collect.mod.DestinationModule,
+		docPolicy:    docPolicyInclude,
+		sourceToDest: args.collect.syncInput.SourceToDest,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("scan logical root %q: %w", args.destRoot, err)
+	}
+
+	return rootContents, nil
 }
 
 func ensureSourceDirExists(sourceDir string, mod *moduleRecord) error {

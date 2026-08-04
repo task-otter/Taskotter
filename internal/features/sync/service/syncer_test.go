@@ -14,9 +14,7 @@ import (
 	resolvesvc "github.com/task-otter/Taskotter/internal/features/resolve/service"
 	storedomain "github.com/task-otter/Taskotter/internal/features/store/domain"
 	storesvc "github.com/task-otter/Taskotter/internal/features/store/service"
-	synctaskfile "github.com/task-otter/Taskotter/internal/features/sync/adapters/taskfile"
 	syncdomain "github.com/task-otter/Taskotter/internal/features/sync/domain"
-	"github.com/task-otter/Taskotter/internal/features/sync/domain/lockmodel"
 	syncsvc "github.com/task-otter/Taskotter/internal/features/sync/service"
 	"github.com/task-otter/Taskotter/internal/shared/config"
 	"github.com/task-otter/Taskotter/internal/shared/consts"
@@ -31,13 +29,7 @@ func fixtureStore(t *testing.T) *storedomain.Snapshot {
 		dirTests, dirFixtures, dirStore,
 	)
 
-	snap, err := storesvc.LocalSnapshot(root, &storedomain.RefInfo{
-		Repository:       config.StoreRepository,
-		RequestedVersion: consts.Empty,
-		SourceRef:        "refs/heads/main",
-		ResolvedCommit:   "abc123",
-		DefaultBranch:    "main",
-	})
+	snap, err := storesvc.LocalSnapshot(root, testStoreRefInfo())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -209,21 +201,9 @@ func eslintSyncInput(
 	snap *storedomain.Snapshot,
 	source string,
 ) syncdomain.SyncInput {
-	return syncdomain.SyncInput{
-		Config:      cfg,
-		TaskfileOps: synctaskfile.Ops{},
-		Snapshot:    snap,
-		Requested: map[string]lockmodel.ModuleRecord{
-			testModuleEslint: {
-				SourceModule:      source,
-				DestinationModule: testModuleEslint,
-				Path:              config.DefaultTargetFolder + "/" + testModuleEslint,
-			},
-		},
-		Dependencies: nil,
-		SourceToDest: map[string]string{source: testModuleEslint},
-		DestByTask:   map[string]string{testModuleEslint: testModuleEslint},
-	}
+	return variantModuleSyncInput(&variantModuleSyncArgs{
+		cfg: cfg, snap: snap, task: testModuleEslint, source: source,
+	})
 }
 
 func mutateEslintPnpmFnm(cfg *config.Config) {
@@ -285,7 +265,7 @@ func assertManagedHasPath(t *testing.T, paths map[string]struct{}, rel string) {
 	full := goManagedPath(rel)
 
 	if _, ok := paths[full]; !ok {
-		t.Fatalf("expected managed path %q", full)
+		t.Fatalf(errFmtExpectedManagedPath, full)
 	}
 }
 
@@ -319,25 +299,6 @@ func assertDocPathsManaged(t *testing.T, plan *syncdomain.Plan) {
 	assertManagedHasPath(t, paths, docNestedNoteMD)
 }
 
-// TestIncludesDocFalseSkipsReadme verifies README is excluded from managed files when includes-doc is false.
-func TestIncludesDocFalseSkipsReadme(t *testing.T) {
-	t.Parallel()
-
-	workspace := t.TempDir()
-	writeRootTaskfile(t, workspace)
-
-	snap := fixtureStore(t)
-	cfg := testConfig(workspace, mutateEslintPnpmFnmNoDocs)
-	si := buildEslintSyncInput(t, cfg, snap)
-
-	plan, err := syncsvc.BuildPlan(&si)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	assertNoReadmeManaged(t, plan)
-}
-
 func eslintManagedReadmePath() string {
 	return pathutil.JoinRelative(config.DefaultTargetFolder, testModuleEslint, testReadmeName)
 }
@@ -361,18 +322,17 @@ func assertEslintReadmeManaged(t *testing.T, plan *syncdomain.Plan) {
 		return
 	}
 
-	t.Fatalf("expected managed path %q", wantPath)
+	t.Fatalf(errFmtExpectedManagedPath, wantPath)
 }
 
-// TestIncludesDocTrueIncludesEslintReadme verifies nested eslint pulls README from the logical module root.
-func TestIncludesDocTrueIncludesEslintReadme(t *testing.T) {
-	t.Parallel()
+func buildEslintPlan(t *testing.T, mutate func(*config.Config)) *syncdomain.Plan {
+	t.Helper()
 
 	workspace := t.TempDir()
 	writeRootTaskfile(t, workspace)
 
 	snap := fixtureStore(t)
-	cfg := testConfig(workspace, mutateEslintPnpmFnm)
+	cfg := testConfig(workspace, mutate)
 	si := buildEslintSyncInput(t, cfg, snap)
 
 	plan, err := syncsvc.BuildPlan(&si)
@@ -380,7 +340,21 @@ func TestIncludesDocTrueIncludesEslintReadme(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	assertEslintReadmeManaged(t, plan)
+	return plan
+}
+
+// TestIncludesDocFalseSkipsReadme verifies README is excluded when includes-doc is false.
+func TestIncludesDocFalseSkipsReadme(t *testing.T) {
+	t.Parallel()
+
+	assertNoReadmeManaged(t, buildEslintPlan(t, mutateEslintPnpmFnmNoDocs))
+}
+
+// TestIncludesDocTrueIncludesEslintReadme verifies nested eslint pulls README when includes-doc is true.
+func TestIncludesDocTrueIncludesEslintReadme(t *testing.T) {
+	t.Parallel()
+
+	assertEslintReadmeManaged(t, buildEslintPlan(t, mutateEslintPnpmFnm))
 }
 
 // TestIncludesDocFalseSkipsFixtureDocs verifies go fixture README and docs/ are excluded when includes-doc is false.

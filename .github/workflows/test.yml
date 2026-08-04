@@ -23,6 +23,7 @@ jobs:
         with:
           github-token: ${{ github.token }}
           fail-on-changes: true
+          store-version: v0.0.1
           tasks: |
             go
             golangci-lint

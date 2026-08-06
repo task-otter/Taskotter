@@ -102,6 +102,7 @@ includes:
       GO_JUNIT_REPORT: '{{.GO_JUNIT_REPORT}}'
       GO_INSTALL_DIR_UNIX: '{{.GO_INSTALL_DIR_UNIX}}'
       GO_GLOBAL_BIN: '{{.GO_GLOBAL_BIN}}'
+    dir: ..
   yamllint:
     taskfile: yamllint/Taskfile.yml
     vars:
@@ -115,6 +116,7 @@ includes:
       YAMLLINT_TARGETS: '{{.YAMLLINT_TARGETS}}'
       YAMLLINT_CONFIG: '{{.YAMLLINT_CONFIG}}'
       YAMLLINT_EXTRA_ARGS: '{{.YAMLLINT_EXTRA_ARGS}}'
+    dir: ..
   actionlint:
     taskfile: actionlint/Taskfile.yml
     vars:
@@ -122,6 +124,7 @@ includes:
       ACTIONLINT_VERSION: '{{.ACTIONLINT_VERSION}}'
       ACTIONLINT_EXTRA_ARGS: '{{.ACTIONLINT_EXTRA_ARGS}}'
       ACTIONLINT_TARGETS: '{{.ACTIONLINT_TARGETS}}'
+    dir: ..
   zizmor:
     taskfile: zizmor/Taskfile.yml
     vars:
@@ -129,6 +132,7 @@ includes:
       ZIZMOR_EXTRA_ARGS: '{{.ZIZMOR_EXTRA_ARGS}}'
       ZIZMOR_TARGETS: '{{.ZIZMOR_TARGETS}}'
       ZIZMOR_VERSION: '{{.ZIZMOR_VERSION}}'
+    dir: ..
   adrs:
     taskfile: adrs/Taskfile.yml
     vars:
@@ -136,6 +140,7 @@ includes:
       EXTRA_ARGS: '{{.EXTRA_ARGS}}'
       ADRS_VERSION: '{{.ADRS_VERSION}}'
       ADRS_EXTRA_ARGS: '{{.ADRS_EXTRA_ARGS}}'
+    dir: ..
   hadolint:
     taskfile: hadolint/Taskfile.yml
     vars:
@@ -147,6 +152,7 @@ includes:
       HADOLINT_CONFIG: '{{.HADOLINT_CONFIG}}'
       HADOLINT_DOCKERFILE: '{{.HADOLINT_DOCKERFILE}}'
       HADOLINT_EXTRA_ARGS: '{{.HADOLINT_EXTRA_ARGS}}'
+    dir: ..
   golangci-lint:
     taskfile: golangci-lint/Taskfile.yml
     vars:
@@ -162,6 +168,7 @@ includes:
       GOLANGCI_LINT_FMT_FORMATTER_FLAGS: '{{.GOLANGCI_LINT_FMT_FORMATTER_FLAGS}}'
       GLOBAL_GO_BIN: '{{.GLOBAL_GO_BIN}}'
       GO_GLOBAL_BIN: '{{.GO_GLOBAL_BIN}}'
+    dir: ..
   govulncheck:
     taskfile: govulncheck/Taskfile.yml
     vars:
@@ -169,6 +176,7 @@ includes:
       GOVULNCHECK_LINT_SKIP_PATTERN: '{{.GOVULNCHECK_LINT_SKIP_PATTERN}}'
       GLOBAL_GO_BIN: '{{.GLOBAL_GO_BIN}}'
       GO_GLOBAL_BIN: '{{.GO_GLOBAL_BIN}}'
+    dir: ..
 tasks:
   install:
     desc: Run install for synced TaskOtter modules

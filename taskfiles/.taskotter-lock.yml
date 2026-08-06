@@ -2,7 +2,7 @@
 configuration:
   includes_doc: true
   node_package_manager: bun
-  node_version_manager: ''
+  node_version_manager: ""
   sync_root: true
   target_folder: taskfiles
   tasks:

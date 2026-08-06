@@ -49,6 +49,7 @@ type (
 		entry        *yaml.Node
 		moduleVars   *yaml.Node
 		path         string
+		dir          string
 		task         string
 		managedTasks []string
 	}
@@ -113,6 +114,7 @@ const (
 	dotDotSlash    = "../"
 	keyIncludes    = "includes"
 	keyTaskfile    = "taskfile"
+	keyDir         = "dir"
 	keyVars        = "vars"
 	keyTasks       = "tasks"
 	taskfileSuffix = "Taskfile.yml"
@@ -373,13 +375,29 @@ func isMatchingKey(keyNode *yaml.Node, key string) bool {
 func moduleIncludePath(rootDir, targetFolder, dest string) string {
 	target := filepath.ToSlash(filepath.Join(targetFolder, dest, "Taskfile.yml"))
 
-	if rootDir == consts.Empty || rootDir == "." {
+	if rootDir == consts.Empty || rootDir == consts.PathDot {
 		return target
 	}
 
 	rel, err := filepath.Rel(filepath.FromSlash(rootDir), filepath.FromSlash(target))
 	if err != nil {
 		return target
+	}
+
+	return filepath.ToSlash(rel)
+}
+
+// includeDirForRoot returns the include-level dir so module tasks run from the
+// workspace root. Empty or "." (aggregator at workspace root) yields "."; a
+// nested aggregator such as "taskfiles" yields "..".
+func includeDirForRoot(rootDir string) string {
+	if rootDir == consts.Empty || rootDir == consts.PathDot {
+		return consts.PathDot
+	}
+
+	rel, err := filepath.Rel(filepath.FromSlash(rootDir), consts.PathDot)
+	if err != nil {
+		return consts.PathDot
 	}
 
 	return filepath.ToSlash(rel)
@@ -648,6 +666,7 @@ func updateExistingIncludeEntry(params *includeUpsertParams, entry *yaml.Node, p
 	err := updateExistingInclude(&existingIncludeParams{
 		entry:        entry,
 		path:         path,
+		dir:          includeDirForRoot(params.input.RootTaskfileDir),
 		moduleVars:   params.moduleVars[params.task],
 		managedTasks: params.input.ManagedTasks,
 		task:         params.task,
@@ -660,7 +679,7 @@ func updateExistingIncludeEntry(params *includeUpsertParams, entry *yaml.Node, p
 }
 
 func appendNewInclude(params *includeUpsertParams, path string, moduleVars *yaml.Node) {
-	entry := newIncludeEntry(path, moduleVars)
+	entry := newIncludeEntry(path, includeDirForRoot(params.input.RootTaskfileDir), moduleVars)
 	appendMappingPair(params.includesNode, yamlScalar(params.task), entry)
 }
 
@@ -670,7 +689,7 @@ func updateExistingInclude(params *existingIncludeParams) error {
 		return fmt.Errorf("ensure managed include for task %q: %w", params.task, err)
 	}
 
-	setIncludePath(params.entry, params.path)
+	setIncludePath(params.entry, params.path, params.dir)
 	mergeIncludeVars(params.entry, params.moduleVars)
 
 	return nil
@@ -710,16 +729,21 @@ func isManagedInclude(params *managedIncludeParams) bool {
 	return containsString(params.managedTasks, params.task)
 }
 
-func setIncludePath(entry *yaml.Node, path string) {
-	taskfileNode := findMappingValue(entry, keyTaskfile)
+func setIncludePath(entry *yaml.Node, path, dir string) {
+	setOrAppendMappingScalar(entry, keyTaskfile, path)
+	setOrAppendMappingScalar(entry, keyDir, dir)
+}
 
-	if taskfileNode == nil {
-		appendMappingPair(entry, yamlScalar(keyTaskfile), yamlScalar(path))
+func setOrAppendMappingScalar(entry *yaml.Node, key, value string) {
+	node := findMappingValue(entry, key)
+
+	if node == nil {
+		appendMappingPair(entry, yamlScalar(key), yamlScalar(value))
 
 		return
 	}
 
-	taskfileNode.Value = path
+	node.Value = value
 }
 
 func extractVarsNode(content []byte) (*yaml.Node, error) {
@@ -1014,9 +1038,10 @@ func cloneYAMLNode(node *yaml.Node) *yaml.Node {
 	return out.Content[consts.IndexZero]
 }
 
-func newIncludeEntry(path string, modVars *yaml.Node) *yaml.Node {
+func newIncludeEntry(path, dir string, modVars *yaml.Node) *yaml.Node {
 	entry := newYAMLMappingNode()
 	appendMappingPair(entry, yamlScalar(keyTaskfile), yamlScalar(path))
+	appendMappingPair(entry, yamlScalar(keyDir), yamlScalar(dir))
 
 	if modVars != nil {
 		appendMappingPair(entry, yamlScalar(keyVars), includeVarsNode(modVars))

@@ -22,7 +22,6 @@ const (
 	wantVersion35           = `version: "3.5"`
 	fmtWantVersion35        = "expected root Taskfile version 3.5: %s"
 	pathTaskfilesGoYML      = "taskfiles/go/Taskfile.yml"
-	fmtMissingGoInclude     = "missing go include: %s"
 	destPnpm                = "pnpm"
 	srcPnpmFnm              = "pnpm/fnm"
 	wantPnpmRewrite         = "../pnpm/Taskfile.yml"
@@ -37,6 +36,8 @@ const (
 	wantGoCmdUnixDefault    = `GO_CMD_UNIX: /usr/local/go/bin/go`
 	wantGoVersionRef        = `GO_VERSION: '{{.GO_VERSION}}'`
 	wantGoCmdUnixRef        = `GO_CMD_UNIX: '{{.GO_CMD_UNIX}}'`
+	wantIncludeDirDot       = "dir: ."
+	wantIncludeDirParent    = "dir: .."
 )
 
 func rewriteIncludesInput() []byte {
@@ -244,6 +245,7 @@ func assertTemplateOutput(t *testing.T, text string) {
 	assertContainsAll(t, text, []string{
 		wantVersion35,
 		pathTaskfilesGoYML,
+		wantIncludeDirDot,
 	})
 	assertGoModulePromotedVars(t, text)
 }
@@ -280,9 +282,10 @@ func TestUpdateRootTaskfileFolderRelativeIncludes(t *testing.T) {
 func assertFolderRelativeInclude(t *testing.T, text string) {
 	t.Helper()
 
-	if !strings.Contains(text, "taskfile: go/Taskfile.yml") {
-		t.Fatalf("expected folder-relative include, got: %s", text)
-	}
+	assertContainsAll(t, text, []string{
+		"taskfile: go/Taskfile.yml",
+		wantIncludeDirParent,
+	})
 
 	if strings.Contains(text, pathTaskfilesGoYML) {
 		t.Fatalf("include should not repeat the target folder: %s", text)
@@ -325,6 +328,7 @@ func assertForcedIncludeRootRefs(t *testing.T, text string) {
 	t.Helper()
 
 	assertGoModulePromotedVars(t, text)
+	assertContainsAll(t, text, []string{wantIncludeDirDot})
 	assertContainsNone(t, text, []string{"go1.22.0"})
 }
 
@@ -365,17 +369,12 @@ func TestUpdateRootTaskfile(t *testing.T) {
 func assertUpdateRootTaskfileOutput(t *testing.T, text string) {
 	t.Helper()
 
-	if !strings.Contains(text, pathTaskfilesGoYML) {
-		t.Fatalf(fmtMissingGoInclude, text)
-	}
-
-	if !strings.Contains(text, "taskfiles/eslint/Taskfile.yml") {
-		t.Fatalf("missing eslint include: %s", text)
-	}
-
-	if !strings.Contains(text, "custom/Taskfile.yml") {
-		t.Fatalf("user include removed: %s", text)
-	}
+	assertContainsAll(t, text, []string{
+		pathTaskfilesGoYML,
+		"taskfiles/eslint/Taskfile.yml",
+		"custom/Taskfile.yml",
+		wantIncludeDirDot,
+	})
 }
 
 // TestUpdateRootTaskfileGeneratedTasksAndPromotedVars verifies generated tasks and
@@ -416,6 +415,7 @@ func assertGeneratedTasksAndPromotedVars(t *testing.T, text string) {
 		wantGoVersionRef,
 		"CONFIG: \"\"",
 		"CONFIG: '{{.CONFIG}}'",
+		wantIncludeDirDot,
 		"task: go:lint",
 		"task: eslint:lint",
 		"echo custom",

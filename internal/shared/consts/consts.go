@@ -13,6 +13,8 @@ const (
 	PathSepString = "/"
 	// PathParent is the ".." parent directory path component.
 	PathParent = ".."
+	// PathDot is the "." current directory path component.
+	PathDot = "."
 	// GitDir is the name of the .git directory.
 	GitDir = ".git"
 	// GitDirWithSep is the .git directory name with a trailing separator.

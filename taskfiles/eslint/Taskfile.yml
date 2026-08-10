@@ -1,0 +1,161 @@
+---
+version: "3.5"
+output:
+  group:
+    begin: "::group::{{.TASK}}"
+    end: "::endgroup::"
+    error_only: false
+silent: true
+includes:
+  pnpm:
+    taskfile: ../pnpm/Taskfile.yml
+vars:
+  ESLINT_LINT_SKIP_PATTERN: ""
+  ESLINT_TARGETS: ""
+  ESLINT_DEFAULT_TARGETS: "src/**/*.{js,jsx,ts,tsx}"
+  ESLINT_CONFIG: ""
+  ESLINT_CACHE: ""
+  ESLINT_DEFAULT_CACHE: "true"
+  ESLINT_EXTRA_ARGS: ""
+  ESLINT_VERSION: ""
+tasks:
+  default:
+    run: once
+    desc: Show available ESLint tasks
+    cmds:
+      - task --list
+  install:
+    run: once
+    desc: Install ESLint as a local devDependency
+    summary: |
+      Install eslint as a local devDependency. Pass ESLINT_VERSION=x.y.z to pin a
+      specific release instead of the package manager's default resolution.
+    vars:
+      RESOLVED_VERSION: '{{default .ESLINT_VERSION .ESLINT_VERSION_OVERRIDE}}'
+      RESOLVED_EXTRA_ARGS: '{{default .ESLINT_EXTRA_ARGS .ESLINT_EXTRA_ARGS_OVERRIDE}}'
+    status:
+      - >-
+        node -e "const installed = require('./node_modules/eslint/package.json'); const requested = '{{.RESOLVED_VERSION}}'; process.exit(!requested || installed.version === requested ? 0 : 1)"
+    cmds:
+      - task: pnpm:add
+        vars:
+          PACKAGES: 'eslint{{if .RESOLVED_VERSION}}@{{.RESOLVED_VERSION}}{{end}}'
+          EXTRA_ARGS: '{{.RESOLVED_EXTRA_ARGS}}{{if .CLI_ARGS}} {{.CLI_ARGS}}{{end}}'
+  install:undo:
+    run: once
+    desc: Remove the locally installed ESLint devDependency
+    summary: Remove eslint from local devDependencies via the active package manager.
+    prompt:
+      - This will remove eslint from local devDependencies.
+      - Continue?
+    cmds:
+      - task: pnpm:remove
+        vars:
+          PACKAGES: eslint
+          EXTRA_ARGS: '{{default .ESLINT_EXTRA_ARGS .ESLINT_EXTRA_ARGS_OVERRIDE}}'
+  upgrade:
+    run: once
+    desc: Upgrade ESLint to the latest release
+    summary: Reinstall eslint at the latest version as a local devDependency.
+    cmds:
+      - task: pnpm:add
+        vars:
+          PACKAGES: eslint@latest
+          EXTRA_ARGS: '{{default .ESLINT_EXTRA_ARGS .ESLINT_EXTRA_ARGS_OVERRIDE}}'
+  config:init:
+    run: once
+    dir: "{{.USER_WORKING_DIR}}"
+    desc: Create a starter ESLint flat config when none exists
+    summary: |
+      Write a minimal eslint.config.mjs with recommended defaults.
+      Non-interactive — does not run the eslint --init wizard.
+      Skipped if a recognized ESLint config file already exists in the
+      current directory (eslint.config.js/mjs/cjs or .eslintrc.*).
+    status:
+      - >-
+        test -f eslint.config.js || test -f eslint.config.mjs || test -f eslint.config.cjs || test -f .eslintrc.js || test -f .eslintrc.cjs || test -f .eslintrc.json || test -f .eslintrc.yml || test -f .eslintrc.yaml
+    cmds:
+      - |
+        printf '%s\n' \
+          '/** @type {import("eslint").Linter.Config[]} */' \
+          'export default [' \
+          '  {' \
+          '    languageOptions: {' \
+          '      ecmaVersion: "latest",' \
+          '      sourceType: "module",' \
+          '    },' \
+          '  },' \
+          '];' > eslint.config.mjs
+      - echo 'Created eslint.config.mjs.'
+  # Shared implementation of lint / lint:fix / ci. Each override is resolved
+  # exactly once here; the three public tasks differ only by MODE_ARGS.
+  _run:
+    internal: true
+    run: when_changed
+    vars:
+      RESOLVED_CONFIG: '{{default .ESLINT_CONFIG .ESLINT_CONFIG_OVERRIDE}}'
+      RESOLVED_CACHE: '{{or .ESLINT_CACHE_OVERRIDE .ESLINT_CACHE .ESLINT_DEFAULT_CACHE}}'
+      RESOLVED_SKIP: '{{default .ESLINT_LINT_SKIP_PATTERN .ESLINT_LINT_SKIP_PATTERN_OVERRIDE}}'
+      RESOLVED_TARGETS: '{{or .ESLINT_TARGETS_OVERRIDE .ESLINT_TARGETS .ESLINT_DEFAULT_TARGETS}}'
+      RESOLVED_EXTRA_ARGS: '{{default .ESLINT_EXTRA_ARGS .ESLINT_EXTRA_ARGS_OVERRIDE}}'
+    cmds:
+      - task: pnpm:exec
+        vars:
+          BINARY: eslint
+          ARGS: >-
+            {{if .RESOLVED_CONFIG}}--config "{{.RESOLVED_CONFIG}}" {{end}} {{- if eq .RESOLVED_CACHE "true"}}--cache --cache-location .cache/eslint/ {{end}} {{- if .MODE_ARGS}}{{.MODE_ARGS}} {{end}} {{- if .RESOLVED_SKIP}}--ignore-pattern "{{.RESOLVED_SKIP}}" {{end}} {{- .RESOLVED_TARGETS}}
+          EXTRA_ARGS: '{{.RESOLVED_EXTRA_ARGS}}{{if .CLI_ARGS}} {{.CLI_ARGS}}{{end}}'
+  lint:
+    run: once
+    desc: Lint targets with ESLint
+    cmds:
+      - task: _run
+        vars:
+          MODE_ARGS: ""
+      - echo "✅ eslint passed"
+  lint:fix:
+    run: once
+    desc: Lint targets with ESLint and apply fixes
+    cmds:
+      - task: _run
+        vars:
+          MODE_ARGS: "--fix"
+      - echo "✅ eslint fixes applied"
+  ci:
+    run: once
+    desc: Run ESLint with zero-warning CI enforcement
+    cmds:
+      - task: _run
+        vars:
+          MODE_ARGS: "--max-warnings=0"
+      - echo "✅ eslint passed"
+  ci:fix:
+    run: once
+    desc: Run lint:fix for CI fixing
+    summary: |
+      Run lint:fix to apply automatic lint fixes. Suitable for CI
+      autofix workflows.
+    cmds:
+      - task: lint:fix
+  cache:clean:
+    run: once
+    desc: Remove the ESLint cache directory
+    cmds:
+      - if [ -d .cache/eslint ]; then rm -rf .cache/eslint; fi
+  version:
+    run: once
+    desc: Show the locally resolved ESLint version
+    cmds:
+      - task: pnpm:exec
+        vars:
+          BINARY: eslint
+          ARGS: "--version"
+  help:
+    run: once
+    desc: Show ESLint CLI help
+    cmds:
+      - task: pnpm:exec
+        vars:
+          BINARY: eslint
+          ARGS: "--help"
+          EXTRA_ARGS: '{{default .ESLINT_EXTRA_ARGS .ESLINT_EXTRA_ARGS_OVERRIDE}}{{if .CLI_ARGS}} {{.CLI_ARGS}}{{end}}'

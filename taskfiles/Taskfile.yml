@@ -72,6 +72,30 @@ vars:
   ZIZMOR_LINT_SKIP_PATTERN: ""
   ZIZMOR_TARGETS: ".github"
   ZIZMOR_VERSION: "1.25.2"
+  ESLINT_CACHE: ""
+  ESLINT_CONFIG: ""
+  ESLINT_DEFAULT_CACHE: "true"
+  ESLINT_DEFAULT_TARGETS: "src/**/*.{js,jsx,ts,tsx}"
+  ESLINT_EXTRA_ARGS: ""
+  ESLINT_LINT_SKIP_PATTERN: ""
+  ESLINT_TARGETS: ""
+  ESLINT_VERSION: ""
+  PRETTIER_CONFIG: ""
+  PRETTIER_DEFAULT_IGNORE_PATH: ".prettierignore"
+  PRETTIER_DEFAULT_TARGETS: "."
+  PRETTIER_EXTRA_ARGS: ""
+  PRETTIER_FMT_SKIP_PATTERN: ""
+  PRETTIER_IGNORE_PATH: ""
+  PRETTIER_TARGETS: ""
+  PRETTIER_VERSION: ""
+  TYPESCRIPT_FILE: src/index.ts
+  TYPESCRIPT_OUTFILE: dist/index.js
+  TYPESCRIPT_OUT_DIR: dist
+  TYPESCRIPT_TRACE_DIR: .tsc-trace
+  TYPESCRIPT_TSCONFIG: tsconfig.json
+  TYPESCRIPT_TSC_FLAGS: ""
+  TYPESCRIPT_TSX_FLAGS: ""
+  TYPESCRIPT_VERSION: ""
 includes:
   go:
     taskfile: go/Taskfile.yml
@@ -103,130 +127,89 @@ includes:
       GO_INSTALL_DIR_UNIX: '{{.GO_INSTALL_DIR_UNIX}}'
       GO_GLOBAL_BIN: '{{.GO_GLOBAL_BIN}}'
     dir: ..
-  yamllint:
-    taskfile: yamllint/Taskfile.yml
-    vars:
-      YAMLLINT_LINT_SKIP_PATTERN: '{{.YAMLLINT_LINT_SKIP_PATTERN}}'
-      UV_LOAD: '{{.UV_LOAD}}'
-      TARGETS: "."
-      CONFIG: '{{.CONFIG}}'
-      EXTRA_ARGS: '{{.EXTRA_ARGS}}'
-      YAMLLINT_VERSION: '{{.YAMLLINT_VERSION}}'
-      YAMLFIX_VERSION: '{{.YAMLFIX_VERSION}}'
-      YAMLLINT_TARGETS: '{{.YAMLLINT_TARGETS}}'
-      YAMLLINT_CONFIG: '{{.YAMLLINT_CONFIG}}'
-      YAMLLINT_EXTRA_ARGS: '{{.YAMLLINT_EXTRA_ARGS}}'
+  eslint:
+    taskfile: eslint/Taskfile.yml
     dir: ..
-  actionlint:
-    taskfile: actionlint/Taskfile.yml
     vars:
-      ACTIONLINT_LINT_SKIP_PATTERN: '{{.ACTIONLINT_LINT_SKIP_PATTERN}}'
-      ACTIONLINT_VERSION: '{{.ACTIONLINT_VERSION}}'
-      ACTIONLINT_EXTRA_ARGS: '{{.ACTIONLINT_EXTRA_ARGS}}'
-      ACTIONLINT_TARGETS: '{{.ACTIONLINT_TARGETS}}'
+      ESLINT_LINT_SKIP_PATTERN: '{{.ESLINT_LINT_SKIP_PATTERN}}'
+      ESLINT_TARGETS: '{{.ESLINT_TARGETS}}'
+      ESLINT_DEFAULT_TARGETS: '{{.ESLINT_DEFAULT_TARGETS}}'
+      ESLINT_CONFIG: '{{.ESLINT_CONFIG}}'
+      ESLINT_CACHE: '{{.ESLINT_CACHE}}'
+      ESLINT_DEFAULT_CACHE: '{{.ESLINT_DEFAULT_CACHE}}'
+      ESLINT_EXTRA_ARGS: '{{.ESLINT_EXTRA_ARGS}}'
+      ESLINT_VERSION: '{{.ESLINT_VERSION}}'
+  prettier:
+    taskfile: prettier/Taskfile.yml
     dir: ..
-  zizmor:
-    taskfile: zizmor/Taskfile.yml
     vars:
-      ZIZMOR_LINT_SKIP_PATTERN: '{{.ZIZMOR_LINT_SKIP_PATTERN}}'
-      ZIZMOR_EXTRA_ARGS: '{{.ZIZMOR_EXTRA_ARGS}}'
-      ZIZMOR_TARGETS: '{{.ZIZMOR_TARGETS}}'
-      ZIZMOR_VERSION: '{{.ZIZMOR_VERSION}}'
+      PRETTIER_FMT_SKIP_PATTERN: '{{.PRETTIER_FMT_SKIP_PATTERN}}'
+      PRETTIER_TARGETS: '{{.PRETTIER_TARGETS}}'
+      PRETTIER_DEFAULT_TARGETS: '{{.PRETTIER_DEFAULT_TARGETS}}'
+      PRETTIER_CONFIG: '{{.PRETTIER_CONFIG}}'
+      PRETTIER_IGNORE_PATH: '{{.PRETTIER_IGNORE_PATH}}'
+      PRETTIER_DEFAULT_IGNORE_PATH: '{{.PRETTIER_DEFAULT_IGNORE_PATH}}'
+      PRETTIER_EXTRA_ARGS: '{{.PRETTIER_EXTRA_ARGS}}'
+      PRETTIER_VERSION: '{{.PRETTIER_VERSION}}'
+  typescript:
+    taskfile: typescript/Taskfile.yml
     dir: ..
-  adrs:
-    taskfile: adrs/Taskfile.yml
     vars:
-      CARGO_BIN_UNIX: '{{.CARGO_BIN_UNIX}}'
-      EXTRA_ARGS: '{{.EXTRA_ARGS}}'
-      ADRS_VERSION: '{{.ADRS_VERSION}}'
-      ADRS_EXTRA_ARGS: '{{.ADRS_EXTRA_ARGS}}'
-    dir: ..
-  hadolint:
-    taskfile: hadolint/Taskfile.yml
-    vars:
-      HADOLINT_LINT_SKIP_PATTERN: '{{.HADOLINT_LINT_SKIP_PATTERN}}'
-      CONFIG: '{{.CONFIG}}'
-      DOCKERFILE: "Dockerfile"
-      EXTRA_ARGS: '{{.EXTRA_ARGS}}'
-      HADOLINT_VERSION: '{{.HADOLINT_VERSION}}'
-      HADOLINT_CONFIG: '{{.HADOLINT_CONFIG}}'
-      HADOLINT_DOCKERFILE: '{{.HADOLINT_DOCKERFILE}}'
-      HADOLINT_EXTRA_ARGS: '{{.HADOLINT_EXTRA_ARGS}}'
-    dir: ..
-  golangci-lint:
-    taskfile: golangci-lint/Taskfile.yml
-    vars:
-      GOLANGCI_LINT_VERSION: '{{.GOLANGCI_LINT_VERSION}}'
-      GOLANGCI_LINT_LINT_SKIP_PATTERN: '{{.GOLANGCI_LINT_LINT_SKIP_PATTERN}}'
-      GOLANGCI_LINT_FMT_SKIP_PATTERN: '{{.GOLANGCI_LINT_FMT_SKIP_PATTERN}}'
-      # Written next to the project's golangci-lint config so relative paths inside
-      # the merged copy keep resolving. Overwritten on every run, never deleted.
-      GOLANGCI_LINT_INTERNAL_SKIP_CONFIG: '{{.GOLANGCI_LINT_INTERNAL_SKIP_CONFIG}}'
-      # Formatter selection shared by every golangci-lint fmt invocation (both the
-      # skip-pattern and plain paths, on Unix and Windows). Kept in one place so the
-      # four call sites cannot drift apart.
-      GOLANGCI_LINT_FMT_FORMATTER_FLAGS: '{{.GOLANGCI_LINT_FMT_FORMATTER_FLAGS}}'
-      GLOBAL_GO_BIN: '{{.GLOBAL_GO_BIN}}'
-      GO_GLOBAL_BIN: '{{.GO_GLOBAL_BIN}}'
-    dir: ..
-  govulncheck:
-    taskfile: govulncheck/Taskfile.yml
-    vars:
-      GOVULNCHECK_VERSION: '{{.GOVULNCHECK_VERSION}}'
-      GOVULNCHECK_LINT_SKIP_PATTERN: '{{.GOVULNCHECK_LINT_SKIP_PATTERN}}'
-      GLOBAL_GO_BIN: '{{.GLOBAL_GO_BIN}}'
-      GO_GLOBAL_BIN: '{{.GO_GLOBAL_BIN}}'
-    dir: ..
+      TYPESCRIPT_FILE: '{{.TYPESCRIPT_FILE}}'
+      TYPESCRIPT_OUTFILE: '{{.TYPESCRIPT_OUTFILE}}'
+      TYPESCRIPT_OUT_DIR: '{{.TYPESCRIPT_OUT_DIR}}'
+      TYPESCRIPT_TSCONFIG: '{{.TYPESCRIPT_TSCONFIG}}'
+      TYPESCRIPT_TSX_FLAGS: '{{.TYPESCRIPT_TSX_FLAGS}}'
+      TYPESCRIPT_TSC_FLAGS: '{{.TYPESCRIPT_TSC_FLAGS}}'
+      TYPESCRIPT_TRACE_DIR: '{{.TYPESCRIPT_TRACE_DIR}}'
+      TYPESCRIPT_VERSION: '{{.TYPESCRIPT_VERSION}}'
 tasks:
+  ci:
+    desc: Run ci for synced TaskOtter modules
+    cmds:
+      - task: eslint:ci
+      - task: typescript:ci
+  ci:fix:
+    desc: Run ci:fix for synced TaskOtter modules
+    cmds:
+      - task: eslint:ci:fix
+      - task: prettier:ci:fix
+  config:init:
+    desc: Run config:init for synced TaskOtter modules
+    cmds:
+      - task: eslint:config:init
+      - task: prettier:config:init
+      - task: typescript:config:init
+  help:
+    desc: Run help for synced TaskOtter modules
+    cmds:
+      - task: eslint:help
+      - task: prettier:help
   install:
     desc: Run install for synced TaskOtter modules
     cmds:
+      - task: eslint:install
+      - task: prettier:install
+      - task: typescript:install
       - task: go:install
-      - task: golangci-lint:install
-      - task: govulncheck:install
-      - task: yamllint:install
-      - task: actionlint:install
-      - task: zizmor:install
-      - task: adrs:install
-      - task: hadolint:install
   install:undo:
     desc: Run install:undo for synced TaskOtter modules
     cmds:
+      - task: eslint:install:undo
+      - task: prettier:install:undo
+      - task: typescript:install:undo
       - task: go:install:undo
-      - task: yamllint:install:undo
-      - task: actionlint:install:undo
-      - task: zizmor:install:undo
-      - task: adrs:install:undo
-      - task: hadolint:install:undo
-  lint:
-    desc: Run lint for synced TaskOtter modules
-    cmds:
-      - task: golangci-lint:lint
-      - task: govulncheck:lint
-      - task: yamllint:lint
-      - task: actionlint:lint
-      - task: zizmor:lint
-      - task: hadolint:lint
-  lint:fix:
-    desc: Run lint:fix for synced TaskOtter modules
-    cmds:
-      - task: golangci-lint:lint:fix
-      - task: yamllint:lint:fix
   upgrade:
     desc: Run upgrade for synced TaskOtter modules
     cmds:
+      - task: eslint:upgrade
+      - task: prettier:upgrade
+      - task: typescript:upgrade
       - task: go:upgrade
-      - task: yamllint:upgrade
-      - task: actionlint:upgrade
-      - task: zizmor:upgrade
-      - task: adrs:upgrade
-      - task: hadolint:upgrade
   version:
     desc: Run version for synced TaskOtter modules
     cmds:
+      - task: eslint:version
+      - task: prettier:version
+      - task: typescript:version
       - task: go:version
-      - task: yamllint:version
-      - task: actionlint:version
-      - task: zizmor:version
-      - task: adrs:version
-      - task: hadolint:version

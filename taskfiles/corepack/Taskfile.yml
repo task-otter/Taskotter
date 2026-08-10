@@ -1,0 +1,302 @@
+---
+version: "3.5"
+output:
+  group:
+    begin: "::group::{{.TASK}}"
+    end: "::endgroup::"
+    error_only: false
+silent: true
+includes:
+  fnm:
+    taskfile: ../fnm/Taskfile.yml
+vars:
+  FNM_INSTALL_DIR: "$HOME/.local/share/fnm"
+  FNM_LOAD: 'export PATH="{{.FNM_INSTALL_DIR}}:$HOME/.local/bin:$PATH"; eval "$(fnm env --shell bash)"'
+  FNM_USE: >-
+    {{if .NODE_VERSION}}fnm use "{{.NODE_VERSION}}" {{- else}}if [ -f .node-version ] || [ -f .nvmrc ]; then fnm use; fi{{end}}
+  NODE_VERSION: ""
+  COREPACK_VERSION: 0.34.0 # override with COREPACK_VERSION=latest
+  COREPACK_UNAVAILABLE_MSG: "corepack is not available. Run the install task for this Corepack Taskfile."
+  WINDOWS_NODE_ACTIVATE: |
+    fnm env --shell powershell | Out-String | Invoke-Expression
+    if ($env:NODE_VERSION) {
+      fnm use $env:NODE_VERSION
+    } elseif ((Test-Path '.node-version') -or (Test-Path '.nvmrc')) {
+      fnm use
+    }
+tasks:
+  default:
+    run: once
+    desc: Show available Corepack automation tasks
+    summary: Display the list of available Corepack-related tasks defined in this Taskfile.
+    cmds:
+      - task --list
+  node:setup:
+    run: once
+    desc: Install Node.js for Corepack workflows
+    summary: Install Node.js through fnm.
+    cmds:
+      - task: _node:setup:unix
+      - task: _node:setup:windows
+  install:
+    run: once
+    desc: Install Corepack with npm when missing
+    summary: >-
+      Ensure the fnm-managed Node.js runtime has Corepack available, installing corepack globally through npm when Node.js does not provide it.
+    cmds:
+      - task: _install:unix
+      - task: _install:windows
+  install:undo:
+    run: once
+    desc: Remove Corepack installed through npm
+    summary: Run npm uninstall --global corepack to remove the Corepack package installed by the install task.
+    prompt:
+      - This will remove Corepack installed through npm.
+      - Continue?
+    cmds:
+      - task: _install:undo:unix
+      - task: _install:undo:windows
+  upgrade:
+    run: once
+    desc: Upgrade Corepack to the pinned COREPACK_VERSION
+    summary: |
+      Reinstall corepack at COREPACK_VERSION through npm, replacing any
+      existing installation. Update COREPACK_VERSION in the Taskfile vars
+      to change the target release.
+    cmds:
+      - task: _upgrade:unix
+      - task: _upgrade:windows
+  setup:
+    run: once
+    desc: Install and enable Corepack shims
+    summary: >-
+      Ensure Corepack is available, then enable supported package manager shims for the fnm-managed Node.js runtime.
+    deps:
+      - task: install
+    cmds:
+      - task: enable
+  version:
+    run: once
+    desc: Show the active Corepack version
+    summary: Print the Corepack version available through the fnm-managed Node.js runtime.
+    cmds:
+      - task: _corepack:unix
+        vars: {ARGS: --version}
+      - task: _corepack:windows
+        vars: {ARGS: --version}
+  enable:
+    run: once
+    desc: Enable Corepack package manager shims
+    summary: Run corepack enable so supported package manager shims resolve through Corepack.
+    cmds:
+      - task: _corepack:unix
+        vars: {ARGS: enable}
+      - task: _corepack:windows
+        vars: {ARGS: enable}
+  disable:
+    run: once
+    desc: Disable Corepack package manager shims
+    summary: Run corepack disable to remove Corepack package manager shims from the active runtime.
+    cmds:
+      - task: _corepack:unix
+        vars: {ARGS: disable}
+      - task: _corepack:windows
+        vars: {ARGS: disable}
+  use:
+    run: once
+    desc: Pin a package manager version in package.json
+    summary: Run corepack use for PACKAGE_MANAGER@VERSION in the current project root.
+    requires:
+      vars: [PACKAGE_MANAGER, VERSION]
+    cmds:
+      - task: _use:unix
+        vars:
+          PACKAGE_MANAGER: "{{.PACKAGE_MANAGER}}"
+          VERSION: "{{.VERSION}}"
+      - task: _use:windows
+        vars:
+          PACKAGE_MANAGER: "{{.PACKAGE_MANAGER}}"
+          VERSION: "{{.VERSION}}"
+  cache:clean:
+    run: once
+    desc: Clear the Corepack cache
+    summary: Run corepack cache clean to remove package manager archives cached by Corepack.
+    cmds:
+      - task: _corepack:unix
+        vars: {ARGS: cache clean}
+      - task: _corepack:windows
+        vars: {ARGS: cache clean}
+  _node:setup:unix:
+    run: once
+    internal: true
+    platforms: [linux, darwin]
+    set: [errexit, nounset, pipefail]
+    env:
+      NODE_VERSION: "{{.NODE_VERSION}}"
+    cmds:
+      - |
+        if [ -n "$NODE_VERSION" ]; then task fnm:node:install VERSION="$NODE_VERSION"; else task fnm:node:install; fi
+  _node:setup:windows:
+    run: once
+    internal: true
+    platforms: [windows]
+    env:
+      NODE_VERSION: "{{.NODE_VERSION}}"
+    cmds:
+      - >-
+        powershell -NoProfile -ExecutionPolicy Bypass -Command "if ($env:NODE_VERSION) { task fnm:node:install \"VERSION=$env:NODE_VERSION\" } else { task fnm:node:install }"
+  _install:unix:
+    run: once
+    internal: true
+    platforms: [linux, darwin]
+    status:
+      - >-
+        test -f "{{.FNM_INSTALL_DIR}}/fnm" || command -v fnm >/dev/null 2>&1 || test -f "$HOME/.local/bin/fnm"
+      - >-
+        bash -c '{{.FNM_LOAD}}; {{.FNM_USE}}; command -v corepack >/dev/null 2>&1 && corepack --version | grep -Fqx "{{.COREPACK_VERSION}}"'
+    preconditions:
+      - sh: >-
+          test -f "{{.FNM_INSTALL_DIR}}/fnm" || command -v fnm >/dev/null 2>&1 || test -f "$HOME/.local/bin/fnm"
+        msg: 'fnm is not installed. Run: task node:setup'
+    cmds:
+      - bash -c '{{.FNM_LOAD}}; {{.FNM_USE}}; npm install --global "corepack@{{.COREPACK_VERSION}}"'
+  _install:windows:
+    run: once
+    internal: true
+    platforms: [windows]
+    env:
+      NODE_VERSION: "{{.NODE_VERSION}}"
+    status:
+      - >-
+        powershell -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference = 'Stop'; $env:NODE_VERSION = '{{.NODE_VERSION}}'; if (-not (Get-Command fnm -ErrorAction SilentlyContinue)) { exit 1 }; {{.WINDOWS_NODE_ACTIVATE}}; $corepack = Get-Command corepack -ErrorAction SilentlyContinue; if ($corepack -and ((& $corepack.Source --version) -eq '{{.COREPACK_VERSION}}')) { exit 0 }; exit 1"
+    preconditions:
+      - sh: >-
+          powershell -NoProfile -ExecutionPolicy Bypass -Command "if (Get-Command fnm -ErrorAction SilentlyContinue) { exit 0 } else { exit 1 }"
+        msg: 'fnm is not installed or not available in PATH. Run: task node:setup'
+    cmds:
+      - >-
+        powershell -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference = 'Stop'; $env:NODE_VERSION = '{{.NODE_VERSION}}'; {{.WINDOWS_NODE_ACTIVATE}}; npm install --global 'corepack@{{.COREPACK_VERSION}}'"
+  _install:undo:unix:
+    run: once
+    internal: true
+    platforms: [linux, darwin]
+    status:
+      - >-
+        test -f "{{.FNM_INSTALL_DIR}}/fnm" || command -v fnm >/dev/null 2>&1 || test -f "$HOME/.local/bin/fnm"
+      - bash -c '{{.FNM_LOAD}}; {{.FNM_USE}}; ! command -v corepack >/dev/null 2>&1'
+    preconditions:
+      - sh: >-
+          test -f "{{.FNM_INSTALL_DIR}}/fnm" || command -v fnm >/dev/null 2>&1 || test -f "$HOME/.local/bin/fnm"
+        msg: 'fnm is not installed. Run: task node:setup'
+    cmds:
+      - bash -c '{{.FNM_LOAD}}; {{.FNM_USE}}; npm uninstall --global corepack'
+  _install:undo:windows:
+    run: once
+    internal: true
+    platforms: [windows]
+    env:
+      NODE_VERSION: "{{.NODE_VERSION}}"
+    status:
+      - >-
+        powershell -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference = 'Stop'; $env:NODE_VERSION = '{{.NODE_VERSION}}'; if (-not (Get-Command fnm -ErrorAction SilentlyContinue)) { exit 1 }; {{.WINDOWS_NODE_ACTIVATE}}; if (Get-Command corepack -ErrorAction SilentlyContinue) { exit 1 } else { exit 0 }"
+    preconditions:
+      - sh: >-
+          powershell -NoProfile -ExecutionPolicy Bypass -Command "if (Get-Command fnm -ErrorAction SilentlyContinue) { exit 0 } else { exit 1 }"
+        msg: 'fnm is not installed or not available in PATH. Run: task node:setup'
+    cmds:
+      - >-
+        powershell -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference = 'Stop'; $env:NODE_VERSION = '{{.NODE_VERSION}}'; {{.WINDOWS_NODE_ACTIVATE}}; npm uninstall --global corepack"
+  _upgrade:unix:
+    run: once
+    internal: true
+    platforms: [linux, darwin]
+    preconditions:
+      - sh: >-
+          test -f "{{.FNM_INSTALL_DIR}}/fnm" || command -v fnm >/dev/null 2>&1 || test -f "$HOME/.local/bin/fnm"
+        msg: 'fnm is not installed. Run: task node:setup'
+    cmds:
+      - bash -c '{{.FNM_LOAD}}; {{.FNM_USE}}; npm install --global "corepack@{{.COREPACK_VERSION}}"'
+  _upgrade:windows:
+    run: once
+    internal: true
+    platforms: [windows]
+    env:
+      NODE_VERSION: "{{.NODE_VERSION}}"
+    preconditions:
+      - sh: >-
+          powershell -NoProfile -ExecutionPolicy Bypass -Command "if (Get-Command fnm -ErrorAction SilentlyContinue) { exit 0 } else { exit 1 }"
+        msg: 'fnm is not installed or not available in PATH. Run: task node:setup'
+    cmds:
+      - >-
+        powershell -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference = 'Stop'; $env:NODE_VERSION = '{{.NODE_VERSION}}'; {{.WINDOWS_NODE_ACTIVATE}}; npm install --global 'corepack@{{.COREPACK_VERSION}}'"
+  _corepack:unix:
+    run: once
+    internal: true
+    platforms: [linux, darwin]
+    set: [errexit, nounset, pipefail]
+    requires:
+      vars: [ARGS]
+    preconditions:
+      - sh: >-
+          test -f "{{.FNM_INSTALL_DIR}}/fnm" || command -v fnm >/dev/null 2>&1 || test -f "$HOME/.local/bin/fnm"
+        msg: 'fnm is not installed. Run: task node:setup'
+    cmds:
+      - >-
+        bash -c '{{.FNM_LOAD}}; {{.FNM_USE}}; command -v corepack >/dev/null 2>&1 || { echo "{{.COREPACK_UNAVAILABLE_MSG}}"; exit 1; }; corepack {{.ARGS}}'
+  _corepack:windows:
+    run: once
+    internal: true
+    platforms: [windows]
+    requires:
+      vars: [ARGS]
+    env:
+      NODE_VERSION: "{{.NODE_VERSION}}"
+    preconditions:
+      - sh: >-
+          powershell -NoProfile -ExecutionPolicy Bypass -Command "if (Get-Command fnm -ErrorAction SilentlyContinue) { exit 0 } else { exit 1 }"
+        msg: 'fnm is not installed or not available in PATH. Run: task node:setup'
+    cmds:
+      - >-
+        powershell -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference = 'Stop'; $env:NODE_VERSION = '{{.NODE_VERSION}}'; {{.WINDOWS_NODE_ACTIVATE}}; if (-not (Get-Command corepack -ErrorAction SilentlyContinue)) { Write-Error '{{.COREPACK_UNAVAILABLE_MSG}}'; exit 1 }; corepack {{.ARGS}}"
+  _use:unix:
+    run: once
+    internal: true
+    platforms: [linux, darwin]
+    dir: "{{.USER_WORKING_DIR}}"
+    env:
+      PACKAGE_MANAGER: "{{.PACKAGE_MANAGER}}"
+      VERSION: "{{.VERSION}}"
+    preconditions:
+      - sh: 'printf "%s" "$PACKAGE_MANAGER" | grep -qE "^(npm|pnpm|yarn)$"'
+        msg: "PACKAGE_MANAGER must be npm, pnpm, or yarn."
+      - sh: 'printf "%s" "$VERSION" | grep -qE "^[A-Za-z0-9.+_-]+$"'
+        msg: "VERSION contains invalid characters."
+      - sh: 'test -f "{{.USER_WORKING_DIR}}/package.json"'
+        msg: "package.json not found. Run this task from the project root."
+    cmds:
+      - task: _corepack:unix
+        vars:
+          ARGS: "use {{.PACKAGE_MANAGER}}@{{.VERSION}}"
+  _use:windows:
+    run: once
+    internal: true
+    platforms: [windows]
+    dir: "{{.USER_WORKING_DIR}}"
+    env:
+      NODE_VERSION: "{{.NODE_VERSION}}"
+      PACKAGE_MANAGER: "{{.PACKAGE_MANAGER}}"
+      VERSION: "{{.VERSION}}"
+    preconditions:
+      - sh: >-
+          powershell -NoProfile -ExecutionPolicy Bypass -Command "if ($env:PACKAGE_MANAGER -match '^(npm|pnpm|yarn)$') { exit 0 } else { exit 1 }"
+        msg: "PACKAGE_MANAGER must be npm, pnpm, or yarn."
+      - sh: >-
+          powershell -NoProfile -ExecutionPolicy Bypass -Command "if ($env:VERSION -match '^[A-Za-z0-9.+_-]+$') { exit 0 } else { exit 1 }"
+        msg: "VERSION contains invalid characters."
+      - sh: >-
+          powershell -NoProfile -ExecutionPolicy Bypass -Command "if (Test-Path '{{.USER_WORKING_DIR}}\package.json') { exit 0 } else { exit 1 }"
+        msg: "package.json not found. Run this task from the project root."
+    cmds:
+      - task: _corepack:windows
+        vars:
+          ARGS: "use {{.PACKAGE_MANAGER}}@{{.VERSION}}"

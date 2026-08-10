@@ -1,0 +1,755 @@
+---
+version: "3.5"
+includes:
+  pnpm:
+    taskfile: ../pnpm/Taskfile.yml
+    optional: true
+output:
+  group:
+    begin: "::group::{{.TASK}}"
+    end: "::endgroup::"
+    error_only: false
+silent: true
+vars:
+  TYPESCRIPT_FILE: src/index.ts
+  TYPESCRIPT_OUTFILE: dist/index.js
+  TYPESCRIPT_OUT_DIR: dist
+  TYPESCRIPT_TSCONFIG: tsconfig.json
+  TYPESCRIPT_TSX_FLAGS: ""
+  TYPESCRIPT_TSC_FLAGS: ""
+  TYPESCRIPT_TRACE_DIR: .tsc-trace
+  TYPESCRIPT_VERSION: ""
+tasks:
+  default:
+    run: once
+    desc: List available TypeScript tasks
+    summary: Show all TypeScript tasks defined in this Taskfile.
+    silent: true
+    cmds:
+      - task --list
+  version:
+    run: once
+    desc: Show installed tsc and tsx versions
+    summary: |
+      Print the tsc and tsx versions resolved from node_modules or global PATH.
+      Also prints tsserver guidance — it ships with the typescript package and is
+      managed by editors, never started manually.
+    cmds:
+      - task: _version:unix
+      - task: _version:windows
+  tsserver:info:
+    run: once
+    desc: Show tsserver location and editor integration guidance
+    summary: |
+      Print the tsserver binary path and explain that it is a long-running stdio
+      process managed by editors (VS Code, Neovim, etc.). tsserver provides
+      autocomplete, hover types, go-to-definition, and inline diagnostics through
+      the TypeScript Server protocol (stdio-based).
+
+      tsserver does NOT speak Language Server Protocol (LSP) directly. Some editors
+      use an LSP adapter such as typescript-language-server (tsls) to wrap it.
+      VS Code communicates with tsserver natively via the TypeScript Server protocol.
+
+      Never start tsserver manually.
+    cmds:
+      - task: _tsserver:info:unix
+      - task: _tsserver:info:windows
+  install:
+    run: once
+    desc: Install TypeScript dev dependencies (auto-detects package manager)
+    summary: |
+      Install typescript (provides tsc + tsserver), tsx, and @types/node as
+      devDependencies using the project's package manager.
+      Pass PM=npm|yarn|pnpm|bun to force a specific package manager, and
+      TYPESCRIPT_VERSION=x.y.z to pin the typescript package to a specific release.
+      Lockfile detection order (when PM is not set):
+        bun.lock / bun.lockb → bun add -d
+        pnpm-lock.yaml       → pnpm add -D
+        yarn.lock            → yarn add -D
+        (fallback)           → npm install -D
+    vars:
+      RESOLVED_VERSION: '{{default .TYPESCRIPT_VERSION .TYPESCRIPT_VERSION_OVERRIDE}}'
+    status:
+      - >-
+        node -e "const installed = require('./node_modules/typescript/package.json'); const requested = '{{.RESOLVED_VERSION}}'; process.exit(!requested || installed.version === requested ? 0 : 1)"
+    cmds:
+      - task: pnpm:add
+        vars:
+          PACKAGES: 'typescript{{if .RESOLVED_VERSION}}@{{.RESOLVED_VERSION}}{{end}} tsx @types/node'
+          PM: "{{.PM}}"
+      - task: _install:windows
+  install:undo:
+    run: once
+    desc: Remove the locally installed TypeScript dev dependencies
+    summary: Remove typescript, tsx, and @types/node from local devDependencies.
+    prompt:
+      - This will remove typescript, tsx, and @types/node from local devDependencies.
+      - Continue?
+    cmds:
+      - task: pnpm:remove
+        vars:
+          PACKAGES: "typescript tsx @types/node"
+          PM: "{{.PM}}"
+  upgrade:
+    run: once
+    desc: Upgrade TypeScript dev dependencies to the latest release
+    summary: Reinstall typescript, tsx, and @types/node at their latest versions.
+    cmds:
+      - task: pnpm:add
+        vars:
+          PACKAGES: "typescript@latest tsx@latest @types/node@latest"
+          PM: "{{.PM}}"
+  run:
+    run: once
+    desc: Run a TypeScript file with tsx — no type-checking (TYPESCRIPT_FILE=src/index.ts)
+    summary: |
+      Execute a TypeScript file directly using tsx. Types are stripped via esbuild;
+      no type errors are caught. Always run typecheck before committing.
+      Default entry point: src/index.ts. Override with TYPESCRIPT_FILE=path/to/file.ts.
+      TSX_FLAGS and CLI_ARGS are trusted input — never pass untrusted user data.
+      Examples:
+        task typescript:run
+        task typescript:run TYPESCRIPT_FILE=scripts/seed.ts
+        task typescript:run TYPESCRIPT_FILE=src/index.ts TYPESCRIPT_TSX_FLAGS="--env-file .env"
+        task typescript:run -- --port 3000
+    cmds:
+      - task: _tsx
+        vars:
+          ARGS: >-
+            {{if .TYPESCRIPT_TSX_FLAGS}}{{.TYPESCRIPT_TSX_FLAGS}} {{end}} {{- .TYPESCRIPT_FILE}}{{if .CLI_ARGS}} {{.CLI_ARGS}}{{end}}
+      - task: _tsx:windows
+        vars:
+          ARGS: >-
+            {{if .TYPESCRIPT_TSX_FLAGS}}{{.TYPESCRIPT_TSX_FLAGS}} {{end}} {{- .TYPESCRIPT_FILE}}{{if .CLI_ARGS}} {{.CLI_ARGS}}{{end}}
+  dev:
+    run: once
+    desc: Run a TypeScript file in watch mode with tsx (TYPESCRIPT_FILE=src/index.ts)
+    summary: |
+      Start tsx in watch mode. The process restarts on every file change.
+      tsx watch performs no type-checking. Run typecheck:watch in a second
+      terminal for live type-error feedback alongside the running process.
+      Default entry point: src/index.ts. Override with TYPESCRIPT_FILE=path/to/file.ts.
+      Examples:
+        task typescript:dev
+        task typescript:dev TYPESCRIPT_FILE=src/server.ts
+        task typescript:dev TYPESCRIPT_TSX_FLAGS="--env-file .env"
+    cmds:
+      - task: _tsx
+        vars:
+          ARGS: "watch {{if .TYPESCRIPT_TSX_FLAGS}}{{.TYPESCRIPT_TSX_FLAGS}} {{end}}{{.TYPESCRIPT_FILE}}"
+      - task: _tsx:windows
+        vars:
+          ARGS: "watch {{if .TYPESCRIPT_TSX_FLAGS}}{{.TYPESCRIPT_TSX_FLAGS}} {{end}}{{.TYPESCRIPT_FILE}}"
+  typecheck:
+    run: once
+    desc: Type-check the project without emitting files (tsc --noEmit)
+    summary: |
+      Run tsc --noEmit for a full static type-check. No files are written.
+      This is the definitive validation step — tsx never catches type errors.
+      Uses tsconfig.json by default. Override with TYPESCRIPT_TSCONFIG=path/to/tsconfig.json.
+      TSC_FLAGS are trusted input — never pass untrusted user data.
+      Examples:
+        task typescript:typecheck
+        task typescript:typecheck TYPESCRIPT_TSCONFIG=tsconfig.strict.json
+        task typescript:typecheck TYPESCRIPT_TSC_FLAGS="--strict"
+    cmds:
+      - task: _tsc
+        vars:
+          ARGS: "--noEmit{{if .TYPESCRIPT_TSC_FLAGS}} {{.TYPESCRIPT_TSC_FLAGS}}{{end}}"
+      - task: _tsc:windows
+        vars:
+          ARGS: "--noEmit{{if .TYPESCRIPT_TSC_FLAGS}} {{.TYPESCRIPT_TSC_FLAGS}}{{end}}"
+  typecheck:watch:
+    run: once
+    desc: Type-check in watch mode — recheck on every file change (tsc --noEmit --watch)
+    summary: |
+      Run tsc --noEmit --watch to rerun the type-checker on every save.
+      Best paired with task dev in a split terminal: tsx handles fast execution
+      while tsc reports live type errors in parallel.
+      Examples:
+        task typescript:typecheck:watch
+        task typescript:typecheck:watch TYPESCRIPT_TSCONFIG=tsconfig.strict.json
+    cmds:
+      - task: _tsc
+        vars:
+          ARGS: "--noEmit --watch{{if .TYPESCRIPT_TSC_FLAGS}} {{.TYPESCRIPT_TSC_FLAGS}}{{end}}"
+      - task: _tsc:windows
+        vars:
+          ARGS: "--noEmit --watch{{if .TYPESCRIPT_TSC_FLAGS}} {{.TYPESCRIPT_TSC_FLAGS}}{{end}}"
+  typecheck:files:
+    run: once
+    desc: Type-check specific files without a tsconfig (FILES="src/a.ts src/b.ts")
+    summary: |
+      WARNING: This task bypasses tsconfig.json entirely. When TypeScript receives
+      explicit file arguments on the CLI it ignores ALL tsconfig settings including:
+        moduleResolution, paths, jsx, target, lib, types, strict, module, baseUrl.
+      Results WILL differ from a full project type-check. For authoritative
+      validation always use: task typescript:typecheck
+
+      Run tsc --noEmit on an explicit file list — useful for quickly checking a
+      handful of isolated files in a controlled environment.
+      FILES must be a space-separated list of .ts paths (trusted input only).
+      TSC_FLAGS are appended after --noEmit (trusted input only).
+      Examples:
+        task typescript:typecheck:files FILES="src/utils.ts src/api.ts"
+        task typescript:typecheck:files FILES=src/index.ts TYPESCRIPT_TSC_FLAGS="--strict"
+    requires:
+      vars:
+        - FILES
+    cmds:
+      - task: _tsc:noconfig
+        vars:
+          ARGS: "--noEmit {{.TYPESCRIPT_TSC_FLAGS}} {{.FILES}}"
+      - task: _tsc:noconfig:windows
+        vars:
+          ARGS: "--noEmit {{.TYPESCRIPT_TSC_FLAGS}} {{.FILES}}"
+  build:
+    run: once
+    desc: Compile TypeScript to JavaScript (tsc)
+    summary: |
+      Run tsc to compile the project. Performs a full type-check and emits
+      JavaScript to outDir. --noEmitOnError ensures no partial output is written
+      when type errors exist. Recommend also setting "noEmitOnError": true in
+      tsconfig.json so tsc --watch behaves the same way.
+      Uses tsconfig.json by default. Override with TYPESCRIPT_TSCONFIG=path/to/tsconfig.json.
+      TSC_FLAGS are trusted input — never pass untrusted user data.
+      Examples:
+        task typescript:build
+        task typescript:build TYPESCRIPT_TSCONFIG=tsconfig.prod.json
+        task typescript:build TYPESCRIPT_TSC_FLAGS="--incremental"
+    cmds:
+      - task: _tsc
+        vars:
+          ARGS: "--noEmitOnError{{if .TYPESCRIPT_TSC_FLAGS}} {{.TYPESCRIPT_TSC_FLAGS}}{{end}}"
+      - task: _tsc:windows
+        vars:
+          ARGS: "--noEmitOnError{{if .TYPESCRIPT_TSC_FLAGS}} {{.TYPESCRIPT_TSC_FLAGS}}{{end}}"
+  build:watch:
+    run: once
+    desc: Compile TypeScript in watch mode — recompile on every file change (tsc --watch)
+    summary: |
+      Run tsc --noEmitOnError --watch to keep the compiler running and recompile on
+      every save. No partial output is written when errors exist.
+      Useful when developing libraries where consumers need continuously
+      refreshed compiled output from dist/.
+      Examples:
+        task typescript:build:watch
+        task typescript:build:watch TYPESCRIPT_TSCONFIG=tsconfig.lib.json
+    cmds:
+      - task: _tsc
+        vars:
+          ARGS: "--noEmitOnError --watch{{if .TYPESCRIPT_TSC_FLAGS}} {{.TYPESCRIPT_TSC_FLAGS}}{{end}}"
+      - task: _tsc:windows
+        vars:
+          ARGS: "--noEmitOnError --watch{{if .TYPESCRIPT_TSC_FLAGS}} {{.TYPESCRIPT_TSC_FLAGS}}{{end}}"
+  build:clean:
+    run: once
+    desc: Remove the output directory then compile TypeScript (clean build)
+    summary: |
+      Delete OUT_DIR and run a full tsc compile with --noEmitOnError. Guarantees
+      no stale files survive in the output before shipping.
+      Equivalent to: rm -rf dist && tsc --noEmitOnError
+      Override the output directory with TYPESCRIPT_OUT_DIR=build.
+      Examples:
+        task typescript:build:clean
+        task typescript:build:clean TYPESCRIPT_OUT_DIR=build TYPESCRIPT_TSCONFIG=tsconfig.prod.json
+    cmds:
+      - task: _build:clean:unix
+      - task: _build:clean:windows
+  emit:dts:
+    run: once
+    desc: Emit only .d.ts declaration files without JavaScript (tsc --emitDeclarationOnly)
+    summary: |
+      Run tsc --declaration --emitDeclarationOnly. Useful for library authors
+      who ship type declarations separately from their bundled JavaScript.
+      Output goes to OUT_DIR (default: dist/). Override with TYPESCRIPT_OUT_DIR=types.
+      Examples:
+        task typescript:emit:dts
+        task typescript:emit:dts TYPESCRIPT_OUT_DIR=types
+    cmds:
+      - task: _tsc
+        vars:
+          ARGS: >-
+            --declaration --emitDeclarationOnly --outDir "{{.TYPESCRIPT_OUT_DIR}}" {{- if .TYPESCRIPT_TSC_FLAGS}} {{.TYPESCRIPT_TSC_FLAGS}}{{end}}
+      - task: _tsc:windows
+        vars:
+          ARGS: >-
+            --declaration --emitDeclarationOnly --outDir '{{.TYPESCRIPT_OUT_DIR}}' {{- if .TYPESCRIPT_TSC_FLAGS}} {{.TYPESCRIPT_TSC_FLAGS}}{{end}}
+  config:show:
+    run: once
+    desc: Show the fully resolved tsconfig.json (tsc --showConfig)
+    summary: |
+      Run tsc --showConfig to display the effective config after resolving all
+      extends chains, path aliases, and compiler defaults. Useful for debugging
+      unexpected compiler behaviour.
+      Examples:
+        task typescript:config:show
+        task typescript:config:show TYPESCRIPT_TSCONFIG=tsconfig.lib.json
+    cmds:
+      - task: _tsc
+        vars:
+          ARGS: --showConfig
+      - task: _tsc:windows
+        vars:
+          ARGS: --showConfig
+  config:init:
+    run: once
+    desc: Generate a starter tsconfig.json in the current directory (tsc --init)
+    summary: |
+      Run tsc --init to create a tsconfig.json with sensible defaults and
+      extensive inline comments. If tsconfig.json already exists, tsc reports
+      that without overwriting it. Run from the Node.js project root.
+      Recommended: set "noEmitOnError": true in the generated tsconfig.json to
+      prevent partial JS output when type errors exist (task typescript:build
+      also passes --noEmitOnError, but the tsconfig setting covers tsc --watch).
+    cmds:
+      - task: _tsc:noconfig
+        vars:
+          ARGS: --init
+      - task: _tsc:noconfig:windows
+        vars:
+          ARGS: --init
+  config:files:
+    run: once
+    desc: List all files included in the TypeScript compilation (tsc --listFiles)
+    summary: |
+      Run tsc --listFiles --noEmit to print every file the compiler processes.
+      Useful for diagnosing unexpected files being included or excluded by
+      include/exclude globs or references.
+      Examples:
+        task typescript:config:files
+        task typescript:config:files TYPESCRIPT_TSCONFIG=tsconfig.lib.json
+    cmds:
+      - task: _tsc
+        vars:
+          ARGS: --listFiles --noEmit
+      - task: _tsc:windows
+        vars:
+          ARGS: --listFiles --noEmit
+  config:diagnostics:
+    run: once
+    desc: Show tsc performance diagnostics (tsc --diagnostics)
+    summary: |
+      Run tsc --noEmit --diagnostics to report files checked, memory usage,
+      and time per compilation phase. Use to guide incremental-build or
+      skipLibCheck optimisations.
+      Examples:
+        task typescript:config:diagnostics
+        task typescript:config:diagnostics TYPESCRIPT_TSCONFIG=tsconfig.lib.json
+    cmds:
+      - task: _tsc
+        vars:
+          ARGS: --noEmit --diagnostics
+      - task: _tsc:windows
+        vars:
+          ARGS: --noEmit --diagnostics
+  config:trace:
+    run: once
+    desc: Generate a tsc performance trace for analysis (tsc --generateTrace)
+    summary: |
+      Run tsc --generateTrace to emit a JSON trace of every compiler phase.
+      Load the output in chrome://tracing or analyse it with:
+        npx @typescript/analyze-trace <trace-dir>
+      Default trace directory: .tsc-trace/. Override with TYPESCRIPT_TRACE_DIR=your-dir.
+      Examples:
+        task typescript:config:trace
+        task typescript:config:trace TYPESCRIPT_TRACE_DIR=.traces/tsc
+    cmds:
+      - task: _config:trace:unix
+        vars:
+          TYPESCRIPT_TRACE_DIR: "{{.TYPESCRIPT_TRACE_DIR}}"
+      - task: _config:trace:windows
+        vars:
+          TYPESCRIPT_TRACE_DIR: "{{.TYPESCRIPT_TRACE_DIR}}"
+  start:
+    run: once
+    desc: Run the compiled JavaScript with node (TYPESCRIPT_OUTFILE=dist/index.js)
+    summary: |
+      Execute the compiled output using plain node — no TypeScript tooling.
+      Run task typescript:build first to ensure the output is up to date.
+      Default output file: dist/index.js. Override with TYPESCRIPT_OUTFILE=dist/server.js.
+      Examples:
+        task typescript:start
+        task typescript:start TYPESCRIPT_OUTFILE=dist/server.js
+    cmds:
+      - task: _start:unix
+      - task: _start:windows
+  ci:
+    run: once
+    desc: Type-check the project for CI — exits non-zero on any type error
+    summary: |
+      Run tsc --noEmit as a strict CI gate. Functionally identical to typecheck
+      but named ci to make the pipeline step self-documenting in logs.
+      Examples:
+        task typescript:ci
+        task typescript:ci TYPESCRIPT_TSCONFIG=tsconfig.strict.json
+    cmds:
+      - task: _tsc
+        vars:
+          ARGS: "--noEmit{{if .TYPESCRIPT_TSC_FLAGS}} {{.TYPESCRIPT_TSC_FLAGS}}{{end}}"
+      - task: _tsc:windows
+        vars:
+          ARGS: "--noEmit{{if .TYPESCRIPT_TSC_FLAGS}} {{.TYPESCRIPT_TSC_FLAGS}}{{end}}"
+      - echo "✅ tsc passed"
+  clean:
+    run: once
+    desc: Remove the compiled output directory (TYPESCRIPT_OUT_DIR=dist)
+    summary: |
+      Delete the tsc output directory. Defaults to dist/. Override with TYPESCRIPT_OUT_DIR=build.
+      Skipped automatically when the directory does not exist.
+      Examples:
+        task typescript:clean
+        task typescript:clean TYPESCRIPT_OUT_DIR=build
+    prompt:
+      - "This will delete the {{.TYPESCRIPT_OUT_DIR}}/ directory."
+      - Continue?
+    cmds:
+      - task: _clean:unix
+      - task: _clean:windows
+  clean:all:
+    run: once
+    desc: Remove dist/, tsconfig.tsbuildinfo, and .tsc-trace/ (full build reset)
+    summary: |
+      Delete the output directory, incremental build cache (tsconfig.tsbuildinfo),
+      and the tsc trace directory. Fully resets TypeScript build state.
+      Run task typescript:build after to produce a fresh compile.
+      Override the output directory with TYPESCRIPT_OUT_DIR=build.
+    prompt:
+      - "WARNING: This will delete {{.TYPESCRIPT_OUT_DIR}}/, tsconfig.tsbuildinfo, and .tsc-trace/."
+      - Continue?
+    cmds:
+      - task: _clean:all:unix
+      - task: _clean:all:windows
+  _tsc:
+    run: once
+    internal: true
+    platforms: [linux, darwin]
+    dir: "{{.USER_WORKING_DIR}}"
+    set: [errexit, nounset, pipefail]
+    preconditions:
+      - sh: 'test -f "{{.USER_WORKING_DIR}}/node_modules/.bin/tsc" || command -v tsc >/dev/null 2>&1'
+        msg: "tsc not found. Run: task typescript:install"
+      - sh: 'test -f "{{.USER_WORKING_DIR}}/{{.TYPESCRIPT_TSCONFIG}}"'
+        msg: 'TSCONFIG "{{.TYPESCRIPT_TSCONFIG}}" not found. Run: task typescript:config:init'
+    cmds:
+      - |
+        if [ -f "node_modules/.bin/tsc" ]; then
+          node_modules/.bin/tsc --project "{{.TYPESCRIPT_TSCONFIG}}" {{.ARGS}}
+        else
+          tsc --project "{{.TYPESCRIPT_TSCONFIG}}" {{.ARGS}}
+        fi
+  _tsc:windows:
+    run: once
+    internal: true
+    platforms: [windows]
+    dir: "{{.USER_WORKING_DIR}}"
+    preconditions:
+      - sh: >-
+          powershell -NoProfile -ExecutionPolicy Bypass -Command "if ((Test-Path 'node_modules\.bin\tsc.cmd') -or (Get-Command tsc -ErrorAction SilentlyContinue)) { exit 0 } else { exit 1 }"
+        msg: "tsc not found. Run: task typescript:install"
+      - sh: >-
+          powershell -NoProfile -ExecutionPolicy Bypass -Command "if (Test-Path '{{.TYPESCRIPT_TSCONFIG}}') { exit 0 } else { exit 1 }"
+        msg: 'TSCONFIG "{{.TYPESCRIPT_TSCONFIG}}" not found. Run: task typescript:config:init'
+    cmds:
+      - >-
+        powershell -NoProfile -ExecutionPolicy Bypass -Command "if (Test-Path 'node_modules\.bin\tsc.cmd') { & node_modules\.bin\tsc.cmd --project '{{.TYPESCRIPT_TSCONFIG}}' {{.ARGS}} } else { tsc --project '{{.TYPESCRIPT_TSCONFIG}}' {{.ARGS}} }"
+  _tsc:noconfig:
+    run: once
+    internal: true
+    platforms: [linux, darwin]
+    dir: "{{.USER_WORKING_DIR}}"
+    set: [errexit, nounset, pipefail]
+    preconditions:
+      - sh: 'test -f "{{.USER_WORKING_DIR}}/node_modules/.bin/tsc" || command -v tsc >/dev/null 2>&1'
+        msg: "tsc not found. Run: task typescript:install"
+    cmds:
+      - |
+        if [ -f "node_modules/.bin/tsc" ]; then
+          node_modules/.bin/tsc {{.ARGS}}
+        else
+          tsc {{.ARGS}}
+        fi
+  _tsc:noconfig:windows:
+    run: once
+    internal: true
+    platforms: [windows]
+    dir: "{{.USER_WORKING_DIR}}"
+    preconditions:
+      - sh: >-
+          powershell -NoProfile -ExecutionPolicy Bypass -Command "if ((Test-Path 'node_modules\.bin\tsc.cmd') -or (Get-Command tsc -ErrorAction SilentlyContinue)) { exit 0 } else { exit 1 }"
+        msg: "tsc not found. Run: task typescript:install"
+    cmds:
+      - >-
+        powershell -NoProfile -ExecutionPolicy Bypass -Command "if (Test-Path 'node_modules\.bin\tsc.cmd') { & node_modules\.bin\tsc.cmd {{.ARGS}} } else { tsc {{.ARGS}} }"
+  _tsx:
+    run: once
+    internal: true
+    platforms: [linux, darwin]
+    dir: "{{.USER_WORKING_DIR}}"
+    set: [errexit, nounset, pipefail]
+    preconditions:
+      - sh: 'test -f "{{.USER_WORKING_DIR}}/node_modules/.bin/tsx" || command -v tsx >/dev/null 2>&1'
+        msg: "tsx not found. Run: task typescript:install"
+      - sh: 'test -f "{{.USER_WORKING_DIR}}/{{.TYPESCRIPT_FILE}}"'
+        msg: 'TYPESCRIPT_FILE "{{.TYPESCRIPT_FILE}}" not found. Set TYPESCRIPT_FILE=path/to/your/file.ts'
+    cmds:
+      - |
+        if [ -f "node_modules/.bin/tsx" ]; then
+          node_modules/.bin/tsx {{.ARGS}}
+        else
+          tsx {{.ARGS}}
+        fi
+  _tsx:windows:
+    run: once
+    internal: true
+    platforms: [windows]
+    dir: "{{.USER_WORKING_DIR}}"
+    preconditions:
+      - sh: >-
+          powershell -NoProfile -ExecutionPolicy Bypass -Command "if ((Test-Path 'node_modules\.bin\tsx.cmd') -or (Get-Command tsx -ErrorAction SilentlyContinue)) { exit 0 } else { exit 1 }"
+        msg: "tsx not found. Run: task typescript:install"
+      - sh: >-
+          powershell -NoProfile -ExecutionPolicy Bypass -Command "if (Test-Path '{{.TYPESCRIPT_FILE}}') { exit 0 } else { exit 1 }"
+        msg: 'TYPESCRIPT_FILE "{{.TYPESCRIPT_FILE}}" not found. Set TYPESCRIPT_FILE=path/to/your/file.ts'
+    cmds:
+      - >-
+        powershell -NoProfile -ExecutionPolicy Bypass -Command "if (Test-Path 'node_modules\.bin\tsx.cmd') { & node_modules\.bin\tsx.cmd {{.ARGS}} } else { tsx {{.ARGS}} }"
+  _install:windows:
+    run: once
+    internal: true
+    platforms: [windows]
+    dir: "{{.USER_WORKING_DIR}}"
+    env:
+      TS_VERSION: "{{.TYPESCRIPT_VERSION}}"
+    preconditions:
+      - sh: >-
+          powershell -NoProfile -ExecutionPolicy Bypass -Command "if (Test-Path '{{.USER_WORKING_DIR}}\\package.json') { exit 0 } else { exit 1 }"
+        msg: "package.json not found. Run this task from the Node.js project root."
+    cmds:
+      - task: pnpm:add
+        vars:
+          PACKAGES: >-
+            {{if .TYPESCRIPT_VERSION}}typescript@{{.TYPESCRIPT_VERSION}} tsx @types/node{{else}}
+
+              typescript tsx @types/node{{end}}
+  _version:unix:
+    run: once
+    internal: true
+    platforms: [linux, darwin]
+    dir: "{{.USER_WORKING_DIR}}"
+    set: [errexit, nounset, pipefail]
+    preconditions:
+      - sh: command -v node >/dev/null 2>&1
+        msg: "node is not available. Install Node.js first."
+    cmds:
+      - |
+        echo '=== tsc (TypeScript Compiler) ==='
+        if [ -f node_modules/.bin/tsc ]; then
+          node_modules/.bin/tsc --version
+        elif command -v tsc >/dev/null 2>&1; then
+          tsc --version
+        else
+          echo 'tsc not found. Run: task typescript:install'
+        fi
+        echo ''
+        echo '=== tsx (TypeScript Execute) ==='
+        if [ -f node_modules/.bin/tsx ]; then
+          node_modules/.bin/tsx --version
+        elif command -v tsx >/dev/null 2>&1; then
+          tsx --version
+        else
+          echo 'tsx not found. Run: task typescript:install'
+        fi
+        echo ''
+        echo '=== tsserver (TypeScript Server) ==='
+        if [ -f node_modules/.bin/tsserver ]; then
+          echo "Binary: $(pwd)/node_modules/.bin/tsserver"
+        elif command -v tsserver >/dev/null 2>&1; then
+          echo "Binary: $(command -v tsserver)"
+        else
+          echo 'tsserver not found. Run: task typescript:install'
+        fi
+        echo 'Uses TypeScript Server protocol (stdio-based), not LSP directly.'
+        echo 'Managed by your editor. Do not start it manually.'
+  _version:windows:
+    run: once
+    internal: true
+    platforms: [windows]
+    dir: "{{.USER_WORKING_DIR}}"
+    preconditions:
+      - sh: >-
+          powershell -NoProfile -ExecutionPolicy Bypass -Command "if (Get-Command node -ErrorAction SilentlyContinue) { exit 0 } else { exit 1 }"
+        msg: "node is not available. Install Node.js first."
+    cmds:
+      - >-
+        powershell -NoProfile -ExecutionPolicy Bypass -Command "Write-Host '=== tsc (TypeScript Compiler) ==='; if (Test-Path 'node_modules\.bin\tsc.cmd') { & node_modules\.bin\tsc.cmd --version } elseif (Get-Command tsc -ErrorAction SilentlyContinue) { tsc --version } else { Write-Host 'tsc not found. Run task typescript:install' }; Write-Host ''; Write-Host '=== tsx (TypeScript Execute) ==='; if (Test-Path 'node_modules\.bin\tsx.cmd') { & node_modules\.bin\tsx.cmd --version } elseif (Get-Command tsx -ErrorAction SilentlyContinue) { tsx --version } else { Write-Host 'tsx not found. Run task typescript:install' }; Write-Host ''; Write-Host '=== tsserver (TypeScript Server) ==='; if (Test-Path 'node_modules\.bin\tsserver.cmd') { Write-Host ('Binary: ' + (Get-Location).Path + '\node_modules\.bin\tsserver.cmd') } elseif (Get-Command tsserver -ErrorAction SilentlyContinue) { Write-Host ('Binary: ' + (Get-Command tsserver).Source) } else { Write-Host 'tsserver not found. Run task typescript:install' }; Write-Host 'Uses TypeScript Server protocol (stdio-based), not LSP directly.'; Write-Host 'Managed by your editor. Do not start it manually.'"
+  _tsserver:info:unix:
+    run: once
+    internal: true
+    platforms: [linux, darwin]
+    dir: "{{.USER_WORKING_DIR}}"
+    set: [errexit, nounset, pipefail]
+    cmds:
+      - |
+        echo '=== tsserver (TypeScript Server) ==='
+        echo ''
+        if [ -f node_modules/.bin/tsserver ]; then
+          echo "Binary: $(pwd)/node_modules/.bin/tsserver"
+          echo 'Source: ships with the typescript package'
+        elif command -v tsserver >/dev/null 2>&1; then
+          echo "Binary: $(command -v tsserver) (global install)"
+        else
+          echo 'tsserver not found. Run: task typescript:install'
+        fi
+        echo ''
+        echo 'tsserver is a long-running stdio process managed by your editor.'
+        echo 'It provides autocomplete, hover types, go-to-definition, rename,'
+        echo 'and inline diagnostics. Never start it manually.'
+        echo ''
+        echo 'Protocol: TypeScript Server protocol (stdio-based), NOT Language Server'
+        echo 'Protocol (LSP) directly. Some editors use an LSP adapter such as'
+        echo 'typescript-language-server (tsls) to wrap tsserver. VS Code talks'
+        echo 'to tsserver natively via the TypeScript Server protocol.'
+        echo ''
+        echo 'VS Code — Command Palette (Cmd+Shift+P / Ctrl+Shift+P):'
+        echo '  TypeScript: Restart TS Server'
+        echo '  TypeScript: Select TypeScript Version'
+        echo '  TypeScript: Open TS Server Log'
+        echo '  TypeScript: Go to Project Config'
+  _tsserver:info:windows:
+    run: once
+    internal: true
+    platforms: [windows]
+    dir: "{{.USER_WORKING_DIR}}"
+    cmds:
+      - >-
+        powershell -NoProfile -ExecutionPolicy Bypass -Command "Write-Host '=== tsserver (TypeScript Server) ==='; Write-Host ''; if (Test-Path 'node_modules\.bin\tsserver.cmd') { Write-Host ('Binary: ' + (Get-Location).Path + '\node_modules\.bin\tsserver.cmd'); Write-Host 'Source: ships with the typescript package' } elseif (Get-Command tsserver -ErrorAction SilentlyContinue) { Write-Host ('Binary: ' + (Get-Command tsserver).Source + ' (global install)') } else { Write-Host 'tsserver not found. Run task typescript:install' }; Write-Host ''; Write-Host 'tsserver is a long-running stdio process managed by your editor.'; Write-Host 'It provides autocomplete, hover types, go-to-definition, rename,'; Write-Host 'and inline diagnostics. Never start it manually.'; Write-Host ''; Write-Host 'Protocol: TypeScript Server protocol (stdio-based), NOT Language Server'; Write-Host 'Protocol (LSP) directly. Some editors use an LSP adapter such as'; Write-Host 'typescript-language-server (tsls) to wrap tsserver. VS Code talks'; Write-Host 'to tsserver natively via the TypeScript Server protocol.'; Write-Host ''; Write-Host 'VS Code - Command Palette (Ctrl+Shift+P):'; Write-Host '  TypeScript: Restart TS Server'; Write-Host '  TypeScript: Select TypeScript Version'; Write-Host '  TypeScript: Open TS Server Log'; Write-Host '  TypeScript: Go to Project Config'"
+  _build:clean:unix:
+    run: once
+    internal: true
+    platforms: [linux, darwin]
+    dir: "{{.USER_WORKING_DIR}}"
+    set: [errexit, nounset, pipefail]
+    cmds:
+      - echo 'Removing {{.TYPESCRIPT_OUT_DIR}}...'
+      - rm -rf "{{.TYPESCRIPT_OUT_DIR}}"
+      - task: _tsc
+        vars:
+          ARGS: "--noEmitOnError{{if .TYPESCRIPT_TSC_FLAGS}} {{.TYPESCRIPT_TSC_FLAGS}}{{end}}"
+      - echo 'Clean build complete.'
+  _build:clean:windows:
+    run: once
+    internal: true
+    platforms: [windows]
+    dir: "{{.USER_WORKING_DIR}}"
+    cmds:
+      - echo Removing {{.TYPESCRIPT_OUT_DIR}}...
+      - >-
+        powershell -NoProfile -ExecutionPolicy Bypass -Command "if (Test-Path '{{.TYPESCRIPT_OUT_DIR}}') { Remove-Item -Recurse -Force '{{.TYPESCRIPT_OUT_DIR}}' }"
+      - task: _tsc:windows
+        vars:
+          ARGS: "--noEmitOnError{{if .TYPESCRIPT_TSC_FLAGS}} {{.TYPESCRIPT_TSC_FLAGS}}{{end}}"
+      - echo Clean build complete.
+  _config:trace:unix:
+    run: once
+    internal: true
+    platforms: [linux, darwin]
+    dir: "{{.USER_WORKING_DIR}}"
+    set: [errexit, nounset, pipefail]
+    cmds:
+      - echo 'Generating trace to {{.TYPESCRIPT_TRACE_DIR}}...'
+      - task: _tsc
+        vars:
+          ARGS: >-
+            --generateTrace {{.TYPESCRIPT_TRACE_DIR}} --noEmit {{- if .TYPESCRIPT_TSC_FLAGS}} {{.TYPESCRIPT_TSC_FLAGS}}{{end}}
+      - |
+        echo ''
+        echo 'Trace written to {{.TYPESCRIPT_TRACE_DIR}}/'
+        echo 'Analyse with: npx @typescript/analyze-trace {{.TYPESCRIPT_TRACE_DIR}}'
+        echo 'Or load {{.TYPESCRIPT_TRACE_DIR}}/trace.json in chrome://tracing'
+  _config:trace:windows:
+    run: once
+    internal: true
+    platforms: [windows]
+    dir: "{{.USER_WORKING_DIR}}"
+    cmds:
+      - echo Generating trace to {{.TYPESCRIPT_TRACE_DIR}}...
+      - task: _tsc:windows
+        vars:
+          ARGS: >-
+            --generateTrace {{.TYPESCRIPT_TRACE_DIR}} --noEmit {{- if .TYPESCRIPT_TSC_FLAGS}} {{.TYPESCRIPT_TSC_FLAGS}}{{end}}
+      - >-
+        powershell -NoProfile -ExecutionPolicy Bypass -Command "Write-Host ''; Write-Host 'Trace written to {{.TYPESCRIPT_TRACE_DIR}}/'; Write-Host 'Analyse with - npx @typescript/analyze-trace {{.TYPESCRIPT_TRACE_DIR}}'; Write-Host 'Or load {{.TYPESCRIPT_TRACE_DIR}}/trace.json in chrome://tracing'"
+  _start:unix:
+    run: once
+    internal: true
+    platforms: [linux, darwin]
+    dir: "{{.USER_WORKING_DIR}}"
+    set: [errexit, nounset, pipefail]
+    preconditions:
+      - sh: command -v node >/dev/null 2>&1
+        msg: "node is not available. Install Node.js first."
+      - sh: 'test -f "{{.USER_WORKING_DIR}}/{{.TYPESCRIPT_OUTFILE}}"'
+        msg: 'OUTFILE "{{.TYPESCRIPT_OUTFILE}}" not found. Run: task typescript:build'
+    cmds:
+      - node "{{.TYPESCRIPT_OUTFILE}}"
+  _start:windows:
+    run: once
+    internal: true
+    platforms: [windows]
+    dir: "{{.USER_WORKING_DIR}}"
+    preconditions:
+      - sh: >-
+          powershell -NoProfile -ExecutionPolicy Bypass -Command "if (Get-Command node -ErrorAction SilentlyContinue) { exit 0 } else { exit 1 }"
+        msg: "node is not available. Install Node.js first."
+      - sh: >-
+          powershell -NoProfile -ExecutionPolicy Bypass -Command "if (Test-Path '{{.TYPESCRIPT_OUTFILE}}') { exit 0 } else { exit 1 }"
+        msg: 'OUTFILE "{{.TYPESCRIPT_OUTFILE}}" not found. Run: task typescript:build'
+    cmds:
+      - powershell -NoProfile -ExecutionPolicy Bypass -Command "node '{{.TYPESCRIPT_OUTFILE}}'"
+  _clean:unix:
+    run: once
+    internal: true
+    platforms: [linux, darwin]
+    dir: "{{.USER_WORKING_DIR}}"
+    set: [errexit, nounset, pipefail]
+    status:
+      - 'test ! -d "{{.USER_WORKING_DIR}}/{{.TYPESCRIPT_OUT_DIR}}"'
+    cmds:
+      - echo 'Removing {{.TYPESCRIPT_OUT_DIR}}...'
+      - rm -rf "{{.TYPESCRIPT_OUT_DIR}}"
+      - echo Done.
+  _clean:windows:
+    run: once
+    internal: true
+    platforms: [windows]
+    dir: "{{.USER_WORKING_DIR}}"
+    status:
+      - >-
+        powershell -NoProfile -ExecutionPolicy Bypass -Command "if (Test-Path '{{.TYPESCRIPT_OUT_DIR}}') { exit 1 } else { exit 0 }"
+    cmds:
+      - echo Removing {{.TYPESCRIPT_OUT_DIR}}...
+      - >-
+        powershell -NoProfile -ExecutionPolicy Bypass -Command "if (Test-Path '{{.TYPESCRIPT_OUT_DIR}}') { Remove-Item -Recurse -Force '{{.TYPESCRIPT_OUT_DIR}}' }"
+      - echo Done.
+  _clean:all:unix:
+    run: once
+    internal: true
+    platforms: [linux, darwin]
+    dir: "{{.USER_WORKING_DIR}}"
+    set: [errexit, nounset, pipefail]
+    cmds:
+      - echo 'Removing {{.TYPESCRIPT_OUT_DIR}}/, tsconfig.tsbuildinfo, and .tsc-trace/...'
+      - rm -rf "{{.TYPESCRIPT_OUT_DIR}}"
+      - rm -f tsconfig.tsbuildinfo
+      - rm -rf .tsc-trace
+      - echo Done.
+  _clean:all:windows:
+    run: once
+    internal: true
+    platforms: [windows]
+    dir: "{{.USER_WORKING_DIR}}"
+    cmds:
+      - echo Removing build artifacts...
+      - >-
+        powershell -NoProfile -ExecutionPolicy Bypass -Command "if (Test-Path '{{.TYPESCRIPT_OUT_DIR}}') { Remove-Item -Recurse -Force '{{.TYPESCRIPT_OUT_DIR}}' }; if (Test-Path 'tsconfig.tsbuildinfo') { Remove-Item -Force 'tsconfig.tsbuildinfo' }; if (Test-Path '.tsc-trace') { Remove-Item -Recurse -Force '.tsc-trace' }; Write-Host Done."

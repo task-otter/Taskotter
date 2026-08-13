@@ -15,6 +15,15 @@ import (
 	"github.com/task-otter/Taskotter/internal/shared/iox"
 )
 
+type (
+	rewriteIncludesAssert struct {
+		mapping  map[string]string
+		fromDest string
+		input    []byte
+		want     []byte
+	}
+)
+
 const (
 	targetFolderTaskfiles = "taskfiles"
 	taskESLint            = "eslint"
@@ -254,60 +263,68 @@ tasks:
 `)
 }
 
-// TestRewriteIncludesPreservesFoldedBlock verifies folded cmd blocks stay byte-identical aside from the include path.
-func TestRewriteIncludesPreservesFoldedBlock(t *testing.T) {
-	t.Parallel()
-
-	input := rewriteIncludesFoldedInput()
-	want := bytes.Replace(
+func wantFoldedIncludeRewrite(input []byte) []byte {
+	return bytes.Replace(
 		input,
 		[]byte("taskfile: ../../../../pnpm/fnm/Taskfile.yml"),
 		[]byte("taskfile: "+wantPnpmRewrite),
 		consts.IndexOne,
 	)
+}
 
-	out, err := taskfile.RewriteIncludes(
-		input,
-		map[string]string{srcPnpmFnm: destPnpm},
-		taskESLint,
-	)
+func assertRewriteIncludesEqual(t *testing.T, params *rewriteIncludesAssert) {
+	t.Helper()
+
+	out, err := taskfile.RewriteIncludes(params.input, params.mapping, params.fromDest)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if !bytes.Equal(out, want) {
-		t.Fatalf("folded block not preserved:\ngot:\n%s\nwant:\n%s", out, want)
+	if !bytes.Equal(out, params.want) {
+		t.Fatalf("unexpected RewriteIncludes output:\ngot:\n%s\nwant:\n%s", out, params.want)
 	}
 }
 
-// TestRewriteIncludesNoopIdentity verifies unchanged include paths return the original bytes.
-func TestRewriteIncludesNoopIdentity(t *testing.T) {
+// TestRewriteIncludesPreservesFoldedBlock verifies folded cmd blocks stay byte-identical aside from the include path.
+func TestRewriteIncludesPreservesFoldedBlock(t *testing.T) {
 	t.Parallel()
 
 	input := rewriteIncludesFoldedInput()
 
-	out, err := taskfile.RewriteIncludes(input, map[string]string{}, taskESLint)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assertRewriteIncludesEqual(t, &rewriteIncludesAssert{
+		input:    input,
+		want:     wantFoldedIncludeRewrite(input),
+		mapping:  map[string]string{srcPnpmFnm: destPnpm},
+		fromDest: taskESLint,
+	})
+}
 
-	if !bytes.Equal(out, input) {
-		t.Fatalf("expected byte-identical output on empty sourceToDest:\ngot:\n%s\nwant:\n%s", out, input)
-	}
+// TestRewriteIncludesNoopEmptyMap verifies an empty sourceToDest returns the original bytes.
+func TestRewriteIncludesNoopEmptyMap(t *testing.T) {
+	t.Parallel()
 
-	identityInput := rewriteIncludesInput()
-	identityOut, err := taskfile.RewriteIncludes(
-		identityInput,
-		map[string]string{srcPnpmFnm: destPnpm},
-		consts.Empty,
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	input := rewriteIncludesFoldedInput()
 
-	if !bytes.Equal(identityOut, identityInput) {
-		t.Fatalf("expected byte-identical output when fromDest is empty")
-	}
+	assertRewriteIncludesEqual(t, &rewriteIncludesAssert{
+		input:    input,
+		want:     input,
+		mapping:  map[string]string{},
+		fromDest: taskESLint,
+	})
+}
+
+// TestRewriteIncludesNoopEmptyFromDest verifies an empty fromDest leaves mapped paths unchanged.
+func TestRewriteIncludesNoopEmptyFromDest(t *testing.T) {
+	t.Parallel()
+
+	input := rewriteIncludesInput()
+
+	assertRewriteIncludesEqual(t, &rewriteIncludesAssert{
+		input:    input,
+		want:     input,
+		mapping:  map[string]string{srcPnpmFnm: destPnpm},
+		fromDest: consts.Empty,
+	})
 }
 
 func assertTemplateOutput(t *testing.T, text string) {

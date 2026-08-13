@@ -108,18 +108,66 @@ type (
 
 	// includePathReplacement locates one include taskfile scalar in the original YAML.
 	includePathReplacement struct {
-		line    int
-		column  int
 		oldPath string
 		newPath string
+		line    int
+		column  int
 		style   yaml.Style
 	}
 
 	// includePathSpan is a byte range in the original content to overwrite.
 	includePathSpan struct {
+		value string
 		start int
 		end   int
-		value string
+	}
+
+	// rewriteIncludesParams carries state for rewriting include paths in a Taskfile.
+	rewriteIncludesParams struct {
+		root         *yaml.Node
+		sourceToDest map[string]string
+		fromDest     string
+		content      []byte
+	}
+
+	// yamlPosition locates a scalar at a 1-based YAML line/column in content.
+	yamlPosition struct {
+		content []byte
+		line    int
+		column  int
+	}
+
+	// scalarSpanParams locates the byte span of a scalar value at offset.
+	scalarSpanParams struct {
+		oldPath string
+		content []byte
+		offset  int
+		style   yaml.Style
+	}
+
+	// quotedSpanParams locates the interior of a quoted scalar at offset.
+	quotedSpanParams struct {
+		oldPath string
+		content []byte
+		offset  int
+		quote   byte
+	}
+
+	// replaceSpanParams overwrites content[start:end] with value.
+	replaceSpanParams struct {
+		value   string
+		content []byte
+		start   int
+		end     int
+	}
+
+	// collectIncludeReplacementsParams carries state for collecting include path edits.
+	collectIncludeReplacementsParams struct {
+		includes     *yaml.Node
+		entry        *yaml.Node
+		sourceToDest map[string]string
+		fromDest     string
+		out          []includePathReplacement
 	}
 )
 
@@ -165,17 +213,53 @@ func RewriteIncludes(
 	sourceToDest map[string]string,
 	fromDest string,
 ) ([]byte, error) {
-	_, root, err := parseTaskfileRoot(content, "parse Taskfile YAML: %v", "empty Taskfile YAML")
+	out, err := rewriteIncludesFromContent(&rewriteIncludesParams{
+		content:      content,
+		root:         nil,
+		sourceToDest: sourceToDest,
+		fromDest:     fromDest,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("rewrite includes from content: %w", err)
+	}
+
+	return out, nil
+}
+
+func rewriteIncludesFromContent(params *rewriteIncludesParams) ([]byte, error) {
+	doc, root, err := parseTaskfileRoot(
+		params.content,
+		"parse Taskfile YAML: %v",
+		"empty Taskfile YAML",
+	)
 	if err != nil {
 		return nil, fmt.Errorf(errParseTaskfileRoot, err)
 	}
 
-	replacements := collectIncludePathReplacements(root, sourceToDest, fromDest)
-	if len(replacements) == consts.IndexZero {
-		return content, nil
+	iox.Discard(doc)
+
+	params.root = root
+
+	out, err := applyRewriteIncludes(params)
+	if err != nil {
+		return nil, fmt.Errorf("apply rewrite includes: %w", err)
 	}
 
-	out, err := applyIncludePathReplacements(content, replacements)
+	return out, nil
+}
+
+func applyRewriteIncludes(params *rewriteIncludesParams) ([]byte, error) {
+	replacements := collectIncludePathReplacements(
+		params.root,
+		params.sourceToDest,
+		params.fromDest,
+	)
+
+	if len(replacements) == consts.IndexZero {
+		return params.content, nil
+	}
+
+	out, err := applyIncludePathReplacements(params.content, replacements)
 	if err != nil {
 		return nil, fmt.Errorf("apply include path replacements: %w", err)
 	}
@@ -189,6 +273,7 @@ func collectIncludePathReplacements(
 	fromDest string,
 ) []includePathReplacement {
 	includesNode := findMappingValue(root, keyIncludes)
+
 	if includesNode == nil {
 		return nil
 	}
@@ -205,22 +290,48 @@ func collectIncludePathReplacementsFromNode(
 		return nil
 	}
 
-	var out []includePathReplacement
+	capacity := len(includes.Content)/yamlMappingPairKeyValue + consts.IndexOne
+	out := make([]includePathReplacement, consts.IndexZero, capacity)
 
-	for idx := consts.IndexZero; idx < len(includes.Content); idx += yamlMappingPairKeyValue {
-		replacement, ok := includePathReplacementForEntry(
-			includes.Content[idx+consts.IndexOne],
-			sourceToDest,
-			fromDest,
-		)
-		if !ok {
-			continue
-		}
+	return appendIncludePathReplacements(&collectIncludeReplacementsParams{
+		out:          out,
+		includes:     includes,
+		entry:        nil,
+		sourceToDest: sourceToDest,
+		fromDest:     fromDest,
+	})
+}
 
-		out = append(out, replacement)
+func appendIncludePathReplacements(
+	params *collectIncludeReplacementsParams,
+) []includePathReplacement {
+	for idx := consts.IndexZero; idx < len(params.includes.Content); idx += yamlMappingPairKeyValue {
+		params.out = appendIncludeEntryReplacement(&collectIncludeReplacementsParams{
+			out:          params.out,
+			includes:     nil,
+			entry:        params.includes.Content[idx+consts.IndexOne],
+			sourceToDest: params.sourceToDest,
+			fromDest:     params.fromDest,
+		})
 	}
 
-	return out
+	return params.out
+}
+
+func appendIncludeEntryReplacement(
+	params *collectIncludeReplacementsParams,
+) []includePathReplacement {
+	replacement, ok := includePathReplacementForEntry(
+		params.entry,
+		params.sourceToDest,
+		params.fromDest,
+	)
+
+	if !ok {
+		return params.out
+	}
+
+	return append(params.out, replacement)
 }
 
 func includePathReplacementForEntry(
@@ -228,18 +339,38 @@ func includePathReplacementForEntry(
 	sourceToDest map[string]string,
 	fromDest string,
 ) (includePathReplacement, bool) {
+	taskfileNode, ok := includeTaskfileScalar(entry)
+
+	if !ok {
+		return emptyIncludePathReplacement(), false
+	}
+
+	return replacementFromTaskfileNode(taskfileNode, sourceToDest, fromDest)
+}
+
+func includeTaskfileScalar(entry *yaml.Node) (*yaml.Node, bool) {
 	if entry.Kind != yaml.MappingNode {
-		return includePathReplacement{}, false
+		return nil, false
 	}
 
 	taskfileNode := findMappingValue(entry, keyTaskfile)
+
 	if taskfileNode == nil || taskfileNode.Kind != yaml.ScalarNode {
-		return includePathReplacement{}, false
+		return nil, false
 	}
 
+	return taskfileNode, true
+}
+
+func replacementFromTaskfileNode(
+	taskfileNode *yaml.Node,
+	sourceToDest map[string]string,
+	fromDest string,
+) (includePathReplacement, bool) {
 	newPath := rewriteIncludePath(taskfileNode.Value, sourceToDest, fromDest)
+
 	if newPath == taskfileNode.Value {
-		return includePathReplacement{}, false
+		return emptyIncludePathReplacement(), false
 	}
 
 	return includePathReplacement{
@@ -251,10 +382,32 @@ func includePathReplacementForEntry(
 	}, true
 }
 
+func emptyIncludePathReplacement() includePathReplacement {
+	return includePathReplacement{
+		oldPath: consts.Empty,
+		newPath: consts.Empty,
+		line:    consts.IndexZero,
+		column:  consts.IndexZero,
+		style:   yaml.Style(consts.IndexZero),
+	}
+}
+
 func applyIncludePathReplacements(
 	content []byte,
 	replacements []includePathReplacement,
 ) ([]byte, error) {
+	spans, err := includePathSpans(content, replacements)
+	if err != nil {
+		return nil, fmt.Errorf("resolve include path spans: %w", err)
+	}
+
+	return replaceIncludePathSpans(content, spans), nil
+}
+
+func includePathSpans(
+	content []byte,
+	replacements []includePathReplacement,
+) ([]includePathSpan, error) {
 	spans := make([]includePathSpan, consts.IndexZero, len(replacements))
 
 	for i := range replacements {
@@ -266,6 +419,10 @@ func applyIncludePathReplacements(
 		spans = append(spans, span)
 	}
 
+	return spans, nil
+}
+
+func replaceIncludePathSpans(content []byte, spans []includePathSpan) []byte {
 	slices.SortFunc(spans, func(left, right includePathSpan) int {
 		return cmp.Compare(right.start, left.start)
 	})
@@ -273,24 +430,71 @@ func applyIncludePathReplacements(
 	out := content
 
 	for i := range spans {
-		out = replaceByteSpan(out, spans[i].start, spans[i].end, spans[i].value)
+		out = replaceByteSpan(&replaceSpanParams{
+			content: out,
+			start:   spans[i].start,
+			end:     spans[i].end,
+			value:   spans[i].value,
+		})
 	}
 
-	return out, nil
+	return out
 }
 
 func includePathSpanForReplacement(
 	content []byte,
 	replacement *includePathReplacement,
 ) (includePathSpan, error) {
-	offset, err := offsetAtLineColumn(content, replacement.line, replacement.column)
+	offset, err := replacementContentOffset(content, replacement)
 	if err != nil {
-		return includePathSpan{}, fmt.Errorf("offset at line/column: %w", err)
+		return emptyIncludePathSpan(), fmt.Errorf("replacement content offset: %w", err)
 	}
 
-	start, end, err := scalarValueSpan(content, offset, replacement.oldPath, replacement.style)
+	span, err := spanFromReplacement(content, offset, replacement)
 	if err != nil {
-		return includePathSpan{}, fmt.Errorf("scalar value span: %w", err)
+		return emptyIncludePathSpan(), fmt.Errorf("span from replacement: %w", err)
+	}
+
+	return span, nil
+}
+
+func emptyIncludePathSpan() includePathSpan {
+	return includePathSpan{
+		value: consts.Empty,
+		start: consts.IndexZero,
+		end:   consts.IndexZero,
+	}
+}
+
+func replacementContentOffset(
+	content []byte,
+	replacement *includePathReplacement,
+) (int, error) {
+	offset, err := offsetAtLineColumn(&yamlPosition{
+		content: content,
+		line:    replacement.line,
+		column:  replacement.column,
+	})
+	if err != nil {
+		return consts.IndexZero, fmt.Errorf("offset at line/column: %w", err)
+	}
+
+	return offset, nil
+}
+
+func spanFromReplacement(
+	content []byte,
+	offset int,
+	replacement *includePathReplacement,
+) (includePathSpan, error) {
+	start, end, err := scalarValueSpan(&scalarSpanParams{
+		content: content,
+		offset:  offset,
+		oldPath: replacement.oldPath,
+		style:   replacement.style,
+	})
+	if err != nil {
+		return emptyIncludePathSpan(), fmt.Errorf("scalar value span: %w", err)
 	}
 
 	return includePathSpan{
@@ -300,61 +504,176 @@ func includePathSpanForReplacement(
 	}, nil
 }
 
-func offsetAtLineColumn(content []byte, line, column int) (int, error) {
-	if line < consts.IndexOne || column < consts.IndexOne {
-		return consts.IndexZero, &RewriteError{
-			Message: fmt.Sprintf("invalid YAML position line=%d column=%d", line, column),
-		}
+func offsetAtLineColumn(pos *yamlPosition) (int, error) {
+	if pos.line < consts.IndexOne || pos.column < consts.IndexOne {
+		return consts.IndexZero, fmt.Errorf(
+			"invalid yaml position: %w",
+			invalidYAMLPosition(pos.line, pos.column),
+		)
 	}
 
+	offset, err := offsetForValidLineColumn(pos)
+	if err != nil {
+		return consts.IndexZero, fmt.Errorf("offset for valid line column: %w", err)
+	}
+
+	return offset, nil
+}
+
+func invalidYAMLPosition(line, column int) error {
+	return &RewriteError{
+		Message: fmt.Sprintf("invalid YAML position line=%d column=%d", line, column),
+	}
+}
+
+func offsetForValidLineColumn(pos *yamlPosition) (int, error) {
+	offset, err := lineStartOffset(pos.content, pos.line)
+	if err != nil {
+		return consts.IndexZero, fmt.Errorf("line start offset: %w", err)
+	}
+
+	colOffset, err := columnOffsetInLine(pos, offset)
+	if err != nil {
+		return consts.IndexZero, fmt.Errorf("column offset in line: %w", err)
+	}
+
+	return colOffset, nil
+}
+
+func lineStartOffset(content []byte, line int) (int, error) {
 	offset := consts.IndexZero
 	currentLine := consts.IndexOne
 
 	for currentLine < line {
-		newline := bytes.IndexByte(content[offset:], '\n')
-		if newline < consts.IndexZero {
-			return consts.IndexZero, &RewriteError{
-				Message: fmt.Sprintf("YAML line %d past end of content", line),
-			}
+		next, err := advanceToNextLine(content, offset, line)
+		if err != nil {
+			return consts.IndexZero, fmt.Errorf("advance to next line: %w", err)
 		}
 
-		offset += newline + consts.IndexOne
+		offset = next
 		currentLine++
 	}
 
-	lineEnd := bytes.IndexByte(content[offset:], '\n')
-	if lineEnd < consts.IndexZero {
-		lineEnd = len(content) - offset
+	return offset, nil
+}
+
+func advanceToNextLine(content []byte, offset, line int) (int, error) {
+	newline := bytes.IndexByte(content[offset:], '\n')
+
+	if newline < consts.IndexZero {
+		return consts.IndexZero, &RewriteError{
+			Message: fmt.Sprintf("YAML line %d past end of content", line),
+		}
 	}
 
-	colOffset := column - consts.IndexOne
+	return offset + newline + consts.IndexOne, nil
+}
+
+func columnOffsetInLine(pos *yamlPosition, offset int) (int, error) {
+	lineEnd := lineEndOffset(pos.content, offset)
+	colOffset := pos.column - consts.IndexOne
+
 	if colOffset > lineEnd {
 		return consts.IndexZero, &RewriteError{
-			Message: fmt.Sprintf("YAML column %d past end of line %d", column, line),
+			Message: fmt.Sprintf("YAML column %d past end of line %d", pos.column, pos.line),
 		}
 	}
 
 	return offset + colOffset, nil
 }
 
-func scalarValueSpan(
-	content []byte,
-	offset int,
-	oldPath string,
-	style yaml.Style,
+func lineEndOffset(content []byte, offset int) int {
+	lineEnd := bytes.IndexByte(content[offset:], '\n')
+
+	if lineEnd < consts.IndexZero {
+		return len(content) - offset
+	}
+
+	return lineEnd
+}
+
+func scalarValueSpan(params *scalarSpanParams) (start, end int, err error) {
+	start, end, err = scalarSpanByQuote(params)
+	if err != nil {
+		return consts.IndexZero, consts.IndexZero, fmt.Errorf("resolve scalar value span: %w", err)
+	}
+
+	return start, end, nil
+}
+
+func scalarSpanByQuote(params *scalarSpanParams) (start, end int, err error) {
+	quote, quoted := quoteForYAMLStyle(params.style)
+
+	start, end, err = spanForQuoteChoice(params, quote, quoted)
+	if err != nil {
+		return consts.IndexZero, consts.IndexZero, fmt.Errorf(
+			"scalar value span for style: %w",
+			err,
+		)
+	}
+
+	return start, end, nil
+}
+
+func spanForQuoteChoice(
+	params *scalarSpanParams,
+	quote byte,
+	quoted bool,
 ) (start, end int, err error) {
+	switch quoted {
+	case true:
+		start, end, err = wrapQuotedScalarSpan(params, quote)
+	default:
+		start, end, err = wrapPlainScalarSpan(params)
+	}
+
+	if err != nil {
+		return consts.IndexZero, consts.IndexZero, fmt.Errorf("span for quote choice: %w", err)
+	}
+
+	return start, end, nil
+}
+
+// quoteForYAMLStyle returns the quote byte for quoted scalar styles.
+//
+//nolint:exhaustive // Tagged/Literal/Folded/Flow and plain (0) use unquoted spans
+func quoteForYAMLStyle(style yaml.Style) (quote byte, quoted bool) {
 	switch style {
 	case yaml.DoubleQuotedStyle:
-		return quotedScalarValueSpan(content, offset, oldPath, '"')
+		return '"', true
 	case yaml.SingleQuotedStyle:
-		return quotedScalarValueSpan(content, offset, oldPath, '\'')
+		return '\'', true
 	default:
-		return plainScalarValueSpan(content, offset, oldPath)
+		return byte(consts.IndexZero), false
 	}
+}
+
+func wrapQuotedScalarSpan(params *scalarSpanParams, quote byte) (start, end int, err error) {
+	start, end, err = quotedScalarValueSpan(&quotedSpanParams{
+		content: params.content,
+		offset:  params.offset,
+		oldPath: params.oldPath,
+		quote:   quote,
+	})
+	if err != nil {
+		return consts.IndexZero, consts.IndexZero, fmt.Errorf("quoted scalar value span: %w", err)
+	}
+
+	return start, end, nil
+}
+
+func wrapPlainScalarSpan(params *scalarSpanParams) (start, end int, err error) {
+	start, end, err = plainScalarValueSpan(params.content, params.offset, params.oldPath)
+	if err != nil {
+		return consts.IndexZero, consts.IndexZero, fmt.Errorf("plain scalar value span: %w", err)
+	}
+
+	return start, end, nil
 }
 
 func plainScalarValueSpan(content []byte, offset int, oldPath string) (start, end int, err error) {
 	pathBytes := []byte(oldPath)
+
 	if !bytes.HasPrefix(content[offset:], pathBytes) {
 		return consts.IndexZero, consts.IndexZero, &RewriteError{
 			Message: fmt.Sprintf("include path %q not found at YAML position", oldPath),
@@ -364,58 +683,98 @@ func plainScalarValueSpan(content []byte, offset int, oldPath string) (start, en
 	return offset, offset + len(pathBytes), nil
 }
 
-func quotedScalarValueSpan(
-	content []byte,
-	offset int,
-	oldPath string,
-	quote byte,
-) (start, end int, err error) {
-	if offset >= len(content) || content[offset] != quote {
+func quotedScalarValueSpan(params *quotedSpanParams) (start, end int, err error) {
+	if params.offset >= len(params.content) || params.content[params.offset] != params.quote {
 		return consts.IndexZero, consts.IndexZero, &RewriteError{
-			Message: fmt.Sprintf("expected %q-quoted include path at YAML position", quote),
+			Message: fmt.Sprintf(
+				"expected %q-quoted include path at YAML position",
+				params.quote,
+			),
 		}
 	}
 
-	closeIdx, err := findClosingQuote(content, offset, quote)
+	start, end, err = quotedScalarInteriorSpan(params)
 	if err != nil {
-		return consts.IndexZero, consts.IndexZero, err
+		return consts.IndexZero, consts.IndexZero, fmt.Errorf(
+			"quoted scalar interior span: %w",
+			err,
+		)
 	}
 
-	interior := content[offset+consts.IndexOne : closeIdx]
-	if string(interior) != oldPath {
+	return start, end, nil
+}
+
+func quotedScalarInteriorSpan(params *quotedSpanParams) (start, end int, err error) {
+	closeIdx, err := findClosingQuote(params.content, params.offset, params.quote)
+	if err != nil {
+		return consts.IndexZero, consts.IndexZero, fmt.Errorf("find closing quote: %w", err)
+	}
+
+	interior := params.content[params.offset+consts.IndexOne : closeIdx]
+
+	if string(interior) != params.oldPath {
 		return consts.IndexZero, consts.IndexZero, &RewriteError{
-			Message: fmt.Sprintf("include path %q not found inside quotes at YAML position", oldPath),
+			Message: fmt.Sprintf(
+				"include path %q not found inside quotes at YAML position",
+				params.oldPath,
+			),
 		}
 	}
 
-	return offset + consts.IndexOne, closeIdx, nil
+	return params.offset + consts.IndexOne, closeIdx, nil
 }
 
 func findClosingQuote(content []byte, openIdx int, quote byte) (int, error) {
 	idx := openIdx + consts.IndexOne
 
 	for idx < len(content) {
-		switch {
-		case quote == '"' && content[idx] == '\\':
-			idx += consts.IndexTwo
-		case content[idx] == quote && quote == '\'' &&
-			idx+consts.IndexOne < len(content) && content[idx+consts.IndexOne] == '\'':
-			idx += consts.IndexTwo
-		case content[idx] == quote:
-			return idx, nil
-		default:
-			idx++
+		next, found := advanceQuotedIndex(content, idx, quote)
+
+		if found {
+			return next, nil
 		}
+
+		idx = next
 	}
 
 	return consts.IndexZero, &RewriteError{Message: "unterminated quoted include path"}
 }
 
-func replaceByteSpan(content []byte, start, end int, value string) []byte {
-	out := make([]byte, consts.IndexZero, len(content)-end+start+len(value))
-	out = append(out, content[:start]...)
-	out = append(out, value...)
-	out = append(out, content[end:]...)
+func advanceQuotedIndex(content []byte, idx int, quote byte) (next int, foundClose bool) {
+	if isDoubleQuoteEscape(content, idx, quote) {
+		return idx + consts.IndexTwo, false
+	}
+
+	if isSingleQuoteEscape(content, idx, quote) {
+		return idx + consts.IndexTwo, false
+	}
+
+	if content[idx] == quote {
+		return idx, true
+	}
+
+	return idx + consts.IndexOne, false
+}
+
+func isDoubleQuoteEscape(content []byte, idx int, quote byte) bool {
+	return quote == '"' && content[idx] == '\\'
+}
+
+func isSingleQuoteEscape(content []byte, idx int, quote byte) bool {
+	return content[idx] == quote && quote == '\'' &&
+		idx+consts.IndexOne < len(content) && content[idx+consts.IndexOne] == '\''
+}
+
+func replaceByteSpan(params *replaceSpanParams) []byte {
+	out := make(
+		[]byte,
+		consts.IndexZero,
+		len(params.content)-params.end+params.start+len(params.value),
+	)
+
+	out = append(out, params.content[:params.start]...)
+	out = append(out, params.value...)
+	out = append(out, params.content[params.end:]...)
 
 	return out
 }

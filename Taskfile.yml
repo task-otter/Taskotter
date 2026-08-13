@@ -3,7 +3,7 @@ version: "3.5"
 
 includes:
   taskotter:
-    taskfile: taskfiles/Taskfile.yml
+    taskfile: taskotter/Taskfile.yml
 tasks:
   default:
     run: once

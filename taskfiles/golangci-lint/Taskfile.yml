@@ -99,6 +99,15 @@ tasks:
         vars:
           GO_LINT_FIX: "--fix"
           GO_LINT_ARGS: "{{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}./...{{end}}"
+  ci:fix:
+    run: once
+    desc: Run fmt then lint:fix for CI
+    summary: |
+      Run fmt then lint:fix. Applies formatting and automatic lint fixes
+      suitable for CI autofix workflows.
+    cmds:
+      - task: fmt
+      - task: lint:fix
   fmt:
     run: once
     desc: Format Go files with golangci-lint formatters

@@ -89,6 +89,8 @@ task cargo:build RUST_TOOLCHAIN=1.79.0 CARGO_EXTRA_ARGS=--release
 | `fmt:check` | Check Rust formatting with `cargo fmt --check` |
 | `lint` | Lint Rust code with `cargo clippy` |
 | `lint:fix` | Auto-fix Rust lint issues with `cargo clippy --fix` |
+| `ci` | Run `fmt:check` then `lint` |
+| `ci:fix` | Run `fmt` then `lint:fix` for CI |
 | `version` | Show the installed cargo version |
 | `which` | Show the path to the cargo binary |
 | `verify` | Print cargo and rustc versions and the rustup toolchain overview |

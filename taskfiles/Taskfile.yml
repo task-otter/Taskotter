@@ -178,6 +178,11 @@ includes:
       GO_GLOBAL_BIN: '{{.GO_GLOBAL_BIN}}'
     dir: ..
 tasks:
+  ci:fix:
+    desc: Run ci:fix for synced TaskOtter modules
+    cmds:
+      - task: golangci-lint:ci:fix
+      - task: yamllint:ci:fix
   install:
     desc: Run install for synced TaskOtter modules
     cmds:

@@ -119,6 +119,14 @@ tasks:
     cmds:
       - >-
         bash -lc '{{.UV_LOAD}}; _skip="{{if .YAMLLINT_LINT_SKIP_PATTERN_OVERRIDE}}{{.YAMLLINT_LINT_SKIP_PATTERN_OVERRIDE}} {{- else}}{{.YAMLLINT_LINT_SKIP_PATTERN}}{{end}}"; if [ -z "$_skip" ]; then yamllint --strict {{if .YAMLLINT_CONFIG_OVERRIDE}}-c "{{.YAMLLINT_CONFIG_OVERRIDE}}" {{else if .YAMLLINT_CONFIG}}-c "{{.YAMLLINT_CONFIG}}" {{end}} {{if .YAMLLINT_TARGETS_OVERRIDE}}{{.YAMLLINT_TARGETS_OVERRIDE}}{{else if .YAMLLINT_TARGETS}}{{.YAMLLINT_TARGETS}} {{else}}.{{end}} {{if .YAMLLINT_EXTRA_ARGS_OVERRIDE}}{{.YAMLLINT_EXTRA_ARGS_OVERRIDE}} {{- else}}{{.YAMLLINT_EXTRA_ARGS}}{{end}}; else _files="$(mktemp)"; trap '"'"'rm -f "$_files"'"'"' EXIT; for _target in {{if .YAMLLINT_TARGETS_OVERRIDE}}{{.YAMLLINT_TARGETS_OVERRIDE}} {{else if .YAMLLINT_TARGETS}}{{.YAMLLINT_TARGETS}}{{else}}.{{end}}; do if [ -d "$_target" ]; then find "$_target" -type f \( -name "*.yml" -o -name "*.yaml" \) -print0; elif [ -f "$_target" ]; then printf "%s\000" "$_target"; fi; done | task --silent --taskfile "{{.TASKFILE_DIR}}/../internal/skipfiles/Taskfile.yml" filter "SKIPFILES_PATTERN=$_skip" >"$_files"; if [ -s "$_files" ]; then xargs -0 yamllint --strict {{if .YAMLLINT_CONFIG_OVERRIDE}}-c "{{.YAMLLINT_CONFIG_OVERRIDE}}" {{else if .YAMLLINT_CONFIG}}-c "{{.YAMLLINT_CONFIG}}" {{end}} {{if .YAMLLINT_EXTRA_ARGS_OVERRIDE}}{{.YAMLLINT_EXTRA_ARGS_OVERRIDE}}{{else}}{{.YAMLLINT_EXTRA_ARGS}}{{end}} <"$_files"; else echo "No matching YAML files found"; fi; fi && echo "✅ yamllint passed" || { echo "❌ yamllint failed"; exit 1; }'
+  ci:fix:
+    run: once
+    desc: Run lint:fix for CI fixing
+    summary: |
+      Run lint:fix to apply automatic lint fixes. Suitable for CI
+      autofix workflows.
+    cmds:
+      - task: lint:fix
   config:init:
     run: once
     dir: "{{.USER_WORKING_DIR}}"

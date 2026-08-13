@@ -1,0 +1,207 @@
+---
+version: "3.5"
+vars:
+  ACTIONLINT_EXTRA_ARGS: ""
+  ACTIONLINT_LINT_SKIP_PATTERN: ""
+  ACTIONLINT_TARGETS: ""
+  ACTIONLINT_VERSION: "1.7.12"
+  ADRS_EXTRA_ARGS: ""
+  ADRS_VERSION: ""
+  CARGO_BIN_UNIX: "$HOME/.cargo/bin"
+  GOLANGCI_LINT_FMT_FORMATTER_FLAGS: >-
+    -E gci -E gofmt -E gofumpt -E goimports -E golines -E swaggo
+  GOLANGCI_LINT_FMT_SKIP_PATTERN: ""
+  GOLANGCI_LINT_INTERNAL_SKIP_CONFIG: ".golangci-taskotter-skip.yml"
+  GOLANGCI_LINT_LINT_SKIP_PATTERN: ""
+  GOLANGCI_LINT_VERSION: ""
+  GOVULNCHECK_LINT_SKIP_PATTERN: ""
+  GOVULNCHECK_VERSION: ""
+  GO_BIN_UNIX: "{{.GO_ROOT_UNIX}}/bin"
+  GO_CMD_UNIX: "{{.GO_BIN_UNIX}}/go"
+  GO_COVER_PROFILE: ""
+  GO_DOWNLOAD_BASE_URL: https://go.dev/dl
+  GO_FUZZTIME: ""
+  GO_GLOBAL_BIN:
+    sh: |
+      gobin="${GOBIN:-}"
+      if [ -z "$gobin" ] && command -v go >/dev/null 2>&1; then
+        gobin="$(go env GOBIN)"
+      fi
+      if [ -z "$gobin" ]; then
+        gopath="${GOPATH:-}"
+        if [ -z "$gopath" ] && command -v go >/dev/null 2>&1; then
+          gopath="$(go env GOPATH)"
+        fi
+        gobin="${gopath:-$HOME/go}/bin"
+      fi
+      printf '%s' "$gobin"
+  GO_INSTALL_DIR_UNIX: "/usr/local"
+  GO_JUNIT_REPORT: ""
+  GO_ROOT_UNIX: "{{.GO_INSTALL_DIR_UNIX}}/go"
+  GO_VERSION: ""
+  GO_VERSION_URL: https://go.dev/VERSION?m=text
+  HADOLINT_CONFIG: ""
+  HADOLINT_DOCKERFILE: "Dockerfile"
+  HADOLINT_EXTRA_ARGS: ""
+  HADOLINT_LINT_SKIP_PATTERN: ""
+  HADOLINT_VERSION: "2.14.0"
+  UV_LOAD: 'export PATH="$HOME/.local/bin:$PATH"'
+  YAMLFIX_EXTRA_ARGS: ""
+  YAMLFIX_FMT_SKIP_PATTERN: ""
+  YAMLFIX_TARGETS: "."
+  YAMLFIX_VERSION: ""
+  YAMLLINT_CONFIG: ""
+  YAMLLINT_EXTRA_ARGS: ""
+  YAMLLINT_LINT_SKIP_PATTERN: ""
+  YAMLLINT_TARGETS: "."
+  YAMLLINT_VERSION: ""
+  ZIZMOR_EXTRA_ARGS: "--offline"
+  ZIZMOR_LINT_SKIP_PATTERN: ""
+  ZIZMOR_TARGETS: ".github"
+  ZIZMOR_VERSION: "1.25.2"
+includes:
+  go:
+    taskfile: go/Taskfile.yml
+    dir: ..
+    vars:
+      GO_INSTALL_DIR_UNIX: '{{.GO_INSTALL_DIR_UNIX}}'
+      GO_ROOT_UNIX: '{{.GO_ROOT_UNIX}}'
+      GO_BIN_UNIX: '{{.GO_BIN_UNIX}}'
+      GO_CMD_UNIX: '{{.GO_CMD_UNIX}}'
+      GO_VERSION_URL: '{{.GO_VERSION_URL}}'
+      GO_DOWNLOAD_BASE_URL: '{{.GO_DOWNLOAD_BASE_URL}}'
+      GO_VERSION: '{{.GO_VERSION}}'
+      GO_JUNIT_REPORT: '{{.GO_JUNIT_REPORT}}'
+      GO_COVER_PROFILE: '{{.GO_COVER_PROFILE}}'
+      GO_FUZZTIME: '{{.GO_FUZZTIME}}'
+      GO_GLOBAL_BIN: '{{.GO_GLOBAL_BIN}}'
+  golangci-lint:
+    taskfile: golangci-lint/Taskfile.yml
+    dir: ..
+    vars:
+      GOLANGCI_LINT_VERSION: '{{.GOLANGCI_LINT_VERSION}}'
+      GOLANGCI_LINT_LINT_SKIP_PATTERN: '{{.GOLANGCI_LINT_LINT_SKIP_PATTERN}}'
+      GOLANGCI_LINT_FMT_SKIP_PATTERN: '{{.GOLANGCI_LINT_FMT_SKIP_PATTERN}}'
+      # Written next to the project's golangci-lint config so relative paths inside
+      # the merged copy keep resolving. Overwritten on every run, never deleted.
+      GOLANGCI_LINT_INTERNAL_SKIP_CONFIG: '{{.GOLANGCI_LINT_INTERNAL_SKIP_CONFIG}}'
+      # Formatter selection shared by every golangci-lint fmt invocation (both the
+      # skip-pattern and plain paths, on Unix and Windows). Kept in one place so the
+      # four call sites cannot drift apart.
+      GOLANGCI_LINT_FMT_FORMATTER_FLAGS: '{{.GOLANGCI_LINT_FMT_FORMATTER_FLAGS}}'
+      GO_GLOBAL_BIN: '{{.GO_GLOBAL_BIN}}'
+  govulncheck:
+    taskfile: govulncheck/Taskfile.yml
+    dir: ..
+    vars:
+      GOVULNCHECK_VERSION: '{{.GOVULNCHECK_VERSION}}'
+      GOVULNCHECK_LINT_SKIP_PATTERN: '{{.GOVULNCHECK_LINT_SKIP_PATTERN}}'
+      GO_GLOBAL_BIN: '{{.GO_GLOBAL_BIN}}'
+  yamllint:
+    taskfile: yamllint/Taskfile.yml
+    dir: ..
+    vars:
+      YAMLLINT_LINT_SKIP_PATTERN: '{{.YAMLLINT_LINT_SKIP_PATTERN}}'
+      UV_LOAD: '{{.UV_LOAD}}'
+      YAMLLINT_TARGETS: '{{.YAMLLINT_TARGETS}}'
+      YAMLLINT_CONFIG: '{{.YAMLLINT_CONFIG}}'
+      YAMLLINT_EXTRA_ARGS: '{{.YAMLLINT_EXTRA_ARGS}}'
+      YAMLLINT_VERSION: '{{.YAMLLINT_VERSION}}'
+  yamlfix:
+    taskfile: yamlfix/Taskfile.yml
+    dir: ..
+    vars:
+      YAMLFIX_FMT_SKIP_PATTERN: '{{.YAMLFIX_FMT_SKIP_PATTERN}}'
+      UV_LOAD: '{{.UV_LOAD}}'
+      YAMLFIX_TARGETS: '{{.YAMLFIX_TARGETS}}'
+      YAMLFIX_EXTRA_ARGS: '{{.YAMLFIX_EXTRA_ARGS}}'
+      YAMLFIX_VERSION: '{{.YAMLFIX_VERSION}}'
+  actionlint:
+    taskfile: actionlint/Taskfile.yml
+    dir: ..
+    vars:
+      ACTIONLINT_LINT_SKIP_PATTERN: '{{.ACTIONLINT_LINT_SKIP_PATTERN}}'
+      ACTIONLINT_VERSION: '{{.ACTIONLINT_VERSION}}'
+      ACTIONLINT_EXTRA_ARGS: '{{.ACTIONLINT_EXTRA_ARGS}}'
+      ACTIONLINT_TARGETS: '{{.ACTIONLINT_TARGETS}}'
+  zizmor:
+    taskfile: zizmor/Taskfile.yml
+    dir: ..
+    vars:
+      ZIZMOR_LINT_SKIP_PATTERN: '{{.ZIZMOR_LINT_SKIP_PATTERN}}'
+      ZIZMOR_EXTRA_ARGS: '{{.ZIZMOR_EXTRA_ARGS}}'
+      ZIZMOR_TARGETS: '{{.ZIZMOR_TARGETS}}'
+      ZIZMOR_VERSION: '{{.ZIZMOR_VERSION}}'
+  adrs:
+    taskfile: adrs/Taskfile.yml
+    dir: ..
+    vars:
+      CARGO_BIN_UNIX: '{{.CARGO_BIN_UNIX}}'
+      ADRS_EXTRA_ARGS: '{{.ADRS_EXTRA_ARGS}}'
+      ADRS_VERSION: '{{.ADRS_VERSION}}'
+  hadolint:
+    taskfile: hadolint/Taskfile.yml
+    dir: ..
+    vars:
+      HADOLINT_LINT_SKIP_PATTERN: '{{.HADOLINT_LINT_SKIP_PATTERN}}'
+      HADOLINT_CONFIG: '{{.HADOLINT_CONFIG}}'
+      HADOLINT_DOCKERFILE: '{{.HADOLINT_DOCKERFILE}}'
+      HADOLINT_EXTRA_ARGS: '{{.HADOLINT_EXTRA_ARGS}}'
+      HADOLINT_VERSION: '{{.HADOLINT_VERSION}}'
+tasks:
+  ci:
+    desc: Run ci for synced TaskOtter modules
+    cmds:
+      - task: golangci-lint:ci
+      - task: govulncheck:ci
+      - task: yamllint:ci
+      - task: actionlint:ci
+      - task: zizmor:ci
+      - task: hadolint:ci
+  ci:fix:
+    desc: Run ci:fix for synced TaskOtter modules
+    cmds:
+      - task: golangci-lint:ci:fix
+      - task: yamlfix:ci:fix
+  install:
+    desc: Run install for synced TaskOtter modules
+    cmds:
+      - task: go:install
+      - task: golangci-lint:install
+      - task: govulncheck:install
+      - task: yamllint:install
+      - task: yamlfix:install
+      - task: actionlint:install
+      - task: zizmor:install
+      - task: adrs:install
+      - task: hadolint:install
+  install:undo:
+    desc: Run install:undo for synced TaskOtter modules
+    cmds:
+      - task: go:install:undo
+      - task: yamllint:install:undo
+      - task: yamlfix:install:undo
+      - task: actionlint:install:undo
+      - task: zizmor:install:undo
+      - task: adrs:install:undo
+      - task: hadolint:install:undo
+  upgrade:
+    desc: Run upgrade for synced TaskOtter modules
+    cmds:
+      - task: go:upgrade
+      - task: yamllint:upgrade
+      - task: yamlfix:upgrade
+      - task: actionlint:upgrade
+      - task: zizmor:upgrade
+      - task: adrs:upgrade
+      - task: hadolint:upgrade
+  version:
+    desc: Run version for synced TaskOtter modules
+    cmds:
+      - task: go:version
+      - task: yamllint:version
+      - task: yamlfix:version
+      - task: actionlint:version
+      - task: zizmor:version
+      - task: adrs:version
+      - task: hadolint:version

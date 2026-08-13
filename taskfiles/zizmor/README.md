@@ -11,10 +11,10 @@ This module provides tasks to audit, install, and manage [zizmor](https://github
 ### Standalone
 
 ```sh
-task -t taskfiles/zizmor/Taskfile.yml lint
-task -t taskfiles/zizmor/Taskfile.yml lint ZIZMOR_TARGETS=.github/workflows/main.yml
-task -t taskfiles/zizmor/Taskfile.yml lint ZIZMOR_EXTRA_ARGS="--min-severity high"
-task -t taskfiles/zizmor/Taskfile.yml lint ZIZMOR_EXTRA_ARGS="--gh-token $GITHUB_TOKEN"
+task -t taskfiles/zizmor/Taskfile.yml ci
+task -t taskfiles/zizmor/Taskfile.yml ci ZIZMOR_TARGETS=.github/workflows/main.yml
+task -t taskfiles/zizmor/Taskfile.yml ci ZIZMOR_EXTRA_ARGS="--min-severity high"
+task -t taskfiles/zizmor/Taskfile.yml ci ZIZMOR_EXTRA_ARGS="--gh-token $GITHUB_TOKEN"
 ```
 
 ### Included in your Taskfile
@@ -31,7 +31,7 @@ includes:
 Then run:
 
 ```sh
-task zizmor:lint
+task zizmor:ci
 task zizmor:install
 ```
 
@@ -39,7 +39,7 @@ task zizmor:install
 
 | Task | Description |
 |---|---|
-| `lint` | Audit GitHub Actions workflows for security issues |
+| `ci` | Audit GitHub Actions workflows for security issues |
 | `install` | Install zizmor on the current operating system |
 | `install:undo` | Remove zizmor from the current operating system |
 | `upgrade` | Upgrade zizmor to the pinned ZIZMOR_VERSION |
@@ -63,4 +63,4 @@ Skip patterns support `*` within one path segment, `**` across directories, and 
 - **Linux** downloads an `unknown-linux-gnu` binary to `/usr/local/bin`. Only `x86_64` and `aarch64` architectures are supported.
 - **Windows** downloads an `x86_64-pc-windows-msvc.zip` binary to `%USERPROFILE%\bin`. Add `%USERPROFILE%\bin` to your `PATH` after install.
 - The `upgrade` task re-downloads and overwrites the existing binary with the pinned `ZIZMOR_VERSION`. To upgrade to a newer release, update `ZIZMOR_VERSION` in the Taskfile vars.
-- The `lint` task auto-installs zizmor if it is not already present in `PATH`.
+- The `ci` task auto-installs zizmor if it is not already present in `PATH`.

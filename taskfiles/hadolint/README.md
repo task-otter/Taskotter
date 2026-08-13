@@ -5,9 +5,10 @@
 A cross-platform Taskfile for installing and running
 [hadolint](https://github.com/hadolint/hadolint), the Dockerfile linter.
 
-hadolint is installed globally via the platform package manager — Homebrew on
-macOS, apt-get or dnf on Linux, and Scoop on Windows. The install task is
-skipped automatically when hadolint is already present in PATH.
+hadolint is installed globally via a pinned GitHub release binary to
+`/usr/local/bin` on macOS and Linux, and Scoop on Windows. The install task is
+skipped automatically when hadolint is already present in PATH at the pinned
+version.
 
 ## Usage
 
@@ -15,20 +16,20 @@ skipped automatically when hadolint is already present in PATH.
 
 ```sh
 task -t taskfiles/hadolint/Taskfile.yml install
-task -t taskfiles/hadolint/Taskfile.yml lint
+task -t taskfiles/hadolint/Taskfile.yml ci
 task -t taskfiles/hadolint/Taskfile.yml version
 ```
 
 Lint a specific Dockerfile:
 
 ```sh
-task -t taskfiles/hadolint/Taskfile.yml lint HADOLINT_DOCKERFILE=path/to/Dockerfile
+task -t taskfiles/hadolint/Taskfile.yml ci HADOLINT_DOCKERFILE=path/to/Dockerfile
 ```
 
 Pass hadolint arguments after `--`:
 
 ```sh
-task -t taskfiles/hadolint/Taskfile.yml lint -- path/to/Dockerfile --ignore DL3008
+task -t taskfiles/hadolint/Taskfile.yml ci -- path/to/Dockerfile --ignore DL3008
 ```
 
 ### Included
@@ -41,8 +42,8 @@ includes:
 Then run:
 
 ```sh
-task hadolint:lint
-task hadolint:lint HADOLINT_DOCKERFILE=services/api/Dockerfile
+task hadolint:ci
+task hadolint:ci HADOLINT_DOCKERFILE=services/api/Dockerfile
 task hadolint:version
 ```
 
@@ -52,7 +53,7 @@ task hadolint:version
 | -------------- | ------------------------------------------------- | ------------------------------------ |
 | `install`      | Install hadolint on the current operating system  | none                                 |
 | `install:undo` | Remove hadolint from the current operating system | none                                 |
-| `lint`         | Lint a Dockerfile with hadolint                   | `HADOLINT_DOCKERFILE`, `HADOLINT_CONFIG`, `HADOLINT_EXTRA_ARGS` |
+| `ci`         | Lint a Dockerfile with hadolint                   | `HADOLINT_DOCKERFILE`, `HADOLINT_CONFIG`, `HADOLINT_EXTRA_ARGS` |
 | `upgrade`      | Upgrade hadolint to the latest release            | none                                 |
 | `version`      | Show the installed hadolint version               | none                                 |
 
@@ -69,8 +70,8 @@ Skip patterns support `*` within one path segment, `**` across directories, and 
 
 ## Notes
 
-On Linux, hadolint is installed via `apt-get` if available, then `dnf`. If
-neither package manager carries hadolint (e.g. older Ubuntu releases), install
-it manually by downloading the binary from the
-[hadolint releases page](https://github.com/hadolint/hadolint/releases) and
-placing it somewhere in your PATH.
+On macOS and Linux, hadolint is installed from the pinned `HADOLINT_VERSION`
+GitHub release binary into `/usr/local/bin` (`x86_64` and `arm64`). Other
+architectures require a manual install from the
+[hadolint releases page](https://github.com/hadolint/hadolint/releases).
+macOS `upgrade` still uses Homebrew (`brew upgrade hadolint`).

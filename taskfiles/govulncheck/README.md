@@ -13,7 +13,7 @@ it is missing.
 
 ```sh
 task -t taskfiles/govulncheck/Taskfile.yml install
-task -t taskfiles/govulncheck/Taskfile.yml lint
+task -t taskfiles/govulncheck/Taskfile.yml ci
 ```
 
 ### Included
@@ -27,7 +27,7 @@ Then run:
 
 ```sh
 task govulncheck:install
-task govulncheck:lint
+task govulncheck:ci
 ```
 
 ## Scanning
@@ -35,15 +35,15 @@ task govulncheck:lint
 Scan all Go packages for known vulnerabilities by default:
 
 ```sh
-task -t taskfiles/govulncheck/Taskfile.yml lint
-task govulncheck:lint
+task -t taskfiles/govulncheck/Taskfile.yml ci
+task govulncheck:ci
 ```
 
 Auto-installs govulncheck if missing. Override the default `./...` target or
 pass extra flags with `--`:
 
 ```sh
-task govulncheck:lint -- -test ./...
+task govulncheck:ci -- -test ./...
 ```
 
 Set `GOVULNCHECK_LINT_SKIP_PATTERN` to exclude matching file paths from the
@@ -52,7 +52,7 @@ in this repo. govulncheck operates on packages rather than individual
 files, so any package containing a matching file is omitted:
 
 ```sh
-task govulncheck:lint GOVULNCHECK_LINT_SKIP_PATTERN="**/generated/**"
+task govulncheck:ci GOVULNCHECK_LINT_SKIP_PATTERN="**/generated/**"
 ```
 
 ## Versions
@@ -72,12 +72,12 @@ already exists.
 | Task      | Description                                | Key variables                    |
 | --------- | -------------------------------------------- | ----------------------------------- |
 | `install` | Install govulncheck into the global Go bin   | `GO_GLOBAL_BIN`, `GOVULNCHECK_VERSION` |
-| `lint`    | Scan Go packages for known vulnerabilities   | `GOVULNCHECK_LINT_SKIP_PATTERN`     |
+| `ci`    | Scan Go packages for known vulnerabilities   | `GOVULNCHECK_LINT_SKIP_PATTERN`     |
 
 ## Variables
 
 | Variable                        | Default                  | Description                                                    |
 | --------------------------------- | -------------------------- | ------------------------------------------------------------------ |
 | `GOVULNCHECK_VERSION`            | empty (`latest`)          | Optional govulncheck module version                                |
-| `GOVULNCHECK_LINT_SKIP_PATTERN`  | empty                     | Shell-style path glob for Go files skipped by `lint`                |
+| `GOVULNCHECK_LINT_SKIP_PATTERN`  | empty                     | Shell-style path glob for Go files skipped by `ci`                |
 | `GO_GLOBAL_BIN`                  | `GOBIN` or `GOPATH/bin`   | Destination and lookup directory for the installed govulncheck binary |

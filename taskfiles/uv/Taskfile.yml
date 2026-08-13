@@ -1,11 +1,14 @@
 ---
 version: "3.5"
+
 output:
   group:
     begin: "::group::{{.TASK}}"
     end: "::endgroup::"
     error_only: false
+
 silent: true
+
 vars:
   UV_INSTALL_URL: https://astral.sh/uv/install.sh
   UV_INSTALL_URL_WINDOWS: https://astral.sh/uv/install.ps1
@@ -18,6 +21,7 @@ vars:
   PYTHON_VERSION: ""
   UV_TOOL: ""
   UV_VERSION: ""
+
 tasks:
   default:
     run: once
@@ -25,6 +29,7 @@ tasks:
     summary: Display the list of available uv-related tasks defined in this Taskfile.
     cmds:
       - task --list
+
   install:
     run: once
     desc: Install uv on the current operating system
@@ -38,6 +43,7 @@ tasks:
     cmds:
       - task: _install:unix
       - task: _install:windows
+
   install:undo:
     run: once
     desc: Remove uv from the current operating system
@@ -50,6 +56,7 @@ tasks:
     cmds:
       - task: _install:undo:unix
       - task: _install:undo:windows
+
   upgrade:
     run: once
     desc: Upgrade uv to the latest release
@@ -59,6 +66,7 @@ tasks:
     cmds:
       - task: _upgrade:unix
       - task: _upgrade:windows
+
   version:
     run: once
     desc: Show the installed uv version
@@ -68,6 +76,7 @@ tasks:
     cmds:
       - task: _version:unix
       - task: _version:windows
+
   python:install:
     run: once
     desc: Install a Python version with uv (PYTHON_VERSION=3.x)
@@ -87,11 +96,16 @@ tasks:
       - task: _uv:unix
         vars:
           UV_ARGS: >-
-            python install {{if .PYTHON_VERSION_OVERRIDE}}{{.PYTHON_VERSION_OVERRIDE}} {{- else}}{{.PYTHON_VERSION}}{{end}}
+            python install
+            {{if .PYTHON_VERSION_OVERRIDE}}{{.PYTHON_VERSION_OVERRIDE}}
+            {{- else}}{{.PYTHON_VERSION}}{{end}}
       - task: _uv:windows
         vars:
           UV_ARGS: >-
-            python install {{if .PYTHON_VERSION_OVERRIDE}}{{.PYTHON_VERSION_OVERRIDE}} {{- else}}{{.PYTHON_VERSION}}{{end}}
+            python install
+            {{if .PYTHON_VERSION_OVERRIDE}}{{.PYTHON_VERSION_OVERRIDE}}
+            {{- else}}{{.PYTHON_VERSION}}{{end}}
+
   venv:
     run: once
     desc: Create a Python virtual environment with uv (UV_VENV=path)
@@ -107,6 +121,7 @@ tasks:
       - task: _uv:windows
         vars:
           UV_ARGS: 'venv "{{.UV_VENV}}" {{.UV_EXTRA_ARGS}}'
+
   pip:install:
     run: once
     desc: Install packages from a requirements file with uv (UV_REQUIREMENTS=path)
@@ -123,6 +138,7 @@ tasks:
       - task: _uv:windows
         vars:
           UV_ARGS: 'pip install -r "{{.UV_REQUIREMENTS}}" {{.UV_EXTRA_ARGS}}'
+
   run:
     run: once
     desc: Run a script or command with uv (UV_FILE=path)
@@ -142,11 +158,16 @@ tasks:
       - task: _uv:unix
         vars:
           UV_ARGS: >-
-            run "{{if .UV_FILE_OVERRIDE}}{{.UV_FILE_OVERRIDE}}{{else}}{{.UV_FILE}}{{end}}" {{.UV_ARGS}} {{if .UV_EXTRA_ARGS_OVERRIDE}}{{.UV_EXTRA_ARGS_OVERRIDE}}{{else}}{{.UV_EXTRA_ARGS}}{{end}}
+            run "{{if .UV_FILE_OVERRIDE}}{{.UV_FILE_OVERRIDE}}{{else}}{{.UV_FILE}}{{end}}"
+            {{.UV_ARGS}}
+            {{if .UV_EXTRA_ARGS_OVERRIDE}}{{.UV_EXTRA_ARGS_OVERRIDE}}{{else}}{{.UV_EXTRA_ARGS}}{{end}}
       - task: _uv:windows
         vars:
           UV_ARGS: >-
-            run "{{if .UV_FILE_OVERRIDE}}{{.UV_FILE_OVERRIDE}}{{else}}{{.UV_FILE}}{{end}}" {{.UV_ARGS}} {{if .UV_EXTRA_ARGS_OVERRIDE}}{{.UV_EXTRA_ARGS_OVERRIDE}}{{else}}{{.UV_EXTRA_ARGS}}{{end}}
+            run "{{if .UV_FILE_OVERRIDE}}{{.UV_FILE_OVERRIDE}}{{else}}{{.UV_FILE}}{{end}}"
+            {{.UV_ARGS}}
+            {{if .UV_EXTRA_ARGS_OVERRIDE}}{{.UV_EXTRA_ARGS_OVERRIDE}}{{else}}{{.UV_EXTRA_ARGS}}{{end}}
+
   tool:install:
     run: once
     desc: Install a tool into an isolated environment with uv (UV_TOOL=name)
@@ -167,11 +188,16 @@ tasks:
       - task: _uv:unix
         vars:
           UV_ARGS: >-
-            tool install "{{if .UV_TOOL_OVERRIDE}}{{.UV_TOOL_OVERRIDE}}{{else}}{{.UV_TOOL}}{{end}}" {{if .UV_EXTRA_ARGS_OVERRIDE}}{{.UV_EXTRA_ARGS_OVERRIDE}}{{else}}{{.UV_EXTRA_ARGS}}{{end}}
+            tool install
+            "{{if .UV_TOOL_OVERRIDE}}{{.UV_TOOL_OVERRIDE}}{{else}}{{.UV_TOOL}}{{end}}"
+            {{if .UV_EXTRA_ARGS_OVERRIDE}}{{.UV_EXTRA_ARGS_OVERRIDE}}{{else}}{{.UV_EXTRA_ARGS}}{{end}}
       - task: _uv:windows
         vars:
           UV_ARGS: >-
-            tool install "{{if .UV_TOOL_OVERRIDE}}{{.UV_TOOL_OVERRIDE}}{{else}}{{.UV_TOOL}}{{end}}" {{if .UV_EXTRA_ARGS_OVERRIDE}}{{.UV_EXTRA_ARGS_OVERRIDE}}{{else}}{{.UV_EXTRA_ARGS}}{{end}}
+            tool install
+            "{{if .UV_TOOL_OVERRIDE}}{{.UV_TOOL_OVERRIDE}}{{else}}{{.UV_TOOL}}{{end}}"
+            {{if .UV_EXTRA_ARGS_OVERRIDE}}{{.UV_EXTRA_ARGS_OVERRIDE}}{{else}}{{.UV_EXTRA_ARGS}}{{end}}
+
   tool:upgrade:
     run: once
     desc: Upgrade an installed uv tool (UV_TOOL=name)
@@ -191,11 +217,16 @@ tasks:
       - task: _uv:unix
         vars:
           UV_ARGS: >-
-            tool upgrade "{{if .UV_TOOL_OVERRIDE}}{{.UV_TOOL_OVERRIDE}}{{else}}{{.UV_TOOL}}{{end}}" {{if .UV_EXTRA_ARGS_OVERRIDE}}{{.UV_EXTRA_ARGS_OVERRIDE}}{{else}}{{.UV_EXTRA_ARGS}}{{end}}
+            tool upgrade
+            "{{if .UV_TOOL_OVERRIDE}}{{.UV_TOOL_OVERRIDE}}{{else}}{{.UV_TOOL}}{{end}}"
+            {{if .UV_EXTRA_ARGS_OVERRIDE}}{{.UV_EXTRA_ARGS_OVERRIDE}}{{else}}{{.UV_EXTRA_ARGS}}{{end}}
       - task: _uv:windows
         vars:
           UV_ARGS: >-
-            tool upgrade "{{if .UV_TOOL_OVERRIDE}}{{.UV_TOOL_OVERRIDE}}{{else}}{{.UV_TOOL}}{{end}}" {{if .UV_EXTRA_ARGS_OVERRIDE}}{{.UV_EXTRA_ARGS_OVERRIDE}}{{else}}{{.UV_EXTRA_ARGS}}{{end}}
+            tool upgrade
+            "{{if .UV_TOOL_OVERRIDE}}{{.UV_TOOL_OVERRIDE}}{{else}}{{.UV_TOOL}}{{end}}"
+            {{if .UV_EXTRA_ARGS_OVERRIDE}}{{.UV_EXTRA_ARGS_OVERRIDE}}{{else}}{{.UV_EXTRA_ARGS}}{{end}}
+
   _uv:unix:
     run: once
     internal: true
@@ -205,6 +236,7 @@ tasks:
       vars: [UV_ARGS]
     cmds:
       - bash -lc '{{.UV_LOAD}}; uv {{.UV_ARGS}}'
+
   _uv:windows:
     run: once
     internal: true
@@ -213,6 +245,7 @@ tasks:
       vars: [UV_ARGS]
     cmds:
       - uv {{.UV_ARGS}}
+
   _install:unix:
     run: once
     internal: true
@@ -220,27 +253,45 @@ tasks:
     set: [errexit, nounset, pipefail]
     status:
       - >-
-        uv_bin="$HOME/.local/bin/uv"; if [ ! -x "$uv_bin" ]; then uv_bin="$(command -v uv 2>/dev/null)"; fi; [ -n "$uv_bin" ] && [ -x "$uv_bin" ] && { [ -z "{{.UV_VERSION}}" ] || "$uv_bin" --version | grep -Fqx "uv {{.UV_VERSION}}"; }
+        uv_bin="$HOME/.local/bin/uv";
+        if [ ! -x "$uv_bin" ]; then uv_bin="$(command -v uv 2>/dev/null)"; fi;
+        [ -n "$uv_bin" ] && [ -x "$uv_bin" ]
+        && { [ -z "{{.UV_VERSION}}" ] || "$uv_bin" --version | grep -Fq "uv {{.UV_VERSION}}"; }
     preconditions:
       - sh: command -v curl >/dev/null 2>&1
         msg: curl is required to download the uv installer.
     cmds:
       - echo 'Installing uv via the official install script...'
       - >-
-        curl -LsSf "{{if .UV_VERSION}}https://astral.sh/uv/{{.UV_VERSION}}/install.sh{{else}}{{.UV_INSTALL_URL}}{{end}}" | sh
+        curl -LsSf
+        "{{if .UV_VERSION}}https://astral.sh/uv/{{.UV_VERSION}}/install.sh{{else}}{{.UV_INSTALL_URL}}{{end}}"
+        | sh
       - echo 'uv installed. Restart your shell or tasks will use UV_LOAD to locate the binary.'
+
   _install:windows:
     run: once
     internal: true
     platforms: [windows]
     status:
       - >-
-        powershell -NoProfile -ExecutionPolicy Bypass -Command "$uv = Get-Command uv -ErrorAction SilentlyContinue; if (-not $uv) { exit 1 }; $requested = '{{.UV_VERSION}}'; if ([string]::IsNullOrWhiteSpace($requested) -or ((& $uv.Source --version) -eq ('uv ' + $requested))) { exit 0 }; exit 1"
+        powershell -NoProfile -ExecutionPolicy Bypass -Command
+        "$uv = Get-Command uv -ErrorAction SilentlyContinue;
+        if (-not $uv) { exit 1 };
+        $requested = '{{.UV_VERSION}}';
+        if ([string]::IsNullOrWhiteSpace($requested)
+        -or ((& $uv.Source --version) -like ('uv ' + $requested + '*'))) { exit 0 };
+        exit 1"
     cmds:
       - echo Installing uv via the official PowerShell installer...
       - >-
-        powershell -ExecutionPolicy ByPass -c "$installer = if ('{{.UV_VERSION}}') { 'https://astral.sh/uv/' + '{{.UV_VERSION}}' + '/install.ps1' } else { '{{.UV_INSTALL_URL_WINDOWS}}' }; irm $installer | iex"
+        powershell -ExecutionPolicy ByPass -c
+        "$installer = if ('{{.UV_VERSION}}') {
+        'https://astral.sh/uv/' + '{{.UV_VERSION}}' + '/install.ps1'
+        } else {
+        '{{.UV_INSTALL_URL_WINDOWS}}'
+        }; irm $installer | iex"
       - echo uv installed. Restart your terminal to use uv.
+
   _install:undo:unix:
     run: once
     internal: true
@@ -252,17 +303,20 @@ tasks:
       - echo 'Removing uv...'
       - bash -lc '{{.UV_LOAD}}; uv self uninstall'
       - echo 'uv removed.'
+
   _install:undo:windows:
     run: once
     internal: true
     platforms: [windows]
     status:
       - >-
-        powershell -NoProfile -ExecutionPolicy Bypass -Command "if (Get-Command uv -ErrorAction SilentlyContinue) { exit 1 } else { exit 0 }"
+        powershell -NoProfile -ExecutionPolicy Bypass -Command
+        "if (Get-Command uv -ErrorAction SilentlyContinue) { exit 1 } else { exit 0 }"
     cmds:
       - echo Removing uv...
       - uv self uninstall
       - echo uv removed. Restart your terminal.
+
   _upgrade:unix:
     run: once
     internal: true
@@ -275,18 +329,21 @@ tasks:
       - echo 'Upgrading uv...'
       - bash -lc '{{.UV_LOAD}}; uv self update'
       - echo 'uv upgraded.'
+
   _upgrade:windows:
     run: once
     internal: true
     platforms: [windows]
     preconditions:
       - sh: >-
-          powershell -NoProfile -ExecutionPolicy Bypass -Command "if (Get-Command uv -ErrorAction SilentlyContinue) { exit 0 } else { exit 1 }"
+          powershell -NoProfile -ExecutionPolicy Bypass -Command
+          "if (Get-Command uv -ErrorAction SilentlyContinue) { exit 0 } else { exit 1 }"
         msg: uv is not installed. Run task install first.
     cmds:
       - echo Upgrading uv...
       - uv self update
       - echo uv upgraded.
+
   _version:unix:
     run: once
     internal: true
@@ -297,13 +354,15 @@ tasks:
         msg: uv is not installed. Run task install first.
     cmds:
       - bash -lc '{{.UV_LOAD}}; uv --version'
+
   _version:windows:
     run: once
     internal: true
     platforms: [windows]
     preconditions:
       - sh: >-
-          powershell -NoProfile -ExecutionPolicy Bypass -Command "if (Get-Command uv -ErrorAction SilentlyContinue) { exit 0 } else { exit 1 }"
+          powershell -NoProfile -ExecutionPolicy Bypass -Command
+          "if (Get-Command uv -ErrorAction SilentlyContinue) { exit 0 } else { exit 1 }"
         msg: uv is not installed. Run task install first.
     cmds:
       - uv --version

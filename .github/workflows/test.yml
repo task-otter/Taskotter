@@ -29,6 +29,7 @@ jobs:
             golangci-lint
             govulncheck
             yamllint
+            yamlfix
             actionlint
             zizmor
             adrs
@@ -36,7 +37,7 @@ jobs:
           js: |
             runtime: bun
           includes-doc: true
-          target-folder: taskfiles
+          target-folder: taskotter
       - name: Print result
         if: always()
         shell: bash

@@ -23,7 +23,7 @@ jobs:
         with:
           github-token: ${{ github.token }}
           fail-on-changes: true
-          store-version: v0.0.5
+          store-version: v0.0.6
           tasks: |
             go
             golangci-lint
@@ -67,7 +67,10 @@ jobs:
       - name: Install Task
         run: go install github.com/go-task/task/v3/cmd/task@v3.52.0
       - name: Run CI
-        run: task ci
+        run: task taskotter:ci
+      - name: Run Tests
+        shell: bash
+        run: task taskotter:go:test
       - name: Upload coverage to Codecov
         if: ${{ !cancelled() }}
         uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f  # v7.0.0

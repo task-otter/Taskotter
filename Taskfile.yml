@@ -5,15 +5,8 @@ includes:
   taskotter:
     taskfile: taskfiles/Taskfile.yml
 tasks:
-  ci:
-    desc: Run CI checks
+  default:
+    run: once
+    desc: Show all available TaskOtter tasks
     cmds:
-      - task: taskotter:golangci-lint:fmt:check
-      - task: taskotter:lint
-      - task: taskotter:go:test
-
-  ci:fix:
-    desc: Run CI fixs
-    cmds:
-      - task: taskotter:golangci-lint:fmt
-      - task: taskotter:lint:fix
+      - task --list-all

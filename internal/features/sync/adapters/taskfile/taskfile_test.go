@@ -4,6 +4,7 @@
 package taskfile_test
 
 import (
+	"bytes"
 	"os"
 	"strings"
 	"testing"
@@ -236,6 +237,76 @@ func assertRewriteOutput(t *testing.T, text string, wants []string) {
 		if !strings.Contains(text, wants[i]) {
 			t.Fatalf(fmtExpectedInRewritten, wants[i], text)
 		}
+	}
+}
+
+func rewriteIncludesFoldedInput() []byte {
+	return []byte(`version: "3"
+includes:
+  pnpm:
+    taskfile: ../../../../pnpm/fnm/Taskfile.yml
+tasks:
+  lint:
+    cmds:
+      - >-
+        echo hello
+        world keeps folding
+`)
+}
+
+// TestRewriteIncludesPreservesFoldedBlock verifies folded cmd blocks stay byte-identical aside from the include path.
+func TestRewriteIncludesPreservesFoldedBlock(t *testing.T) {
+	t.Parallel()
+
+	input := rewriteIncludesFoldedInput()
+	want := bytes.Replace(
+		input,
+		[]byte("taskfile: ../../../../pnpm/fnm/Taskfile.yml"),
+		[]byte("taskfile: "+wantPnpmRewrite),
+		consts.IndexOne,
+	)
+
+	out, err := taskfile.RewriteIncludes(
+		input,
+		map[string]string{srcPnpmFnm: destPnpm},
+		taskESLint,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !bytes.Equal(out, want) {
+		t.Fatalf("folded block not preserved:\ngot:\n%s\nwant:\n%s", out, want)
+	}
+}
+
+// TestRewriteIncludesNoopIdentity verifies unchanged include paths return the original bytes.
+func TestRewriteIncludesNoopIdentity(t *testing.T) {
+	t.Parallel()
+
+	input := rewriteIncludesFoldedInput()
+
+	out, err := taskfile.RewriteIncludes(input, map[string]string{}, taskESLint)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !bytes.Equal(out, input) {
+		t.Fatalf("expected byte-identical output on empty sourceToDest:\ngot:\n%s\nwant:\n%s", out, input)
+	}
+
+	identityInput := rewriteIncludesInput()
+	identityOut, err := taskfile.RewriteIncludes(
+		identityInput,
+		map[string]string{srcPnpmFnm: destPnpm},
+		consts.Empty,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !bytes.Equal(identityOut, identityInput) {
+		t.Fatalf("expected byte-identical output when fromDest is empty")
 	}
 }
 

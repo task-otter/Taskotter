@@ -5,6 +5,8 @@
 package taskfile
 
 import (
+	"bytes"
+	"cmp"
 	"errors"
 	"fmt"
 	"path/filepath"
@@ -103,6 +105,22 @@ type (
 		fromDest     string
 		dir          string
 	}
+
+	// includePathReplacement locates one include taskfile scalar in the original YAML.
+	includePathReplacement struct {
+		line    int
+		column  int
+		oldPath string
+		newPath string
+		style   yaml.Style
+	}
+
+	// includePathSpan is a byte range in the original content to overwrite.
+	includePathSpan struct {
+		start int
+		end   int
+		value string
+	}
 )
 
 const (
@@ -139,45 +157,267 @@ func (e *RewriteError) Error() string {
 // fromDest is the destination module directory of the Taskfile being rewritten
 // (for example "eslint" or "internal/skipfiles"), used to recompute relative
 // include paths after destination normalization.
+//
+// Only include path scalars are edited in the original bytes; all other YAML
+// formatting (including folded `>-` blocks) is preserved unchanged.
 func RewriteIncludes(
 	content []byte,
 	sourceToDest map[string]string,
 	fromDest string,
 ) ([]byte, error) {
-	node, root, err := parseTaskfileRoot(content, "parse Taskfile YAML: %v", "empty Taskfile YAML")
+	_, root, err := parseTaskfileRoot(content, "parse Taskfile YAML: %v", "empty Taskfile YAML")
 	if err != nil {
 		return nil, fmt.Errorf(errParseTaskfileRoot, err)
 	}
 
-	rewriteIncludesInRoot(root, sourceToDest, fromDest)
+	replacements := collectIncludePathReplacements(root, sourceToDest, fromDest)
+	if len(replacements) == consts.IndexZero {
+		return content, nil
+	}
 
-	out, err := marshalRewrittenTaskfile(node)
+	out, err := applyIncludePathReplacements(content, replacements)
 	if err != nil {
-		return nil, fmt.Errorf("marshal rewritten taskfile: %w", err)
+		return nil, fmt.Errorf("apply include path replacements: %w", err)
 	}
 
 	return out, nil
 }
 
-func rewriteIncludesInRoot(root *yaml.Node, sourceToDest map[string]string, fromDest string) {
+func collectIncludePathReplacements(
+	root *yaml.Node,
+	sourceToDest map[string]string,
+	fromDest string,
+) []includePathReplacement {
 	includesNode := findMappingValue(root, keyIncludes)
-
-	if includesNode != nil {
-		rewriteIncludesNode(includesNode, sourceToDest, fromDest)
+	if includesNode == nil {
+		return nil
 	}
+
+	return collectIncludePathReplacementsFromNode(includesNode, sourceToDest, fromDest)
 }
 
-func marshalRewrittenTaskfile(node *yaml.Node) ([]byte, error) {
-	out, err := marshalAndValidate(
-		node,
-		"marshal Taskfile YAML: %v",
-		"validate rewritten Taskfile YAML: %v",
-	)
-	if err != nil {
-		return nil, fmt.Errorf(errMarshalAndValidate, err)
+func collectIncludePathReplacementsFromNode(
+	includes *yaml.Node,
+	sourceToDest map[string]string,
+	fromDest string,
+) []includePathReplacement {
+	if includes.Kind != yaml.MappingNode {
+		return nil
+	}
+
+	var out []includePathReplacement
+
+	for idx := consts.IndexZero; idx < len(includes.Content); idx += yamlMappingPairKeyValue {
+		replacement, ok := includePathReplacementForEntry(
+			includes.Content[idx+consts.IndexOne],
+			sourceToDest,
+			fromDest,
+		)
+		if !ok {
+			continue
+		}
+
+		out = append(out, replacement)
+	}
+
+	return out
+}
+
+func includePathReplacementForEntry(
+	entry *yaml.Node,
+	sourceToDest map[string]string,
+	fromDest string,
+) (includePathReplacement, bool) {
+	if entry.Kind != yaml.MappingNode {
+		return includePathReplacement{}, false
+	}
+
+	taskfileNode := findMappingValue(entry, keyTaskfile)
+	if taskfileNode == nil || taskfileNode.Kind != yaml.ScalarNode {
+		return includePathReplacement{}, false
+	}
+
+	newPath := rewriteIncludePath(taskfileNode.Value, sourceToDest, fromDest)
+	if newPath == taskfileNode.Value {
+		return includePathReplacement{}, false
+	}
+
+	return includePathReplacement{
+		line:    taskfileNode.Line,
+		column:  taskfileNode.Column,
+		oldPath: taskfileNode.Value,
+		newPath: newPath,
+		style:   taskfileNode.Style,
+	}, true
+}
+
+func applyIncludePathReplacements(
+	content []byte,
+	replacements []includePathReplacement,
+) ([]byte, error) {
+	spans := make([]includePathSpan, consts.IndexZero, len(replacements))
+
+	for i := range replacements {
+		span, err := includePathSpanForReplacement(content, &replacements[i])
+		if err != nil {
+			return nil, fmt.Errorf("resolve include path span: %w", err)
+		}
+
+		spans = append(spans, span)
+	}
+
+	slices.SortFunc(spans, func(left, right includePathSpan) int {
+		return cmp.Compare(right.start, left.start)
+	})
+
+	out := content
+
+	for i := range spans {
+		out = replaceByteSpan(out, spans[i].start, spans[i].end, spans[i].value)
 	}
 
 	return out, nil
+}
+
+func includePathSpanForReplacement(
+	content []byte,
+	replacement *includePathReplacement,
+) (includePathSpan, error) {
+	offset, err := offsetAtLineColumn(content, replacement.line, replacement.column)
+	if err != nil {
+		return includePathSpan{}, fmt.Errorf("offset at line/column: %w", err)
+	}
+
+	start, end, err := scalarValueSpan(content, offset, replacement.oldPath, replacement.style)
+	if err != nil {
+		return includePathSpan{}, fmt.Errorf("scalar value span: %w", err)
+	}
+
+	return includePathSpan{
+		start: start,
+		end:   end,
+		value: replacement.newPath,
+	}, nil
+}
+
+func offsetAtLineColumn(content []byte, line, column int) (int, error) {
+	if line < consts.IndexOne || column < consts.IndexOne {
+		return consts.IndexZero, &RewriteError{
+			Message: fmt.Sprintf("invalid YAML position line=%d column=%d", line, column),
+		}
+	}
+
+	offset := consts.IndexZero
+	currentLine := consts.IndexOne
+
+	for currentLine < line {
+		newline := bytes.IndexByte(content[offset:], '\n')
+		if newline < consts.IndexZero {
+			return consts.IndexZero, &RewriteError{
+				Message: fmt.Sprintf("YAML line %d past end of content", line),
+			}
+		}
+
+		offset += newline + consts.IndexOne
+		currentLine++
+	}
+
+	lineEnd := bytes.IndexByte(content[offset:], '\n')
+	if lineEnd < consts.IndexZero {
+		lineEnd = len(content) - offset
+	}
+
+	colOffset := column - consts.IndexOne
+	if colOffset > lineEnd {
+		return consts.IndexZero, &RewriteError{
+			Message: fmt.Sprintf("YAML column %d past end of line %d", column, line),
+		}
+	}
+
+	return offset + colOffset, nil
+}
+
+func scalarValueSpan(
+	content []byte,
+	offset int,
+	oldPath string,
+	style yaml.Style,
+) (start, end int, err error) {
+	switch style {
+	case yaml.DoubleQuotedStyle:
+		return quotedScalarValueSpan(content, offset, oldPath, '"')
+	case yaml.SingleQuotedStyle:
+		return quotedScalarValueSpan(content, offset, oldPath, '\'')
+	default:
+		return plainScalarValueSpan(content, offset, oldPath)
+	}
+}
+
+func plainScalarValueSpan(content []byte, offset int, oldPath string) (start, end int, err error) {
+	pathBytes := []byte(oldPath)
+	if !bytes.HasPrefix(content[offset:], pathBytes) {
+		return consts.IndexZero, consts.IndexZero, &RewriteError{
+			Message: fmt.Sprintf("include path %q not found at YAML position", oldPath),
+		}
+	}
+
+	return offset, offset + len(pathBytes), nil
+}
+
+func quotedScalarValueSpan(
+	content []byte,
+	offset int,
+	oldPath string,
+	quote byte,
+) (start, end int, err error) {
+	if offset >= len(content) || content[offset] != quote {
+		return consts.IndexZero, consts.IndexZero, &RewriteError{
+			Message: fmt.Sprintf("expected %q-quoted include path at YAML position", quote),
+		}
+	}
+
+	closeIdx, err := findClosingQuote(content, offset, quote)
+	if err != nil {
+		return consts.IndexZero, consts.IndexZero, err
+	}
+
+	interior := content[offset+consts.IndexOne : closeIdx]
+	if string(interior) != oldPath {
+		return consts.IndexZero, consts.IndexZero, &RewriteError{
+			Message: fmt.Sprintf("include path %q not found inside quotes at YAML position", oldPath),
+		}
+	}
+
+	return offset + consts.IndexOne, closeIdx, nil
+}
+
+func findClosingQuote(content []byte, openIdx int, quote byte) (int, error) {
+	idx := openIdx + consts.IndexOne
+
+	for idx < len(content) {
+		switch {
+		case quote == '"' && content[idx] == '\\':
+			idx += consts.IndexTwo
+		case content[idx] == quote && quote == '\'' &&
+			idx+consts.IndexOne < len(content) && content[idx+consts.IndexOne] == '\'':
+			idx += consts.IndexTwo
+		case content[idx] == quote:
+			return idx, nil
+		default:
+			idx++
+		}
+	}
+
+	return consts.IndexZero, &RewriteError{Message: "unterminated quoted include path"}
+}
+
+func replaceByteSpan(content []byte, start, end int, value string) []byte {
+	out := make([]byte, consts.IndexZero, len(content)-end+start+len(value))
+	out = append(out, content[:start]...)
+	out = append(out, value...)
+	out = append(out, content[end:]...)
+
+	return out
 }
 
 // parseTaskfileRoot unmarshals content into a YAML document node and returns its
@@ -230,30 +470,6 @@ func validateMarshaledYAML(out []byte, errMsg string) error {
 	}
 
 	return nil
-}
-
-func rewriteIncludesNode(includes *yaml.Node, sourceToDest map[string]string, fromDest string) {
-	if includes.Kind != yaml.MappingNode {
-		return
-	}
-
-	for idx := consts.IndexZero; idx < len(includes.Content); idx += yamlMappingPairKeyValue {
-		rewriteOneIncludeEntry(includes.Content[idx+consts.IndexOne], sourceToDest, fromDest)
-	}
-}
-
-func rewriteOneIncludeEntry(entry *yaml.Node, sourceToDest map[string]string, fromDest string) {
-	if entry.Kind != yaml.MappingNode {
-		return
-	}
-
-	taskfileNode := findMappingValue(entry, keyTaskfile)
-
-	if taskfileNode == nil || taskfileNode.Kind != yaml.ScalarNode {
-		return
-	}
-
-	taskfileNode.Value = rewriteIncludePath(taskfileNode.Value, sourceToDest, fromDest)
 }
 
 func rewriteIncludePath(path string, sourceToDest map[string]string, fromDest string) string {

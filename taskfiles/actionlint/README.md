@@ -38,9 +38,9 @@ task actionlint:install
 
 | Task | Description |
 |---|---|
+| `lint` | Lint GitHub Actions workflow files with actionlint |
 | `install` | Install actionlint on the current operating system |
 | `install:undo` | Remove actionlint from the current operating system |
-| `lint` | Lint GitHub Actions workflow files with actionlint |
 | `upgrade` | Upgrade actionlint to the latest release |
 | `version` | Show the installed actionlint version |
 

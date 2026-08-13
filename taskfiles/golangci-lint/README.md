@@ -131,6 +131,7 @@ already exists.
 | `install`     | Install golangci-lint into the global Go bin            | `GO_GLOBAL_BIN`, `GOLANGCI_LINT_VERSION` |
 | `lint`        | Lint all Go packages with golangci-lint                 | `GOLANGCI_LINT_LINT_SKIP_PATTERN`    |
 | `lint:fix`    | Auto-fix Go lint issues with golangci-lint               | `GOLANGCI_LINT_LINT_SKIP_PATTERN`    |
+| `ci:fix` | Run `fmt` then `lint:fix` for CI | — |
 | `fmt`         | Format Go files with golangci-lint formatters            | `GOLANGCI_LINT_FMT_SKIP_PATTERN`     |
 | `fmt:check`   | Check Go formatting with golangci-lint formatters         | `GOLANGCI_LINT_FMT_SKIP_PATTERN`     |
 | `config:skip` | Write the golangci-lint skip-pattern config overlay       | `GOLANGCI_LINT_LINT_SKIP_PATTERN`    |

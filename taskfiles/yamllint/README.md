@@ -45,6 +45,7 @@ task yamllint:ci
 | `lint`         | Lint YAML files                                 | `YAMLLINT_TARGETS`, `YAMLLINT_CONFIG`, `YAMLLINT_EXTRA_ARGS` |
 | `lint:fix`     | Auto-fix YAML files with yamlfix                | `YAMLLINT_TARGETS`, `YAMLLINT_EXTRA_ARGS`           |
 | `ci`           | Strict lint for CI (fails on warnings)          | `YAMLLINT_TARGETS`, `YAMLLINT_CONFIG`, `YAMLLINT_EXTRA_ARGS` |
+| `ci:fix` | Run `lint:fix` for CI fixing | — |
 | `config:init`  | Create a default `.yamllint` configuration file | none                              |
 
 ## Variables

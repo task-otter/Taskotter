@@ -107,6 +107,21 @@ tasks:
       - task: _cargo:windows
         vars:
           CARGO_SUBCMD: "test"
+  ci:
+    run: once
+    desc: Run cargo fmt:check then lint
+    cmds:
+      - task: fmt:check
+      - task: lint
+  ci:fix:
+    run: once
+    desc: Run cargo fmt then lint:fix
+    summary: |
+      Run fmt then lint:fix. Applies formatting and automatic lint fixes
+      suitable for CI autofix workflows.
+    cmds:
+      - task: fmt
+      - task: lint:fix
   fmt:
     run: once
     desc: Format Rust code with cargo fmt (CARGO_EXTRA_ARGS=flags)

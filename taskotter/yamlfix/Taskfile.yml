@@ -1,0 +1,171 @@
+---
+version: "3.5"
+output:
+  group:
+    begin: "::group::{{.TASK}}"
+    end: "::endgroup::"
+    error_only: false
+silent: true
+includes:
+  uv:
+    taskfile: ../uv/Taskfile.yml
+vars:
+  YAMLFIX_FMT_SKIP_PATTERN: ""
+  UV_LOAD: 'export PATH="$HOME/.local/bin:$PATH"'
+  YAMLFIX_TARGETS: "."
+  YAMLFIX_EXTRA_ARGS: ""
+  YAMLFIX_VERSION: ""
+tasks:
+  default:
+    run: once
+    desc: Show available yamlfix automation tasks
+    summary: Display the list of available yamlfix-related tasks defined in this Taskfile.
+    cmds:
+      - task --list
+  install:
+    run: once
+    desc: Install yamlfix on the current operating system
+    summary: |
+      Install yamlfix via uv tool install for the current platform.
+      Pass YAMLFIX_VERSION to pin a specific release instead of the latest.
+      uv manages an isolated environment so yamlfix never conflicts with
+      project dependencies. Installs uv first if it is not already present.
+    cmds:
+      - task: _install:unix
+      - task: _install:windows
+  install:undo:
+    run: once
+    desc: Remove yamlfix from the current operating system
+    summary: |
+      Remove yamlfix via uv tool uninstall on all platforms.
+      The uv-managed isolated environment is cleaned up automatically.
+    prompt:
+      - This will remove yamlfix from this machine.
+      - Continue?
+    cmds:
+      - task: _install:undo:unix
+      - task: _install:undo:windows
+  upgrade:
+    run: once
+    desc: Upgrade yamlfix to the latest release
+    summary: |
+      Upgrade yamlfix via uv tool upgrade on all platforms.
+      Auto-installs yamlfix if missing.
+    cmds:
+      - task: _upgrade:unix
+      - task: _upgrade:windows
+  version:
+    run: once
+    desc: Show the installed yamlfix version
+    summary: Print the active yamlfix version via yamlfix --version. Auto-installs yamlfix if missing.
+    deps:
+      - task: install
+    cmds:
+      - cmd: bash -lc '{{.UV_LOAD}}; yamlfix --version'
+        platforms: [linux, darwin]
+      - cmd: yamlfix --version
+        platforms: [windows]
+  ci:fix:
+    run: once
+    dir: "{{.USER_WORKING_DIR}}"
+    desc: Auto-fix YAML files with yamlfix (YAMLFIX_TARGETS=path)
+    summary: |
+      Run yamlfix against YAML files found under YAMLFIX_TARGETS (default .). Excludes
+      Taskfile.yml files whose Go template syntax is incompatible with yamlfix.
+      Pass YAMLFIX_EXTRA_ARGS for additional flags. Auto-installs yamlfix if missing.
+    deps:
+      - task: install
+    vars:
+      YAMLFIX_TARGETS: "."
+      YAMLFIX_EXTRA_ARGS: ""
+    cmds:
+      - >-
+        bash -lc '{{.UV_LOAD}}; _t="{{if .YAMLFIX_TARGETS_OVERRIDE}}{{.YAMLFIX_TARGETS_OVERRIDE}}{{else if
+        .YAMLFIX_TARGETS}}{{.YAMLFIX_TARGETS}}{{else}}.{{end}}"; [ -d "$_t" ] || _t="."; find "$_t" \( -name "*.yml"
+        -o -name "*.yaml"
+        \) ! -name "Taskfile.yml" ! -name "Taskfile.yaml" -print0 | xargs -0 yamlfix {{if
+        .YAMLFIX_FMT_SKIP_PATTERN_OVERRIDE}}--exclude "{{.YAMLFIX_FMT_SKIP_PATTERN_OVERRIDE}}" {{else if
+        .YAMLFIX_FMT_SKIP_PATTERN}}--exclude "{{.YAMLFIX_FMT_SKIP_PATTERN}}" {{end}} {{if
+        .YAMLFIX_EXTRA_ARGS_OVERRIDE}}{{.YAMLFIX_EXTRA_ARGS_OVERRIDE}}{{else}}{{.YAMLFIX_EXTRA_ARGS}}{{end}}'
+  _install:unix:
+    run: once
+    internal: true
+    platforms: [linux, darwin]
+    set: [errexit, nounset, pipefail]
+    status:
+      - >-
+        bash -lc '{{.UV_LOAD}}; command -v yamlfix >/dev/null 2>&1 && { [ -z "{{.YAMLFIX_VERSION}}" ] || yamlfix
+        --version | grep -Fq "{{.YAMLFIX_VERSION}}"; }'
+    deps:
+      - task: uv:install
+    cmds:
+      - echo 'Installing yamlfix via uv...'
+      - >-
+        bash -lc '{{.UV_LOAD}}; uv tool install --force "yamlfix{{if .YAMLFIX_VERSION}}=={{.YAMLFIX_VERSION}}{{end}}"'
+      - echo 'yamlfix installed.'
+  _install:windows:
+    run: once
+    internal: true
+    platforms: [windows]
+    status:
+      - >-
+        powershell -NoProfile -ExecutionPolicy Bypass -Command "$yamlfix = Get-Command yamlfix -ErrorAction
+        SilentlyContinue; if (-not $yamlfix) { exit 1 }; $requested = '{{.YAMLFIX_VERSION}}'; if
+        ([string]::IsNullOrWhiteSpace($requested) -or ((& $yamlfix.Source --version) -like ('*' + $requested + '*'))) {
+        exit 0 }; exit 1"
+    deps:
+      - task: uv:install
+    cmds:
+      - echo Installing yamlfix via uv...
+      - uv tool install --force "yamlfix{{if .YAMLFIX_VERSION}}=={{.YAMLFIX_VERSION}}{{end}}"
+      - echo yamlfix installed.
+  _install:undo:unix:
+    run: once
+    internal: true
+    platforms: [linux, darwin]
+    set: [errexit, nounset, pipefail]
+    status:
+      - bash -lc '{{.UV_LOAD}}; ! command -v yamlfix >/dev/null 2>&1'
+    cmds:
+      - echo 'Removing yamlfix...'
+      - bash -lc '{{.UV_LOAD}}; uv tool uninstall yamlfix'
+      - echo 'yamlfix removed.'
+  _install:undo:windows:
+    run: once
+    internal: true
+    platforms: [windows]
+    status:
+      - >-
+        powershell -NoProfile -ExecutionPolicy Bypass -Command "if (Get-Command yamlfix -ErrorAction SilentlyContinue)
+        { exit 1 } else { exit 0 }"
+    cmds:
+      - echo Removing yamlfix via uv...
+      - uv tool uninstall yamlfix
+      - echo yamlfix removed.
+  _upgrade:unix:
+    run: once
+    internal: true
+    platforms: [linux, darwin]
+    set: [errexit, nounset, pipefail]
+    preconditions:
+      - sh: bash -lc '{{.UV_LOAD}}; command -v yamlfix >/dev/null 2>&1'
+        msg: yamlfix is not installed. Run task install first.
+    cmds:
+      - echo 'Upgrading yamlfix via uv...'
+      - >-
+        bash -lc '{{.UV_LOAD}}; uv tool install --force "yamlfix{{if
+        .YAMLFIX_VERSION}}=={{.YAMLFIX_VERSION}}{{end}}"'
+      - echo 'yamlfix upgraded.'
+  _upgrade:windows:
+    run: once
+    internal: true
+    platforms: [windows]
+    preconditions:
+      - sh: >-
+          powershell -NoProfile -ExecutionPolicy Bypass -Command "if (Get-Command yamlfix -ErrorAction
+          SilentlyContinue) { exit 0 } else { exit 1 }"
+        msg: yamlfix is not installed. Run task install first.
+    cmds:
+      - echo Upgrading yamlfix via uv...
+      - uv tool install --force "yamlfix{{if .YAMLFIX_VERSION}}=={{.YAMLFIX_VERSION}}{{end}}"
+      - echo yamlfix upgraded.

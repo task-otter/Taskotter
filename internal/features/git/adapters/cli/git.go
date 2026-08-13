@@ -18,6 +18,7 @@ import (
 	"github.com/task-otter/Taskotter/internal/shared/consts"
 	"github.com/task-otter/Taskotter/internal/shared/iox"
 	"github.com/task-otter/Taskotter/internal/shared/pathutil"
+	"github.com/task-otter/Taskotter/internal/shared/repo"
 )
 
 type (
@@ -93,6 +94,15 @@ const (
 	fmtGitPushErr = "git push: %w"
 
 	maxGitRefLen = 255
+
+	httpExtraHeaderKey = "http.https://github.com/.extraheader"
+
+	gitConfigLocal = "--local"
+
+	gitConfigUnsetAll = "--unset-all"
+
+	//nolint:gosec // G101: GitHub x-access-token username scheme, not a secret
+	originAccessURLFmt = "https://x-access-token:%s@github.com/%s.git"
 )
 
 var (
@@ -112,7 +122,11 @@ var (
 
 	errInvalidStagePath = errors.New("invalid stage path")
 
+	errInvalidRepository = errors.New("invalid repository")
+
 	gitRefPattern = regexp.MustCompile(`^[a-zA-Z0-9._/-]+$`)
+
+	repoSegmentPattern = regexp.MustCompile(`^[a-zA-Z0-9._-]+$`)
 )
 
 // NewClient returns a git client bound to the given workspace path.
@@ -382,6 +396,27 @@ func plausibleBranchFromLine(line string) (string, bool) {
 	return branch, isPlausibleDefaultBranch(branch)
 }
 
+func isSafeRepoSegment(segment string) bool {
+	if strings.Contains(segment, "..") {
+		return false
+	}
+
+	return repoSegmentPattern.MatchString(segment)
+}
+
+func validateRepositoryCoordinate(repository string) error {
+	owner, name, err := repo.Parse(repository)
+	if err != nil {
+		return fmt.Errorf("parse repository: %w", err)
+	}
+
+	if !isSafeRepoSegment(owner) || !isSafeRepoSegment(name) {
+		return fmt.Errorf("%w %q", errInvalidRepository, repository)
+	}
+
+	return nil
+}
+
 func validateStagePaths(workspace string, paths []string) error {
 	for i := range paths {
 		err := ValidateStagePath(workspace, paths[i])
@@ -461,6 +496,27 @@ func (client *Client) Commit(ctx context.Context, message string) error {
 
 	if err != nil {
 		return fmt.Errorf("git commit: %w", err)
+	}
+
+	return nil
+}
+
+// ConfigureCredentials clears checkout extraheader auth and sets origin to a token URL.
+func (client *Client) ConfigureCredentials(ctx context.Context, token, repository string) error {
+	if token == consts.Empty || repository == consts.Empty {
+		return nil
+	}
+
+	err := validateRepositoryCoordinate(repository)
+	if err != nil {
+		return fmt.Errorf("validate repository: %w", err)
+	}
+
+	client.clearGitHubExtraHeader(ctx)
+
+	err = client.setOriginRemoteURL(ctx, fmt.Sprintf(originAccessURLFmt, token, repository))
+	if err != nil {
+		return fmt.Errorf("set origin url: %w", err)
 	}
 
 	return nil
@@ -587,6 +643,13 @@ func (client *Client) branchFromCommand(ctx context.Context, args ...string) (st
 	branch := normalizeBranch(out)
 
 	return branch, isPlausibleDefaultBranch(branch)
+}
+
+func (client *Client) clearGitHubExtraHeader(ctx context.Context) {
+	// Missing key is expected when checkout did not persist credentials.
+	iox.Discard(
+		client.run(ctx, consts.GitConfig, gitConfigLocal, gitConfigUnsetAll, httpExtraHeaderKey),
+	)
 }
 
 func (client *Client) defaultBranchFromOriginHEAD(ctx context.Context) (string, error) {
@@ -769,6 +832,18 @@ func (client *Client) runStageAdd(ctx context.Context, paths []string) error {
 	err := client.run(ctx, args...)
 	if err != nil {
 		return fmt.Errorf("stage paths: %w", err)
+	}
+
+	return nil
+}
+
+func (client *Client) setOriginRemoteURL(ctx context.Context, remoteURL string) error {
+	cmd := client.newGitCommand(ctx, gitRemote, "set-url", consts.GitOrigin, remoteURL)
+
+	err := cmd.Run()
+	if err != nil {
+		// Omit args and stderr so the token in the remote URL is never logged.
+		return fmt.Errorf("git remote set-url origin: %w", err)
 	}
 
 	return nil

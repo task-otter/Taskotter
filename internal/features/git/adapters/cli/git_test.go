@@ -32,6 +32,10 @@ type (
 		t      *testing.T
 		client *cli.Client
 	}
+
+	accessRepo struct {
+		access, repository string
+	}
 )
 
 const (
@@ -78,6 +82,18 @@ const (
 	testTaskfilesDir = "taskfiles"
 
 	fmtBranchWantMain = "branch = %q, want main"
+
+	httpExtraHeaderKey = "http.https://github.com/.extraheader"
+
+	gitFlagLocal = "--local"
+
+	gitRemoteGetURL = "get-url"
+
+	gitBinaryName = "git"
+
+	testAccessCred = "ghs_fixture_access"
+
+	testOwnerRepo = "owner/repo"
 )
 
 // TestClientBranchMethods verifies branch checkout, existence checks, and last commit message.
@@ -97,6 +113,47 @@ func TestClientCommitAndPush(t *testing.T) {
 	t.Parallel()
 
 	newClientFixture(t, setupRemoteRepo(t)).commitAndPush()
+}
+
+// TestConfigureCredentialsSetsOriginURL verifies checkout extraheader is cleared and origin uses the token URL.
+func TestConfigureCredentialsSetsOriginURL(t *testing.T) {
+	t.Parallel()
+
+	cloneDir := setupRemoteRepo(t)
+	seedCheckoutExtraHeader(t, cloneDir)
+	mustConfigureCredentials(t, cloneDir, &accessRepo{
+		access:     testAccessCred,
+		repository: testOwnerRepo,
+	})
+	assertExtraHeaderUnset(t, cloneDir)
+	assertOriginURL(t, cloneDir, wantOriginAccessURL(testAccessCred, testOwnerRepo))
+}
+
+// TestConfigureCredentialsNoOpWhenEmpty verifies empty token or repository leaves origin unchanged.
+func TestConfigureCredentialsNoOpWhenEmpty(t *testing.T) {
+	t.Parallel()
+
+	cloneDir := setupRemoteRepo(t)
+	before := originGetURL(t, cloneDir)
+	mustConfigureCredentials(t, cloneDir, &accessRepo{
+		access:     consts.Empty,
+		repository: testOwnerRepo,
+	})
+	mustConfigureCredentials(t, cloneDir, &accessRepo{
+		access:     testAccessCred,
+		repository: consts.Empty,
+	})
+	assertOriginURL(t, cloneDir, before)
+}
+
+// TestConfigureCredentialsRejectsInvalidRepository verifies unsafe repository coordinates are rejected.
+func TestConfigureCredentialsRejectsInvalidRepository(t *testing.T) {
+	t.Parallel()
+
+	cloneDir := setupRemoteRepo(t)
+	before := originGetURL(t, cloneDir)
+	assertInvalidRepositoriesRejected(t, cloneDir)
+	assertOriginURL(t, cloneDir, before)
 }
 
 // TestClientHelpers verifies safe directory setup, identity config, and repo detection.
@@ -321,6 +378,88 @@ func assertDefaultBranchMain(t *testing.T, cloneDir string) {
 	}
 }
 
+func assertExtraHeaderUnset(t *testing.T, cloneDir string) {
+	t.Helper()
+
+	cmd := exec.CommandContext(
+		t.Context(),
+		gitBinaryName,
+		gitCmdConfig,
+		gitFlagLocal,
+		"--get-all",
+		httpExtraHeaderKey,
+	)
+
+	cmd.Dir = cloneDir
+
+	out, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Fatalf("expected extraheader unset, got %q", strings.TrimSpace(string(out)))
+	}
+}
+
+func assertInvalidRepositoriesRejected(t *testing.T, cloneDir string) {
+	t.Helper()
+
+	cases := []string{
+		"owner",
+		"owner/repo/extra",
+		"owner/..",
+		"owner/repo with spaces",
+	}
+
+	client := cli.NewClient(cloneDir)
+
+	for i := range cases {
+		err := client.ConfigureCredentials(t.Context(), testAccessCred, cases[i])
+		if err == nil {
+			t.Fatalf("ConfigureCredentials(%q) expected error", cases[i])
+		}
+	}
+}
+
+func assertOriginURL(t *testing.T, cloneDir, want string) {
+	t.Helper()
+
+	got := originGetURL(t, cloneDir)
+
+	if got != want {
+		t.Fatalf("origin URL = %q, want %q", got, want)
+	}
+}
+
+func mustConfigureCredentials(t *testing.T, cloneDir string, in *accessRepo) {
+	t.Helper()
+
+	err := cli.NewClient(cloneDir).ConfigureCredentials(t.Context(), in.access, in.repository)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func originGetURL(t *testing.T, cloneDir string) string {
+	t.Helper()
+
+	return strings.TrimSpace(runGit(t, cloneDir, gitCmdRemote, gitRemoteGetURL, consts.GitOrigin))
+}
+
+func seedCheckoutExtraHeader(t *testing.T, cloneDir string) {
+	t.Helper()
+
+	runGit(
+		t,
+		cloneDir,
+		gitCmdConfig,
+		gitFlagLocal,
+		httpExtraHeaderKey,
+		"AUTHORIZATION: basic fake",
+	)
+}
+
+func wantOriginAccessURL(access, repository string) string {
+	return "https://x-access-token:" + access + "@github.com/" + repository + ".git"
+}
+
 func assertEnsureBranchOwnedSuccess(t *testing.T, mockOps *mockGitOps) {
 	t.Helper()
 
@@ -509,7 +648,7 @@ func runGit(t *testing.T, dir string, args ...string) string {
 	t.Helper()
 
 	//nolint:gosec // test helper runs git in isolated temp repos
-	cmd := exec.CommandContext(t.Context(), "git", args...)
+	cmd := exec.CommandContext(t.Context(), gitBinaryName, args...)
 
 	cmd.Dir = dir
 

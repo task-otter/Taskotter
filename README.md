@@ -35,7 +35,7 @@ permissions:
 | Input | Required | Default | Description |
 |-------|----------|---------|-------------|
 | `tasks` | yes | — | Comma-separated or multiline list of logical task names (`eslint`, `go`, …) |
-| `github-token` | yes | — | Token for pushing the sync branch and managing pull requests |
+| `github-token` | yes | — | Token used to authenticate git push (origin URL) and manage pull requests |
 | `js` | no | empty | YAML block for Node task resolution (see below) |
 | `includes-doc` | no | `true` | Copy `README.md` and `docs/` when `true` |
 | `sync-root` | no | `true` | Create or update the repository root `Taskfile.yml` when `true` |

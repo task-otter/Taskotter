@@ -454,15 +454,31 @@ func (orch *Orchestrator) downloadSnap(ctx context.Context, ref *refInfo) (*snap
 }
 
 func (orch *Orchestrator) ensureGitReadyForSync(ctx context.Context, cfg *config.Config) error {
-	if orch.GitClient != nil {
-		orch.GitClient.EnsureSafeDirectory()
+	err := orch.prepareGitWorkspace(ctx, cfg)
+	if err != nil {
+		return fmt.Errorf("prepare git workspace: %w", err)
 	}
 
 	gitports.WriteLocalIdentity()
 
-	err := gitports.EnsureBranchOwned(ctx, orch.GitBrancher, cfg.BranchName)
+	err = gitports.EnsureBranchOwned(ctx, orch.GitBrancher, cfg.BranchName)
 	if err != nil {
 		return fmt.Errorf("ensure branch owned: %w", err)
+	}
+
+	return nil
+}
+
+func (orch *Orchestrator) prepareGitWorkspace(ctx context.Context, cfg *config.Config) error {
+	if orch.GitClient == nil {
+		return nil
+	}
+
+	orch.GitClient.EnsureSafeDirectory()
+
+	err := orch.GitClient.ConfigureCredentials(ctx, cfg.GitHubToken, cfg.Repository)
+	if err != nil {
+		return fmt.Errorf("configure credentials: %w", err)
 	}
 
 	return nil

@@ -46,6 +46,7 @@ type (
 	// Workspace prepares a git workspace before sync operations.
 	Workspace interface {
 		EnsureSafeDirectory()
+		ConfigureCredentials(ctx context.Context, token, repository string) error
 	}
 )
 

@@ -1,6 +1,8 @@
 ---
 version: "3.5"
+
 silent: true
+
 vars:
   SKIPFILES_UNIX_GLOB_HELPERS: |
     glob_to_regex() {
@@ -46,6 +48,7 @@ vars:
       fi
       printf '%s' "$path"
     }
+
   SKIPFILES_POWERSHELL_GLOB_HELPERS: |
     function ConvertTo-SkipfilesRegex([string]$Pattern) {
       $normalizedPattern = $Pattern.Replace("\", "/")
@@ -86,6 +89,7 @@ vars:
       }
       return $normalized
     }
+
 tasks:
   filter:
     desc: Filter stdin paths by SKIPFILES_PATTERN.
@@ -108,6 +112,7 @@ tasks:
           SKIPFILES_PATTERN: "{{.SKIPFILES_PATTERN}}"
           SKIPFILES_MATCHING: "{{.SKIPFILES_MATCHING}}"
         if: '{{ne .SKIPFILES_PATTERN ""}}'
+
   go-packages:
     desc: Print Go import paths whose files do not match SKIPFILES_PATTERN.
     dir: "{{.USER_WORKING_DIR}}"
@@ -129,6 +134,7 @@ tasks:
           SKIPFILES_PATTERN: "{{.SKIPFILES_PATTERN}}"
           SKIPFILES_GO_TARGETS: "{{.SKIPFILES_GO_TARGETS}}"
         if: '{{ne .SKIPFILES_PATTERN ""}}'
+
   _filter:empty:
     internal: true
     dir: "{{.USER_WORKING_DIR}}"
@@ -155,6 +161,7 @@ tasks:
             }
           '
         platforms: [windows]
+
   _filter:unix:
     internal: true
     dir: "{{.USER_WORKING_DIR}}"
@@ -186,6 +193,7 @@ tasks:
           printf '%s\0' "$path"
         fi
       done < <(tr '\0' '\n')
+
   _filter:windows:
     internal: true
     dir: "{{.USER_WORKING_DIR}}"
@@ -215,6 +223,7 @@ tasks:
           }
         }
       '
+
   _go-packages:all:
     internal: true
     dir: "{{.USER_WORKING_DIR}}"
@@ -251,6 +260,7 @@ tasks:
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           '
         platforms: [windows]
+
   _go-packages:unix:
     internal: true
     dir: "{{.USER_WORKING_DIR}}"
@@ -302,6 +312,7 @@ tasks:
             printf '%s\0' "$import_path"
           fi
         done
+
   _go-packages:windows:
     internal: true
     dir: "{{.USER_WORKING_DIR}}"

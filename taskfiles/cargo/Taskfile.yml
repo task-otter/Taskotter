@@ -1,15 +1,19 @@
 ---
 version: "3.5"
+
 output:
   group:
     begin: "::group::{{.TASK}}"
     end: "::endgroup::"
     error_only: false
+
 silent: true
+
 includes:
   skipfiles:
     taskfile: ../internal/skipfiles/Taskfile.yml
     internal: true
+
 vars:
   CARGO_LINT_SKIP_PATTERN: ""
   CARGO_FMT_SKIP_PATTERN: ""
@@ -18,6 +22,7 @@ vars:
   RUST_TOOLCHAIN: ""
   CARGO_BIN_UNIX: "$HOME/.cargo/bin"
   CARGO_EXTRA_ARGS: ""
+
 tasks:
   default:
     run: once
@@ -25,6 +30,7 @@ tasks:
     summary: Display the list of available Cargo-related tasks defined in this Taskfile.
     cmds:
       - task --list
+
   install:
     run: once
     desc: Install the Rust toolchain via rustup
@@ -37,6 +43,7 @@ tasks:
     cmds:
       - task: _install:unix
       - task: _install:windows
+
   install:undo:
     run: once
     desc: Remove the Rust toolchain installed by rustup
@@ -47,6 +54,7 @@ tasks:
     cmds:
       - task: _install:undo:unix
       - task: _install:undo:windows
+
   upgrade:
     run: once
     desc: Upgrade the Rust toolchain with rustup update
@@ -59,6 +67,7 @@ tasks:
     cmds:
       - task: _upgrade:unix
       - task: _upgrade:windows
+
   build:
     run: once
     desc: Build the crate with cargo build (CARGO_EXTRA_ARGS=flags)
@@ -75,6 +84,7 @@ tasks:
       - task: _cargo:windows
         vars:
           CARGO_SUBCMD: "build"
+
   check:
     run: once
     desc: Type-check the crate with cargo check (CARGO_EXTRA_ARGS=flags)
@@ -91,6 +101,7 @@ tasks:
       - task: _cargo:windows
         vars:
           CARGO_SUBCMD: "check"
+
   test:
     run: once
     desc: Run the crate test suite with cargo test (CARGO_EXTRA_ARGS=flags)
@@ -107,12 +118,14 @@ tasks:
       - task: _cargo:windows
         vars:
           CARGO_SUBCMD: "test"
+
   ci:
     run: once
     desc: Run cargo fmt:check then lint
     cmds:
       - task: fmt:check
       - task: lint
+
   ci:fix:
     run: once
     desc: Run cargo fmt then lint:fix
@@ -122,6 +135,7 @@ tasks:
     cmds:
       - task: fmt
       - task: lint:fix
+
   fmt:
     run: once
     desc: Format Rust code with cargo fmt (CARGO_EXTRA_ARGS=flags)
@@ -135,12 +149,15 @@ tasks:
         vars:
           CARGO_SUBCMD: "fmt"
           CARGO_SKIP_PATTERN: >-
-            {{if .CARGO_FMT_SKIP_PATTERN_OVERRIDE}}{{.CARGO_FMT_SKIP_PATTERN_OVERRIDE}} {{- else}}{{.CARGO_FMT_SKIP_PATTERN}}{{end}}
+            {{if .CARGO_FMT_SKIP_PATTERN_OVERRIDE}}{{.CARGO_FMT_SKIP_PATTERN_OVERRIDE}}
+            {{- else}}{{.CARGO_FMT_SKIP_PATTERN}}{{end}}
       - task: _cargo:windows
         vars:
           CARGO_SUBCMD: "fmt"
           CARGO_SKIP_PATTERN: >-
-            {{if .CARGO_FMT_SKIP_PATTERN_OVERRIDE}}{{.CARGO_FMT_SKIP_PATTERN_OVERRIDE}} {{- else}}{{.CARGO_FMT_SKIP_PATTERN}}{{end}}
+            {{if .CARGO_FMT_SKIP_PATTERN_OVERRIDE}}{{.CARGO_FMT_SKIP_PATTERN_OVERRIDE}}
+            {{- else}}{{.CARGO_FMT_SKIP_PATTERN}}{{end}}
+
   fmt:check:
     run: once
     desc: Check Rust formatting with cargo fmt --check (CARGO_EXTRA_ARGS=flags)
@@ -155,12 +172,15 @@ tasks:
         vars:
           CARGO_SUBCMD: "fmt --check"
           CARGO_SKIP_PATTERN: >-
-            {{if .CARGO_FMT_SKIP_PATTERN_OVERRIDE}}{{.CARGO_FMT_SKIP_PATTERN_OVERRIDE}} {{- else}}{{.CARGO_FMT_SKIP_PATTERN}}{{end}}
+            {{if .CARGO_FMT_SKIP_PATTERN_OVERRIDE}}{{.CARGO_FMT_SKIP_PATTERN_OVERRIDE}}
+            {{- else}}{{.CARGO_FMT_SKIP_PATTERN}}{{end}}
       - task: _cargo:windows
         vars:
           CARGO_SUBCMD: "fmt --check"
           CARGO_SKIP_PATTERN: >-
-            {{if .CARGO_FMT_SKIP_PATTERN_OVERRIDE}}{{.CARGO_FMT_SKIP_PATTERN_OVERRIDE}} {{- else}}{{.CARGO_FMT_SKIP_PATTERN}}{{end}}
+            {{if .CARGO_FMT_SKIP_PATTERN_OVERRIDE}}{{.CARGO_FMT_SKIP_PATTERN_OVERRIDE}}
+            {{- else}}{{.CARGO_FMT_SKIP_PATTERN}}{{end}}
+
   lint:
     run: once
     desc: Lint Rust code with cargo clippy (CARGO_EXTRA_ARGS=flags)
@@ -175,12 +195,15 @@ tasks:
         vars:
           CARGO_SUBCMD: "clippy"
           CARGO_SKIP_PATTERN: >-
-            {{if .CARGO_LINT_SKIP_PATTERN_OVERRIDE}}{{.CARGO_LINT_SKIP_PATTERN_OVERRIDE}} {{- else}}{{.CARGO_LINT_SKIP_PATTERN}}{{end}}
+            {{if .CARGO_LINT_SKIP_PATTERN_OVERRIDE}}{{.CARGO_LINT_SKIP_PATTERN_OVERRIDE}}
+            {{- else}}{{.CARGO_LINT_SKIP_PATTERN}}{{end}}
       - task: _cargo:windows
         vars:
           CARGO_SUBCMD: "clippy"
           CARGO_SKIP_PATTERN: >-
-            {{if .CARGO_LINT_SKIP_PATTERN_OVERRIDE}}{{.CARGO_LINT_SKIP_PATTERN_OVERRIDE}} {{- else}}{{.CARGO_LINT_SKIP_PATTERN}}{{end}}
+            {{if .CARGO_LINT_SKIP_PATTERN_OVERRIDE}}{{.CARGO_LINT_SKIP_PATTERN_OVERRIDE}}
+            {{- else}}{{.CARGO_LINT_SKIP_PATTERN}}{{end}}
+
   lint:fix:
     run: once
     desc: Auto-fix Rust lint issues with cargo clippy --fix
@@ -195,12 +218,15 @@ tasks:
         vars:
           CARGO_SUBCMD: "clippy --fix"
           CARGO_SKIP_PATTERN: >-
-            {{if .CARGO_LINT_SKIP_PATTERN_OVERRIDE}}{{.CARGO_LINT_SKIP_PATTERN_OVERRIDE}} {{- else}}{{.CARGO_LINT_SKIP_PATTERN}}{{end}}
+            {{if .CARGO_LINT_SKIP_PATTERN_OVERRIDE}}{{.CARGO_LINT_SKIP_PATTERN_OVERRIDE}}
+            {{- else}}{{.CARGO_LINT_SKIP_PATTERN}}{{end}}
       - task: _cargo:windows
         vars:
           CARGO_SUBCMD: "clippy --fix"
           CARGO_SKIP_PATTERN: >-
-            {{if .CARGO_LINT_SKIP_PATTERN_OVERRIDE}}{{.CARGO_LINT_SKIP_PATTERN_OVERRIDE}} {{- else}}{{.CARGO_LINT_SKIP_PATTERN}}{{end}}
+            {{if .CARGO_LINT_SKIP_PATTERN_OVERRIDE}}{{.CARGO_LINT_SKIP_PATTERN_OVERRIDE}}
+            {{- else}}{{.CARGO_LINT_SKIP_PATTERN}}{{end}}
+
   version:
     run: once
     desc: Show the installed cargo version
@@ -214,6 +240,7 @@ tasks:
       - task: _cargo:windows
         vars:
           CARGO_SUBCMD: "--version"
+
   which:
     run: once
     desc: Show the path to the cargo binary
@@ -225,6 +252,7 @@ tasks:
     cmds:
       - task: _which:unix
       - task: _which:windows
+
   verify:
     run: once
     desc: Verify the Rust toolchain installation
@@ -237,6 +265,7 @@ tasks:
     cmds:
       - task: _verify:unix
       - task: _verify:windows
+
   _install:unix:
     run: once
     internal: true
@@ -244,25 +273,40 @@ tasks:
     set: [errexit, nounset, pipefail]
     status:
       - >-
-        command -v cargo >/dev/null 2>&1 && { [ -z "{{.RUST_TOOLCHAIN}}" ] || rustup show 2>/dev/null | grep -Fq "{{.RUST_TOOLCHAIN}}"; }
+        command -v cargo >/dev/null 2>&1
+        && { [ -z "{{.RUST_TOOLCHAIN}}" ]
+        || rustup show 2>/dev/null | grep -Fq "{{.RUST_TOOLCHAIN}}"; }
     preconditions:
       - sh: command -v curl >/dev/null 2>&1
         msg: curl is required to download the rustup installer.
     cmds:
       - echo 'Installing the Rust toolchain via rustup...'
       - >-
-        curl --proto '=https' --tlsv1.2 -sSf "{{.RUSTUP_INSTALL_URL}}" | sh -s -- -y --default-toolchain {{default "stable" .RUST_TOOLCHAIN}}
+        curl --proto '=https' --tlsv1.2 -sSf "{{.RUSTUP_INSTALL_URL}}"
+        | sh -s -- -y --default-toolchain {{default "stable" .RUST_TOOLCHAIN}}
       - echo 'Rust installed. Restart your shell if cargo is not yet in PATH.'
+
   _install:windows:
     run: once
     internal: true
     platforms: [windows]
     status:
       - >-
-        powershell -NoProfile -ExecutionPolicy Bypass -Command "if (Get-Command cargo -ErrorAction SilentlyContinue) { $requested = '{{.RUST_TOOLCHAIN}}'; if ([string]::IsNullOrWhiteSpace($requested) -or ((rustup show) -match [regex]::Escape($requested))) { exit 0 } }; exit 1"
+        powershell -NoProfile -ExecutionPolicy Bypass -Command
+        "if (Get-Command cargo -ErrorAction SilentlyContinue) {
+        $requested = '{{.RUST_TOOLCHAIN}}';
+        if ([string]::IsNullOrWhiteSpace($requested)
+        -or ((rustup show) -match [regex]::Escape($requested))) { exit 0 } };
+        exit 1"
     cmds:
       - >-
-        powershell -NoProfile -ExecutionPolicy Bypass -Command "$exe = Join-Path $env:TEMP 'rustup-init.exe'; Write-Host 'Downloading rustup-init.exe...'; Invoke-WebRequest -Uri '{{.RUSTUP_INSTALL_URL_WINDOWS}}/rustup-init.exe' -OutFile $exe; & $exe -y --default-toolchain {{default "stable" .RUST_TOOLCHAIN}}; Remove-Item $exe -Force -ErrorAction SilentlyContinue"
+        powershell -NoProfile -ExecutionPolicy Bypass -Command
+        "$exe = Join-Path $env:TEMP 'rustup-init.exe';
+        Write-Host 'Downloading rustup-init.exe...';
+        Invoke-WebRequest -Uri '{{.RUSTUP_INSTALL_URL_WINDOWS}}/rustup-init.exe' -OutFile $exe;
+        & $exe -y --default-toolchain {{default "stable" .RUST_TOOLCHAIN}};
+        Remove-Item $exe -Force -ErrorAction SilentlyContinue"
+
   _install:undo:unix:
     run: once
     internal: true
@@ -275,16 +319,20 @@ tasks:
         rustup="$(command -v rustup || echo "{{.CARGO_BIN_UNIX}}/rustup")"
         "$rustup" self uninstall -y
       - echo 'Rust toolchain removed.'
+
   _install:undo:windows:
     run: once
     internal: true
     platforms: [windows]
     status:
       - >-
-        powershell -NoProfile -ExecutionPolicy Bypass -Command "if (Get-Command rustup -ErrorAction SilentlyContinue) { exit 1 } else { exit 0 }"
+        powershell -NoProfile -ExecutionPolicy Bypass -Command
+        "if (Get-Command rustup -ErrorAction SilentlyContinue) { exit 1 } else { exit 0 }"
     cmds:
       - >-
-        powershell -NoProfile -ExecutionPolicy Bypass -Command "rustup self uninstall -y"
+        powershell -NoProfile -ExecutionPolicy Bypass -Command
+        "rustup self uninstall -y"
+
   _upgrade:unix:
     run: once
     internal: true
@@ -293,26 +341,33 @@ tasks:
       - |
         rustup="$(command -v rustup || echo "{{.CARGO_BIN_UNIX}}/rustup")"
         "$rustup" update {{.RUST_TOOLCHAIN}}
+
   _upgrade:windows:
     run: once
     internal: true
     platforms: [windows]
     cmds:
       - >-
-        powershell -NoProfile -ExecutionPolicy Bypass -Command "rustup update {{.RUST_TOOLCHAIN}}"
+        powershell -NoProfile -ExecutionPolicy Bypass -Command
+        "rustup update {{.RUST_TOOLCHAIN}}"
+
   _which:unix:
     run: once
     internal: true
     platforms: [linux, darwin]
     cmds:
       - command -v cargo || printf '%s\n' "{{.CARGO_BIN_UNIX}}/cargo"
+
   _which:windows:
     run: once
     internal: true
     platforms: [windows]
     cmds:
       - >-
-        powershell -NoProfile -ExecutionPolicy Bypass -Command "$c = (Get-Command cargo -ErrorAction SilentlyContinue).Source; if ($c) { $c } else { Join-Path $env:USERPROFILE '.cargo\bin\cargo.exe' }"
+        powershell -NoProfile -ExecutionPolicy Bypass -Command
+        "$c = (Get-Command cargo -ErrorAction SilentlyContinue).Source;
+        if ($c) { $c } else { Join-Path $env:USERPROFILE '.cargo\bin\cargo.exe' }"
+
   _verify:unix:
     run: once
     internal: true
@@ -325,13 +380,16 @@ tasks:
         "$cargo" --version
         "$rustc" --version
         "$rustup" show
+
   _verify:windows:
     run: once
     internal: true
     platforms: [windows]
     cmds:
       - >-
-        powershell -NoProfile -ExecutionPolicy Bypass -Command "cargo --version; rustc --version; rustup show"
+        powershell -NoProfile -ExecutionPolicy Bypass -Command
+        "cargo --version; rustc --version; rustup show"
+
   _cargo:unix:
     run: once
     internal: true
@@ -404,6 +462,7 @@ tasks:
         "$cargo" {{if .RUST_TOOLCHAIN}}+{{.RUST_TOOLCHAIN}} {{end}}{{.CARGO_SUBCMD}} "$@" \
           {{if .CARGO_EXTRA_ARGS_OVERRIDE}}{{.CARGO_EXTRA_ARGS_OVERRIDE}}
           {{- else}}{{.CARGO_EXTRA_ARGS}}{{end}}
+
   _cargo:windows:
     run: once
     internal: true
@@ -411,14 +470,17 @@ tasks:
     dir: "{{.USER_WORKING_DIR}}"
     cmds:
       - >-
-        powershell -NoProfile -ExecutionPolicy Bypass -Command "$c = (Get-Command cargo -ErrorAction SilentlyContinue).Source; if (-not $c) { $c = Join-Path $env:USERPROFILE '.cargo\bin\cargo.exe' }; $skipPattern='{{default "" .CARGO_SKIP_PATTERN}}'; if (-not $skipPattern) {
-
+        powershell -NoProfile -ExecutionPolicy Bypass -Command
+        "$c = (Get-Command cargo -ErrorAction SilentlyContinue).Source;
+        if (-not $c) { $c = Join-Path $env:USERPROFILE '.cargo\bin\cargo.exe' };
+        $skipPattern='{{default "" .CARGO_SKIP_PATTERN}}';
+        if (-not $skipPattern) {
           & $c {{if .RUST_TOOLCHAIN}}+{{.RUST_TOOLCHAIN}} {{end}}{{.CARGO_SUBCMD}}
             {{if .CARGO_EXTRA_ARGS_OVERRIDE}}{{.CARGO_EXTRA_ARGS_OVERRIDE}}
             {{- else}}{{.CARGO_EXTRA_ARGS}}{{end}};
           exit $LASTEXITCODE
-        }; function Get-PackageName([string]$manifest) {
-
+        };
+        function Get-PackageName([string]$manifest) {
           $inPackage=$false;
           foreach ($line in Get-Content -LiteralPath $manifest) {
             if ($line -match '^\s*\[package\]\s*$') { $inPackage=$true; continue };
@@ -426,15 +488,14 @@ tasks:
             if ($inPackage -and $line -match '^\s*name\s*=\s*[''\"]([^''\"]+)[''\"]') { return $Matches[1] };
           };
           return ''
-        }; $allFiles=@(Get-ChildItem -Recurse -Filter '*.rs' -File |
-
+        };
+        $allFiles=@(Get-ChildItem -Recurse -Filter '*.rs' -File |
           Where-Object { $_.FullName -notmatch '\\target\\|\\.git\\' });
         $retained=@($allFiles | ForEach-Object FullName |
-
           task --silent --taskfile '{{.TASKFILE_DIR}}/../internal/skipfiles/Taskfile.yml'
             filter ('SKIPFILES_PATTERN=' + $skipPattern));
-        $skippedPackages=@{}; foreach ($file in $allFiles) {
-
+        $skippedPackages=@{};
+        foreach ($file in $allFiles) {
           if ($retained -contains $file.FullName) { continue };
           $directory=$file.Directory;
           while ($directory -and -not (Test-Path -LiteralPath (Join-Path $directory.FullName 'Cargo.toml'))) {
@@ -444,21 +505,22 @@ tasks:
             $name=Get-PackageName (Join-Path $directory.FullName 'Cargo.toml');
             if ($name) { $skippedPackages[$name]=$true }
           }
-        }; if ($skippedPackages.Count -eq 0) {
-
+        };
+        if ($skippedPackages.Count -eq 0) {
           & $c {{if .RUST_TOOLCHAIN}}+{{.RUST_TOOLCHAIN}} {{end}}{{.CARGO_SUBCMD}}
             {{if .CARGO_EXTRA_ARGS_OVERRIDE}}{{.CARGO_EXTRA_ARGS_OVERRIDE}}
             {{- else}}{{.CARGO_EXTRA_ARGS}}{{end}};
           exit $LASTEXITCODE
-        }; $packageArgs=@(); Get-ChildItem -Recurse -Filter Cargo.toml -File |
-
+        };
+        $packageArgs=@();
+        Get-ChildItem -Recurse -Filter Cargo.toml -File |
           Where-Object { $_.FullName -notmatch '\\target\\|\\.git\\' } |
           ForEach-Object {
             $name=Get-PackageName $_.FullName;
             if ($name -and -not $skippedPackages.ContainsKey($name)) { $packageArgs += @('--package', $name) }
           };
-        if ($packageArgs.Count -eq 0) { Write-Host 'No matching Cargo packages found'; exit 0 }; & $c {{if .RUST_TOOLCHAIN}}+{{.RUST_TOOLCHAIN}} {{end}}{{.CARGO_SUBCMD}} @packageArgs
-
+        if ($packageArgs.Count -eq 0) { Write-Host 'No matching Cargo packages found'; exit 0 };
+        & $c {{if .RUST_TOOLCHAIN}}+{{.RUST_TOOLCHAIN}} {{end}}{{.CARGO_SUBCMD}} @packageArgs
           {{if .CARGO_EXTRA_ARGS_OVERRIDE}}{{.CARGO_EXTRA_ARGS_OVERRIDE}}
           {{- else}}{{.CARGO_EXTRA_ARGS}}{{end}};
         exit $LASTEXITCODE"

@@ -43,12 +43,26 @@ tasks:
     deps:
       - task: go:install
     cmds:
-      - >-
-        GOBIN="{{.GO_GLOBAL_BIN}}" go install golang.org/x/vuln/cmd/govulncheck@{{default "latest" .GOVULNCHECK_VERSION}}
+      - cmd: >-
+          GOBIN="{{.GO_GLOBAL_BIN}}" go install golang.org/x/vuln/cmd/govulncheck@{{default "latest"
+          .GOVULNCHECK_VERSION}}
+        platforms: [linux, darwin]
+      - cmd: >-
+          powershell -NoProfile -ExecutionPolicy Bypass -Command
+          "$env:GOBIN = '{{.GO_GLOBAL_BIN}}';
+          go install golang.org/x/vuln/cmd/govulncheck@{{default "latest" .GOVULNCHECK_VERSION}}"
+        platforms: [windows]
     status:
       - >-
-        test -x "{{.GO_GLOBAL_BIN}}/govulncheck" && { test -z "{{.GOVULNCHECK_VERSION}}" || test "{{.GOVULNCHECK_VERSION}}" = "latest" || go version -m "{{.GO_GLOBAL_BIN}}/govulncheck" | awk -v want="{{.GOVULNCHECK_VERSION}}" '$1 == "mod" && $3 == want { found = 1 } END { exit !found }'; }
-  lint:
+        {{if eq .OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -Command
+        "if (-not (Test-Path '{{.GO_GLOBAL_BIN}}/govulncheck.exe')) { exit 1 };
+        $requested = '{{.GOVULNCHECK_VERSION}}';
+        if ([string]::IsNullOrWhiteSpace($requested) -or $requested -eq 'latest') { exit 0 };
+        if ((go version -m '{{.GO_GLOBAL_BIN}}/govulncheck.exe') -like ('*' + $requested + '*')) { exit 0 };
+        exit 1"{{else}}test -x "{{.GO_GLOBAL_BIN}}/govulncheck" && { test -z "{{.GOVULNCHECK_VERSION}}" || test
+        "{{.GOVULNCHECK_VERSION}}" = "latest" || go version -m "{{.GO_GLOBAL_BIN}}/govulncheck" | awk -v
+        want="{{.GOVULNCHECK_VERSION}}" '$1 == "mod" && $3 == want { found = 1 } END { exit !found }'; }{{end}}
+  ci:
     run: once
     desc: Scan Go packages with govulncheck
     summary: |
@@ -102,23 +116,26 @@ tasks:
           xargs -0 "{{.GO_GLOBAL_BIN}}/govulncheck" $options <"$package_list"
         platforms: [linux, darwin]
       - cmd: >-
-          powershell -NoProfile -ExecutionPolicy Bypass -Command "$skipPattern='{{if .GOVULNCHECK_LINT_SKIP_PATTERN_OVERRIDE}}{{.GOVULNCHECK_LINT_SKIP_PATTERN_OVERRIDE}} {{- else}}{{.GOVULNCHECK_LINT_SKIP_PATTERN}}{{end}}'; if (-not $skipPattern) {
-
+          powershell -NoProfile -ExecutionPolicy Bypass -Command "$skipPattern='{{if
+          .GOVULNCHECK_LINT_SKIP_PATTERN_OVERRIDE}}{{.GOVULNCHECK_LINT_SKIP_PATTERN_OVERRIDE}} {{-
+          else}}{{.GOVULNCHECK_LINT_SKIP_PATTERN}}{{end}}'; if (-not $skipPattern) {
 
             & '{{.GO_GLOBAL_BIN}}/govulncheck'
               {{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}./...{{end}};
             exit $LASTEXITCODE
-          }; $targets=@(); $options=@(); foreach ($argument in '{{.CLI_ARGS}}'.Split(' ', [System.StringSplitOptions]::RemoveEmptyEntries)) {
-
+          }; $targets=@(); $options=@(); foreach ($argument in '{{.CLI_ARGS}}'.Split(' ',
+          [System.StringSplitOptions]::RemoveEmptyEntries)) {
 
             if ($argument -eq '.' -or $argument.Contains('/') -or
                 $argument.Contains('\') -or $argument.EndsWith('...')) {
               $targets += $argument
             } else { $options += $argument }
-          }; if (-not $targets) { $targets=@('./...') }; $env:SKIPFILES_PATTERN = $skipPattern; $env:SKIPFILES_GO_TARGETS = $targets -join ' '; $packages=@(& task --silent
-
+          }; if (-not $targets) { $targets=@('./...') }; $env:SKIPFILES_PATTERN = $skipPattern;
+          $env:SKIPFILES_GO_TARGETS = $targets -join ' '; $packages=@(& task --silent
 
             --taskfile '{{.TASKFILE_DIR}}/../internal/skipfiles/Taskfile.yml'
             go-packages);
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; if (-not $packages) { Write-Host 'No matching Go packages found'; exit 0 }; & '{{.GO_GLOBAL_BIN}}/govulncheck' @options @packages; exit $LASTEXITCODE"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; if (-not $packages) { Write-Host 'No matching Go packages
+          found'; exit 0 }; & '{{.GO_GLOBAL_BIN}}/govulncheck' @options @packages; exit
+          $LASTEXITCODE"
         platforms: [windows]

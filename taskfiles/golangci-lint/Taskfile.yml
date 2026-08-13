@@ -60,12 +60,26 @@ tasks:
             github.com/golangci/golangci-lint/v2/cmd/golangci-lint@{{default "latest" .GOLANGCI_LINT_VERSION}}
         platforms: [linux, darwin]
       - cmd: >-
-          powershell -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop'; $globalGoBin = '{{.GO_GLOBAL_BIN}}'; New-Item -ItemType Directory -Force -Path $globalGoBin | Out-Null; $env:GOBIN = $globalGoBin; $installVersion = '{{default "latest" .GOLANGCI_LINT_VERSION}}'; go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$installVersion"
+          powershell -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop'; $globalGoBin =
+          '{{.GO_GLOBAL_BIN}}'; New-Item -ItemType Directory -Force -Path $globalGoBin | Out-Null; $env:GOBIN =
+          $globalGoBin; $installVersion = '{{default "latest" .GOLANGCI_LINT_VERSION}}'; go install
+          github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$installVersion"
         platforms: [windows]
     status:
-      - test -x "{{.GO_GLOBAL_BIN}}/golangci-lint"
       - >-
-        { test -z "{{.GOLANGCI_LINT_VERSION}}" || test "{{.GOLANGCI_LINT_VERSION}}" = "latest" || "{{.GO_GLOBAL_BIN}}/golangci-lint" version --short | awk -v want="{{.GOLANGCI_LINT_VERSION}}" '{ got = $1; sub(/^v/, "", got); sub(/^v/, "", want); sub(/[-+].*$/, "", got); if (got == want) { found = 1 } } END { exit !found }'; }
+        {{if eq .OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -Command
+        "if (-not (Test-Path '{{.GO_GLOBAL_BIN}}/golangci-lint.exe')) { exit 1 };
+        $requested = '{{.GOLANGCI_LINT_VERSION}}';
+        if ([string]::IsNullOrWhiteSpace($requested) -or $requested -eq 'latest') { exit 0 };
+        $got = (& '{{.GO_GLOBAL_BIN}}/golangci-lint.exe' version --short | Select-Object -First 1).ToString().Trim();
+        if ($got.StartsWith('v')) { $got = $got.Substring(1) };
+        if ($requested.StartsWith('v')) { $requested = $requested.Substring(1) };
+        if ($got -match '[-+]') { $got = $got -replace '[-+].*$','' };
+        if ($got -eq $requested) { exit 0 }; exit 1"{{else}}test -x "{{.GO_GLOBAL_BIN}}/golangci-lint"
+        && { test -z "{{.GOLANGCI_LINT_VERSION}}" || test "{{.GOLANGCI_LINT_VERSION}}" = "latest" ||
+        "{{.GO_GLOBAL_BIN}}/golangci-lint" version --short | awk -v want="{{.GOLANGCI_LINT_VERSION}}" '{ got = $1;
+        sub(/^v/, "", got); sub(/^v/, "", want); sub(/[-+].*$/, "", got); if (got == want) { found = 1 } } END { exit
+        !found }'; }{{end}}
   lint:
     run: once
     desc: Lint Go packages with golangci-lint
@@ -99,6 +113,14 @@ tasks:
         vars:
           GO_LINT_FIX: "--fix"
           GO_LINT_ARGS: "{{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}./...{{end}}"
+
+  ci:
+    run: once
+    desc: Run golangci-lint fmt:check then lint
+    cmds:
+      - task: fmt:check
+      - task: lint
+
   ci:fix:
     run: once
     desc: Run fmt then lint:fix for CI
@@ -108,6 +130,7 @@ tasks:
     cmds:
       - task: fmt
       - task: lint:fix
+
   fmt:
     run: once
     desc: Format Go files with golangci-lint formatters
@@ -152,7 +175,8 @@ tasks:
     set: [errexit, nounset, pipefail]
     env:
       GO_SKIP_PATTERN: >-
-        {{if .GOLANGCI_LINT_LINT_SKIP_PATTERN_OVERRIDE}}{{.GOLANGCI_LINT_LINT_SKIP_PATTERN_OVERRIDE}} {{- else}}{{.GOLANGCI_LINT_LINT_SKIP_PATTERN}}{{end}}
+        {{if .GOLANGCI_LINT_LINT_SKIP_PATTERN_OVERRIDE}}{{.GOLANGCI_LINT_LINT_SKIP_PATTERN_OVERRIDE}}
+        {{- else}}{{.GOLANGCI_LINT_LINT_SKIP_PATTERN}}{{end}}
     cmds:
       - cmd: |
           pattern="$GO_SKIP_PATTERN"
@@ -667,40 +691,38 @@ tasks:
           exit "$lint_status"
         platforms: [linux, darwin]
       - cmd: >-
-          powershell -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop'; $lintBinary = '{{.GO_GLOBAL_BIN}}/golangci-lint'; if ('{{.CUSTOM_GCL_ENABLED}}' -eq 'true') {
-
+          powershell -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop'; $lintBinary =
+          '{{.GO_GLOBAL_BIN}}/golangci-lint'; if ('{{.CUSTOM_GCL_ENABLED}}' -eq 'true') {
 
             $lintBinary = '{{.CUSTOM_GCL_BINARY}}'; if (-not [System.IO.Path]::IsPathRooted($lintBinary)) {
 
               $lintBinary = Join-Path (Get-Location) $lintBinary;
             }
-          }; $skipPattern = '{{if .GOLANGCI_LINT_LINT_SKIP_PATTERN_OVERRIDE}}{{.GOLANGCI_LINT_LINT_SKIP_PATTERN_OVERRIDE}} {{- else}}{{.GOLANGCI_LINT_LINT_SKIP_PATTERN}}{{end}}'; if (-not $skipPattern) {
-
+          }; $skipPattern = '{{if
+          .GOLANGCI_LINT_LINT_SKIP_PATTERN_OVERRIDE}}{{.GOLANGCI_LINT_LINT_SKIP_PATTERN_OVERRIDE}} {{-
+          else}}{{.GOLANGCI_LINT_LINT_SKIP_PATTERN}}{{end}}'; if (-not $skipPattern) {
 
             & $lintBinary run
               {{.GO_LINT_FIX}}
               {{.GO_LINT_ARGS}};
             exit $LASTEXITCODE;
-          }; $configPath = (& $lintBinary config path 2>$null | Select-Object -First 1); if ($LASTEXITCODE -ne 0) {
-
+          }; $configPath = (& $lintBinary config path 2>$null | Select-Object -First 1); if
+          ($LASTEXITCODE -ne 0) {
 
             $configPath = '';
           }; if ($configPath) {
-
 
             $configPath = (Resolve-Path -LiteralPath $configPath).Path;
             $configDir = Split-Path -Parent $configPath;
           } else {
 
-
             $configDir = (Get-Location).Path;
-          }; $overlayConfig = Join-Path $configDir '{{.GOLANGCI_LINT_INTERNAL_SKIP_CONFIG}}'; & task --silent --taskfile '{{.TASKFILE_DIR}}/Taskfile.yml' config:skip
-
+          }; $overlayConfig = Join-Path $configDir '{{.GOLANGCI_LINT_INTERNAL_SKIP_CONFIG}}';
+          & task --silent --taskfile '{{.TASKFILE_DIR}}/Taskfile.yml' config:skip
             "GOLANGCI_LINT_LINT_SKIP_PATTERN_OVERRIDE=$skipPattern"; if ($LASTEXITCODE -ne 0) {
 
             exit $LASTEXITCODE;
           }; & $lintBinary run
-
             {{.GO_LINT_FIX}}
             {{.GO_LINT_ARGS}}
             --config $overlayConfig; exit $LASTEXITCODE"
@@ -758,8 +780,10 @@ tasks:
               {{.GOLANGCI_LINT_FMT_FORMATTER_FLAGS}} <"$file_list"
         platforms: [linux, darwin]
       - cmd: >-
-          powershell -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop'; $skipPattern = '{{if .GOLANGCI_LINT_FMT_SKIP_PATTERN_OVERRIDE}}{{.GOLANGCI_LINT_FMT_SKIP_PATTERN_OVERRIDE}} {{- else}}{{.GOLANGCI_LINT_FMT_SKIP_PATTERN}}{{end}}'; if (-not $skipPattern) {
-
+          powershell -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop'; $skipPattern = '{{if
+          .GOLANGCI_LINT_FMT_SKIP_PATTERN_OVERRIDE}}{{.GOLANGCI_LINT_FMT_SKIP_PATTERN_OVERRIDE}} {{-
+          else}}{{.GOLANGCI_LINT_FMT_SKIP_PATTERN}}{{end}}';
+          if (-not $skipPattern) {
 
             & '{{.GO_GLOBAL_BIN}}/golangci-lint' fmt
               {{.GO_FMT_DIFF}}
@@ -767,7 +791,6 @@ tasks:
               {{.GO_FMT_TARGETS}};
             exit $LASTEXITCODE;
           }; $targets = '{{.GO_FMT_TARGETS}}' -split '\s+'; $files = @($targets | ForEach-Object {
-
 
             $target = $_ -replace '\.\.\.$', '';
             $target = $target.TrimEnd('/').TrimEnd('\');
@@ -779,7 +802,6 @@ tasks:
             };
           } | Where-Object {
 
-
             $path = [string](Resolve-Path -LiteralPath $_.FullName -Relative);
             $path = $path.Replace('\', '/');
             $path -notlike '*/node_modules/*' -and
@@ -787,11 +809,9 @@ tasks:
               $path -notlike '*/vendor/*';
           } | ForEach-Object FullName |
 
-
             task --silent --taskfile '{{.TASKFILE_DIR}}/../internal/skipfiles/Taskfile.yml'
               filter ('SKIPFILES_PATTERN=' + $skipPattern));
           if ($files.Count -gt 0) {
-
 
             & '{{.GO_GLOBAL_BIN}}/golangci-lint' fmt
               {{.GO_FMT_DIFF}}

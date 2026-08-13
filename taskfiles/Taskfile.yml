@@ -178,11 +178,15 @@ includes:
       GO_GLOBAL_BIN: '{{.GO_GLOBAL_BIN}}'
     dir: ..
 tasks:
-  ci:fix:
-    desc: Run ci:fix for synced TaskOtter modules
+  ci:
+    desc: Run ci for synced TaskOtter modules
     cmds:
-      - task: golangci-lint:ci:fix
-      - task: yamllint:ci:fix
+      - task: golangci-lint:ci
+      - task: govulncheck:ci
+      - task: yamllint:ci
+      - task: actionlint:ci
+      - task: zizmor:ci
+      - task: hadolint:ci
   install:
     desc: Run install for synced TaskOtter modules
     cmds:
@@ -203,20 +207,6 @@ tasks:
       - task: zizmor:install:undo
       - task: adrs:install:undo
       - task: hadolint:install:undo
-  lint:
-    desc: Run lint for synced TaskOtter modules
-    cmds:
-      - task: golangci-lint:lint
-      - task: govulncheck:lint
-      - task: yamllint:lint
-      - task: actionlint:lint
-      - task: zizmor:lint
-      - task: hadolint:lint
-  lint:fix:
-    desc: Run lint:fix for synced TaskOtter modules
-    cmds:
-      - task: golangci-lint:lint:fix
-      - task: yamllint:lint:fix
   upgrade:
     desc: Run upgrade for synced TaskOtter modules
     cmds:

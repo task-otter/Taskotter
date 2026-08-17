@@ -1,0 +1,299 @@
+---
+version: "3.5"
+
+output:
+  group:
+    begin: "::group::{{.TASK}}"
+    end: "::endgroup::"
+    error_only: false
+
+silent: true
+
+includes:
+  pnpm:
+    taskfile: ../pnpm/Taskfile.yml
+
+vars:
+  PRETTIER_FMT_SKIP_PATTERN: ""
+  PRETTIER_TARGETS: ""
+  PRETTIER_DEFAULT_TARGETS: "."
+  PRETTIER_CONFIG: ""
+  PRETTIER_IGNORE_PATH: ""
+  PRETTIER_DEFAULT_IGNORE_PATH: ".prettierignore"
+  PRETTIER_EXTRA_ARGS: ""
+  PRETTIER_VERSION: ""
+
+tasks:
+  default:
+    run: once
+    desc: Show available Prettier tasks
+    cmds:
+      - task --list
+
+  install:
+    run: once
+    dir: "{{.USER_WORKING_DIR}}"
+    desc: Install Prettier as a local devDependency
+    summary: |
+      Install prettier as a local devDependency. Pass PRETTIER_VERSION=x.y.z to pin a
+      specific release instead of the package manager's default resolution.
+    vars:
+      RESOLVED_VERSION: '{{default .PRETTIER_VERSION .PRETTIER_VERSION_OVERRIDE}}'
+      RESOLVED_EXTRA_ARGS: '{{default .PRETTIER_EXTRA_ARGS .PRETTIER_EXTRA_ARGS_OVERRIDE}}'
+    status:
+      - >-
+        node -e "const installed = require('./node_modules/prettier/package.json');
+        const requested = '{{.RESOLVED_VERSION}}';
+        process.exit(!requested || installed.version === requested ? 0 : 1)"
+    cmds:
+      - task: pnpm:add
+        vars:
+          PACKAGES: 'prettier{{if .RESOLVED_VERSION}}@{{.RESOLVED_VERSION}}{{end}}'
+          EXTRA_ARGS: '{{.RESOLVED_EXTRA_ARGS}}{{if .CLI_ARGS}} {{.CLI_ARGS}}{{end}}'
+
+  install:undo:
+    run: once
+    desc: Remove the locally installed Prettier devDependency
+    summary: Remove prettier from local devDependencies via the active package manager.
+    prompt:
+      - This will remove prettier from local devDependencies.
+      - Continue?
+    cmds:
+      - task: pnpm:remove
+        vars:
+          PACKAGES: prettier
+          EXTRA_ARGS: '{{default .PRETTIER_EXTRA_ARGS .PRETTIER_EXTRA_ARGS_OVERRIDE}}'
+
+  upgrade:
+    run: once
+    desc: Upgrade Prettier to the latest release
+    summary: Reinstall prettier at the latest version as a local devDependency.
+    cmds:
+      - task: pnpm:add
+        vars:
+          PACKAGES: prettier@latest
+          EXTRA_ARGS: '{{default .PRETTIER_EXTRA_ARGS .PRETTIER_EXTRA_ARGS_OVERRIDE}}'
+
+  config:init:
+    run: once
+    dir: "{{.USER_WORKING_DIR}}"
+    desc: Create a starter Prettier config when none exists
+    vars:
+      PRETTIER_CONFIG_PATH: '{{or .PRETTIER_CONFIG_OVERRIDE .PRETTIER_CONFIG ".prettierrc.json"}}'
+    status:
+      - test -f "{{.PRETTIER_CONFIG_PATH}}"
+    cmds:
+      - "printf '{\\n' > \"{{.PRETTIER_CONFIG_PATH}}\""
+      - "printf '  \"singleQuote\": true,\\n' >> \"{{.PRETTIER_CONFIG_PATH}}\""
+      - "printf '  \"semi\": true\\n' >> \"{{.PRETTIER_CONFIG_PATH}}\""
+      - "printf '}\\n' >> \"{{.PRETTIER_CONFIG_PATH}}\""
+      - echo 'Created {{.PRETTIER_CONFIG_PATH}}.'
+
+  config:skip:
+    desc: Upsert the skip pattern into the Prettier ignore file
+    summary: |
+      Write PRETTIER_FMT_SKIP_PATTERN into a managed section of
+      .prettierignore (or PRETTIER_IGNORE_PATH). Every ci:fix and fmt:check task
+      runs this first. Empty pattern removes only the managed block;
+      the ignore file itself is never deleted.
+    dir: "{{.USER_WORKING_DIR}}"
+    set: [errexit, nounset, pipefail]
+    vars:
+      RESOLVED_SKIP: '{{default .PRETTIER_FMT_SKIP_PATTERN .PRETTIER_FMT_SKIP_PATTERN_OVERRIDE}}'
+      RESOLVED_IGNORE_PATH: '{{or .PRETTIER_IGNORE_PATH_OVERRIDE .PRETTIER_IGNORE_PATH .PRETTIER_DEFAULT_IGNORE_PATH}}'
+    env:
+      PRETTIER_SKIP_PATTERN: "{{.RESOLVED_SKIP}}"
+      PRETTIER_SKIP_IGNORE_PATH: "{{.RESOLVED_IGNORE_PATH}}"
+    cmds:
+      - cmd: |
+          pattern="$PRETTIER_SKIP_PATTERN"
+          ignore_path="$PRETTIER_SKIP_IGNORE_PATH"
+          begin_marker="# BEGIN taskotter-skip"
+          end_marker="# END taskotter-skip"
+
+          remove_managed_block() {
+            local file="$1"
+            [[ -f "$file" ]] || return 0
+            local tmp
+            tmp="$(mktemp)"
+            awk -v begin="$begin_marker" -v end="$end_marker" '
+              $0 == begin { in_block = 1; next }
+              in_block && $0 == end { in_block = 0; next }
+              !in_block { print }
+            ' "$file" >"$tmp"
+            mv "$tmp" "$file"
+          }
+
+          # Nothing to skip: drop only the managed block a previous run left
+          # behind. Never delete the ignore file itself.
+          if [[ -z "$pattern" ]]; then
+            remove_managed_block "$ignore_path"
+            exit 0
+          fi
+
+          pattern="${pattern//\\//}"
+
+          if [[ -f "$ignore_path" ]] && grep -qxF -- "$begin_marker" "$ignore_path"; then
+            tmp="$(mktemp)"
+            awk -v begin="$begin_marker" -v end="$end_marker" -v pattern="$pattern" '
+              $0 == begin {
+                print begin
+                print pattern
+                print end
+                in_block = 1
+                next
+              }
+              in_block && $0 == end { in_block = 0; next }
+              !in_block { print }
+            ' "$ignore_path" >"$tmp"
+            mv "$tmp" "$ignore_path"
+            exit 0
+          fi
+
+          if [[ -f "$ignore_path" && -s "$ignore_path" ]]; then
+            if [[ "$(tail -c1 "$ignore_path" | wc -l)" -eq 0 ]]; then
+              printf '\n' >>"$ignore_path"
+            fi
+            printf '%s\n%s\n%s\n' "$begin_marker" "$pattern" "$end_marker" >>"$ignore_path"
+          else
+            printf '%s\n%s\n%s\n' "$begin_marker" "$pattern" "$end_marker" >"$ignore_path"
+          fi
+        platforms: [linux, darwin]
+      - cmd: |
+          powershell -NoProfile -ExecutionPolicy Bypass -Command - <<'POWERSHELL'
+          $ErrorActionPreference = 'Stop'
+          $pattern = $env:PRETTIER_SKIP_PATTERN
+          $ignorePath = $env:PRETTIER_SKIP_IGNORE_PATH
+          $beginMarker = '# BEGIN taskotter-skip'
+          $endMarker = '# END taskotter-skip'
+
+          function Remove-ManagedBlock([string]$path) {
+              if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { return }
+              $lines = @(Get-Content -LiteralPath $path)
+              $result = [System.Collections.Generic.List[string]]::new()
+              $inBlock = $false
+              foreach ($line in $lines) {
+                  if ($line -eq $beginMarker) { $inBlock = $true; continue }
+                  if ($inBlock -and $line -eq $endMarker) { $inBlock = $false; continue }
+                  if (-not $inBlock) { $result.Add($line) }
+              }
+              Set-Content -LiteralPath $path -Value $result -Encoding utf8
+          }
+
+          if ([string]::IsNullOrWhiteSpace($pattern)) {
+              Remove-ManagedBlock $ignorePath
+              exit 0
+          }
+
+          $pattern = $pattern.Replace('\', '/')
+          $block = @($beginMarker, $pattern, $endMarker)
+
+          if (Test-Path -LiteralPath $ignorePath -PathType Leaf) {
+              $lines = @(Get-Content -LiteralPath $ignorePath)
+              if ($lines -contains $beginMarker) {
+                  $result = [System.Collections.Generic.List[string]]::new()
+                  $inBlock = $false
+                  foreach ($line in $lines) {
+                      if ($line -eq $beginMarker) {
+                          $result.Add($beginMarker)
+                          $result.Add($pattern)
+                          $result.Add($endMarker)
+                          $inBlock = $true
+                          continue
+                      }
+                      if ($inBlock -and $line -eq $endMarker) { $inBlock = $false; continue }
+                      if (-not $inBlock) { $result.Add($line) }
+                  }
+                  Set-Content -LiteralPath $ignorePath -Value $result -Encoding utf8
+                  exit 0
+              }
+              $result = [System.Collections.Generic.List[string]]::new()
+              foreach ($line in $lines) { $result.Add($line) }
+              foreach ($line in $block) { $result.Add($line) }
+              Set-Content -LiteralPath $ignorePath -Value $result -Encoding utf8
+              exit 0
+          }
+
+          Set-Content -LiteralPath $ignorePath -Value $block -Encoding utf8
+          POWERSHELL
+        platforms: [windows]
+
+  # Shared implementation of fmt:check / ci:fix. Each override is resolved exactly
+  # once here; the two public tasks differ only by MODE_ARGS.
+  _run:
+    internal: true
+    run: when_changed
+    vars:
+      RESOLVED_TARGETS: '{{or .PRETTIER_TARGETS_OVERRIDE .PRETTIER_TARGETS .PRETTIER_DEFAULT_TARGETS}}'
+      RESOLVED_CONFIG: '{{default .PRETTIER_CONFIG .PRETTIER_CONFIG_OVERRIDE}}'
+      RESOLVED_IGNORE_PATH: '{{or .PRETTIER_IGNORE_PATH_OVERRIDE .PRETTIER_IGNORE_PATH .PRETTIER_DEFAULT_IGNORE_PATH}}'
+      RESOLVED_EXTRA_ARGS: '{{default .PRETTIER_EXTRA_ARGS .PRETTIER_EXTRA_ARGS_OVERRIDE}}'
+    cmds:
+      - task: config:skip
+      - task: _exec:ignore
+        vars:
+          BINARY: prettier
+          ARGS: >-
+            {{.RESOLVED_TARGETS}}
+            {{.MODE_ARGS}}
+            {{- if .RESOLVED_CONFIG}} --config "{{.RESOLVED_CONFIG}}"{{end}}
+          PRETTIER_IGNORE_PATH: '{{.RESOLVED_IGNORE_PATH}}'
+          PRETTIER_EXTRA_ARGS: '{{.RESOLVED_EXTRA_ARGS}}{{if .CLI_ARGS}} {{.CLI_ARGS}}{{end}}'
+
+  fmt:check:
+    run: once
+    desc: Check formatting with Prettier
+    cmds:
+      - task: _run
+        vars:
+          MODE_ARGS: "--check"
+      - echo "✅ prettier passed"
+
+  ci:fix:
+    run: once
+    desc: Format files with Prettier
+    cmds:
+      - task: _run
+        vars:
+          MODE_ARGS: "--write"
+      - echo "✅ prettier fixes applied"
+
+  version:
+    run: once
+    desc: Show the locally resolved Prettier version
+    cmds:
+      - task: pnpm:exec
+        vars:
+          BINARY: prettier
+          ARGS: "--version"
+
+  help:
+    run: once
+    desc: Show Prettier CLI help
+    cmds:
+      - task: pnpm:exec
+        vars:
+          BINARY: prettier
+          ARGS: "--help"
+          EXTRA_ARGS: >-
+            {{default .PRETTIER_EXTRA_ARGS .PRETTIER_EXTRA_ARGS_OVERRIDE}}{{if .CLI_ARGS}} {{.CLI_ARGS}}{{end}}
+
+  _exec:ignore:
+    run: once
+    internal: true
+    desc: Execute a local project binary and include an ignore file when present
+    requires:
+      vars: [BINARY]
+    vars:
+      IGNORE_FLAG: "--ignore-path"
+      _IGNORE_ARGS:
+        sh: |
+          if [ -n "{{.PRETTIER_IGNORE_PATH}}" ] && [ -f "{{.PRETTIER_IGNORE_PATH}}" ]; then
+            echo "{{.IGNORE_FLAG}} {{.PRETTIER_IGNORE_PATH}}"
+          fi
+    cmds:
+      - task: pnpm:exec
+        vars:
+          BINARY: "{{.BINARY}}"
+          ARGS: "{{.ARGS}} {{._IGNORE_ARGS}}"
+          EXTRA_ARGS: "{{.PRETTIER_EXTRA_ARGS}}{{if .CLI_ARGS}} {{.CLI_ARGS}}{{end}}"

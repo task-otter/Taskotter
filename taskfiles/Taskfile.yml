@@ -1,0 +1,153 @@
+---
+version: "3.5"
+vars:
+  ESLINT_CACHE: ""
+  ESLINT_CONFIG: ""
+  ESLINT_DEFAULT_CACHE: "true"
+  ESLINT_DEFAULT_TARGETS: "src/**/*.{js,jsx,ts,tsx}"
+  ESLINT_EXTRA_ARGS: ""
+  ESLINT_LINT_SKIP_PATTERN: ""
+  ESLINT_TARGETS: ""
+  ESLINT_VERSION: ""
+  GO_BIN_UNIX: "{{.GO_ROOT_UNIX}}/bin"
+  GO_CMD_UNIX: "{{.GO_BIN_UNIX}}/go"
+  GO_COVER_PROFILE: ""
+  GO_DOWNLOAD_BASE_URL: https://go.dev/dl
+  GO_FUZZTIME: ""
+  GO_GLOBAL_BIN:
+    sh: |
+      gobin="${GOBIN:-}"
+      if [ -z "$gobin" ] && command -v go >/dev/null 2>&1; then
+        gobin="$(go env GOBIN)"
+      fi
+      if [ -z "$gobin" ]; then
+        gopath="${GOPATH:-}"
+        if [ -z "$gopath" ] && command -v go >/dev/null 2>&1; then
+          gopath="$(go env GOPATH)"
+        fi
+        gobin="${gopath:-$HOME/go}/bin"
+      fi
+      printf '%s' "$gobin"
+  GO_INSTALL_DIR_UNIX: "/usr/local"
+  GO_JUNIT_REPORT: ""
+  GO_ROOT_UNIX: "{{.GO_INSTALL_DIR_UNIX}}/go"
+  GO_VERSION: ""
+  GO_VERSION_URL: https://go.dev/VERSION?m=text
+  PRETTIER_CONFIG: ""
+  PRETTIER_DEFAULT_IGNORE_PATH: ".prettierignore"
+  PRETTIER_DEFAULT_TARGETS: "."
+  PRETTIER_EXTRA_ARGS: ""
+  PRETTIER_FMT_SKIP_PATTERN: ""
+  PRETTIER_IGNORE_PATH: ""
+  PRETTIER_TARGETS: ""
+  PRETTIER_VERSION: ""
+  TYPESCRIPT_FILE: src/index.ts
+  TYPESCRIPT_OUTFILE: dist/index.js
+  TYPESCRIPT_OUT_DIR: dist
+  TYPESCRIPT_TRACE_DIR: .tsc-trace
+  TYPESCRIPT_TSCONFIG: tsconfig.json
+  TYPESCRIPT_TSC_FLAGS: ""
+  TYPESCRIPT_TSX_FLAGS: ""
+  TYPESCRIPT_VERSION: ""
+includes:
+  eslint:
+    taskfile: eslint/Taskfile.yml
+    dir: ..
+    vars:
+      ESLINT_LINT_SKIP_PATTERN: '{{.ESLINT_LINT_SKIP_PATTERN}}'
+      ESLINT_TARGETS: '{{.ESLINT_TARGETS}}'
+      ESLINT_DEFAULT_TARGETS: '{{.ESLINT_DEFAULT_TARGETS}}'
+      ESLINT_CONFIG: '{{.ESLINT_CONFIG}}'
+      ESLINT_CACHE: '{{.ESLINT_CACHE}}'
+      ESLINT_DEFAULT_CACHE: '{{.ESLINT_DEFAULT_CACHE}}'
+      ESLINT_EXTRA_ARGS: '{{.ESLINT_EXTRA_ARGS}}'
+      ESLINT_VERSION: '{{.ESLINT_VERSION}}'
+  prettier:
+    taskfile: prettier/Taskfile.yml
+    dir: ..
+    vars:
+      PRETTIER_FMT_SKIP_PATTERN: '{{.PRETTIER_FMT_SKIP_PATTERN}}'
+      PRETTIER_TARGETS: '{{.PRETTIER_TARGETS}}'
+      PRETTIER_DEFAULT_TARGETS: '{{.PRETTIER_DEFAULT_TARGETS}}'
+      PRETTIER_CONFIG: '{{.PRETTIER_CONFIG}}'
+      PRETTIER_IGNORE_PATH: '{{.PRETTIER_IGNORE_PATH}}'
+      PRETTIER_DEFAULT_IGNORE_PATH: '{{.PRETTIER_DEFAULT_IGNORE_PATH}}'
+      PRETTIER_EXTRA_ARGS: '{{.PRETTIER_EXTRA_ARGS}}'
+      PRETTIER_VERSION: '{{.PRETTIER_VERSION}}'
+  typescript:
+    taskfile: typescript/Taskfile.yml
+    dir: ..
+    vars:
+      TYPESCRIPT_FILE: '{{.TYPESCRIPT_FILE}}'
+      TYPESCRIPT_OUTFILE: '{{.TYPESCRIPT_OUTFILE}}'
+      TYPESCRIPT_OUT_DIR: '{{.TYPESCRIPT_OUT_DIR}}'
+      TYPESCRIPT_TSCONFIG: '{{.TYPESCRIPT_TSCONFIG}}'
+      TYPESCRIPT_TSX_FLAGS: '{{.TYPESCRIPT_TSX_FLAGS}}'
+      TYPESCRIPT_TSC_FLAGS: '{{.TYPESCRIPT_TSC_FLAGS}}'
+      TYPESCRIPT_TRACE_DIR: '{{.TYPESCRIPT_TRACE_DIR}}'
+      TYPESCRIPT_VERSION: '{{.TYPESCRIPT_VERSION}}'
+  go:
+    taskfile: go/Taskfile.yml
+    dir: ..
+    vars:
+      GO_INSTALL_DIR_UNIX: '{{.GO_INSTALL_DIR_UNIX}}'
+      GO_ROOT_UNIX: '{{.GO_ROOT_UNIX}}'
+      GO_BIN_UNIX: '{{.GO_BIN_UNIX}}'
+      GO_CMD_UNIX: '{{.GO_CMD_UNIX}}'
+      GO_VERSION_URL: '{{.GO_VERSION_URL}}'
+      GO_DOWNLOAD_BASE_URL: '{{.GO_DOWNLOAD_BASE_URL}}'
+      GO_VERSION: '{{.GO_VERSION}}'
+      GO_JUNIT_REPORT: '{{.GO_JUNIT_REPORT}}'
+      GO_COVER_PROFILE: '{{.GO_COVER_PROFILE}}'
+      GO_FUZZTIME: '{{.GO_FUZZTIME}}'
+      GO_GLOBAL_BIN: '{{.GO_GLOBAL_BIN}}'
+tasks:
+  ci:
+    desc: Run ci for synced TaskOtter modules
+    cmds:
+      - task: eslint:ci
+      - task: typescript:ci
+  ci:fix:
+    desc: Run ci:fix for synced TaskOtter modules
+    cmds:
+      - task: eslint:ci:fix
+      - task: prettier:ci:fix
+  config:init:
+    desc: Run config:init for synced TaskOtter modules
+    cmds:
+      - task: eslint:config:init
+      - task: prettier:config:init
+      - task: typescript:config:init
+  help:
+    desc: Run help for synced TaskOtter modules
+    cmds:
+      - task: eslint:help
+      - task: prettier:help
+  install:
+    desc: Run install for synced TaskOtter modules
+    cmds:
+      - task: eslint:install
+      - task: prettier:install
+      - task: typescript:install
+      - task: go:install
+  install:undo:
+    desc: Run install:undo for synced TaskOtter modules
+    cmds:
+      - task: eslint:install:undo
+      - task: prettier:install:undo
+      - task: typescript:install:undo
+      - task: go:install:undo
+  upgrade:
+    desc: Run upgrade for synced TaskOtter modules
+    cmds:
+      - task: eslint:upgrade
+      - task: prettier:upgrade
+      - task: typescript:upgrade
+      - task: go:upgrade
+  version:
+    desc: Run version for synced TaskOtter modules
+    cmds:
+      - task: eslint:version
+      - task: prettier:version
+      - task: typescript:version
+      - task: go:version

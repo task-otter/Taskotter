@@ -401,51 +401,58 @@ tasks:
       install it quietly.
     platforms: [windows]
     status:
-      - >-
-        powershell -NoProfile -ExecutionPolicy Bypass -Command "if ('{{default "false" .FORCE}}' -eq 'true') { exit 1 };
-        $requested = '{{.GO_VERSION}}'; if (Get-Command go -ErrorAction SilentlyContinue) {
-
-          if ([string]::IsNullOrWhiteSpace($requested)
-          -or ((& go version).Split()[2] -eq $requested)) { exit 0 }
-        }; exit 1"
+      # Task runs status/preconditions/cmds through mvdan/sh (POSIX), so
+      # PowerShell `$vars` in double quotes are expanded before powershell.exe
+      # sees them. Keep these checks POSIX, matching linux/macos.
+      - '[ "{{default "false" .FORCE}}" != "true" ]'
+      - |
+          command -v go >/dev/null 2>&1 || exit 1
+          if [ -z "{{.GO_VERSION}}" ]; then
+            exit 0
+          fi
+          set -- $(go version)
+          [ "$3" = "{{.GO_VERSION}}" ]
     preconditions:
-      - sh: >-
-          powershell -NoProfile -ExecutionPolicy Bypass -Command "$version = '{{.GO_VERSION}}'; if
-          ([string]::IsNullOrWhiteSpace($version) -or $version.StartsWith('go')) { exit 0 } else { exit 1 }"
+      - sh: 'case "{{.GO_VERSION}}" in ""|go*) exit 0 ;; *) exit 1 ;; esac'
         msg: GO_VERSION must use the official Go release format, for example go1.26.2.
-      - sh: >-
-          powershell -NoProfile -ExecutionPolicy Bypass -Command "if ($env:PROCESSOR_ARCHITECTURE -eq 'AMD64' -or
-          $env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { exit 0 } else { exit 1 }"
+      - sh: '[ "{{ARCH}}" = "amd64" ] || [ "{{ARCH}}" = "arm64" ]'
         msg: Go MSI install supports AMD64 and ARM64 Windows architectures.
     cmds:
+      # #region agent log
+      - cmd: >-
+          echo "debug-d0df0d runId=post-fix hypothesisId=H4 DOT_ARCH={{.ARCH}}
+          FN_ARCH={{ARCH}} GO_VERSION={{.GO_VERSION}}"
+      # #endregion
+      # Quoted heredoc keeps PowerShell `$vars` away from POSIX expansion.
       # Resolve the version, pick the architecture, download, verify and install
       # in one PowerShell session. Splitting these across commands previously
       # required staging the version in a shared TEMP file and duplicating the
       # download for AMD64 and ARM64.
-      - >-
-        powershell -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop'; $version =
-        '{{.GO_VERSION}}'; if ([string]::IsNullOrWhiteSpace($version)) {
-
-          $version = ((Invoke-RestMethod -Uri '{{.GO_VERSION_URL}}') -split \"`n\")[0].Trim()
-        }; $arch = if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { 'arm64' } else { 'amd64' }; $package =
-        \"$version.windows-$arch.msi\"; $workDir = Join-Path $env:TEMP ('taskotter-go-' +
-        [Guid]::NewGuid().ToString('N')); New-Item -ItemType Directory -Path $workDir | Out-Null; try {
-
-          $installer = Join-Path $workDir $package;
-          Write-Host \"Downloading $package...\";
-          Invoke-WebRequest -Uri \"{{.GO_DOWNLOAD_BASE_URL}}/$package\" -OutFile $installer;
-          $expected = (Invoke-RestMethod
-            -Uri \"{{.GO_DOWNLOAD_BASE_URL}}/$package.sha256\").Trim();
-          $actual = (Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash;
-          if ($expected -ne $actual) {
-            Write-Error \"Checksum mismatch for $package: expected $expected, got $actual\";
-          };
-          Start-Process msiexec.exe -Wait
-            -ArgumentList @('/i', $installer, '/quiet', '/norestart');
-        } finally {
-
-          Remove-Item -LiteralPath $workDir -Recurse -Force -ErrorAction SilentlyContinue;
-        }"
+      - cmd: |
+          powershell -NoProfile -ExecutionPolicy Bypass -Command - <<'POWERSHELL'
+          $ErrorActionPreference = 'Stop'
+          $version = '{{.GO_VERSION}}'
+          if ([string]::IsNullOrWhiteSpace($version)) {
+            $version = ((Invoke-RestMethod -Uri '{{.GO_VERSION_URL}}') -split "`n")[0].Trim()
+          }
+          $arch = if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { 'arm64' } else { 'amd64' }
+          $package = "$version.windows-$arch.msi"
+          $workDir = Join-Path $env:TEMP ('taskotter-go-' + [Guid]::NewGuid().ToString('N'))
+          New-Item -ItemType Directory -Path $workDir | Out-Null
+          try {
+            $installer = Join-Path $workDir $package
+            Write-Host "Downloading $package..."
+            Invoke-WebRequest -Uri "{{.GO_DOWNLOAD_BASE_URL}}/$package" -OutFile $installer
+            $expected = (Invoke-RestMethod -Uri "{{.GO_DOWNLOAD_BASE_URL}}/$package.sha256").Trim()
+            $actual = (Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash
+            if ($expected -ne $actual) {
+              Write-Error "Checksum mismatch for $package: expected $expected, got $actual"
+            }
+            Start-Process msiexec.exe -Wait -ArgumentList @('/i', $installer, '/quiet', '/norestart')
+          } finally {
+            Remove-Item -LiteralPath $workDir -Recurse -Force -ErrorAction SilentlyContinue
+          }
+          POWERSHELL
   _install:undo:macos:
     run: once
     internal: true

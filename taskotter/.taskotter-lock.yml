@@ -6,6 +6,7 @@ configuration:
   target_folder: taskotter
   tasks:
     - go
+    - go-junit-report
     - golangci-lint
     - govulncheck
     - yamllint
@@ -14,7 +15,14 @@ configuration:
     - zizmor
     - adrs
     - hadolint
-generated_root_tasks: [ci, ci:fix, install, version]
+generated_root_tasks:
+  - ci
+  - ci:fix
+  - install
+  - test
+  - verify
+  - version
+  - which
 managed_files:
   - destination_module: actionlint
     path: taskotter/actionlint/README.md
@@ -36,6 +44,16 @@ managed_files:
     sha256: 2c6df5f6be8c841bac53f793d0849e7990d48ad572d8ec332e0ff17efd917790
     source_module: adrs
     source_path: taskfiles/adrs/Taskfile.yml
+  - destination_module: go-junit-report
+    path: taskotter/go-junit-report/README.md
+    sha256: c26e08f9c7d9baf71a2d8df96a242a8053cfea694479f5e2a8944db7957cf1b4
+    source_module: go-junit-report
+    source_path: taskfiles/go-junit-report/README.md
+  - destination_module: go-junit-report
+    path: taskotter/go-junit-report/Taskfile.yml
+    sha256: d0613bbffa4fd6aae1f79293607587bcc6d5c00b9ef2df48b5ac247c0e11190e
+    source_module: go-junit-report
+    source_path: taskfiles/go-junit-report/Taskfile.yml
   - destination_module: go
     path: taskotter/go/README.md
     sha256: 31c3b2735375793bc7b3bc02876c9dc896f805761169dc761a596762a81610cd
@@ -134,6 +152,10 @@ resolved_modules:
       destination_module: go
       path: taskotter/go
       source_module: go
+    go-junit-report:
+      destination_module: go-junit-report
+      path: taskotter/go-junit-report
+      source_module: go-junit-report
     golangci-lint:
       destination_module: golangci-lint
       path: taskotter/golangci-lint
@@ -162,5 +184,5 @@ source:
   default_branch: main
   repository: task-otter/store
   requested_version: v0.0.8
-  resolved_commit: 410406d7d30a0583fc1aa37d81af43496e48f86e
+  resolved_commit: 124ae957e6279e420b04407e14f46956f2a3f350
   source_ref: refs/tags/v0.0.8

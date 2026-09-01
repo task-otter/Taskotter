@@ -68,6 +68,7 @@ vars:
   YAMLFIX_NIX_INSTALLABLE: nixpkgs#yamlfix
   YAMLLINT_NIX_INSTALLABLE: nixpkgs#yamllint
   ZIZMOR_NIX_INSTALLABLE: nixpkgs#zizmor
+  GO_JUNIT_REPORT_NIX_INSTALLABLE: nixpkgs#go nixpkgs#go-junit-report
 includes:
   go:
     taskfile: go/Taskfile.yml
@@ -166,6 +167,13 @@ includes:
       HADOLINT_EXTRA_ARGS: '{{.HADOLINT_EXTRA_ARGS}}'
       HADOLINT_VERSION: '{{.HADOLINT_VERSION}}'
       HADOLINT_NIX_INSTALLABLE: '{{.HADOLINT_NIX_INSTALLABLE}}'
+  go-junit-report:
+    taskfile: go-junit-report/Taskfile.yml
+    dir: ..
+    vars:
+      GO_JUNIT_REPORT_NIX_INSTALLABLE: '{{.GO_JUNIT_REPORT_NIX_INSTALLABLE}}'
+      GO_JUNIT_REPORT: '{{.GO_JUNIT_REPORT}}'
+      GO_COVER_PROFILE: '{{.GO_COVER_PROFILE}}'
 tasks:
   ci:
     desc: Run ci for synced TaskOtter modules
@@ -185,6 +193,7 @@ tasks:
     desc: Run install for synced TaskOtter modules
     cmds:
       - task: go:install
+      - task: go-junit-report:install
       - task: golangci-lint:install
       - task: govulncheck:install
       - task: yamllint:install
@@ -193,10 +202,21 @@ tasks:
       - task: zizmor:install
       - task: adrs:install
       - task: hadolint:install
+  test:
+    desc: Run test for synced TaskOtter modules
+    cmds:
+      - task: go:test
+      - task: go-junit-report:test
+  verify:
+    desc: Run verify for synced TaskOtter modules
+    cmds:
+      - task: go:verify
+      - task: go-junit-report:verify
   version:
     desc: Run version for synced TaskOtter modules
     cmds:
       - task: go:version
+      - task: go-junit-report:version
       - task: golangci-lint:version
       - task: govulncheck:version
       - task: yamllint:version
@@ -205,3 +225,8 @@ tasks:
       - task: zizmor:version
       - task: adrs:version
       - task: hadolint:version
+  which:
+    desc: Run which for synced TaskOtter modules
+    cmds:
+      - task: go:which
+      - task: go-junit-report:which

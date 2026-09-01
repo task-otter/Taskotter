@@ -2,17 +2,22 @@
 
 ## What is this Taskfile?
 
-A cross-platform Taskfile for installing yamllint, managing upgrades, linting
-YAML files, and generating a project configuration.
+A cross-platform Taskfile for linting YAML files and generating a project
+configuration. The `ci` task auto-installs yamllint via `nix:install:profile`.
 
 ## Usage
 
 ### Standalone
 
 ```sh
-task -t taskfiles/yamllint/Taskfile.yml install
 task -t taskfiles/yamllint/Taskfile.yml config:init
 task -t taskfiles/yamllint/Taskfile.yml ci
+```
+
+Install only:
+
+```sh
+task -t taskfiles/yamllint/Taskfile.yml install
 ```
 
 ### Included
@@ -25,34 +30,33 @@ includes:
 Then run:
 
 ```sh
-task yamllint:install
 task yamllint:ci
 ```
 
 ## Public Tasks
 
-| Task           | Description                                     | Key variables                     |
-| -------------- | ----------------------------------------------- | --------------------------------- |
-| `install`      | Install yamllint on the current OS if missing   | `YAMLLINT_VERSION`                |
-| `install:undo` | Remove yamllint from the current OS             | none                              |
-| `upgrade`      | Upgrade yamllint to the latest release          | none                              |
-| `version`      | Show the installed yamllint version             | none                              |
-| `ci`           | Strict lint for CI (fails on warnings)          | `YAMLLINT_TARGETS`, `YAMLLINT_CONFIG`, `YAMLLINT_EXTRA_ARGS` |
-| `config:init`  | Create a default `.yamllint` configuration file | none                              |
+| Task           | Description                                     |
+| -------------- | ----------------------------------------------- |
+| `ci`           | Strict lint for CI (fails on warnings)          |
+| `config:init`  | Create a default `.yamllint` configuration file |
+| `install`      | Install yamllint via the Nix profile            |
+| `version`      | Show the active yamllint version                |
 
 ## Variables
 
 | Variable     | Default   | Description                                      |
 | ------------ | --------- | ------------------------------------------------ |
+| `YAMLLINT_NIX_INSTALLABLE` | `nixpkgs#yamllint` | Flake installable passed to `nix:install:profile` |
 | `YAMLLINT_TARGETS`    | `.`       | Files or directories to lint                     |
 | `YAMLLINT_CONFIG`     | _(empty)_ | Path to a yamllint config file passed via `-c`   |
 | `YAMLLINT_EXTRA_ARGS` | _(empty)_ | Extra flags forwarded to `yamllint` |
-| `YAMLLINT_VERSION` | _(empty)_ | Pin a specific yamllint release for `install`/`upgrade`; empty installs latest |
-| `YAMLLINT_LINT_SKIP_PATTERN` | _(empty)_ | Forward-slash path glob for files skipped by lint checks |
 
-Skip patterns support `*` within one path segment, `**` across directories, and `?` for one character. Paths are matched relative to the task working directory; for example, `**/generated/**`.
+Pin a revision by overriding the installable, for example
+`YAMLLINT_NIX_INSTALLABLE=github:NixOS/nixpkgs/<rev>#yamllint`.
 
 ## Notes
+
+- Install goes through `nix:install:profile` (Nix is installed first if missing). Native Windows is not supported; use WSL2.
 
 **`config:init`** writes a `.yamllint` file in the current directory and is
 skipped if the file already exists. To regenerate, delete `.yamllint` first.

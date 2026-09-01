@@ -59,6 +59,15 @@ vars:
   ZIZMOR_LINT_SKIP_PATTERN: ""
   ZIZMOR_TARGETS: ".github"
   ZIZMOR_VERSION: "1.25.2"
+  ACTIONLINT_NIX_INSTALLABLE: nixpkgs#actionlint
+  ADRS_NIX_INSTALLABLE: nixpkgs#adrs
+  GOLANGCI_LINT_NIX_INSTALLABLE: nixpkgs#go nixpkgs#golangci-lint
+  GOVULNCHECK_NIX_INSTALLABLE: nixpkgs#go nixpkgs#govulncheck
+  GO_NIX_INSTALLABLE: nixpkgs#go
+  HADOLINT_NIX_INSTALLABLE: nixpkgs#hadolint
+  YAMLFIX_NIX_INSTALLABLE: nixpkgs#yamlfix
+  YAMLLINT_NIX_INSTALLABLE: nixpkgs#yamllint
+  ZIZMOR_NIX_INSTALLABLE: nixpkgs#zizmor
 includes:
   go:
     taskfile: go/Taskfile.yml
@@ -75,6 +84,7 @@ includes:
       GO_COVER_PROFILE: '{{.GO_COVER_PROFILE}}'
       GO_FUZZTIME: '{{.GO_FUZZTIME}}'
       GO_GLOBAL_BIN: '{{.GO_GLOBAL_BIN}}'
+      GO_NIX_INSTALLABLE: '{{.GO_NIX_INSTALLABLE}}'
   golangci-lint:
     taskfile: golangci-lint/Taskfile.yml
     dir: ..
@@ -90,6 +100,7 @@ includes:
       # four call sites cannot drift apart.
       GOLANGCI_LINT_FMT_FORMATTER_FLAGS: '{{.GOLANGCI_LINT_FMT_FORMATTER_FLAGS}}'
       GO_GLOBAL_BIN: '{{.GO_GLOBAL_BIN}}'
+      GOLANGCI_LINT_NIX_INSTALLABLE: '{{.GOLANGCI_LINT_NIX_INSTALLABLE}}'
   govulncheck:
     taskfile: govulncheck/Taskfile.yml
     dir: ..
@@ -97,6 +108,7 @@ includes:
       GOVULNCHECK_VERSION: '{{.GOVULNCHECK_VERSION}}'
       GOVULNCHECK_LINT_SKIP_PATTERN: '{{.GOVULNCHECK_LINT_SKIP_PATTERN}}'
       GO_GLOBAL_BIN: '{{.GO_GLOBAL_BIN}}'
+      GOVULNCHECK_NIX_INSTALLABLE: '{{.GOVULNCHECK_NIX_INSTALLABLE}}'
   yamllint:
     taskfile: yamllint/Taskfile.yml
     dir: ..
@@ -107,6 +119,7 @@ includes:
       YAMLLINT_CONFIG: '{{.YAMLLINT_CONFIG}}'
       YAMLLINT_EXTRA_ARGS: '{{.YAMLLINT_EXTRA_ARGS}}'
       YAMLLINT_VERSION: '{{.YAMLLINT_VERSION}}'
+      YAMLLINT_NIX_INSTALLABLE: '{{.YAMLLINT_NIX_INSTALLABLE}}'
   yamlfix:
     taskfile: yamlfix/Taskfile.yml
     dir: ..
@@ -116,6 +129,7 @@ includes:
       YAMLFIX_TARGETS: '{{.YAMLFIX_TARGETS}}'
       YAMLFIX_EXTRA_ARGS: '{{.YAMLFIX_EXTRA_ARGS}}'
       YAMLFIX_VERSION: '{{.YAMLFIX_VERSION}}'
+      YAMLFIX_NIX_INSTALLABLE: '{{.YAMLFIX_NIX_INSTALLABLE}}'
   actionlint:
     taskfile: actionlint/Taskfile.yml
     dir: ..
@@ -124,6 +138,7 @@ includes:
       ACTIONLINT_VERSION: '{{.ACTIONLINT_VERSION}}'
       ACTIONLINT_EXTRA_ARGS: '{{.ACTIONLINT_EXTRA_ARGS}}'
       ACTIONLINT_TARGETS: '{{.ACTIONLINT_TARGETS}}'
+      ACTIONLINT_NIX_INSTALLABLE: '{{.ACTIONLINT_NIX_INSTALLABLE}}'
   zizmor:
     taskfile: zizmor/Taskfile.yml
     dir: ..
@@ -132,6 +147,7 @@ includes:
       ZIZMOR_EXTRA_ARGS: '{{.ZIZMOR_EXTRA_ARGS}}'
       ZIZMOR_TARGETS: '{{.ZIZMOR_TARGETS}}'
       ZIZMOR_VERSION: '{{.ZIZMOR_VERSION}}'
+      ZIZMOR_NIX_INSTALLABLE: '{{.ZIZMOR_NIX_INSTALLABLE}}'
   adrs:
     taskfile: adrs/Taskfile.yml
     dir: ..
@@ -139,6 +155,7 @@ includes:
       CARGO_BIN_UNIX: '{{.CARGO_BIN_UNIX}}'
       ADRS_EXTRA_ARGS: '{{.ADRS_EXTRA_ARGS}}'
       ADRS_VERSION: '{{.ADRS_VERSION}}'
+      ADRS_NIX_INSTALLABLE: '{{.ADRS_NIX_INSTALLABLE}}'
   hadolint:
     taskfile: hadolint/Taskfile.yml
     dir: ..
@@ -148,6 +165,7 @@ includes:
       HADOLINT_DOCKERFILE: '{{.HADOLINT_DOCKERFILE}}'
       HADOLINT_EXTRA_ARGS: '{{.HADOLINT_EXTRA_ARGS}}'
       HADOLINT_VERSION: '{{.HADOLINT_VERSION}}'
+      HADOLINT_NIX_INSTALLABLE: '{{.HADOLINT_NIX_INSTALLABLE}}'
 tasks:
   ci:
     desc: Run ci for synced TaskOtter modules
@@ -175,30 +193,12 @@ tasks:
       - task: zizmor:install
       - task: adrs:install
       - task: hadolint:install
-  install:undo:
-    desc: Run install:undo for synced TaskOtter modules
-    cmds:
-      - task: go:install:undo
-      - task: yamllint:install:undo
-      - task: yamlfix:install:undo
-      - task: actionlint:install:undo
-      - task: zizmor:install:undo
-      - task: adrs:install:undo
-      - task: hadolint:install:undo
-  upgrade:
-    desc: Run upgrade for synced TaskOtter modules
-    cmds:
-      - task: go:upgrade
-      - task: yamllint:upgrade
-      - task: yamlfix:upgrade
-      - task: actionlint:upgrade
-      - task: zizmor:upgrade
-      - task: adrs:upgrade
-      - task: hadolint:upgrade
   version:
     desc: Run version for synced TaskOtter modules
     cmds:
       - task: go:version
+      - task: golangci-lint:version
+      - task: govulncheck:version
       - task: yamllint:version
       - task: yamlfix:version
       - task: actionlint:version

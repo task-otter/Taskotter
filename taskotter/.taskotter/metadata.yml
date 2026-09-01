@@ -1,4 +1,4 @@
 ---
-configuration_hash: 73e3cfffa50e51c90ff159af843f91e7efa5cd4152655b78e6891af39dc98a64
+configuration_hash: 78e02e5f76863fef646b05971f9959c6c280d5e38a9ff3861099cc385ee42e37
 lock_file: taskotter/.taskotter-lock.yml
 target_folder: taskotter

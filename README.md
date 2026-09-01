@@ -52,9 +52,6 @@ Optional YAML block for resolving Node.js task variants. Omit when syncing non-N
 | `runtime` | always | `nodejs` | `nodejs`, `bun` |
 | `package-manager` | `runtime: nodejs` | `npm` | `npm`, `yarn`, `pnpm` |
 
-`version-manager` was removed: the store no longer publishes `fnm` or `nvm` variants, so
-the field had no effect on module resolution. Supplying it is a validation error — delete
-the key from your workflow.
 
 ```yaml
 js: |

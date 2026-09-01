@@ -1,6 +1,0 @@
----
-schema: taskotter.store/v1
-module: internal/skipfiles
-taskfile: Taskfile.yml
-exported_tasks: [lint]
-variants: []

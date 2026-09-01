@@ -32,7 +32,6 @@ func TestParseJSNodeJSDefaults(t *testing.T) {
 	if cfg.NodePackageManager != config.PMNPM {
 		t.Fatalf("NodePackageManager = %q, want npm", cfg.NodePackageManager)
 	}
-
 }
 
 // TestParseJSBun verifies bun runtime sets the bun package manager.
@@ -49,7 +48,6 @@ func TestParseJSBun(t *testing.T) {
 	if cfg.NodePackageManager != config.PackageManager(config.JSRuntimeBun) {
 		t.Fatalf("NodePackageManager = %q, want bun", cfg.NodePackageManager)
 	}
-
 }
 
 // TestParseJSBunRejectsVersionManager verifies the removed version-manager key fails under bun.

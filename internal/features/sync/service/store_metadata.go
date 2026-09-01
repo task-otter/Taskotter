@@ -152,11 +152,20 @@ func readStoreTaskMetadata(abs, module string) (storeTaskMetadata, error) {
 		return emptyStoreTaskMetadata(), fmt.Errorf("read metadata for %q: %w", module, err)
 	}
 
+	meta, err := parseStoreTaskMetadata(data, module)
+	if err != nil {
+		return emptyStoreTaskMetadata(), fmt.Errorf("metadata for %q: %w", module, err)
+	}
+
+	return meta, nil
+}
+
+func parseStoreTaskMetadata(data []byte, module string) (storeTaskMetadata, error) {
 	var meta storeTaskMetadata
 
-	err = yaml.Unmarshal(data, &meta)
+	err := yaml.Unmarshal(data, &meta)
 	if err != nil {
-		return emptyStoreTaskMetadata(), fmt.Errorf("parse metadata for %q: %w", module, err)
+		return emptyStoreTaskMetadata(), fmt.Errorf("parse metadata: %w", err)
 	}
 
 	if meta.Schema != storeMetadataSchema {

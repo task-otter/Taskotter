@@ -165,14 +165,8 @@ func collectModules(dir, prefix string, catalog map[string]struct{}) error {
 		return fmt.Errorf("load module catalog: %w", err)
 	}
 
-	isRoot := prefix == consts.Empty
-
-	if !isModuleDir(entries) && !isRoot {
+	if !recordModule(prefix, entries, catalog) {
 		return nil
-	}
-
-	if !isRoot {
-		catalog[prefix] = struct{}{}
 	}
 
 	err = visitChildDirs(&catalogWalk{
@@ -186,6 +180,22 @@ func collectModules(dir, prefix string, catalog map[string]struct{}) error {
 	}
 
 	return nil
+}
+
+// recordModule catalogs dir under prefix and reports whether its child
+// directories should be visited. The root is always walked but never cataloged.
+func recordModule(prefix string, entries []os.DirEntry, catalog map[string]struct{}) bool {
+	if prefix == consts.Empty {
+		return true
+	}
+
+	if !isModuleDir(entries) {
+		return false
+	}
+
+	catalog[prefix] = struct{}{}
+
+	return true
 }
 
 func isModuleDir(entries []os.DirEntry) bool {

@@ -33,7 +33,6 @@ const (
 	fmtWantVersion35        = "expected root Taskfile version 3.5: %s"
 	pathTaskfilesGoYML      = "taskfiles/go/Taskfile.yml"
 	destPnpm                = "pnpm"
-	srcPnpmNode             = "pnpm"
 	wantPnpmRewrite         = "../pnpm/Taskfile.yml"
 	moduleESLintNodeVariant = "eslint/node"
 	moduleJQ                = "jq"
@@ -187,7 +186,7 @@ func TestRewriteIncludes(t *testing.T) {
 
 	out, err := taskfile.RewriteIncludes(
 		rewriteIncludesInput(),
-		map[string]string{srcPnpmNode: destPnpm},
+		map[string]string{destPnpm: destPnpm},
 		taskESLint,
 	)
 	if err != nil {
@@ -294,7 +293,7 @@ func TestRewriteIncludesPreservesFoldedBlock(t *testing.T) {
 	assertRewriteIncludesEqual(t, &rewriteIncludesAssert{
 		input:    input,
 		want:     wantFoldedIncludeRewrite(input),
-		mapping:  map[string]string{srcPnpmNode: destPnpm},
+		mapping:  map[string]string{destPnpm: destPnpm},
 		fromDest: taskESLint,
 	})
 }
@@ -322,7 +321,7 @@ func TestRewriteIncludesNoopEmptyFromDest(t *testing.T) {
 	assertRewriteIncludesEqual(t, &rewriteIncludesAssert{
 		input:    input,
 		want:     input,
-		mapping:  map[string]string{srcPnpmNode: destPnpm},
+		mapping:  map[string]string{destPnpm: destPnpm},
 		fromDest: consts.Empty,
 	})
 }
@@ -641,7 +640,7 @@ func TestRewriteUsesRealStoreSnippet(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	out, err := taskfile.RewriteIncludes(data, map[string]string{srcPnpmNode: destPnpm}, taskESLint)
+	out, err := taskfile.RewriteIncludes(data, map[string]string{destPnpm: destPnpm}, taskESLint)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -29,6 +29,8 @@ type (
 const (
 	taskESLint = "eslint"
 
+	modPnpm = "pnpm"
+
 	testEslintChain = "eslint/node/pnpm"
 )
 
@@ -98,7 +100,7 @@ func prBodyRequestedModules() map[string]lockmodel.ModuleRecord {
 
 func prBodyDependencyModules() []lockmodel.ModuleRecord {
 	return []lockmodel.ModuleRecord{
-		{SourceModule: "pnpm", DestinationModule: "pnpm", Path: "taskfiles/pnpm"},
+		{SourceModule: modPnpm, DestinationModule: modPnpm, Path: "taskfiles/pnpm"},
 	}
 }
 

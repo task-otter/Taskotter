@@ -14,11 +14,7 @@ configuration:
     - zizmor
     - adrs
     - hadolint
-generated_root_tasks:
-  - ci
-  - ci:fix
-  - install
-  - version
+generated_root_tasks: [ci, ci:fix, install, version]
 managed_files:
   - destination_module: actionlint
     path: taskotter/actionlint/README.md

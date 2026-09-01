@@ -4,6 +4,7 @@
 package service_test
 
 import (
+	"fmt"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -14,8 +15,6 @@ import (
 )
 
 const (
-	metadataFileName = "metadata.yml"
-
 	currentSchemaMetadata = "---\nschema: taskotter.dev/taskfile-metadata/v1\n" +
 		"module: tool/node/pnpm\ntaskfile: Taskfile.yml\nexported_tasks: [install]\n"
 
@@ -29,20 +28,36 @@ func buildPlanWithLeafMetadata(t *testing.T, metadata string) error {
 	storeRoot := writeNestedDocsStore(t)
 	leafDir := filepath.Join(storeRoot, config.DefaultTargetFolder, parentDocLeaf)
 	writeModuleFile(&moduleFileInput{
-		t: t, dir: leafDir, rel: metadataFileName, content: metadata,
+		t: t, dir: leafDir, rel: testMetadataFileName, content: metadata,
 	})
+
+	err := buildNestedDocsMetadataPlan(t, storeRoot)
+	if err != nil {
+		return fmt.Errorf("leaf metadata plan: %w", err)
+	}
+
+	return nil
+}
+
+func buildNestedDocsMetadataPlan(t *testing.T, storeRoot string) error {
+	t.Helper()
 
 	workspace := t.TempDir()
 	writeRootTaskfile(t, workspace)
 
-	snap := nestedDocsSnapshot(t, storeRoot)
-	cfg := testConfig(workspace, mutateNestedDocs(true))
-	si := nestedDocsSyncInput(cfg, snap)
+	si := nestedDocsSyncInput(
+		testConfig(workspace, mutateNestedDocs(true)),
+		nestedDocsSnapshot(t, storeRoot),
+	)
 
 	plan, err := syncsvc.BuildPlan(&si)
 	iox.Discard(plan)
 
-	return err
+	if err != nil {
+		return fmt.Errorf("build plan: %w", err)
+	}
+
+	return nil
 }
 
 // TestStoreMetadataAcceptsCurrentSchema verifies the pinned metadata.yml schema is accepted.

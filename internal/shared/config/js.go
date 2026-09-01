@@ -70,11 +70,18 @@ func defaultedRaw(raw, fallback string) string {
 func dispatchJSRuntime(yamlInput *jsInput) (*jsConfig, error) {
 	err := rejectVersionManager(yamlInput)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("reject js version manager: %w", err)
 	}
 
-	runtime := defaultedJSRuntime(yamlInput.Runtime)
+	jsCfg, err := parseWithJSRuntime(yamlInput, defaultedJSRuntime(yamlInput.Runtime))
+	if err != nil {
+		return nil, fmt.Errorf("parse js runtime config: %w", err)
+	}
 
+	return jsCfg, nil
+}
+
+func parseWithJSRuntime(yamlInput *jsInput, runtime string) (*jsConfig, error) {
 	parser, ok := jsRuntimeParsers()[JSRuntime(runtime)]
 
 	if !ok {

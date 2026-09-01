@@ -12,15 +12,25 @@ import (
 	"github.com/task-otter/Taskotter/internal/shared/config"
 )
 
+type (
+	// fixtureStore holds the catalog and dependency graph of the fixture store.
+	fixtureStore struct {
+		catalog map[string]struct{}
+		deps    map[string][]string
+	}
+)
+
 const (
 	fixtureStoreRoot = "../../../../tests/fixtures/store"
 
 	moduleESLintNodePnpm = "eslint/node/pnpm"
 
 	moduleESLint = "eslint"
+
+	noDependencies = 0
 )
 
-func loadFixtureCatalog(t *testing.T) (map[string]struct{}, map[string][]string) {
+func loadFixtureCatalog(t *testing.T) fixtureStore {
 	t.Helper()
 
 	catalog, deps, err := storesvc.LoadCatalogAndDeps(fixtureStoreRoot)
@@ -28,7 +38,22 @@ func loadFixtureCatalog(t *testing.T) (map[string]struct{}, map[string][]string)
 		t.Fatalf("load catalog and deps: %v", err)
 	}
 
-	return catalog, deps
+	return fixtureStore{catalog: catalog, deps: deps}
+}
+
+func resolveFixtureESLintSource(t *testing.T) string {
+	t.Helper()
+
+	res, err := resolvesvc.Resolve(&resolvesvc.ResolveInput{
+		Task:           moduleESLint,
+		Catalog:        loadFixtureCatalog(t).catalog,
+		PackageManager: config.PMPnpm,
+	})
+	if err != nil {
+		t.Fatalf("resolve %q: %v", moduleESLint, err)
+	}
+
+	return res.SourceModule
 }
 
 // TestCatalogContainsFlattenedVariants verifies the store's flattened node variant
@@ -36,7 +61,7 @@ func loadFixtureCatalog(t *testing.T) (map[string]struct{}, map[string][]string)
 func TestCatalogContainsFlattenedVariants(t *testing.T) {
 	t.Parallel()
 
-	catalog, _ := loadFixtureCatalog(t)
+	catalog := loadFixtureCatalog(t).catalog
 
 	wants := []string{moduleESLint, moduleESLintNodePnpm, "eslint/node", "pnpm", "go"}
 
@@ -52,7 +77,7 @@ func TestCatalogContainsFlattenedVariants(t *testing.T) {
 func TestCatalogSkipsTaskfilelessDirectories(t *testing.T) {
 	t.Parallel()
 
-	catalog, _ := loadFixtureCatalog(t)
+	catalog := loadFixtureCatalog(t).catalog
 
 	for module := range catalog {
 		if strings.HasPrefix(module, "go/docs") {
@@ -65,9 +90,9 @@ func TestCatalogSkipsTaskfilelessDirectories(t *testing.T) {
 func TestDepsValidateAgainstCatalog(t *testing.T) {
 	t.Parallel()
 
-	_, deps := loadFixtureCatalog(t)
+	deps := loadFixtureCatalog(t).deps
 
-	if len(deps[moduleESLintNodePnpm]) == 0 {
+	if len(deps[moduleESLintNodePnpm]) == noDependencies {
 		t.Fatalf("expected dependencies for %q, got %#v", moduleESLintNodePnpm, deps)
 	}
 }
@@ -77,24 +102,15 @@ func TestDepsValidateAgainstCatalog(t *testing.T) {
 func TestResolveFlattenedNodeVariant(t *testing.T) {
 	t.Parallel()
 
-	catalog, _ := loadFixtureCatalog(t)
+	source := resolveFixtureESLintSource(t)
 
-	res, err := resolvesvc.Resolve(&resolvesvc.ResolveInput{
-		Task:           moduleESLint,
-		Catalog:        catalog,
-		PackageManager: config.PMPnpm,
-	})
-	if err != nil {
-		t.Fatalf("resolve %q: %v", moduleESLint, err)
+	if source != moduleESLintNodePnpm {
+		t.Fatalf("SourceModule = %q, want %q", source, moduleESLintNodePnpm)
 	}
 
-	if res.SourceModule != moduleESLintNodePnpm {
-		t.Fatalf("SourceModule = %q, want %q", res.SourceModule, moduleESLintNodePnpm)
-	}
-
-	dest, err := resolvesvc.Normalize(res.SourceModule)
+	dest, err := resolvesvc.Normalize(source)
 	if err != nil {
-		t.Fatalf("normalize %q: %v", res.SourceModule, err)
+		t.Fatalf("normalize %q: %v", source, err)
 	}
 
 	if dest != moduleESLint {

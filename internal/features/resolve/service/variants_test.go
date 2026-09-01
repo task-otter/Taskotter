@@ -124,7 +124,7 @@ func stripOneSuffixPrimaryCases() []stripOneSuffixCase {
 		{input: srcESLintPnpm, wantStripped: true, wantResult: taskESLint},
 		{input: srcESLintBun, wantStripped: true, wantResult: taskESLint},
 		{input: taskESLint, wantStripped: false, wantResult: taskESLint},
-		{input: modPnpm, wantStripped: false, wantResult: modPnpm},
+		{input: destPnpm, wantStripped: false, wantResult: destPnpm},
 	}
 }
 

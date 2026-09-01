@@ -22,8 +22,8 @@ const (
 
 func deps() map[string][]string {
 	return map[string][]string{
-		srcESLintPnpm: {modPnpm},
-		modPnpm:       {modNodejs, modNix},
+		srcESLintPnpm: {destPnpm},
+		destPnpm:      {modNodejs, modNix},
 		modNodejs:     {modNix},
 		modNix:        {},
 		"go":          {},
@@ -39,7 +39,7 @@ func TestResolveTransitive(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	want := []string{modNix, modNodejs, modPnpm}
+	want := []string{modNix, modNodejs, destPnpm}
 
 	if len(got) != len(want) {
 		t.Fatalf(fmtGotWant, got, want)
@@ -56,13 +56,13 @@ func TestResolveTransitive(t *testing.T) {
 func TestDuplicateDependencyDeduped(t *testing.T) {
 	t.Parallel()
 
-	got, err := service.ResolveTransitive([]string{srcESLintPnpm, modPnpm}, deps())
+	got, err := service.ResolveTransitive([]string{srcESLintPnpm, destPnpm}, deps())
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	for i := range got {
-		if got[i] == modPnpm {
+		if got[i] == destPnpm {
 			t.Fatal("requested module should not appear in dependencies")
 		}
 	}

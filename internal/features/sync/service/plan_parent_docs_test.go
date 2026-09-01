@@ -30,27 +30,37 @@ func writeNestedDocsStore(t *testing.T) string {
 	root := t.TempDir()
 	writeFileWithDir(t, filepath.Join(root, ".deps.yml"), []byte(parentDocLeaf+": []\n"))
 
-	toolDir := filepath.Join(root, config.DefaultTargetFolder, parentDocTool)
-	writeModuleFile(&moduleFileInput{
-		t: t, dir: toolDir, rel: testTaskfileName, content: testEmptyTaskfileYAML,
-	})
-	writeModuleFile(&moduleFileInput{
-		t: t, dir: toolDir, rel: testReadmeName, content: parentDocRootReadme,
-	})
+	writeNestedDocsToolDir(t, root)
 
 	// Every directory on the way to a variant leaf is itself a module, so the
 	// intermediate node directory needs its own Taskfile.yml to be walked.
-	nodeDir := filepath.Join(root, config.DefaultTargetFolder, parentDocNode)
-	writeModuleFile(&moduleFileInput{
-		t: t, dir: nodeDir, rel: testTaskfileName, content: testEmptyTaskfileYAML,
-	})
-
-	leafDir := filepath.Join(root, config.DefaultTargetFolder, parentDocLeaf)
-	writeModuleFile(&moduleFileInput{
-		t: t, dir: leafDir, rel: testTaskfileName, content: testEmptyTaskfileYAML,
-	})
+	writeNestedDocsTaskfile(t, root, parentDocNode)
+	writeNestedDocsTaskfile(t, root, parentDocLeaf)
 
 	return root
+}
+
+func writeNestedDocsTaskfile(t *testing.T, root, module string) {
+	t.Helper()
+
+	writeModuleFile(&moduleFileInput{
+		t:       t,
+		dir:     filepath.Join(root, config.DefaultTargetFolder, module),
+		rel:     testTaskfileName,
+		content: testEmptyTaskfileYAML,
+	})
+}
+
+func writeNestedDocsToolDir(t *testing.T, root string) {
+	t.Helper()
+
+	writeNestedDocsTaskfile(t, root, parentDocTool)
+	writeModuleFile(&moduleFileInput{
+		t:       t,
+		dir:     filepath.Join(root, config.DefaultTargetFolder, parentDocTool),
+		rel:     testReadmeName,
+		content: parentDocRootReadme,
+	})
 }
 
 func writeNestedDocsStoreWithLeafReadme(t *testing.T) string {

@@ -334,22 +334,6 @@ func isAuthFailureStatus(statusCode int) bool {
 	return statusCode == http.StatusUnauthorized || statusCode == http.StatusForbidden
 }
 
-func isModuleDir(entries []os.DirEntry) bool {
-	for i := range entries {
-		entry := entries[i]
-
-		if entry.IsDir() {
-			continue
-		}
-
-		if entry.Name() == "Taskfile.yml" {
-			return true
-		}
-	}
-
-	return false
-}
-
 func newRefInfo(requestedVersion, defaultBranch string) RefInfo {
 	return RefInfo{
 		Repository:       config.StoreRepository,

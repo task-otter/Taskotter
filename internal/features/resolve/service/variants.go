@@ -14,7 +14,9 @@ import (
 	"github.com/task-otter/Taskotter/internal/shared/consts"
 )
 
-type pkgMgr = config.PackageManager
+type (
+	pkgMgr = config.PackageManager
+)
 
 const (
 	fmtWrapQuoted = "%w %q"

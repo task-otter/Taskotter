@@ -1,36 +1,24 @@
 ---
 version: "3.5"
 output:
+
   group:
     begin: "::group::{{.TASK}}"
     end: "::endgroup::"
     error_only: false
 silent: true
+
+includes:
+
+  nix:
+    taskfile: ../nix/Taskfile.yml
+
 vars:
-  GO_INSTALL_DIR_UNIX: "/usr/local"
-  GO_ROOT_UNIX: "{{.GO_INSTALL_DIR_UNIX}}/go"
-  GO_BIN_UNIX: "{{.GO_ROOT_UNIX}}/bin"
-  GO_CMD_UNIX: "{{.GO_BIN_UNIX}}/go"
-  GO_VERSION_URL: https://go.dev/VERSION?m=text
-  GO_DOWNLOAD_BASE_URL: https://go.dev/dl
-  GO_VERSION: ""
-  GO_JUNIT_REPORT: ""
-  GO_COVER_PROFILE: ""
+
+  GO_NIX_INSTALLABLE: nixpkgs#go
+
   GO_FUZZTIME: ""
-  GO_GLOBAL_BIN:
-    sh: |
-      gobin="${GOBIN:-}"
-      if [ -z "$gobin" ] && command -v go >/dev/null 2>&1; then
-        gobin="$(go env GOBIN)"
-      fi
-      if [ -z "$gobin" ]; then
-        gopath="${GOPATH:-}"
-        if [ -z "$gopath" ] && command -v go >/dev/null 2>&1; then
-          gopath="$(go env GOPATH)"
-        fi
-        gobin="${gopath:-$HOME/go}/bin"
-      fi
-      printf '%s' "$gobin"
+
 tasks:
   default:
     run: once
@@ -38,96 +26,41 @@ tasks:
     summary: Display the list of available Go-related tasks defined in this Taskfile.
     cmds:
       - task --list
+
   install:
     run: once
-    desc: Install Go on the current operating system
+    desc: Install Go via the Nix profile
     summary: |
-      Install GO_VERSION for the current platform, defaulting to the latest
-      stable release. macOS uses Homebrew for latest or the official package
-      for an explicit version. Linux uses the official tarball and Windows
-      uses the official MSI.
+      Install Go into the user Nix profile when it is not already
+      available on PATH. Override the GO_NIX_INSTALLABLE
+      variable to pin a different package or version.
     cmds:
-      - task: _install:macos:brew
-      - task: _install:macos:pkg
-      - task: _install:linux:tarball
-      - task: _install:windows:msi
-      - task: _shell:setup:linux
-  install:undo:
-    run: once
-    desc: Remove Go from the current operating system
-    summary: |
-      Remove the Go toolchain for the current platform.
-      macOS uses Homebrew if Go was installed that way, otherwise removes
-      /usr/local/go directly (the official package installer's location).
-      Linux removes GO_INSTALL_DIR_UNIX/go (default /usr/local/go).
-      Windows uses the Programs and Features uninstaller via PowerShell.
-    prompt:
-      - This will remove Go from this machine.
-      - Continue?
-    cmds:
-      - task: _install:undo:macos
-      - task: _install:undo:linux
-      - task: _install:undo:windows
-  install:go-junit-report:
-    run: once
-    desc: Install go-junit-report globally
-    summary: Install go-junit-report v2.1.0 into the global Go bin.
-    deps:
-      - task: install
-    cmds:
-      - cmd: GOBIN="{{.GO_GLOBAL_BIN}}" go install github.com/jstemmer/go-junit-report/v2@v2.1.0
-        platforms: [linux, darwin]
-      - cmd: >-
-          powershell -NoProfile -ExecutionPolicy Bypass -Command
-          "$env:GOBIN = '{{.GO_GLOBAL_BIN}}';
-          go install github.com/jstemmer/go-junit-report/v2@v2.1.0"
-        platforms: [windows]
-    status:
-      - >-
-        {{if eq .OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -Command
-        "if (-not (Test-Path '{{.GO_GLOBAL_BIN}}/go-junit-report.exe')) { exit 1 };
-        if ((go version -m '{{.GO_GLOBAL_BIN}}/go-junit-report.exe') -like '*v2.1.0*') { exit 0 };
-        exit 1"{{else}}test -x "{{.GO_GLOBAL_BIN}}/go-junit-report"
-        && go version -m "{{.GO_GLOBAL_BIN}}/go-junit-report" | awk -v
-        want="v2.1.0" '$1 == "mod" && $3 == want { found = 1 } END { exit !found }'{{end}}
-  upgrade:
-    run: once
-    desc: Upgrade Go to the selected or latest stable release
-    summary: |
-      Upgrade Go to GO_VERSION, defaulting to the latest stable release.
-      macOS uses Homebrew for latest or the official package for an explicit
-      version. Linux uses the official tarball and Windows uses the official
-      MSI.
-    cmds:
-      - task: _upgrade:macos:brew
-      - task: _install:macos:pkg
-      - task: _install:linux:tarball
+      - task: nix:install:profile
         vars:
-          FORCE: "true"
-      - task: _install:windows:msi
-        vars:
-          FORCE: "true"
-      - task: _shell:setup:linux
-        vars:
-          FORCE: "true"
+          NIX_INSTALLABLE: "{{.GO_NIX_INSTALLABLE}}"
+
   version:
     run: once
-    desc: Show the installed Go version
-    summary: Print the active Go toolchain version via `go version`. Auto-installs Go if missing.
+    desc: Show the active Go version
+    summary: |
+      Print the version reported by the go binary resolved from PATH.
+      Auto-installs Go if missing.
     deps:
       - task: install
     cmds:
       - task: _version:unix
       - task: _version:windows
+
   which:
     run: once
     desc: Show the path to the Go binary
-    summary: Print the Go binary resolved from PATH, falling back to GO_CMD_UNIX on Linux. Auto-installs Go if missing.
+    summary: Print the Go binary resolved from PATH. Auto-installs Go if missing.
     deps:
       - task: install
     cmds:
       - task: _which:unix
       - task: _which:windows
+
   verify:
     run: once
     desc: Verify the Go installation and environment
@@ -140,26 +73,25 @@ tasks:
     cmds:
       - task: _verify:unix
       - task: _verify:windows
+
   test:
     run: once
     dir: "{{.USER_WORKING_DIR}}"
-    desc: Run Go unit tests and write JUnit XML and coverage reports
+    desc: Run Go unit tests
     summary: |
-      Run `go test -v` with coverage against all Go packages by default, stream
-      test output to stdout, write a JUnit XML report to GO_JUNIT_REPORT
-      (default junit.xml), and write a coverage profile to GO_COVER_PROFILE
-      (default coverage.out). Pass CLI arguments after -- to override the
-      default ./... target or add flags.
+      Run `go test -v` against all Go packages by default. Pass CLI arguments
+      after -- to override the default ./... target or add flags. For JUnit XML
+      and coverage reports, use the go-junit-report Taskfile.
     deps:
-      - task: install:go-junit-report
-    vars:
-      GO_JUNIT_REPORT_OUT: '{{if .GO_JUNIT_REPORT}}{{.GO_JUNIT_REPORT}}{{else}}junit.xml{{end}}'
-      GO_COVER_OUT: '{{if .GO_COVER_PROFILE}}{{.GO_COVER_PROFILE}}{{else}}coverage.out{{end}}'
+      - task: install
     cmds:
-      - >-
-        go test -v -covermode atomic -coverprofile "{{.GO_COVER_OUT}}"
-        {{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}./...{{end}} 2>&1 | "{{.GO_GLOBAL_BIN}}/go-junit-report"
-        -set-exit-code -iocopy -out "{{.GO_JUNIT_REPORT_OUT}}"
+      - cmd: >-
+          bash -lc '{{.NIX_LOAD}}; go test -v
+          {{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}./...{{end}}'
+        platforms: [linux, darwin]
+      - cmd: go test -v {{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}./...{{end}}
+        platforms: [windows]
+
   bench:
     run: once
     dir: "{{.USER_WORKING_DIR}}"
@@ -169,8 +101,16 @@ tasks:
       unit-test execution (-run '^$'). Pass CLI arguments after -- to override
       the default ./... target or the -bench pattern, for example:
       `task go:bench -- -bench BenchmarkName ./internal/parser`.
+    deps:
+      - task: install
     cmds:
-      - go test -run '^$' -bench . -benchmem {{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}./...{{end}}
+      - cmd: >-
+          bash -lc '{{.NIX_LOAD}}; go test -run "^$" -bench . -benchmem
+          {{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}./...{{end}}'
+        platforms: [linux, darwin]
+      - cmd: go test -run '^$' -bench . -benchmem {{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}./...{{end}}
+        platforms: [windows]
+
   fuzz:
     run: once
     dir: "{{.USER_WORKING_DIR}}"
@@ -180,422 +120,27 @@ tasks:
       fuzzes a single target in one package per run, so pass the -fuzz pattern
       and package after --, for example:
       `task go:fuzz -- -fuzz FuzzName ./internal/parser`.
+    deps:
+      - task: install
     vars:
       GO_FUZZ_TIME: '{{if .GO_FUZZTIME}}{{.GO_FUZZTIME}}{{else}}30s{{end}}'
     cmds:
-      - go test -run '^$' -fuzztime '{{.GO_FUZZ_TIME}}' {{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}-fuzz . .{{end}}
-  _install:macos:brew:
-    run: once
-    internal: true
-    desc: Install Go on macOS using Homebrew
-    summary: Run `brew install go` on macOS when GO_VERSION is not set.
-    platforms: [darwin]
-    set: [errexit, nounset, pipefail]
-    status:
-      - '[ -n "{{.GO_VERSION}}" ] || command -v go >/dev/null 2>&1'
-    preconditions:
-      - sh: command -v brew >/dev/null 2>&1
-        msg: Homebrew is required to install Go on macOS. Install it from https://brew.sh and re-run this task.
-    cmds:
-      - echo 'Installing Go via Homebrew...'
-      - brew update
-      - brew install go
-      - echo 'Go installed successfully.'
-  _upgrade:macos:brew:
-    run: once
-    internal: true
-    desc: Upgrade Go on macOS using Homebrew
-    summary: Upgrade Go through Homebrew when GO_VERSION is not set.
-    platforms: [darwin]
-    set: [errexit, nounset, pipefail]
-    status:
-      - test -n "{{.GO_VERSION}}"
-    preconditions:
-      - sh: command -v brew >/dev/null 2>&1
-        msg: Homebrew is required to upgrade Go on macOS. Install it from https://brew.sh and re-run this task.
-    cmds:
-      - echo 'Upgrading Go via Homebrew...'
-      - brew update
-      - |
-        if brew list go >/dev/null 2>&1; then
-          brew upgrade go
-        else
-          brew install go
-        fi
-  _install:macos:pkg:
-    run: once
-    internal: true
-    desc: Install an explicit Go version on macOS
-    summary: Download and install the official GO_VERSION package on macOS.
-    platforms: [darwin]
-    set: [errexit, nounset, pipefail]
-    vars:
-      GO_DARWIN_UNAME_ARCH:
-        sh: uname -m
-      GO_DARWIN_ARCH: >-
-        {{if or (eq .GO_DARWIN_UNAME_ARCH "arm64") (eq .GO_DARWIN_UNAME_ARCH "aarch64")}}arm64 {{- else if or (eq
-        .GO_DARWIN_UNAME_ARCH "x86_64") (eq .GO_DARWIN_UNAME_ARCH "amd64")}}amd64 {{-
-        else}}{{.GO_DARWIN_UNAME_ARCH}}{{end}}
-      GO_DARWIN_ARCH_SUPPORTED: >-
-        {{if or (eq .GO_DARWIN_ARCH "arm64") (eq .GO_DARWIN_ARCH "amd64")}}true {{- else}}false{{end}}
-    status:
-      - >-
-        [ -z "{{.GO_VERSION}}" ] || { [ "{{default "false" .FORCE}}" != "true" ] && test -x "{{.GO_CMD_UNIX}}" && [
-        "$("{{.GO_CMD_UNIX}}" version | awk '{print $3}')" = "{{.GO_VERSION}}" ]; }
-    preconditions:
-      - sh: 'case "{{.GO_VERSION}}" in ""|go*) exit 0 ;; *) exit 1 ;; esac'
-        msg: GO_VERSION must use the official Go release format, for example go1.26.2.
-      - sh: '[ "{{.GO_DARWIN_ARCH_SUPPORTED}}" = "true" ]'
-        msg: Unsupported macOS architecture {{.GO_DARWIN_UNAME_ARCH}}.
-      - sh: command -v curl >/dev/null 2>&1
-        msg: curl is required to download Go.
-      - sh: command -v installer >/dev/null 2>&1
-        msg: The macOS installer command is required to install Go.
-      - sh: command -v shasum >/dev/null 2>&1
-        msg: shasum is required to verify the Go download.
-      - sh: 'test "$(id -u)" -eq 0 || command -v sudo >/dev/null 2>&1'
-        msg: sudo is required to install the Go package when not running as root.
-    cmds:
-      - cmd: |
-          # This task only handles an explicitly requested version; Homebrew
-          # covers the "latest" path. The guard lives here and not only in
-          # status: because `task --force` disables status checks, and a forced
-          # run with an empty GO_VERSION would request
-          # https://go.dev/dl/.darwin-arm64.pkg, which 404s.
-          if [ -z "{{.GO_VERSION}}" ]; then
-            exit 0
-          fi
+      - cmd: >-
+          bash -lc '{{.NIX_LOAD}}; go test -run "^$" -fuzztime "{{.GO_FUZZ_TIME}}"
+          {{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}-fuzz . .{{end}}'
+        platforms: [linux, darwin]
+      - cmd: go test -run '^$' -fuzztime '{{.GO_FUZZ_TIME}}' {{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}-fuzz . .{{end}}
+        platforms: [windows]
 
-          work_dir="$(mktemp -d)"
-          trap 'rm -rf "$work_dir"' EXIT INT TERM
-
-          package="{{.GO_VERSION}}.darwin-{{.GO_DARWIN_ARCH}}.pkg"
-          echo "Downloading $package..."
-          curl -fL "{{.GO_DOWNLOAD_BASE_URL}}/$package" -o "$work_dir/$package"
-          curl -fsSL "{{.GO_DOWNLOAD_BASE_URL}}/$package.sha256" -o "$work_dir/$package.sha256"
-
-          expected="$(tr -d '[:space:]' < "$work_dir/$package.sha256")"
-          actual="$(shasum -a 256 "$work_dir/$package" | awk '{print $1}')"
-          if [ "$expected" != "$actual" ]; then
-            echo "Checksum mismatch for $package: expected $expected, got $actual" >&2
-            exit 1
-          fi
-
-          if [ "$(id -u)" -eq 0 ]; then
-            installer -pkg "$work_dir/$package" -target /
-          else
-            sudo installer -pkg "$work_dir/$package" -target /
-          fi
-  _install:linux:tarball:
-    run: once
-    internal: true
-    desc: Install Go on Linux using the official tarball
-    summary: |
-      Download GO_VERSION, defaulting to the latest stable Go Linux tarball,
-      replace GO_INSTALL_DIR_UNIX/go, and extract the new toolchain. Requires sudo
-      when not running as root.
-    platforms: [linux]
-    set: [errexit, nounset, pipefail]
-    vars:
-      GO_UNAME_ARCH:
-        sh: uname -m
-      GO_LINUX_ARCH: >-
-        {{if or (eq .GO_UNAME_ARCH "x86_64") (eq .GO_UNAME_ARCH "amd64")}}amd64 {{- else if or (eq .GO_UNAME_ARCH
-        "aarch64") (eq .GO_UNAME_ARCH "arm64")}}arm64 {{- else if eq .GO_UNAME_ARCH "armv6l"}}armv6l {{- else if or (eq
-        .GO_UNAME_ARCH "i386") (eq .GO_UNAME_ARCH "i686")}}386 {{- else if eq .GO_UNAME_ARCH "ppc64le"}}ppc64le {{- else
-        if eq .GO_UNAME_ARCH "s390x"}}s390x {{- else}}{{.GO_UNAME_ARCH}}{{end}}
-      GO_LINUX_ARCH_SUPPORTED: >-
-        {{if or (eq .GO_LINUX_ARCH "amd64") (eq .GO_LINUX_ARCH "arm64") (eq .GO_LINUX_ARCH "armv6l") (eq .GO_LINUX_ARCH
-        "386") (eq .GO_LINUX_ARCH "ppc64le") (eq .GO_LINUX_ARCH "s390x")}}true {{- else}}false{{end}}
-    status:
-      - '[ "{{default "false" .FORCE}}" != "true" ]'
-      - >-
-        [ -z "{{.GO_VERSION}}" ] || { command -v go >/dev/null 2>&1 && [ "$(go version | awk '{print $3}')" =
-        "{{.GO_VERSION}}" ]; }
-      - command -v go >/dev/null 2>&1
-    preconditions:
-      - sh: 'case "{{.GO_VERSION}}" in ""|go*) exit 0 ;; *) exit 1 ;; esac'
-        msg: GO_VERSION must use the official Go release format, for example go1.26.2.
-      - sh: command -v curl >/dev/null 2>&1
-        msg: curl is required to download Go.
-      - sh: command -v tar >/dev/null 2>&1
-        msg: tar is required to extract Go.
-      - sh: command -v uname >/dev/null 2>&1
-        msg: uname is required to detect the system architecture.
-      - sh: command -v sha256sum >/dev/null 2>&1 || command -v shasum >/dev/null 2>&1
-        msg: sha256sum or shasum is required to verify the Go download.
-      - sh: '[ "{{.GO_LINUX_ARCH_SUPPORTED}}" = "true" ]'
-        msg: Unsupported Linux architecture {{.GO_UNAME_ARCH}}.
-      - sh: 'test "$(id -u)" -eq 0 || command -v sudo >/dev/null 2>&1'
-        msg: sudo is required to install Go under GO_INSTALL_DIR_UNIX when not running as root.
-    cmds:
-      - cmd: |
-          # Everything happens in a private temp directory removed by the trap,
-          # so an interrupted or failed run leaves neither a partial download nor
-          # a predictable /tmp path another user could have pre-created.
-          work_dir="$(mktemp -d)"
-          trap 'rm -rf "$work_dir" 2>/dev/null || sudo -n rm -rf "$work_dir" 2>/dev/null || true' \
-            EXIT INT TERM
-
-          privileged() {
-            if [ "$(id -u)" -eq 0 ]; then
-              "$@"
-            else
-              sudo "$@"
-            fi
-          }
-
-          if [ -n "{{.GO_VERSION}}" ]; then
-            archive="{{.GO_VERSION}}.linux-{{.GO_LINUX_ARCH}}.tar.gz"
-          else
-            archive="$(curl -fsSL "{{.GO_VERSION_URL}}" | sed -n '1p').linux-{{.GO_LINUX_ARCH}}.tar.gz"
-          fi
-
-          echo "Downloading $archive..."
-          curl -fL "{{.GO_DOWNLOAD_BASE_URL}}/$archive" -o "$work_dir/$archive"
-          curl -fsSL "{{.GO_DOWNLOAD_BASE_URL}}/$archive.sha256" -o "$work_dir/$archive.sha256"
-
-          # go.dev serves the bare hex digest, not a checksum-file line.
-          expected="$(tr -d '[:space:]' < "$work_dir/$archive.sha256")"
-          if command -v sha256sum >/dev/null 2>&1; then
-            actual="$(sha256sum "$work_dir/$archive" | awk '{print $1}')"
-          else
-            actual="$(shasum -a 256 "$work_dir/$archive" | awk '{print $1}')"
-          fi
-          if [ "$expected" != "$actual" ]; then
-            echo "Checksum mismatch for $archive: expected $expected, got $actual" >&2
-            exit 1
-          fi
-
-          # Extract and smoke-test the new toolchain *before* touching the
-          # installed one. The previous flow removed GO_ROOT_UNIX first, so a
-          # truncated archive left the machine with no Go at all and no rollback.
-          # Extraction is privileged so GO_ROOT_UNIX stays root-owned.
-          if [ "$(id -u)" -eq 0 ]; then
-            tar -C "$work_dir" -xzf "$work_dir/$archive"
-          else
-            sudo tar -C "$work_dir" -xzf "$work_dir/$archive"
-          fi
-          "$work_dir/go/bin/go" version >/dev/null
-
-          echo "Installing Go to {{.GO_ROOT_UNIX}}..."
-          privileged rm -rf "{{.GO_ROOT_UNIX}}.old"
-          if [ -d "{{.GO_ROOT_UNIX}}" ]; then
-            privileged mv "{{.GO_ROOT_UNIX}}" "{{.GO_ROOT_UNIX}}.old"
-          fi
-          if ! privileged mv "$work_dir/go" "{{.GO_ROOT_UNIX}}"; then
-            echo "Install failed; restoring the previous toolchain." >&2
-            if [ -d "{{.GO_ROOT_UNIX}}.old" ]; then
-              privileged mv "{{.GO_ROOT_UNIX}}.old" "{{.GO_ROOT_UNIX}}"
-            fi
-            exit 1
-          fi
-          privileged rm -rf "{{.GO_ROOT_UNIX}}.old"
-          echo "Go installed to {{.GO_ROOT_UNIX}}."
-  _install:windows:msi:
-    run: once
-    internal: true
-    desc: Install Go on Windows using the official MSI
-    summary: |
-      Download GO_VERSION, defaulting to the latest stable Go Windows MSI, and
-      install it quietly.
-    platforms: [windows]
-    status:
-      - >-
-        powershell -NoProfile -ExecutionPolicy Bypass -Command "if ('{{default "false" .FORCE}}' -eq 'true') { exit 1 };
-        $requested = '{{.GO_VERSION}}'; if (Get-Command go -ErrorAction SilentlyContinue) {
-
-          if ([string]::IsNullOrWhiteSpace($requested)
-          -or ((& go version).Split()[2] -eq $requested)) { exit 0 }
-        }; exit 1"
-    preconditions:
-      - sh: >-
-          powershell -NoProfile -ExecutionPolicy Bypass -Command "$version = '{{.GO_VERSION}}'; if
-          ([string]::IsNullOrWhiteSpace($version) -or $version.StartsWith('go')) { exit 0 } else { exit 1 }"
-        msg: GO_VERSION must use the official Go release format, for example go1.26.2.
-      - sh: >-
-          powershell -NoProfile -ExecutionPolicy Bypass -Command "if ($env:PROCESSOR_ARCHITECTURE -eq 'AMD64' -or
-          $env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { exit 0 } else { exit 1 }"
-        msg: Go MSI install supports AMD64 and ARM64 Windows architectures.
-    cmds:
-      # Resolve the version, pick the architecture, download, verify and install
-      # in one PowerShell session. Splitting these across commands previously
-      # required staging the version in a shared TEMP file and duplicating the
-      # download for AMD64 and ARM64.
-      - >-
-        powershell -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop'; $version =
-        '{{.GO_VERSION}}'; if ([string]::IsNullOrWhiteSpace($version)) {
-
-          $version = ((Invoke-RestMethod -Uri '{{.GO_VERSION_URL}}') -split \"`n\")[0].Trim()
-        }; $arch = if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { 'arm64' } else { 'amd64' }; $package =
-        \"$version.windows-$arch.msi\"; $workDir = Join-Path $env:TEMP ('taskotter-go-' +
-        [Guid]::NewGuid().ToString('N')); New-Item -ItemType Directory -Path $workDir | Out-Null; try {
-
-          $installer = Join-Path $workDir $package;
-          Write-Host \"Downloading $package...\";
-          Invoke-WebRequest -Uri \"{{.GO_DOWNLOAD_BASE_URL}}/$package\" -OutFile $installer;
-          $expected = (Invoke-RestMethod
-            -Uri \"{{.GO_DOWNLOAD_BASE_URL}}/$package.sha256\").Trim();
-          $actual = (Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash;
-          if ($expected -ne $actual) {
-            Write-Error \"Checksum mismatch for $package: expected $expected, got $actual\";
-          };
-          Start-Process msiexec.exe -Wait
-            -ArgumentList @('/i', $installer, '/quiet', '/norestart');
-        } finally {
-
-          Remove-Item -LiteralPath $workDir -Recurse -Force -ErrorAction SilentlyContinue;
-        }"
-  _install:undo:macos:
-    run: once
-    internal: true
-    platforms: [darwin]
-    set: [errexit, nounset, pipefail]
-    status:
-      - '! command -v go >/dev/null 2>&1 && ! test -d "{{.GO_ROOT_UNIX}}"'
-    cmds:
-      - |
-        if command -v brew >/dev/null 2>&1 && brew list go >/dev/null 2>&1; then
-          echo 'Removing Go via Homebrew...'
-          brew uninstall go
-        elif [ -d "{{.GO_ROOT_UNIX}}" ]; then
-          echo 'Removing Go from {{.GO_ROOT_UNIX}}...'
-          rm -rf "{{.GO_ROOT_UNIX}}"
-        fi
-      - echo 'Go removed.'
-  _install:undo:linux:
-    run: once
-    internal: true
-    platforms: [linux]
-    set: [errexit, nounset, pipefail]
-    status:
-      - '! test -d "{{.GO_ROOT_UNIX}}"'
-    preconditions:
-      - sh: 'test "$(id -u)" -eq 0 || command -v sudo >/dev/null 2>&1'
-        msg: sudo is required to remove Go under GO_INSTALL_DIR_UNIX when not running as root.
-    cmds:
-      - echo 'Removing Go from {{.GO_ROOT_UNIX}}...'
-      - cmd: rm -rf "{{.GO_ROOT_UNIX}}"
-        if: '[ "$(id -u)" -eq 0 ]'
-      - cmd: sudo rm -rf "{{.GO_ROOT_UNIX}}"
-        if: '[ "$(id -u)" -ne 0 ]'
-      - echo 'Go removed.'
-  _install:undo:windows:
-    run: once
-    internal: true
-    platforms: [windows]
-    status:
-      - >-
-        powershell -NoProfile -ExecutionPolicy Bypass -Command "if (Get-Command go -ErrorAction SilentlyContinue) { exit
-        1 } else { exit 0 }"
-    cmds:
-      - echo Removing Go...
-      - >-
-        powershell -NoProfile -ExecutionPolicy Bypass -Command "$pkg = Get-Package -Name 'Go Programming Language*'
-        -ErrorAction SilentlyContinue; if ($pkg) { $pkg | Uninstall-Package -Force } else { Write-Warning 'Go package
-        not found via Get-Package. Remove it manually from Apps & Features.' }"
-      - echo Go removed. Restart your terminal.
-  _shell:setup:linux:
-    run: once
-    internal: true
-    desc: Configure Go PATH on Linux
-    summary: Add GO_BIN_UNIX to the current user's shell profile if it is not already available.
-    platforms: [linux]
-    set: [errexit, nounset, pipefail]
-    status:
-      - '[ "{{default "false" .FORCE}}" != "true" ] && command -v go >/dev/null 2>&1'
-    cmds:
-      - task: _shell:setup:linux:profile
-        vars:
-          FORCE: "{{.FORCE}}"
-          GO_PROFILE: "$HOME/.zshrc"
-        if: '[ "$(basename "${SHELL:-}")" = "zsh" ]'
-      - task: _shell:setup:linux:profile
-        vars:
-          FORCE: "{{.FORCE}}"
-          GO_PROFILE: "$HOME/.bashrc"
-        if: '[ "$(basename "${SHELL:-}")" = "bash" ]'
-      - task: _shell:setup:linux:profile
-        vars:
-          FORCE: "{{.FORCE}}"
-          GO_PROFILE: "$HOME/.profile"
-        if: '[ "$(basename "${SHELL:-}")" != "zsh" ] && [ "$(basename "${SHELL:-}")" != "bash" ]'
-  _shell:setup:linux:profile:
-    run: once
-    internal: true
-    desc: Configure Go PATH in a Linux shell profile
-    summary: Add GO_BIN_UNIX to the selected Linux shell profile if it is not already available.
-    platforms: [linux]
-    set: [errexit, nounset, pipefail]
-    requires:
-      vars:
-        - GO_PROFILE
-    status:
-      - >-
-        [ "{{default "false" .FORCE}}" != "true" ] && command -v go >/dev/null 2>&1 || grep -qF "{{.GO_BIN_UNIX}}"
-        "{{.GO_PROFILE}}" 2>/dev/null
-    cmds:
-      # The header and the export are appended by a single guarded block. As two
-      # separately guarded commands, an interrupt between them left a "# Go"
-      # header with no export, and the second guard then saw the marker and
-      # skipped forever.
-      - cmd: |
-          touch "{{.GO_PROFILE}}"
-          if ! grep -qF "{{.GO_BIN_UNIX}}" "{{.GO_PROFILE}}" 2>/dev/null; then
-            printf '\n# Go\nexport PATH="$PATH:{{.GO_BIN_UNIX}}"\n' >> "{{.GO_PROFILE}}"
-          fi
-      - echo "Go PATH added to {{.GO_PROFILE}}. Restart your shell or run export PATH=\"\$PATH:{{.GO_BIN_UNIX}}\"."
-  _version:unix:
-    run: once
-    internal: true
-    desc: Show Go version on macOS or Linux
-    summary: Print `go version` on macOS or Linux.
-    platforms: [linux, darwin]
-    preconditions:
-      - sh: command -v go >/dev/null 2>&1 || test -x "{{.GO_CMD_UNIX}}"
-        msg: Go is not installed or not available in PATH.
-    cmds:
-      # An explicit GO_VERSION pins the toolchain under GO_ROOT_UNIX; otherwise
-      # prefer whatever PATH resolves, falling back to GO_ROOT_UNIX.
-      - cmd: |
-          if [ -n "{{.GO_VERSION}}" ] && [ -x "{{.GO_CMD_UNIX}}" ]; then
-            "{{.GO_CMD_UNIX}}" version
-          elif command -v go >/dev/null 2>&1; then
-            go version
-          else
-            "{{.GO_CMD_UNIX}}" version
-          fi
-  _version:windows:
-    run: once
-    internal: true
-    desc: Show Go version on Windows
-    summary: Print `go version` on Windows.
-    platforms: [windows]
-    preconditions:
-      - sh: >-
-          powershell -NoProfile -ExecutionPolicy Bypass -Command "if (Get-Command go -ErrorAction SilentlyContinue) {
-          exit 0 } else { exit 1 }"
-        msg: Go is not installed or not available in PATH.
-    cmds:
-      - go version
   _which:unix:
     run: once
     internal: true
     desc: Show Go binary path on macOS or Linux
     summary: Print the Go binary path resolved by the current PATH on macOS or Linux.
     platforms: [linux, darwin]
-    preconditions:
-      - sh: command -v go >/dev/null 2>&1 || test -x "{{.GO_CMD_UNIX}}"
-        msg: Go is not installed or not available in PATH.
     cmds:
-      - cmd: |
-          if [ -n "{{.GO_VERSION}}" ] && [ -x "{{.GO_CMD_UNIX}}" ]; then
-            printf '%s\n' '{{.GO_CMD_UNIX}}'
-          elif command -v go >/dev/null 2>&1; then
-            command -v go
-          else
-            printf '%s\n' '{{.GO_CMD_UNIX}}'
-          fi
+      - bash -lc '{{.NIX_LOAD}}; command -v go'
+
   _which:windows:
     run: once
     internal: true
@@ -609,26 +154,16 @@ tasks:
         msg: Go is not installed or not available in PATH.
     cmds:
       - powershell -NoProfile -ExecutionPolicy Bypass -Command "(Get-Command go).Source"
+
   _verify:unix:
     run: once
     internal: true
     desc: Verify Go on macOS or Linux
     summary: Print Go version, GOROOT, and GOPATH on macOS or Linux.
     platforms: [linux, darwin]
-    preconditions:
-      - sh: command -v go >/dev/null 2>&1 || test -x "{{.GO_CMD_UNIX}}"
-        msg: Go is not installed or not available in PATH.
     cmds:
-      - cmd: |
-          if [ -n "{{.GO_VERSION}}" ] && [ -x "{{.GO_CMD_UNIX}}" ]; then
-            go_cmd='{{.GO_CMD_UNIX}}'
-          elif command -v go >/dev/null 2>&1; then
-            go_cmd=go
-          else
-            go_cmd='{{.GO_CMD_UNIX}}'
-          fi
-          "$go_cmd" version
-          "$go_cmd" env GOROOT GOPATH
+      - bash -lc '{{.NIX_LOAD}}; go version; go env GOROOT GOPATH'
+
   _verify:windows:
     run: once
     internal: true
@@ -643,3 +178,26 @@ tasks:
     cmds:
       - go version
       - go env GOROOT GOPATH
+
+  _version:unix:
+    run: once
+    internal: true
+    desc: Show Go version on macOS or Linux
+    summary: Print the go version on macOS or Linux.
+    platforms: [linux, darwin]
+    cmds:
+      - bash -lc '{{.NIX_LOAD}}; go version'
+
+  _version:windows:
+    run: once
+    internal: true
+    desc: Show Go version on Windows
+    summary: Print the go version on Windows.
+    platforms: [windows]
+    preconditions:
+      - sh: >-
+          powershell -NoProfile -ExecutionPolicy Bypass -Command "if (Get-Command go -ErrorAction SilentlyContinue) {
+          exit 0 } else { exit 1 }"
+        msg: Go is not installed or not available in PATH.
+    cmds:
+      - go version

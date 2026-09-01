@@ -4,7 +4,7 @@ A [TaskOtter](https://github.com/task-otter/store) module for [actionlint](https
 
 ## What is this Taskfile?
 
-This module provides tasks to lint, install, and manage [actionlint](https://github.com/rhysd/actionlint). actionlint statically checks GitHub Actions workflow files for syntax errors, type mismatches in expressions, incorrect event payloads, and more.
+This module lints GitHub Actions workflow files with [actionlint](https://github.com/rhysd/actionlint). actionlint statically checks workflows for syntax errors, type mismatches in expressions, incorrect event payloads, and more. The `ci` task auto-installs actionlint via `nix:install:profile`.
 
 ## Usage
 
@@ -16,22 +16,24 @@ task -t taskfiles/actionlint/Taskfile.yml ci ACTIONLINT_TARGETS=.github/workflow
 task -t taskfiles/actionlint/Taskfile.yml ci ACTIONLINT_EXTRA_ARGS="-ignore 'label.*'"
 ```
 
+Install only, without linting:
+
+```sh
+task nix:install:profile NIX_INSTALLABLE=nixpkgs#actionlint
+```
+
 ### Included in your Taskfile
 
 ```yaml
 includes:
   actionlint:
     taskfile: taskfiles/actionlint/Taskfile.yml
-    vars:
-      ACTIONLINT_TARGETS_OVERRIDE: "{{.ACTIONLINT_TARGETS}}"
-      ACTIONLINT_EXTRA_ARGS_OVERRIDE: "{{.ACTIONLINT_EXTRA_ARGS}}"
 ```
 
 Then run:
 
 ```sh
 task actionlint:ci
-task actionlint:install
 ```
 
 ## Public Tasks
@@ -39,25 +41,22 @@ task actionlint:install
 | Task | Description |
 |---|---|
 | `ci` | Lint GitHub Actions workflow files with actionlint |
-| `install` | Install actionlint on the current operating system |
-| `install:undo` | Remove actionlint from the current operating system |
-| `upgrade` | Upgrade actionlint to the latest release |
-| `version` | Show the installed actionlint version |
+| `install` | Install actionlint via the Nix profile |
+| `version` | Show the active actionlint version |
 
 ## Variables
 
 | Variable | Default | Description |
 |---|---|---|
-| `ACTIONLINT_VERSION` | `"1.7.12"` | Pinned version used for macOS and Linux binary download |
+| `ACTIONLINT_NIX_INSTALLABLE` | `nixpkgs#actionlint` | Flake installable passed to `nix:install:profile` |
 | `ACTIONLINT_EXTRA_ARGS` | `""` | Additional flags passed to `actionlint` (e.g. `-ignore`, `-format`) |
 | `ACTIONLINT_TARGETS` | `""` | Paths to workflow files; empty = auto-discover `.github/workflows` |
-| `ACTIONLINT_LINT_SKIP_PATTERN` | _(empty)_ | Forward-slash path glob for files skipped by lint checks and fixes |
 
-Skip patterns support `*` within one path segment, `**` across directories, and `?` for one character. Paths are matched relative to the task working directory; for example, `**/generated/**`.
+Pin a revision by overriding the installable, for example
+`ACTIONLINT_NIX_INSTALLABLE=github:NixOS/nixpkgs/<rev>#actionlint`.
 
 ## Notes
 
-- **macOS** and **Linux** download a pinned binary from GitHub Releases into `/usr/local/bin`. Requires `curl`, `tar`, and `install`. Supported architectures: macOS `x86_64`/`arm64`, Linux `x86_64`/`aarch64`.
-- **Windows** installs via Scoop (`scoop install actionlint`). Scoop must be installed.
+- Install goes through `nix:install:profile` (Nix is installed first if missing). Native Windows is not supported; use WSL2.
 - When `ACTIONLINT_TARGETS` is empty, actionlint automatically discovers all files under `.github/workflows/` in the current working directory.
 - The `ci` task auto-installs actionlint if it is not already present in `PATH`.

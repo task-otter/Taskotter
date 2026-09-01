@@ -2,28 +2,22 @@
 
 ## What is this Taskfile?
 
-A cross-platform Taskfile for installing and running
-[hadolint](https://github.com/hadolint/hadolint), the Dockerfile linter.
-
-hadolint is installed globally via a pinned GitHub release binary to
-`/usr/local/bin` on macOS and Linux, and Scoop on Windows. The install task is
-skipped automatically when hadolint is already present in PATH at the pinned
-version.
+A Taskfile for running [hadolint](https://github.com/hadolint/hadolint), the
+Dockerfile linter. The `ci` task auto-installs hadolint via `nix:install:profile`.
 
 ## Usage
 
 ### Standalone
 
 ```sh
-task -t taskfiles/hadolint/Taskfile.yml install
 task -t taskfiles/hadolint/Taskfile.yml ci
-task -t taskfiles/hadolint/Taskfile.yml version
+task -t taskfiles/hadolint/Taskfile.yml ci HADOLINT_DOCKERFILE=path/to/Dockerfile
 ```
 
-Lint a specific Dockerfile:
+Install only, without linting:
 
 ```sh
-task -t taskfiles/hadolint/Taskfile.yml ci HADOLINT_DOCKERFILE=path/to/Dockerfile
+task -t taskfiles/hadolint/Taskfile.yml install
 ```
 
 Pass hadolint arguments after `--`:
@@ -44,34 +38,29 @@ Then run:
 ```sh
 task hadolint:ci
 task hadolint:ci HADOLINT_DOCKERFILE=services/api/Dockerfile
-task hadolint:version
 ```
 
 ## Public Tasks
 
-| Task           | Description                                       | Key variables                        |
-| -------------- | ------------------------------------------------- | ------------------------------------ |
-| `install`      | Install hadolint on the current operating system  | none                                 |
-| `install:undo` | Remove hadolint from the current operating system | none                                 |
-| `ci`         | Lint a Dockerfile with hadolint                   | `HADOLINT_DOCKERFILE`, `HADOLINT_CONFIG`, `HADOLINT_EXTRA_ARGS` |
-| `upgrade`      | Upgrade hadolint to the latest release            | none                                 |
-| `version`      | Show the installed hadolint version               | none                                 |
+| Task | Description                     | Key variables                                              |
+| ---- | ------------------------------- | ---------------------------------------------------------- |
+| `ci` | Lint a Dockerfile with hadolint | `HADOLINT_DOCKERFILE`, `HADOLINT_CONFIG`, `HADOLINT_EXTRA_ARGS` |
+| `install` | Install hadolint via the Nix profile | `HADOLINT_NIX_INSTALLABLE` |
+| `version` | Show the active hadolint version | — |
 
 ## Variables
 
-| Variable     | Default      | Description                                            |
-| ------------ | ------------ | ------------------------------------------------------ |
-| `HADOLINT_DOCKERFILE` | `Dockerfile` | Path to the Dockerfile to lint                         |
-| `HADOLINT_CONFIG`     | empty        | Path to a hadolint config file passed via `--config`   |
-| `HADOLINT_EXTRA_ARGS` | empty        | Extra arguments appended when CLI_ARGS is not provided |
-| `HADOLINT_LINT_SKIP_PATTERN` | _(empty)_ | Forward-slash path glob for files skipped by lint checks and fixes |
+| Variable                     | Default      | Description                                            |
+| ---------------------------- | ------------ | ------------------------------------------------------ |
+| `HADOLINT_NIX_INSTALLABLE`   | `nixpkgs#hadolint` | Flake installable passed to `nix:install:profile` |
+| `HADOLINT_DOCKERFILE`        | `Dockerfile` | Path to the Dockerfile to lint                         |
+| `HADOLINT_CONFIG`            | empty        | Path to a hadolint config file passed via `--config`   |
+| `HADOLINT_EXTRA_ARGS`        | empty        | Extra arguments appended when CLI_ARGS is not provided |
 
-Skip patterns support `*` within one path segment, `**` across directories, and `?` for one character. Paths are matched relative to the task working directory; for example, `**/generated/**`.
+Pin a revision by overriding the installable, for example
+`HADOLINT_NIX_INSTALLABLE=github:NixOS/nixpkgs/<rev>#hadolint`.
 
 ## Notes
 
-On macOS and Linux, hadolint is installed from the pinned `HADOLINT_VERSION`
-GitHub release binary into `/usr/local/bin` (`x86_64` and `arm64`). Other
-architectures require a manual install from the
-[hadolint releases page](https://github.com/hadolint/hadolint/releases).
-macOS `upgrade` still uses Homebrew (`brew upgrade hadolint`).
+- Install goes through `nix:install:profile` (Nix is installed first if missing). Native Windows is not supported; use WSL2.
+- The `ci` task auto-installs hadolint if it is not already present in `PATH`.

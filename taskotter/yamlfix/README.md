@@ -4,16 +4,22 @@ A [TaskOtter](https://github.com/task-otter/store) module for [yamlfix](https://
 
 ## What is this Taskfile?
 
-This module installs `yamlfix` via [uv](https://docs.astral.sh/uv/) into an isolated tool environment, then formats YAML files in place. It excludes `Taskfile.yml` / `Taskfile.yaml` whose Go template syntax is incompatible with yamlfix.
+This module formats YAML files in place. The `ci:fix` task auto-installs
+yamlfix via `nix:install:profile`. It excludes `Taskfile.yml` / `Taskfile.yaml`
+whose Go template syntax is incompatible with yamlfix.
 
 ## Usage
 
 ### Standalone
 
 ```sh
-task -t taskfiles/yamlfix/Taskfile.yml install
 task -t taskfiles/yamlfix/Taskfile.yml ci:fix YAMLFIX_TARGETS=.
-task -t taskfiles/yamlfix/Taskfile.yml version
+```
+
+Install only:
+
+```sh
+task -t taskfiles/yamlfix/Taskfile.yml install
 ```
 
 ### Included in your Taskfile
@@ -28,31 +34,28 @@ Then run:
 
 ```sh
 task yamlfix:ci:fix
-task yamlfix:install YAMLFIX_VERSION=1.17.0
 ```
 
 ## Public Tasks
 
-| Task | Description | Key variables |
-|---|---|---|
-| `install` | Install yamlfix on the current OS | `YAMLFIX_VERSION` |
-| `install:undo` | Remove yamlfix from the current OS | none |
-| `upgrade` | Upgrade yamlfix to the latest release | `YAMLFIX_VERSION` |
-| `version` | Show the installed yamlfix version | none |
-| `ci:fix` | Auto-fix YAML files with yamlfix | `YAMLFIX_TARGETS`, `YAMLFIX_EXTRA_ARGS` |
+| Task | Description |
+|---|---|
+| `ci:fix` | Auto-fix YAML files with yamlfix |
+| `install` | Install yamlfix via the Nix profile |
+| `version` | Show the active yamlfix version |
 
 ## Variables
 
 | Variable | Default | Description |
 |---|---|---|
+| `YAMLFIX_NIX_INSTALLABLE` | `nixpkgs#yamlfix` | Flake installable passed to `nix:install:profile` |
 | `YAMLFIX_TARGETS` | `.` | Files or directories to format |
 | `YAMLFIX_EXTRA_ARGS` | _(empty)_ | Extra flags forwarded to `yamlfix` |
-| `YAMLFIX_VERSION` | _(empty)_ | Pin a specific yamlfix release for `install`/`upgrade`; empty installs latest |
-| `YAMLFIX_FMT_SKIP_PATTERN` | _(empty)_ | Forward-slash path glob passed to yamlfix `--exclude` |
-| `UV_LOAD` | `export PATH="$HOME/.local/bin:$PATH"` | Shell snippet that puts uv-managed tools on PATH (unix) |
 
-Skip patterns support `*` within one path segment, `**` across directories, and `?` for one character. Paths are matched relative to the task working directory; for example, `**/generated/**`.
+Pin a revision by overriding the installable, for example
+`YAMLFIX_NIX_INSTALLABLE=github:NixOS/nixpkgs/<rev>#yamlfix`.
 
 ## Notes
 
+- Install goes through `nix:install:profile` (Nix is installed first if missing). Native Windows is not supported; use WSL2.
 - `ci:fix` skips `Taskfile.yml` and `Taskfile.yaml` because Go template syntax breaks yamlfix.

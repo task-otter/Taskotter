@@ -2,7 +2,7 @@
 version: '2'
 linters:
   default: all
-  disable: [wsl, gomodguard, nonamedreturns, testpackage, godot]
+  disable: [wsl, gomodguard, nonamedreturns, testpackage, godot, exhaustruct]
   settings:
     asasalint:
       exclude: []
@@ -621,7 +621,7 @@ linters:
       ignore-decls: []
     whitespace:
       multi-if: true
-      multi-func: false
+      multi-func: true
     wrapcheck:
       extra-ignore-sigs: []
       ignore-sigs: []

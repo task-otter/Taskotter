@@ -18,7 +18,7 @@ func jsEnv(dir, jsValue string) map[string]string {
 	return env
 }
 
-// TestParseJSNodeJSDefaults verifies nodejs runtime defaults to npm package manager and fnm.
+// TestParseJSNodeJSDefaults verifies nodejs runtime defaults to the npm package manager.
 //
 //nolint:paralleltest // LoadFromEnv uses t.Setenv; cannot run in parallel
 func TestParseJSNodeJSDefaults(t *testing.T) {
@@ -33,12 +33,9 @@ func TestParseJSNodeJSDefaults(t *testing.T) {
 		t.Fatalf("NodePackageManager = %q, want npm", cfg.NodePackageManager)
 	}
 
-	if cfg.NodeVersionManager != config.VMFnm {
-		t.Fatalf(fmtWantFnm, cfg.NodeVersionManager)
-	}
 }
 
-// TestParseJSBun verifies bun runtime sets bun package manager with no version manager.
+// TestParseJSBun verifies bun runtime sets the bun package manager.
 //
 //nolint:paralleltest // LoadFromEnv uses t.Setenv; cannot run in parallel
 func TestParseJSBun(t *testing.T) {
@@ -53,12 +50,9 @@ func TestParseJSBun(t *testing.T) {
 		t.Fatalf("NodePackageManager = %q, want bun", cfg.NodePackageManager)
 	}
 
-	if cfg.NodeVersionManager != consts.Empty {
-		t.Fatalf("NodeVersionManager = %q, want empty", cfg.NodeVersionManager)
-	}
 }
 
-// TestParseJSBunRejectsVersionManager verifies bun runtime with a version-manager fails validation.
+// TestParseJSBunRejectsVersionManager verifies the removed version-manager key fails under bun.
 //
 //nolint:paralleltest // LoadFromEnv uses t.Setenv; cannot run in parallel
 func TestParseJSBunRejectsVersionManager(t *testing.T) {
@@ -119,7 +113,7 @@ func TestParseJSDefaultsRuntimeToNodeJS(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
 
-	env[consts.InputJS] = "package-manager: yarn\nversion-manager: nvm\n"
+	env[consts.InputJS] = "package-manager: yarn\n"
 	setEnv(t, env)
 
 	cfg, err := config.LoadFromEnv()
@@ -154,13 +148,18 @@ func TestParseJSRejectsInvalidRuntime(t *testing.T) {
 	loadEnvExpectError(t, env, "expected invalid runtime error")
 }
 
-// TestParseJSRejectsInvalidVersionManager verifies an unrecognized version manager value is rejected.
+// TestParseJSRejectsVersionManager verifies the removed version-manager key is rejected outright,
+// including values that were valid before the store dropped its fnm and nvm variants.
 //
 //nolint:paralleltest // LoadFromEnv uses t.Setenv; cannot run in parallel
-func TestParseJSRejectsInvalidVersionManager(t *testing.T) {
-	dir := t.TempDir()
-	env := baseEnv(dir)
+func TestParseJSRejectsVersionManager(t *testing.T) {
+	removed := []string{"fnm", "nvm", "volta"}
 
-	env[consts.InputJS] = "runtime: nodejs\nversion-manager: volta\n"
-	loadEnvExpectError(t, env, "expected invalid version manager error")
+	for i := range removed {
+		dir := t.TempDir()
+		env := baseEnv(dir)
+
+		env[consts.InputJS] = "runtime: nodejs\nversion-manager: " + removed[i] + "\n"
+		loadEnvExpectError(t, env, "expected removed version-manager error")
+	}
 }

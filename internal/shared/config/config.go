@@ -29,15 +29,11 @@ type (
 	// PackageManager selects the Node package manager for JS task resolution.
 	PackageManager string
 
-	// VersionManager selects the Node version manager for JS task resolution.
-	VersionManager string
-
 	// Config holds validated TaskOtter action inputs and derived sync metadata.
 	Config struct {
 		Repository         string
 		GitHubOutput       string
 		NodePackageManager PackageManager
-		NodeVersionManager VersionManager
 		BranchName         string
 		ConfigurationHash  string
 		BaseBranch         string
@@ -55,7 +51,6 @@ type (
 
 	hashPayload struct {
 		NodePackageManager string
-		NodeVersionManager string
 		TargetFolder       string
 		StoreVersion       string
 		Tasks              []string
@@ -66,7 +61,6 @@ type (
 	parsedEnvInputs struct {
 		jsRuntime        JSRuntime
 		packageManager   PackageManager
-		versionManager   VersionManager
 		normalizedTarget string
 		rootTaskfile     string
 		tasks            []string
@@ -78,14 +72,12 @@ type (
 	tasksAndJSSettings struct {
 		jsRuntime      JSRuntime
 		packageManager PackageManager
-		versionManager VersionManager
 		tasks          []string
 	}
 
 	jsSettings struct {
 		jsRuntime      JSRuntime
 		packageManager PackageManager
-		versionManager VersionManager
 	}
 
 	toggleFlags struct {
@@ -150,12 +142,6 @@ const (
 	// PMPnpm selects pnpm.
 	PMPnpm PackageManager = "pnpm"
 
-	// VMFnm selects fnm as the Node version manager.
-	VMFnm VersionManager = "fnm"
-
-	// VMNvm selects nvm as the Node version manager.
-	VMNvm VersionManager = "nvm"
-
 	errParseIncludesDoc   = "parse includes-doc: %w"
 	errParseSyncRoot      = "parse sync-root: %w"
 	errParseFailOnChanges = "parse fail-on-changes: %w"
@@ -219,7 +205,6 @@ func assembleConfig(input *assembleConfigInput) *Config {
 		Tasks:              input.Parsed.tasks,
 		JSRuntime:          input.Parsed.jsRuntime,
 		NodePackageManager: input.Parsed.packageManager,
-		NodeVersionManager: input.Parsed.versionManager,
 		IncludesDoc:        input.Parsed.includesDoc,
 		SyncRoot:           input.Parsed.syncRoot,
 		FailOnChanges:      input.Parsed.failOnChanges,
@@ -251,7 +236,6 @@ func buildHashPayload(raw *rawEnvConfig, parsed *parsedEnvInputs) *hashPayload {
 	return &hashPayload{
 		Tasks:              parsed.tasks,
 		NodePackageManager: string(parsed.packageManager),
-		NodeVersionManager: string(parsed.versionManager),
 		TargetFolder:       parsed.normalizedTarget,
 		StoreVersion:       raw.storeVersion,
 		IncludesDoc:        parsed.includesDoc,
@@ -278,7 +262,6 @@ func computeConfigurationHash(payload *hashPayload) (hash, branch string) {
 	data, err := json.Marshal(map[string]any{
 		"tasks":                payload.Tasks,
 		"node_package_manager": payload.NodePackageManager,
-		"node_version_manager": payload.NodeVersionManager,
 		"target_folder":        payload.TargetFolder,
 		"store_version":        payload.StoreVersion,
 		"includes_doc":         payload.IncludesDoc,
@@ -311,14 +294,12 @@ func jsSettingsFromConfig(jsCfg *jsConfig) jsSettings {
 		return jsSettings{
 			jsRuntime:      consts.Empty,
 			packageManager: consts.Empty,
-			versionManager: consts.Empty,
 		}
 	}
 
 	return jsSettings{
 		jsRuntime:      jsCfg.Runtime,
 		packageManager: jsCfg.NodePackageManager,
-		versionManager: jsCfg.NodeVersionManager,
 	}
 }
 
@@ -356,7 +337,6 @@ func mergeParsedInputs(args *mergeParsedArgs) parsedEnvInputs {
 		tasks:            args.tasks.tasks,
 		jsRuntime:        args.tasks.jsRuntime,
 		packageManager:   args.tasks.packageManager,
-		versionManager:   args.tasks.versionManager,
 		includesDoc:      args.flags.includesDoc,
 		syncRoot:         args.flags.syncRoot,
 		failOnChanges:    args.flags.failOnChanges,
@@ -491,7 +471,6 @@ func parseTasksAndJSSettings(raw *rawEnvConfig) (tasksAndJSSettings, error) {
 		tasks:          tasks,
 		jsRuntime:      settings.jsRuntime,
 		packageManager: settings.packageManager,
-		versionManager: settings.versionManager,
 	}, nil
 }
 

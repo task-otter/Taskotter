@@ -32,7 +32,6 @@ const (
 	yamlKeyIncludesDoc        = "includes_doc"
 	yamlKeyManagedFiles       = "managed_files"
 	yamlKeyNodePackageManager = "node_package_manager"
-	yamlKeyNodeVersionManager = "node_version_manager"
 	yamlKeyPath               = "path"
 	yamlKeyRepository         = "repository"
 	yamlKeyRequested          = "requested"
@@ -172,10 +171,6 @@ func decodeLockConfigurationRuntime(cfg map[string]*yaml.Node, lock *LockFile) e
 		yamlDecodeTarget{
 			Key: yamlKeyNodePackageManager,
 			Out: &lock.Configuration.NodePackageManager,
-		},
-		yamlDecodeTarget{
-			Key: yamlKeyNodeVersionManager,
-			Out: &lock.Configuration.NodeVersionManager,
 		},
 		yamlDecodeTarget{Key: yamlKeyIncludesDoc, Out: &lock.Configuration.IncludesDoc},
 		yamlDecodeTarget{Key: yamlKeySyncRoot, Out: &lock.Configuration.SyncRoot},
@@ -338,7 +333,6 @@ func marshalLockConfiguration(cfg *LockConfiguration) map[string]any {
 		yamlKeyTargetFolder:       cfg.TargetFolder,
 		yamlKeyTasks:              cfg.Tasks,
 		yamlKeyNodePackageManager: cfg.NodePackageManager,
-		yamlKeyNodeVersionManager: cfg.NodeVersionManager,
 		yamlKeyIncludesDoc:        cfg.IncludesDoc,
 		yamlKeySyncRoot:           cfg.SyncRoot,
 	}

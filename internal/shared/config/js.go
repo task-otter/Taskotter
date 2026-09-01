@@ -25,7 +25,6 @@ type (
 	jsConfig struct {
 		Runtime            JSRuntime
 		NodePackageManager PackageManager
-		NodeVersionManager VersionManager
 	}
 )
 
@@ -69,6 +68,11 @@ func defaultedRaw(raw, fallback string) string {
 }
 
 func dispatchJSRuntime(yamlInput *jsInput) (*jsConfig, error) {
+	err := rejectVersionManager(yamlInput)
+	if err != nil {
+		return nil, err
+	}
+
 	runtime := defaultedJSRuntime(yamlInput.Runtime)
 
 	parser, ok := jsRuntimeParsers()[JSRuntime(runtime)]
@@ -88,11 +92,23 @@ func dispatchJSRuntime(yamlInput *jsInput) (*jsConfig, error) {
 	return jsCfg, nil
 }
 
+// rejectVersionManager fails on the removed js.version-manager key. Store modules no longer
+// carry a version-manager path segment, so the value has no meaning.
+func rejectVersionManager(yamlInput *jsInput) error {
+	if strings.TrimSpace(yamlInput.VersionManager) == consts.Empty {
+		return nil
+	}
+
+	return &ValidationError{
+		Field:   fieldJSVersionManager,
+		Message: consts.JSVersionManagerRemoved,
+	}
+}
+
 func emptyJSConfig() *jsConfig {
 	return &jsConfig{
 		Runtime:            consts.Empty,
 		NodePackageManager: consts.Empty,
-		NodeVersionManager: consts.Empty,
 	}
 }
 
@@ -124,17 +140,9 @@ func parseJSBun(yamlInput *jsInput) (*jsConfig, error) {
 		}
 	}
 
-	if strings.TrimSpace(yamlInput.VersionManager) != consts.Empty {
-		return nil, &ValidationError{
-			Field:   fieldJSVersionManager,
-			Message: consts.JSValidOnlyForNodejs,
-		}
-	}
-
 	return &jsConfig{
 		Runtime:            JSRuntimeBun,
 		NodePackageManager: PackageManager(JSRuntimeBun),
-		NodeVersionManager: consts.Empty,
 	}, nil
 }
 
@@ -155,22 +163,15 @@ func parseJSInput(raw string) (jsInput, error) {
 
 func parseJSNodeJS(yamlInput *jsInput) (*jsConfig, error) {
 	packageManagerRaw := defaultedRaw(yamlInput.PackageManager, string(PMNPM))
-	versionManagerRaw := defaultedRaw(yamlInput.VersionManager, string(VMFnm))
 
 	packageManager, err := validatePackageManager(packageManagerRaw)
 	if err != nil {
 		return nil, fmt.Errorf("validate package manager: %w", err)
 	}
 
-	versionManager, err := parseNodeVersionManager(versionManagerRaw)
-	if err != nil {
-		return nil, fmt.Errorf("parse node version manager: %w", err)
-	}
-
 	return &jsConfig{
 		Runtime:            JSRuntimeNodeJS,
 		NodePackageManager: packageManager,
-		NodeVersionManager: versionManager,
 	}, nil
 }
 
@@ -194,18 +195,6 @@ func parseNodePackageManager(raw string) (PackageManager, error) {
 		return consts.Empty, &ValidationError{
 			Field:   fieldJSPackageManager,
 			Message: fmt.Sprintf("invalid value %q: allowed values are npm, yarn, or pnpm", raw),
-		}
-	}
-}
-
-func parseNodeVersionManager(raw string) (VersionManager, error) {
-	switch raw {
-	case "fnm", "nvm":
-		return VersionManager(raw), nil
-	default:
-		return consts.Empty, &ValidationError{
-			Field:   fieldJSVersionManager,
-			Message: fmt.Sprintf("invalid value %q: allowed values are fnm or nvm", raw),
 		}
 	}
 }

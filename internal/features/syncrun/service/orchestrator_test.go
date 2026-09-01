@@ -329,7 +329,6 @@ func testConfig(workspace string) *config.Config {
 		Tasks:              []string{consts.Go},
 		JSRuntime:          consts.Empty,
 		NodePackageManager: consts.Empty,
-		NodeVersionManager: consts.Empty,
 		IncludesDoc:        true,
 		SyncRoot:           true,
 		FailOnChanges:      false,

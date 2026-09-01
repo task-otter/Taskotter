@@ -66,10 +66,9 @@ func dependencySources(
 	return deps, nil
 }
 
-func mutateEslintGoPnpmFnm(cfg *config.Config) {
+func mutateEslintGoPnpm(cfg *config.Config) {
 	cfg.Tasks = []string{testModuleEslint, consts.Go}
 	cfg.NodePackageManager = config.PMPnpm
-	cfg.NodeVersionManager = config.VMFnm
 	cfg.IncludesDoc = true
 }
 
@@ -118,7 +117,7 @@ func TestBuildPlanInitialSync(t *testing.T) {
 	workspace := t.TempDir()
 	writeRootTaskfile(t, workspace)
 
-	cfg := testConfig(workspace, mutateEslintGoPnpmFnm)
+	cfg := testConfig(workspace, mutateEslintGoPnpm)
 	plan := replan(t, workspace, cfg)
 
 	if !plan.Changed {
@@ -180,7 +179,7 @@ func resolveEslintMod(
 
 	return mustResolveTask(t, &resolvesvc.ResolveInput{
 		Task: testModuleEslint, Catalog: snap.Catalog,
-		PackageManager: cfg.NodePackageManager, VersionManager: cfg.NodeVersionManager,
+		PackageManager: cfg.NodePackageManager,
 	})
 }
 
@@ -206,10 +205,9 @@ func eslintSyncInput(
 	})
 }
 
-func mutateEslintPnpmFnm(cfg *config.Config) {
+func mutateEslintPnpm(cfg *config.Config) {
 	cfg.Tasks = []string{testModuleEslint}
 	cfg.NodePackageManager = config.PMPnpm
-	cfg.NodeVersionManager = config.VMFnm
 	cfg.IncludesDoc = true
 }
 
@@ -222,16 +220,15 @@ func TestUnmanagedDestinationConflict(t *testing.T) {
 	writeUnmanagedFile(t, workspace)
 
 	snap := fixtureStore(t)
-	cfg := testConfig(workspace, mutateEslintPnpmFnm)
+	cfg := testConfig(workspace, mutateEslintPnpm)
 	si := buildEslintSyncInput(t, cfg, snap)
 
 	expectBuildPlanError(t, &si, "expected unmanaged destination conflict")
 }
 
-func mutateEslintPnpmFnmNoDocs(cfg *config.Config) {
+func mutateEslintPnpmNoDocs(cfg *config.Config) {
 	cfg.Tasks = []string{testModuleEslint}
 	cfg.NodePackageManager = config.PMPnpm
-	cfg.NodeVersionManager = config.VMFnm
 	cfg.IncludesDoc = false
 }
 
@@ -347,14 +344,14 @@ func buildEslintPlan(t *testing.T, mutate func(*config.Config)) *syncdomain.Plan
 func TestIncludesDocFalseSkipsReadme(t *testing.T) {
 	t.Parallel()
 
-	assertNoReadmeManaged(t, buildEslintPlan(t, mutateEslintPnpmFnmNoDocs))
+	assertNoReadmeManaged(t, buildEslintPlan(t, mutateEslintPnpmNoDocs))
 }
 
 // TestIncludesDocTrueIncludesEslintReadme verifies nested eslint pulls README when includes-doc is true.
 func TestIncludesDocTrueIncludesEslintReadme(t *testing.T) {
 	t.Parallel()
 
-	assertEslintReadmeManaged(t, buildEslintPlan(t, mutateEslintPnpmFnm))
+	assertEslintReadmeManaged(t, buildEslintPlan(t, mutateEslintPnpm))
 }
 
 // TestIncludesDocFalseSkipsFixtureDocs verifies go fixture README and docs/ are excluded when includes-doc is false.

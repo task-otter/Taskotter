@@ -14,48 +14,27 @@ import (
 	"github.com/task-otter/Taskotter/internal/shared/consts"
 )
 
-type (
-	pkgMgr = config.PackageManager
-	verMgr = config.VersionManager
-)
+type pkgMgr = config.PackageManager
 
 const (
 	fmtWrapQuoted = "%w %q"
 )
 
-var (
-	errVersionManagerRequired = errors.New("js.version-manager required for package manager")
-	errInvalidPackageManager  = errors.New("invalid package manager")
-)
+var errInvalidPackageManager = errors.New("invalid package manager")
 
 func nodeToolSuffixes() []string {
 	return []string{
-		"node/fnm/npm", "node/fnm/yarn", "node/fnm/pnpm",
-		"node/nvm/npm", "node/nvm/yarn", "node/nvm/pnpm",
+		"node/npm", "node/yarn", "node/pnpm",
 		"bun",
 	}
 }
 
 func stripSuffixes() []string {
 	return []string{
-		"/node/fnm/npm",
-		"/node/fnm/yarn",
-		"/node/fnm/pnpm",
-		"/node/nvm/npm",
-		"/node/nvm/yarn",
-		"/node/nvm/pnpm",
+		"/node/npm",
+		"/node/yarn",
+		"/node/pnpm",
 		"/bun",
-		"/fnm",
-		"/nvm",
-		"-npm-fnm",
-		"-npm-nvm",
-		"-yarn-fnm",
-		"-yarn-nvm",
-		"-pnpm-fnm",
-		"-pnpm-nvm",
-		"-bun",
-		"-fnm",
-		"-nvm",
 	}
 }
 
@@ -77,32 +56,15 @@ func IsNodeToolVariant(moduleName, logicalTask string) bool {
 }
 
 // BuildSourceModule constructs the store module name for a logical task and JS configuration.
-func BuildSourceModule(task string, packageManager pkgMgr, versionManager verMgr) (string, error) {
+func BuildSourceModule(task string, packageManager pkgMgr) (string, error) {
 	switch packageManager {
 	case config.PackageManager(config.JSRuntimeBun):
 		return path.Join(task, string(packageManager)), nil
 	case config.PMNPM, config.PMYarn, config.PMPnpm:
-		module, err := buildNodePackageModule(task, packageManager, versionManager)
-		if err != nil {
-			return consts.Empty, fmt.Errorf("build node package module: %w", err)
-		}
-
-		return module, nil
+		return path.Join(task, "node", string(packageManager)), nil
 	default:
 		return consts.Empty, fmt.Errorf(fmtWrapQuoted, errInvalidPackageManager, packageManager)
 	}
-}
-
-func buildNodePackageModule(task string, pkg pkgMgr, ver verMgr) (string, error) {
-	if ver == consts.Empty {
-		return consts.Empty, fmt.Errorf(
-			fmtWrapQuoted,
-			errVersionManagerRequired,
-			pkg,
-		)
-	}
-
-	return path.Join(task, "node", string(ver), string(pkg)), nil
 }
 
 // StripOneSuffix removes one known suffix from the end of name.

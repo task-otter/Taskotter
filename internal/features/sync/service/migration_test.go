@@ -33,7 +33,7 @@ type (
 func TestPackageManagerSwitchSameDestination(t *testing.T) {
 	t.Parallel()
 
-	mods := []string{"eslint/node/fnm/pnpm", "eslint/node/fnm/npm"}
+	mods := []string{"eslint/node/pnpm", "eslint/node/npm", "eslint/bun"}
 
 	for i := range mods {
 		t.Run(mods[i], func(t *testing.T) {

@@ -29,7 +29,7 @@ type (
 const (
 	taskESLint = "eslint"
 
-	testEslintChain = "eslint/node/fnm/pnpm"
+	testEslintChain = "eslint/node/pnpm"
 )
 
 // TestBuildPRBody verifies the pull request body includes requested and dependency modules.
@@ -98,7 +98,7 @@ func prBodyRequestedModules() map[string]lockmodel.ModuleRecord {
 
 func prBodyDependencyModules() []lockmodel.ModuleRecord {
 	return []lockmodel.ModuleRecord{
-		{SourceModule: "pnpm/fnm", DestinationModule: "pnpm", Path: "taskfiles/pnpm"},
+		{SourceModule: "pnpm", DestinationModule: "pnpm", Path: "taskfiles/pnpm"},
 	}
 }
 
@@ -135,7 +135,6 @@ func emptyPRBodyLockConfiguration() lockmodel.LockConfiguration {
 	return lockmodel.LockConfiguration{
 		TargetFolder:       consts.Empty,
 		NodePackageManager: consts.Empty,
-		NodeVersionManager: consts.Empty,
 		Tasks:              nil,
 		IncludesDoc:        false,
 		SyncRoot:           false,
@@ -157,7 +156,6 @@ func prBodyConfig() *config.Config {
 		Tasks:              []string{taskESLint},
 		JSRuntime:          config.JSRuntimeNodeJS,
 		NodePackageManager: config.PMPnpm,
-		NodeVersionManager: config.VMFnm,
 		IncludesDoc:        true,
 		SyncRoot:           true,
 		FailOnChanges:      false,

@@ -44,8 +44,6 @@ const (
 
 	testStoreVersionTag = "v1.2.3"
 
-	fmtWantFnm = "NodeVersionManager = %q, want fnm"
-
 	fmtTasksWant = "Tasks = %#v, want %#v"
 
 	fmtBaseBranchWant = "BaseBranch = %q, want %s"
@@ -67,7 +65,7 @@ func targetFolderCases() []targetFolderCase {
 	}
 }
 
-// TestBunWithVersionManagerRejected verifies bun runtime with a version-manager fails validation.
+// TestBunWithVersionManagerRejected verifies the removed version-manager key fails validation.
 //
 //nolint:paralleltest // LoadFromEnv uses t.Setenv; cannot run in parallel
 func TestBunWithVersionManagerRejected(t *testing.T) {
@@ -241,7 +239,7 @@ func TestLoadFromEnvDockerInputEnvNames(t *testing.T) {
 
 	env[consts.InputGithubToken] = consts.Empty
 	env["INPUT_GITHUB-TOKEN"] = testDockerAuth
-	env[consts.InputJS] = "runtime: nodejs\npackage-manager: pnpm\nversion-manager: fnm\n"
+	env[consts.InputJS] = "runtime: nodejs\npackage-manager: pnpm\n"
 	env["INPUT_INCLUDES-DOC"] = testFalseValue
 	env["INPUT_SYNC-ROOT"] = testFalseValue
 	env["INPUT_TARGET-FOLDER"] = testCustomTaskfiles
@@ -517,10 +515,6 @@ func assertDockerJSSettings(t *testing.T, cfg *config.Config) {
 
 	if cfg.NodePackageManager != config.PMPnpm {
 		t.Fatalf("NodePackageManager = %q, want pnpm", cfg.NodePackageManager)
-	}
-
-	if cfg.NodeVersionManager != config.VMFnm {
-		t.Fatalf(fmtWantFnm, cfg.NodeVersionManager)
 	}
 
 	if cfg.IncludesDoc {

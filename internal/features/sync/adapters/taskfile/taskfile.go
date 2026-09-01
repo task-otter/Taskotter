@@ -203,7 +203,7 @@ func (e *RewriteError) Error() string {
 
 // RewriteIncludes updates include taskfile paths using sourceToDest mappings.
 // fromDest is the destination module directory of the Taskfile being rewritten
-// (for example "eslint" or "internal/skipfiles"), used to recompute relative
+// (for example "eslint" or "eslint/node"), used to recompute relative
 // include paths after destination normalization.
 //
 // Only include path scalars are edited in the original bytes; all other YAML
@@ -881,7 +881,7 @@ func destinationIncludePath(fromDest, dest, original string) string {
 }
 
 // splitRelativePrefix separates the leading ./ or ../ segments from the module
-// directory. Namespaced modules such as internal/skipfiles keep their slash in
+// directory. Slashed variant modules such as eslint/node keep their slash in
 // the returned directory so it can be matched against source module names, and
 // they sit one level deeper, so their siblings are reached through ../../.
 func splitRelativePrefix(dir string) (prefix, moduleDir string) {

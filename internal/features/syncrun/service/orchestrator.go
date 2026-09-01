@@ -736,7 +736,6 @@ func (orch *Orchestrator) resolveAllModules(cfg *config.Config, snap *snapInfo) 
 		Tasks:          cfg.Tasks,
 		Catalog:        snap.Catalog,
 		PackageManager: cfg.NodePackageManager,
-		VersionManager: cfg.NodeVersionManager,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("resolve modules: %w", err)

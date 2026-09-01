@@ -929,7 +929,6 @@ func setLockConfiguration(lock *syncLock, cfg *config.Config) {
 	lock.Configuration.TargetFolder = cfg.TargetFolder
 	lock.Configuration.Tasks = append([]string{}, cfg.Tasks...)
 	lock.Configuration.NodePackageManager = string(cfg.NodePackageManager)
-	lock.Configuration.NodeVersionManager = string(cfg.NodeVersionManager)
 	lock.Configuration.IncludesDoc = cfg.IncludesDoc
 	lock.Configuration.SyncRoot = cfg.SyncRoot
 }

@@ -2,7 +2,7 @@
 version: "3"
 includes:
   pnpm:
-    taskfile: ../../../../pnpm/fnm/Taskfile.yml
+    taskfile: ../../../pnpm/Taskfile.yml
 vars:
   NODE_VERSION: "24"
 tasks:

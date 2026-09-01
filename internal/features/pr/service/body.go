@@ -82,7 +82,6 @@ func writeJSRuntimeMetadata(body *strings.Builder, cfg *config.Config) {
 	}
 
 	builderPrintf(body, "- Package manager: `%s`\n", cfg.NodePackageManager)
-	builderPrintf(body, "- Version manager: `%s`\n", cfg.NodeVersionManager)
 }
 
 func writeRequestedModulesSection(

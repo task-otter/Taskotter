@@ -20,27 +20,23 @@ type (
 		task           string
 		cat            map[string]struct{}
 		packageManager config.PackageManager
-		versionManager config.VersionManager
 	}
 
 	nodeVariantExpect struct {
 		cat            map[string]struct{}
 		packageManager config.PackageManager
-		versionManager config.VersionManager
 		want           string
 	}
 
 	nodeConfigErrorCase struct {
 		name    string
 		pm      config.PackageManager
-		vm      config.VersionManager
 		wantMsg string
 		catalog []string
 	}
 
 	nodeVariantWant struct {
 		pm   config.PackageManager
-		vm   config.VersionManager
 		want string
 	}
 )
@@ -48,15 +44,9 @@ type (
 const (
 	taskPrettier = "prettier"
 
-	moduleEslintFnmNpm = "eslint/node/fnm/npm"
+	moduleEslintNpm = "eslint/node/npm"
 
-	moduleEslintNvmNpm = "eslint/node/nvm/npm"
-
-	moduleEslintFnmYarn = "eslint/node/fnm/yarn"
-
-	moduleEslintNvmYarn = "eslint/node/nvm/yarn"
-
-	moduleEslintNvmPnpm = "eslint/node/nvm/pnpm"
+	moduleEslintYarn = "eslint/node/yarn"
 
 	errExpected = "expected error"
 )
@@ -67,15 +57,7 @@ func nodeConfigurationErrorCases() []nodeConfigErrorCase {
 			name:    "requires package manager",
 			catalog: []string{srcESLintBun},
 			pm:      consts.Empty,
-			vm:      consts.Empty,
 			wantMsg: "requires js configuration",
-		},
-		{
-			name:    "requires version manager",
-			catalog: []string{moduleEslintFnmNpm},
-			pm:      config.PMNPM,
-			vm:      consts.Empty,
-			wantMsg: "js.version-manager required",
 		},
 	}
 }
@@ -88,9 +70,8 @@ func TestMissingTaskCloseMatches(t *testing.T) {
 		t,
 		resolveInput(&resolveInputParams{
 			task:           "eslit",
-			cat:            catalog(srcESLintBun, moduleEslintFnmNpm),
+			cat:            catalog(srcESLintBun, moduleEslintNpm),
 			packageManager: config.PackageManager(config.JSRuntimeBun),
-			versionManager: consts.Empty,
 		}),
 	)
 	if err == nil {
@@ -110,7 +91,6 @@ func TestMissingTaskWithoutCloseMatches(t *testing.T) {
 			task:           "zzz",
 			cat:            catalog(consts.Go),
 			packageManager: consts.Empty,
-			versionManager: consts.Empty,
 		}),
 	)
 	if err == nil {
@@ -130,16 +110,15 @@ func TestNodeAttemptedSourceMissing(t *testing.T) {
 		t,
 		resolveInput(&resolveInputParams{
 			task:           taskESLint,
-			cat:            catalog(moduleEslintFnmNpm),
+			cat:            catalog(moduleEslintNpm),
 			packageManager: config.PMPnpm,
-			versionManager: config.VMFnm,
 		}),
 	)
 	if err == nil {
 		t.Fatal("expected missing attempted source error")
 	}
 
-	if !strings.Contains(err.Error(), `attempted source module "eslint/node/fnm/pnpm"`) {
+	if !strings.Contains(err.Error(), `attempted source module "eslint/node/pnpm"`) {
 		t.Fatalf(fmtUnexpectedErr, err)
 	}
 }
@@ -152,7 +131,6 @@ func TestResolveAll(t *testing.T) {
 		Tasks:          []string{consts.Go, taskPrettier},
 		Catalog:        catalog(consts.Go, taskPrettier),
 		PackageManager: consts.Empty,
-		VersionManager: consts.Empty,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -171,7 +149,6 @@ func TestResolveAllStopsOnError(t *testing.T) {
 		Tasks:          []string{consts.Go, missingModule},
 		Catalog:        catalog(consts.Go),
 		PackageManager: consts.Empty,
-		VersionManager: consts.Empty,
 	})
 	iox.Discard(resolutions)
 
@@ -188,9 +165,8 @@ func TestResolveInvalidPackageManager(t *testing.T) {
 		t,
 		resolveInput(&resolveInputParams{
 			task:           taskESLint,
-			cat:            catalog(moduleEslintFnmNpm),
+			cat:            catalog(moduleEslintNpm),
 			packageManager: config.PackageManager(pkgDeno),
-			versionManager: consts.Empty,
 		}),
 	)
 	if err == nil {
@@ -214,7 +190,7 @@ func TestResolveNodeConfigurationErrors(t *testing.T) {
 	}
 }
 
-// TestResolveNodeVariants verifies node tasks resolve to the module matching the package/version manager.
+// TestResolveNodeVariants verifies node tasks resolve to the module matching the package manager.
 func TestResolveNodeVariants(t *testing.T) {
 	t.Parallel()
 	runNodeVariantCases(t, nodeVariantCatalog())
@@ -229,7 +205,6 @@ func TestResolveNonNodeTask(t *testing.T) {
 			task:           consts.Go,
 			cat:            catalog(consts.Go),
 			packageManager: consts.Empty,
-			versionManager: consts.Empty,
 		}),
 	)
 	if err != nil {
@@ -269,7 +244,6 @@ func assertNodeConfigurationError(t *testing.T, testCase *nodeConfigErrorCase) {
 		task:           taskESLint,
 		cat:            catalog(testCase.catalog...),
 		packageManager: testCase.pm,
-		versionManager: testCase.vm,
 	}))
 	if err == nil {
 		t.Fatal(errExpected)
@@ -287,7 +261,6 @@ func assertNodeVariantResolved(t *testing.T, expect *nodeVariantExpect) {
 		task:           taskESLint,
 		cat:            expect.cat,
 		packageManager: expect.packageManager,
-		versionManager: expect.versionManager,
 	}))
 	if err != nil {
 		t.Fatal(err)
@@ -311,22 +284,19 @@ func catalog(names ...string) map[string]struct{} {
 func nodeVariantCatalog() map[string]struct{} {
 	return catalog(
 		taskESLint,
-		moduleEslintFnmNpm, moduleEslintNvmNpm,
-		moduleEslintFnmYarn, moduleEslintNvmYarn,
-		srcESLintFnmPnpm, moduleEslintNvmPnpm,
+		moduleEslintNpm,
+		moduleEslintYarn,
+		srcESLintPnpm,
 		srcESLintBun,
 	)
 }
 
 func nodeVariantWantRows() []nodeVariantWant {
 	return []nodeVariantWant{
-		{config.PMNPM, config.VMFnm, moduleEslintFnmNpm},
-		{config.PMNPM, config.VMNvm, moduleEslintNvmNpm},
-		{config.PMYarn, config.VMFnm, moduleEslintFnmYarn},
-		{config.PMYarn, config.VMNvm, moduleEslintNvmYarn},
-		{config.PMPnpm, config.VMFnm, srcESLintFnmPnpm},
-		{config.PMPnpm, config.VMNvm, moduleEslintNvmPnpm},
-		{config.PackageManager(config.JSRuntimeBun), "", srcESLintBun},
+		{config.PMNPM, moduleEslintNpm},
+		{config.PMYarn, moduleEslintYarn},
+		{config.PMPnpm, srcESLintPnpm},
+		{config.PackageManager(config.JSRuntimeBun), srcESLintBun},
 	}
 }
 
@@ -348,7 +318,6 @@ func resolveInput(p *resolveInputParams) *service.ResolveInput {
 		Task:           p.task,
 		Catalog:        p.cat,
 		PackageManager: p.packageManager,
-		VersionManager: p.versionManager,
 	}
 }
 
@@ -362,7 +331,6 @@ func runNodeVariantCases(t *testing.T, cat map[string]struct{}) {
 		assertNodeVariantResolved(t, &nodeVariantExpect{
 			cat:            cat,
 			packageManager: row.pm,
-			versionManager: row.vm,
 			want:           row.want,
 		})
 	}

@@ -13,10 +13,10 @@ Sync pull requests target the branch that invoked TaskOtter. For pull-request wo
 ## Features
 
 - Validates all inputs before modifying files
-- Resolves logical task names to store variants (`eslint` + `pnpm` + `fnm` → `eslint/node/fnm/pnpm`)
-- Recursively resolves dependencies from `.deps.yml`, including namespaced support modules (`internal/skipfiles` → `taskfiles/internal/skipfiles`)
+- Resolves logical task names to store variants (`eslint` + `pnpm` → `eslint/node/pnpm`)
+- Recursively resolves dependencies from `.deps.yml`, including slashed variant modules (`eslint/node/pnpm` → `taskfiles/eslint/node/pnpm`)
 - Supports latest default branch or a pinned store Git tag
-- Normalizes destination directories (`eslint/node/fnm/pnpm` → `taskfiles/eslint`)
+- Normalizes destination directories (`eslint/node/pnpm` → `taskfiles/eslint`)
 - Rewrites internal Taskfile dependency includes to normalized paths
 - Tracks managed files in `<target-folder>/.taskotter-lock.yml`
 - Creates or updates a deterministic PR branch `taskotter/sync-<configuration-hash>`
@@ -51,13 +51,15 @@ Optional YAML block for resolving Node.js task variants. Omit when syncing non-N
 |-------|------|---------|----------------|
 | `runtime` | always | `nodejs` | `nodejs`, `bun` |
 | `package-manager` | `runtime: nodejs` | `npm` | `npm`, `yarn`, `pnpm` |
-| `version-manager` | `runtime: nodejs` | `fnm` | `fnm`, `nvm` |
+
+`version-manager` was removed: the store no longer publishes `fnm` or `nvm` variants, so
+the field had no effect on module resolution. Supplying it is a validation error — delete
+the key from your workflow.
 
 ```yaml
 js: |
   runtime: nodejs
   package-manager: pnpm
-  version-manager: fnm
 ```
 
 ```yaml
@@ -116,7 +118,6 @@ jobs:
           js: |
             runtime: nodejs
             package-manager: pnpm
-            version-manager: fnm
           includes-doc: true
           target-folder: taskfiles
 ```
@@ -169,7 +170,6 @@ jobs:
     js: |
       runtime: nodejs
       package-manager: pnpm
-      version-manager: fnm
 ```
 
 ### Bun runtime
@@ -213,18 +213,18 @@ When synced modules share exported task names in store metadata, TaskOtter also 
 
 - Non-Node tasks (`go`, `docker`, `shellcheck`, …) resolve directly by name
 - Node tasks require the `js` input
-- `runtime: nodejs` uses `package-manager` (default `npm`) and `version-manager` (default `fnm`)
-- `runtime: bun` ignores `package-manager` and `version-manager`
+- `runtime: nodejs` uses `package-manager` (default `npm`)
+- `runtime: bun` ignores `package-manager`
 
 ### Destination layout
 
 Modules copy to `<target-folder>/<normalized-name>/`:
 
 ```text
-taskfiles/eslint/Taskfile.yml      ← eslint/node/fnm/pnpm
-taskfiles/pnpm/Taskfile.yml        ← pnpm/fnm
-taskfiles/corepack/Taskfile.yml    ← corepack/fnm
-taskfiles/fnm/Taskfile.yml         ← fnm
+taskfiles/eslint/Taskfile.yml      ← eslint/node/pnpm
+taskfiles/pnpm/Taskfile.yml        ← pnpm
+taskfiles/nodejs/Taskfile.yml      ← nodejs
+taskfiles/nix/Taskfile.yml         ← nix
 ```
 
 ### Lock file and metadata
@@ -245,9 +245,9 @@ taskfiles/fnm/Taskfile.yml         ← fnm
 |-----------|--------|
 | Empty or invalid task names | Fail before download |
 | Missing store task or variant | Fail with close matches |
-| Bun + version manager | Fail |
-| npm/yarn/pnpm without version manager | Fail |
+| Any use of the removed `js.version-manager` | Fail |
 | Node task without package manager | Fail |
+| Store module with an unrecognized `metadata.yml` schema | Fail |
 | Invalid or unsafe `store-version` | Fail |
 | Unsafe `target-folder` | Fail |
 | Missing root `Taskfile.yml` with `sync-root: true` | Create minimal root Taskfile and include in PR |

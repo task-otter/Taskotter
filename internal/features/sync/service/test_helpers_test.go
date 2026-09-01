@@ -145,7 +145,7 @@ func resolveGoModule(t *testing.T, snap *storedomain.Snapshot) resolvesvc.Resolu
 
 	return mustResolveTask(t, &resolvesvc.ResolveInput{
 		Task: consts.Go, Catalog: snap.Catalog,
-		PackageManager: consts.Empty, VersionManager: consts.Empty,
+		PackageManager: consts.Empty,
 	})
 }
 
@@ -192,7 +192,7 @@ func resolveAllModules(input *moduleTestInput) []resolvesvc.Resolution {
 
 	resolutions, err := resolvesvc.ResolveAll(&resolvesvc.ResolveAllInput{
 		Tasks: input.cfg.Tasks, Catalog: input.snap.Catalog,
-		PackageManager: input.cfg.NodePackageManager, VersionManager: input.cfg.NodeVersionManager,
+		PackageManager: input.cfg.NodePackageManager,
 	})
 	fatalOnErr(input.t, err)
 
@@ -224,7 +224,6 @@ func defaultTestConfig(workspace string) *config.Config {
 		Tasks:              nil,
 		JSRuntime:          consts.Empty,
 		NodePackageManager: consts.Empty,
-		NodeVersionManager: consts.Empty,
 		IncludesDoc:        false,
 		SyncRoot:           true,
 		FailOnChanges:      false,

@@ -74,9 +74,11 @@ const (
 
 	errExpectedDownloadSnapshot = "expected DownloadSnapshot error"
 
-	testInternalSkipfiles = "internal/skipfiles"
+	testESLintNodePnpm = "eslint/node/pnpm"
 
-	testInternalNamespace = "internal"
+	testGoDocsDir = "go/docs"
+
+	testGoDocsNestedDir = "go/docs/nested"
 
 	testToken = "token"
 )
@@ -342,21 +344,22 @@ func assertFixtureCatalog(t *testing.T, snap *github.Snapshot, root string) {
 		t.Fatal("expected go module in catalog")
 	}
 
-	if len(snap.Deps["eslint/node/fnm/pnpm"]) != consts.IndexOne {
-		t.Fatalf("unexpected deps: %#v", snap.Deps["eslint/node/fnm/pnpm"])
+	if len(snap.Deps[testESLintNodePnpm]) != consts.IndexOne {
+		t.Fatalf("unexpected deps: %#v", snap.Deps[testESLintNodePnpm])
 	}
 
-	assertFixtureNamespacedModule(t, snap, root)
+	assertFixtureVariantModule(t, snap, root)
 }
 
-// assertFixtureNamespacedModule checks that internal/ (which has no Taskfile.yml
-// of its own) is treated as a namespace, so only its namespaced children are
-// cataloged as modules, and the namespace itself is not.
-func assertFixtureNamespacedModule(t *testing.T, snap *github.Snapshot, root string) {
+// assertFixtureVariantModule checks that a module's subdirectories are cataloged
+// as slashed variant modules, while a directory without a Taskfile.yml is neither
+// cataloged nor descended into: it can no longer act as a namespace prefix.
+func assertFixtureVariantModule(t *testing.T, snap *github.Snapshot, root string) {
 	t.Helper()
 
-	assertCatalogHasModule(t, snap, testInternalSkipfiles)
-	assertCatalogMissingModule(t, snap, testInternalNamespace)
+	assertCatalogHasModule(t, snap, testESLintNodePnpm)
+	assertCatalogMissingModule(t, snap, testGoDocsDir)
+	assertCatalogMissingModule(t, snap, testGoDocsNestedDir)
 	assertModuleDir(t, snap, root)
 }
 
@@ -367,7 +370,7 @@ func assertCatalogHasModule(t *testing.T, snap *github.Snapshot, module string) 
 	iox.Discard(entry)
 
 	if !ok {
-		t.Fatalf("expected namespaced module in catalog: %#v", snap.Catalog)
+		t.Fatalf("expected variant module in catalog: %#v", snap.Catalog)
 	}
 }
 
@@ -378,17 +381,17 @@ func assertCatalogMissingModule(t *testing.T, snap *github.Snapshot, module stri
 	iox.Discard(entry)
 
 	if ok {
-		t.Fatal("namespace directory must not be cataloged as a module")
+		t.Fatalf("directory without a Taskfile.yml must not be cataloged: %q", module)
 	}
 }
 
 func assertModuleDir(t *testing.T, snap *github.Snapshot, root string) {
 	t.Helper()
 
-	wantDir := filepath.Join(root, "taskfiles", "internal", "skipfiles")
+	wantDir := filepath.Join(root, "taskfiles", "eslint", "node", "pnpm")
 
-	if snap.ModuleDir(testInternalSkipfiles) != wantDir {
-		t.Fatalf("unexpected module dir: %s", snap.ModuleDir(testInternalSkipfiles))
+	if snap.ModuleDir(testESLintNodePnpm) != wantDir {
+		t.Fatalf("unexpected module dir: %s", snap.ModuleDir(testESLintNodePnpm))
 	}
 }
 

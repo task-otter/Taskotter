@@ -18,7 +18,8 @@ import (
 
 const (
 	parentDocTool       = "tool"
-	parentDocLeaf       = "tool/node/fnm/pnpm"
+	parentDocNode       = "tool/node"
+	parentDocLeaf       = "tool/node/pnpm"
 	parentDocRootReadme = "root-readme\n"
 	parentDocLeafReadme = "leaf-readme\n"
 )
@@ -35,6 +36,13 @@ func writeNestedDocsStore(t *testing.T) string {
 	})
 	writeModuleFile(&moduleFileInput{
 		t: t, dir: toolDir, rel: testReadmeName, content: parentDocRootReadme,
+	})
+
+	// Every directory on the way to a variant leaf is itself a module, so the
+	// intermediate node directory needs its own Taskfile.yml to be walked.
+	nodeDir := filepath.Join(root, config.DefaultTargetFolder, parentDocNode)
+	writeModuleFile(&moduleFileInput{
+		t: t, dir: nodeDir, rel: testTaskfileName, content: testEmptyTaskfileYAML,
 	})
 
 	leafDir := filepath.Join(root, config.DefaultTargetFolder, parentDocLeaf)

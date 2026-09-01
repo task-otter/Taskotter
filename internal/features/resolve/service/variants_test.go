@@ -16,7 +16,6 @@ type (
 	buildSourceModuleCase struct {
 		task   string
 		pkgMgr config.PackageManager
-		vm     config.VersionManager
 		want   string
 	}
 
@@ -41,7 +40,7 @@ const (
 func assertBuildSourceModule(t *testing.T, testCase *buildSourceModuleCase) {
 	t.Helper()
 
-	got, err := service.BuildSourceModule(testCase.task, testCase.pkgMgr, testCase.vm)
+	got, err := service.BuildSourceModule(testCase.task, testCase.pkgMgr)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -54,11 +53,7 @@ func assertBuildSourceModule(t *testing.T, testCase *buildSourceModuleCase) {
 func assertBuildSourceModuleError(t *testing.T, testCase *buildSourceModuleCase) {
 	t.Helper()
 
-	got, err := service.BuildSourceModule(
-		testCase.task,
-		testCase.pkgMgr,
-		testCase.vm,
-	)
+	got, err := service.BuildSourceModule(testCase.task, testCase.pkgMgr)
 	iox.Discard(got)
 
 	if err == nil {
@@ -71,32 +66,29 @@ func TestBuildSourceModule(t *testing.T) {
 	t.Parallel()
 
 	assertBuildSourceModule(t, &buildSourceModuleCase{
-		task: taskESLint, pkgMgr: config.PMPnpm, vm: config.VMFnm, want: srcESLintFnmPnpm,
+		task: taskESLint, pkgMgr: config.PMPnpm, want: srcESLintPnpm,
 	})
 	assertBuildSourceModule(t, &buildSourceModuleCase{
 		task:   taskESLint,
 		pkgMgr: config.PackageManager(config.JSRuntimeBun),
-		vm:     consts.Empty,
-		want:   "eslint/bun",
-	})
-	assertBuildSourceModuleError(t, &buildSourceModuleCase{
-		task: taskESLint, pkgMgr: config.PMPnpm, vm: consts.Empty, want: consts.Empty,
+		want:   srcESLintBun,
 	})
 	assertBuildSourceModuleError(t, &buildSourceModuleCase{
 		task:   taskESLint,
 		pkgMgr: config.PackageManager(pkgDeno),
-		vm:     consts.Empty,
 		want:   consts.Empty,
 	})
 }
 
 func nodeToolVariantCases() []nodeToolVariantCase {
 	return []nodeToolVariantCase{
-		{moduleName: srcESLintFnmPnpm, logicalTask: taskESLint, expected: true},
+		{moduleName: srcESLintPnpm, logicalTask: taskESLint, expected: true},
+		{moduleName: srcESLintBun, logicalTask: taskESLint, expected: true},
 		{moduleName: consts.Go, logicalTask: consts.Go, expected: false},
 		{moduleName: taskESLint, logicalTask: taskESLint, expected: false},
-		{moduleName: "prettier/node/fnm/pnpm", logicalTask: taskESLint, expected: false},
-		{moduleName: "eslint/node/fnm/deno", logicalTask: taskESLint, expected: false},
+		{moduleName: "prettier/node/pnpm", logicalTask: taskESLint, expected: false},
+		{moduleName: "eslint/node/deno", logicalTask: taskESLint, expected: false},
+		{moduleName: "eslint/node/fnm/pnpm", logicalTask: taskESLint, expected: false},
 	}
 }
 
@@ -129,9 +121,10 @@ func TestIsNodeToolVariant(t *testing.T) {
 
 func stripOneSuffixPrimaryCases() []stripOneSuffixCase {
 	return []stripOneSuffixCase{
-		{input: srcESLintFnmPnpm, wantStripped: true, wantResult: taskESLint},
+		{input: srcESLintPnpm, wantStripped: true, wantResult: taskESLint},
+		{input: srcESLintBun, wantStripped: true, wantResult: taskESLint},
 		{input: taskESLint, wantStripped: false, wantResult: taskESLint},
-		{input: "eslint-fnm", wantStripped: true, wantResult: taskESLint},
+		{input: modPnpm, wantStripped: false, wantResult: modPnpm},
 	}
 }
 

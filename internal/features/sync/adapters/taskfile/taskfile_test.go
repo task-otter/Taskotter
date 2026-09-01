@@ -27,15 +27,15 @@ type (
 const (
 	targetFolderTaskfiles = "taskfiles"
 	taskESLint            = "eslint"
-	storeESLintTaskfile   = "../../../../../tests/fixtures/store/taskfiles/eslint/node/fnm/pnpm/Taskfile.yml"
+	storeESLintTaskfile   = "../../../../../tests/fixtures/store/taskfiles/eslint/node/pnpm/Taskfile.yml"
 
 	wantVersion35           = `version: "3.5"`
 	fmtWantVersion35        = "expected root Taskfile version 3.5: %s"
 	pathTaskfilesGoYML      = "taskfiles/go/Taskfile.yml"
 	destPnpm                = "pnpm"
-	srcPnpmFnm              = "pnpm/fnm"
+	srcPnpmNode             = "pnpm"
 	wantPnpmRewrite         = "../pnpm/Taskfile.yml"
-	moduleInternalSkipfiles = "internal/skipfiles"
+	moduleESLintNodeVariant = "eslint/node"
 	moduleJQ                = "jq"
 	srcBunLatest            = "bun-latest"
 	destBun                 = "bun"
@@ -54,19 +54,19 @@ func rewriteIncludesInput() []byte {
 	return []byte(`version: "3"
 includes:
   pnpm:
-    taskfile: ../../../../pnpm/fnm/Taskfile.yml
+    taskfile: ../../../pnpm/Taskfile.yml
 tasks:
   lint:
     cmds:
-      - echo ../../../../pnpm/fnm/Taskfile.yml
+      - echo ../../../pnpm/Taskfile.yml
 `)
 }
 
 func rewriteNamespacedInput() []byte {
 	return []byte(`version: "3"
 includes:
-  skipfiles:
-    taskfile: ../internal/skipfiles/Taskfile.yml
+  eslintnode:
+    taskfile: ../eslint/node/Taskfile.yml
   bun:
     taskfile: ../bun-latest/Taskfile.yml
   sibling:
@@ -163,7 +163,7 @@ func goOnlyRootInput() *rootupd.RootUpdateInput {
 
 func rewriteNamespacedSourceToDest() map[string]string {
 	return map[string]string{
-		moduleInternalSkipfiles: moduleInternalSkipfiles,
+		moduleESLintNodeVariant: moduleESLintNodeVariant,
 		srcBunLatest:            destBun,
 		moduleJQ:                moduleJQ,
 	}
@@ -176,7 +176,7 @@ func assertRewriteIncludesOutput(t *testing.T, text string) {
 		t.Fatalf("include not rewritten: %s", text)
 	}
 
-	if !strings.Contains(text, "../../../../pnpm/fnm/Taskfile.yml") {
+	if !strings.Contains(text, "../../../pnpm/Taskfile.yml") {
 		t.Fatalf("command string should remain unchanged: %s", text)
 	}
 }
@@ -187,7 +187,7 @@ func TestRewriteIncludes(t *testing.T) {
 
 	out, err := taskfile.RewriteIncludes(
 		rewriteIncludesInput(),
-		map[string]string{srcPnpmFnm: destPnpm},
+		map[string]string{srcPnpmNode: destPnpm},
 		taskESLint,
 	)
 	if err != nil {
@@ -197,14 +197,14 @@ func TestRewriteIncludes(t *testing.T) {
 	assertRewriteIncludesOutput(t, string(out))
 }
 
-// TestRewriteIncludesNamespacedModule verifies namespaced and unmapped includes rewrite correctly.
+// TestRewriteIncludesNamespacedModule verifies slashed variant and unmapped includes rewrite correctly.
 func TestRewriteIncludesNamespacedModule(t *testing.T) {
 	t.Parallel()
 
 	out, err := taskfile.RewriteIncludes(
 		rewriteNamespacedInput(),
 		rewriteNamespacedSourceToDest(),
-		moduleInternalSkipfiles,
+		moduleESLintNodeVariant,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -232,7 +232,7 @@ func TestRewriteIncludesFlatDestination(t *testing.T) {
 	}
 
 	assertRewriteOutput(t, string(out), []string{
-		"../internal/skipfiles/Taskfile.yml",
+		"taskfile: node/Taskfile.yml",
 		"../bun/Taskfile.yml",
 		"../jq/Taskfile.yml",
 		pathUnknownTaskfile,
@@ -253,7 +253,7 @@ func rewriteIncludesFoldedInput() []byte {
 	return []byte(`version: "3"
 includes:
   pnpm:
-    taskfile: ../../../../pnpm/fnm/Taskfile.yml
+    taskfile: ../../../pnpm/Taskfile.yml
 tasks:
   lint:
     cmds:
@@ -266,7 +266,7 @@ tasks:
 func wantFoldedIncludeRewrite(input []byte) []byte {
 	return bytes.Replace(
 		input,
-		[]byte("taskfile: ../../../../pnpm/fnm/Taskfile.yml"),
+		[]byte("taskfile: ../../../pnpm/Taskfile.yml"),
 		[]byte("taskfile: "+wantPnpmRewrite),
 		consts.IndexOne,
 	)
@@ -294,7 +294,7 @@ func TestRewriteIncludesPreservesFoldedBlock(t *testing.T) {
 	assertRewriteIncludesEqual(t, &rewriteIncludesAssert{
 		input:    input,
 		want:     wantFoldedIncludeRewrite(input),
-		mapping:  map[string]string{srcPnpmFnm: destPnpm},
+		mapping:  map[string]string{srcPnpmNode: destPnpm},
 		fromDest: taskESLint,
 	})
 }
@@ -322,7 +322,7 @@ func TestRewriteIncludesNoopEmptyFromDest(t *testing.T) {
 	assertRewriteIncludesEqual(t, &rewriteIncludesAssert{
 		input:    input,
 		want:     input,
-		mapping:  map[string]string{srcPnpmFnm: destPnpm},
+		mapping:  map[string]string{srcPnpmNode: destPnpm},
 		fromDest: consts.Empty,
 	})
 }
@@ -641,7 +641,7 @@ func TestRewriteUsesRealStoreSnippet(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	out, err := taskfile.RewriteIncludes(data, map[string]string{srcPnpmFnm: destPnpm}, taskESLint)
+	out, err := taskfile.RewriteIncludes(data, map[string]string{srcPnpmNode: destPnpm}, taskESLint)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -13,49 +13,31 @@ import (
 )
 
 const (
-	destCorepack = "corepack"
-	destPnpm     = "pnpm"
-	destNpm      = "npm"
-	destYarn     = "yarn"
-	destNvm      = "nvm"
-	destBun      = "bun"
+	destPnpm = "pnpm"
+	destNpm  = "npm"
+	destYarn = "yarn"
+	destBun  = "bun"
 )
 
 func eslintNormalizeCases() map[string]string {
 	return map[string]string{
-		srcESLintFnmPnpm:       taskESLint,
-		"eslint/node/nvm/pnpm": taskESLint,
-		"eslint/node/fnm/npm":  taskESLint,
-		"eslint/node/nvm/npm":  taskESLint,
-		"eslint/node/fnm/yarn": taskESLint,
-		"eslint/node/nvm/yarn": taskESLint,
-		srcESLintBun:           taskESLint,
-		"eslint-pnpm-fnm":      taskESLint,
-		"eslint-pnpm-nvm":      taskESLint,
-		"eslint-npm-fnm":       taskESLint,
-		"eslint-npm-nvm":       taskESLint,
-		"eslint-yarn-fnm":      taskESLint,
-		"eslint-yarn-nvm":      taskESLint,
-		"eslint-bun":           taskESLint,
+		srcESLintPnpm:       taskESLint,
+		"eslint/node/npm":   taskESLint,
+		"eslint/node/yarn":  taskESLint,
+		srcESLintBun:        taskESLint,
+		"prettier/node/npm": taskPrettier,
 	}
 }
 
+// toolNormalizeCases covers flat store modules, which normalize to themselves
+// now that the store has no version-manager variant directories.
 func toolNormalizeCases() map[string]string {
 	return map[string]string{
-		"pnpm/fnm":     destPnpm,
-		"npm/nvm":      destNpm,
-		"yarn/fnm":     destYarn,
-		"corepack/fnm": destCorepack,
-		"corepack/nvm": destCorepack,
-		"pnpm-fnm":     destPnpm,
-		"npm-nvm":      destNpm,
-		"yarn-fnm":     destYarn,
-		"corepack-fnm": destCorepack,
-		"corepack-nvm": destCorepack,
-		modFnm:         modFnm,
-		destNvm:        destNvm,
-		destBun:        destBun,
-		consts.Go:      consts.Go,
+		destPnpm:  destPnpm,
+		destNpm:   destNpm,
+		destYarn:  destYarn,
+		destBun:   destBun,
+		consts.Go: consts.Go,
 	}
 }
 
@@ -92,7 +74,7 @@ func TestNormalizeExamples(t *testing.T) {
 func TestLongestSuffixFirst(t *testing.T) {
 	t.Parallel()
 
-	got, err := service.Normalize(srcESLintFnmPnpm)
+	got, err := service.Normalize(srcESLintPnpm)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -130,7 +112,7 @@ func TestBuildDestinationMapPropagatesNormalizeError(t *testing.T) {
 func TestDestinationCollision(t *testing.T) {
 	t.Parallel()
 
-	got, err := service.BuildDestinationMap([]string{srcESLintFnmPnpm, srcESLintBun})
+	got, err := service.BuildDestinationMap([]string{srcESLintPnpm, srcESLintBun})
 	iox.Discard(got)
 
 	if err == nil {
@@ -146,14 +128,14 @@ func TestDestinationCollision(t *testing.T) {
 func TestBuildDestinationMapSortsSources(t *testing.T) {
 	t.Parallel()
 
-	mapping, err := service.BuildDestinationMap([]string{consts.Go, srcESLintFnmPnpm})
+	mapping, err := service.BuildDestinationMap([]string{consts.Go, srcESLintPnpm})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	got := service.SortedSources(mapping)
 
-	want := []string{srcESLintFnmPnpm, consts.Go}
+	want := []string{srcESLintPnpm, consts.Go}
 
 	for i := range want {
 		if got[i] != want[i] {

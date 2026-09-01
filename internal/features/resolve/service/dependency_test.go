@@ -12,21 +12,21 @@ import (
 )
 
 const (
-	modPnpmFnm     = "pnpm/fnm"
-	modCorepackFnm = "corepack/fnm"
-	fmtGotWant     = "got %#v, want %#v"
-	nodeA          = "a"
-	nodeB          = "b"
-	nodeC          = "c"
+	modNodejs  = "nodejs"
+	modNix     = "nix"
+	fmtGotWant = "got %#v, want %#v"
+	nodeA      = "a"
+	nodeB      = "b"
+	nodeC      = "c"
 )
 
 func deps() map[string][]string {
 	return map[string][]string{
-		srcESLintFnmPnpm: {modPnpmFnm},
-		modPnpmFnm:       {modCorepackFnm, modFnm},
-		modCorepackFnm:   {modFnm},
-		modFnm:           {},
-		"go":             {},
+		srcESLintPnpm: {modPnpm},
+		modPnpm:       {modNodejs, modNix},
+		modNodejs:     {modNix},
+		modNix:        {},
+		"go":          {},
 	}
 }
 
@@ -34,12 +34,12 @@ func deps() map[string][]string {
 func TestResolveTransitive(t *testing.T) {
 	t.Parallel()
 
-	got, err := service.ResolveTransitive([]string{srcESLintFnmPnpm}, deps())
+	got, err := service.ResolveTransitive([]string{srcESLintPnpm}, deps())
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	want := []string{modCorepackFnm, modFnm, modPnpmFnm}
+	want := []string{modNix, modNodejs, modPnpm}
 
 	if len(got) != len(want) {
 		t.Fatalf(fmtGotWant, got, want)
@@ -56,13 +56,13 @@ func TestResolveTransitive(t *testing.T) {
 func TestDuplicateDependencyDeduped(t *testing.T) {
 	t.Parallel()
 
-	got, err := service.ResolveTransitive([]string{srcESLintFnmPnpm, modPnpmFnm}, deps())
+	got, err := service.ResolveTransitive([]string{srcESLintPnpm, modPnpm}, deps())
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	for i := range got {
-		if got[i] == modPnpmFnm {
+		if got[i] == modPnpm {
 			t.Fatal("requested module should not appear in dependencies")
 		}
 	}
@@ -74,16 +74,16 @@ func TestMissingDependncy(t *testing.T) {
 
 	depMap := deps()
 
-	depMap[srcESLintFnmPnpm] = []string{"missing-mod"}
+	depMap[srcESLintPnpm] = []string{"missing-mod"}
 
-	got, err := service.ResolveTransitive([]string{srcESLintFnmPnpm}, depMap)
+	got, err := service.ResolveTransitive([]string{srcESLintPnpm}, depMap)
 	iox.Discard(got)
 
 	if err == nil {
 		t.Fatal("expected missing dependency error")
 	}
 
-	want := `module "eslint/node/fnm/pnpm" depends on missing module "missing-mod"`
+	want := `module "eslint/node/pnpm" depends on missing module "missing-mod"`
 
 	if !strings.Contains(err.Error(), want) {
 		t.Fatalf(fmtUnexpectedErr, err)

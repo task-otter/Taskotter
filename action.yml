@@ -14,8 +14,9 @@ inputs:
     description: |
       YAML settings for Node.js task resolution.
       runtime: bun | nodejs (default nodejs)
-      When runtime is nodejs: package-manager npm | yarn | pnpm (default npm),
-      version-manager fnm | nvm (default fnm).
+      When runtime is nodejs: package-manager npm | yarn | pnpm (default npm).
+      version-manager has been removed; the store no longer has fnm or nvm
+      variants, and supplying the key is now a validation error.
     required: false
     default: ''
   includes-doc:

@@ -28,7 +28,6 @@ func invalidRepoOrchestratorConfig() *config.Config {
 		Tasks:              nil,
 		JSRuntime:          consts.Empty,
 		NodePackageManager: consts.Empty,
-		NodeVersionManager: consts.Empty,
 		IncludesDoc:        false,
 		SyncRoot:           false,
 		FailOnChanges:      false,

@@ -25,7 +25,6 @@ type (
 	LockConfiguration struct {
 		TargetFolder       string
 		NodePackageManager string
-		NodeVersionManager string
 		Tasks              []string
 		IncludesDoc        bool
 		SyncRoot           bool

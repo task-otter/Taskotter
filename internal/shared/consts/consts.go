@@ -93,10 +93,10 @@ const (
 	Go = "go"
 	// Bun is the bun runtime identifier.
 	Bun = "bun"
-	// NodePkgMgr is the node/fnm/npm variant module identifier.
-	NodePkgMgr = "node/fnm/npm"
-	// NodePkgMgrPnpm is the node/fnm/pnpm variant module identifier.
-	NodePkgMgrPnpm = "node/fnm/pnpm"
+	// NodePkgMgr is the node/npm variant module identifier.
+	NodePkgMgr = "node/npm"
+	// NodePkgMgrPnpm is the node/pnpm variant module identifier.
+	NodePkgMgrPnpm = "node/pnpm"
 	// EslintBun is the eslint/bun variant module identifier.
 	EslintBun = "eslint/bun"
 	// EslintNode is the eslint module identifier.
@@ -117,9 +117,6 @@ const (
 	FilePerm111 = 0o111
 	// FilePerm4755 is the octal file permission including the setuid bit.
 	FilePerm4755 = 0o4755
-
-	// SkipfilesPath is the workspace-relative path to the internal skipfiles list.
-	SkipfilesPath = "internal/skipfiles"
 
 	// FieldRootTaskfile is the root-taskfile config field name.
 	FieldRootTaskfile = "root-taskfile"
@@ -146,6 +143,9 @@ const (
 
 	// JSValidOnlyForNodejs is shared validation message text.
 	JSValidOnlyForNodejs = "is only valid when js.runtime is nodejs"
+	// JSVersionManagerRemoved is the validation message for the removed js.version-manager input.
+	JSVersionManagerRemoved = "has been removed: store modules no longer have " +
+		"fnm or nvm variants; delete this key"
 
 	// HashPrefixLen is the number of hex characters used from the configuration hash.
 	HashPrefixLen = 12

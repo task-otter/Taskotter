@@ -4,6 +4,7 @@
 package service
 
 import (
+	"errors"
 	"fmt"
 	"io/fs"
 	"path"
@@ -28,7 +29,12 @@ type (
 
 const (
 	storeMetadataFileName = "metadata.yml"
+
+	// storeMetadataSchema is the only metadata.yml schema this version understands.
+	storeMetadataSchema = "taskotter.dev/taskfile-metadata/v1"
 )
+
+var errUnsupportedStoreMetadataSchema = errors.New("unsupported metadata.yml schema")
 
 func appendUniqueExportedTask(out []string, seen map[string]struct{}, task string) []string {
 	if task == consts.Empty {
@@ -151,6 +157,13 @@ func readStoreTaskMetadata(abs, module string) (storeTaskMetadata, error) {
 	err = yaml.Unmarshal(data, &meta)
 	if err != nil {
 		return emptyStoreTaskMetadata(), fmt.Errorf("parse metadata for %q: %w", module, err)
+	}
+
+	if meta.Schema != storeMetadataSchema {
+		return emptyStoreTaskMetadata(), fmt.Errorf(
+			"%w %q in %q: expected %q",
+			errUnsupportedStoreMetadataSchema, meta.Schema, module, storeMetadataSchema,
+		)
 	}
 
 	if meta.Module == consts.Empty {

@@ -5,9 +5,9 @@ package service_test
 
 const (
 	taskESLint       = "eslint"
-	srcESLintFnmPnpm = "eslint/node/fnm/pnpm"
+	srcESLintPnpm    = "eslint/node/pnpm"
 	srcESLintBun     = "eslint/bun"
-	modFnm           = "fnm"
+	modPnpm          = "pnpm"
 	fmtGotQ          = "got %q"
 	fmtUnexpectedErr = "unexpected error: %v"
 	missingModule    = "missing"

@@ -25,14 +25,12 @@ type (
 		Task           string
 		Catalog        map[string]struct{}
 		PackageManager config.PackageManager
-		VersionManager config.VersionManager
 	}
 
 	// ResolveAllInput resolves multiple logical tasks against one catalog.
 	ResolveAllInput struct {
 		Catalog        map[string]struct{}
 		PackageManager config.PackageManager
-		VersionManager config.VersionManager
 		Tasks          []string
 	}
 
@@ -40,7 +38,6 @@ type (
 	taskContext struct {
 		catalog        map[string]struct{}
 		packageManager config.PackageManager
-		versionManager config.VersionManager
 	}
 
 	scoredCandidate struct {
@@ -73,7 +70,6 @@ func ResolveAll(input *ResolveAllInput) ([]Resolution, error) {
 			Task:           task,
 			Catalog:        input.Catalog,
 			PackageManager: input.PackageManager,
-			VersionManager: input.VersionManager,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("resolve task %q: %w", task, err)
@@ -90,7 +86,6 @@ func Resolve(input *ResolveInput) (Resolution, error) {
 	taskCtx := taskContext{
 		catalog:        input.Catalog,
 		packageManager: input.PackageManager,
-		versionManager: input.VersionManager,
 	}
 
 	res, err := resolveWithTaskContext(input.Task, &taskCtx)
@@ -142,11 +137,7 @@ func resolveNodeVariant(task string, taskCtx *taskContext) (Resolution, error) {
 		return Resolution{}, nodeVariantMissingJSConfigError(task)
 	}
 
-	attempted, err := BuildSourceModule(
-		task,
-		taskCtx.packageManager,
-		taskCtx.versionManager,
-	)
+	attempted, err := BuildSourceModule(task, taskCtx.packageManager)
 	if err != nil {
 		return Resolution{}, nodeVariantBuildError(task, err)
 	}

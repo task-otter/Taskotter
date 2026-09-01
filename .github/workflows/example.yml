@@ -29,7 +29,6 @@ jobs:
           js: |
             runtime: nodejs
             package-manager: pnpm
-            version-manager: fnm
           includes-doc: true
           target-folder: taskfiles
       - name: Print result

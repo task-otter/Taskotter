@@ -204,29 +204,6 @@ func TestDefaultBranchSymbolicRef(t *testing.T) {
 	assertDefaultBranchMain(t, cloneDir)
 }
 
-func allowedBranchOwnershipCases() []branchOwnershipCase {
-	return []branchOwnershipCase{
-		{
-			name: "new branch",
-			mock: &mockGitOps{
-				branchExists: false,
-				branchErr:    nil,
-				lastMessage:  consts.Empty,
-				messageErr:   nil,
-			},
-		},
-		{
-			name: "taskotter branch",
-			mock: &mockGitOps{
-				branchExists: true,
-				branchErr:    nil,
-				lastMessage:  cli.SyncCommitMessage,
-				messageErr:   nil,
-			},
-		},
-	}
-}
-
 // TestEnsureBranchOwnedAllowsBranch verifies allowed branch ownership cases succeed.
 func TestEnsureBranchOwnedAllowsBranch(t *testing.T) {
 	t.Parallel()
@@ -361,6 +338,29 @@ func TestValidateStagePath(t *testing.T) {
 	assertValidStagePath(t, workspace, "taskfiles/go/Taskfile.yml")
 	assertInvalidStagePath(t, workspace, "../outside")
 	assertInvalidStagePath(t, workspace, "-f")
+}
+
+func allowedBranchOwnershipCases() []branchOwnershipCase {
+	return []branchOwnershipCase{
+		{
+			name: "new branch",
+			mock: &mockGitOps{
+				branchExists: false,
+				branchErr:    nil,
+				lastMessage:  consts.Empty,
+				messageErr:   nil,
+			},
+		},
+		{
+			name: "taskotter branch",
+			mock: &mockGitOps{
+				branchExists: true,
+				branchErr:    nil,
+				lastMessage:  cli.SyncCommitMessage,
+				messageErr:   nil,
+			},
+		},
+	}
 }
 
 func assertDefaultBranchMain(t *testing.T, cloneDir string) {

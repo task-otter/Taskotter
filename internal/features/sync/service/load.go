@@ -210,7 +210,7 @@ func collectMetadataCandidates(workspace, currentMetadataPath string) ([]string,
 		candidates:          &candidates,
 	})
 
-	err := filepath.WalkDir(workspace, walker)
+	err := walkDir(workspace, walker)
 	if err != nil {
 		return nil, fmt.Errorf(errDiscoverPreviousMetadata, err)
 	}
@@ -297,7 +297,7 @@ func metadataFileCandidate(args *metadataCandidateArgs) (string, metadataScanRes
 }
 
 func relMetadataPath(workspace, abs string) (string, error) {
-	rel, err := filepath.Rel(workspace, abs)
+	rel, err := relPath(workspace, abs)
 	if err != nil {
 		return consts.Empty, fmt.Errorf("relative metadata path for %q: %w", abs, err)
 	}

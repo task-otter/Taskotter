@@ -41,6 +41,8 @@ type (
 )
 
 const (
+	errPathOutsideRootMsg = "path resolves outside root"
+
 	fieldTasks         = "tasks"
 	fieldTargetFolder  = "target-folder"
 	fieldPath          = "path"
@@ -61,7 +63,11 @@ var (
 	taskNameRe     = regexp.MustCompile(`^[a-z0-9][a-z0-9-]*$`)
 
 	errPathComponentNotExist = errors.New("path component does not exist")
-	errNotLocalFile          = errors.New("not a local file")
+
+	// absPath resolves a path against the working directory. It is a variable so
+	// tests can exercise the failure branches of the callers below.
+	//nolint:gochecknoglobals // seam so tests can reach the filepath.Abs failure branches
+	absPath = filepath.Abs
 )
 
 // Error implements the error interface, returning the field-prefixed path error message.
@@ -201,7 +207,7 @@ func normalizeAndValidateTargetFolder(raw string) (trimmedOut, normalizedOut str
 }
 
 func resolveEvalWorkspace(workspace string) (string, error) {
-	absWorkspace, err := filepath.Abs(workspace)
+	absWorkspace, err := absPath(workspace)
 	if err != nil {
 		return consts.Empty, fmt.Errorf("resolve workspace: %w", err)
 	}
@@ -290,11 +296,8 @@ func ensureInsideRoot(params *insideRootParams) error {
 	targetAbs := filepath.Join(params.base, filepath.FromSlash(params.normalized))
 
 	rel, err := filepath.Rel(params.base, filepath.Clean(targetAbs))
-	if err != nil {
-		return &PathError{Field: params.field, Value: params.raw, Message: err.Error()}
-	}
 
-	if resolvesOutsideBase(rel) {
+	if err != nil || resolvesOutsideBase(rel) {
 		return &PathError{Field: params.field, Value: params.raw, Message: params.outsideMsg}
 	}
 
@@ -426,7 +429,7 @@ func ValidateRelativePath(root, rel string) (string, error) {
 }
 
 func validateInsideRoot(root, normalized, rel string) error {
-	absRoot, err := filepath.Abs(root)
+	absRoot, err := absPath(root)
 	if err != nil {
 		return fmt.Errorf(errResolveRoot, err)
 	}
@@ -436,7 +439,7 @@ func validateInsideRoot(root, normalized, rel string) error {
 		normalized: normalized,
 		raw:        rel,
 		field:      fieldPath,
-		outsideMsg: "path resolves outside root",
+		outsideMsg: errPathOutsideRootMsg,
 	})
 	if err != nil {
 		return fmt.Errorf("ensure relative path inside root: %w", err)
@@ -501,7 +504,7 @@ func resolveValidatedRoot(root, rel string) (absRoot, safeRel string, err error)
 		return consts.Empty, consts.Empty, fmt.Errorf(errValidateRelativePath, rel, err)
 	}
 
-	absRoot, err = filepath.Abs(root)
+	absRoot, err = absPath(root)
 	if err != nil {
 		return consts.Empty, consts.Empty, fmt.Errorf(errResolveRoot, err)
 	}
@@ -539,33 +542,16 @@ func OpenRelativeFile(root, rel string) (*os.File, error) {
 	return file, nil
 }
 
+// openDirFSFile opens safeRel under absRoot. safeRel has already been validated
+// to stay inside absRoot by resolveValidatedRoot.
 func openDirFSFile(absRoot, safeRel, rel string) (*os.File, error) {
-	opened, err := os.DirFS(absRoot).Open(safeRel)
+	//nolint:gosec // safeRel is validated to resolve inside absRoot before opening
+	file, err := os.Open(filepath.Join(absRoot, filepath.FromSlash(safeRel)))
 	if err != nil {
 		return nil, fmt.Errorf(errFmtOpenFile, rel, err)
 	}
 
-	file, ok := opened.(*os.File)
-
-	if ok {
-		return file, nil
-	}
-
-	err = closeNonLocalFile(opened, rel)
-	if err != nil {
-		return nil, fmt.Errorf("reject non-local file: %w", err)
-	}
-
-	return nil, fmt.Errorf(errFmtOpenFile, rel, errNotLocalFile)
-}
-
-func closeNonLocalFile(opened fs.File, rel string) error {
-	closeErr := opened.Close()
-	if closeErr != nil {
-		return fmt.Errorf("close non-file handle for %q: %w", rel, closeErr)
-	}
-
-	return nil
+	return file, nil
 }
 
 // IsDocPath reports whether rel is documentation copied when includes-doc is enabled.

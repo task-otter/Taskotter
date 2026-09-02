@@ -804,31 +804,15 @@ func parseTaskfileRoot(
 	return doc, docContent, nil
 }
 
-// marshalAndValidate serializes node to YAML and re-parses the result to confirm
-// it is well-formed. marshalErrMsg and validateErrMsg format the respective failures.
-func marshalAndValidate(node *yaml.Node, marshalErrMsg, validateErrMsg string) ([]byte, error) {
+// marshalNode serializes node to YAML. marshalErrMsg formats the failure. The
+// encoder only emits well-formed YAML, so the result needs no re-parse.
+func marshalNode(node *yaml.Node, marshalErrMsg string) ([]byte, error) {
 	out, err := yamlfmt.Marshal(node)
 	if err != nil {
 		return nil, &RewriteError{Message: fmt.Sprintf(marshalErrMsg, err)}
 	}
 
-	err = validateMarshaledYAML(out, validateErrMsg)
-	if err != nil {
-		return nil, fmt.Errorf("validate marshaled yaml: %w", err)
-	}
-
 	return out, nil
-}
-
-func validateMarshaledYAML(out []byte, errMsg string) error {
-	var validateNode yaml.Node
-
-	err := yaml.Unmarshal(out, &validateNode)
-	if err != nil {
-		return &RewriteError{Message: fmt.Sprintf(errMsg, err)}
-	}
-
-	return nil
 }
 
 func rewriteIncludePath(path string, sourceToDest map[string]string, fromDest string) string {
@@ -899,7 +883,7 @@ func splitRelativePrefix(dir string) (prefix, moduleDir string) {
 func stripDotDotSlashes(prefix, dir string) (outPrefix, outDir string) {
 	var prefixSb strings.Builder
 
-	writeErr := iox.BuilderWriteString(&prefixSb, prefix)
+	writeErr := iox.WriteStringFull(&prefixSb, prefix)
 	iox.Discard(writeErr)
 
 	for {
@@ -909,7 +893,7 @@ func stripDotDotSlashes(prefix, dir string) (outPrefix, outDir string) {
 			return finalizeRelativePrefix(prefixSb.String(), dir)
 		}
 
-		writeErr = iox.BuilderWriteString(&prefixSb, dotDotSlash)
+		writeErr = iox.WriteStringFull(&prefixSb, dotDotSlash)
 		iox.Discard(writeErr)
 
 		dir = rest
@@ -1014,11 +998,7 @@ func marshalUpdatedRootTaskfile(node, root *yaml.Node, input *rootUpdateInput) (
 }
 
 func marshalRootTaskfile(node *yaml.Node) ([]byte, error) {
-	out, err := marshalAndValidate(
-		node,
-		"marshal root Taskfile YAML: %v",
-		"validate root Taskfile YAML: %v",
-	)
+	out, err := marshalNode(node, "marshal root Taskfile YAML: %v")
 	if err != nil {
 		return nil, fmt.Errorf(errMarshalAndValidate, err)
 	}
@@ -1592,25 +1572,32 @@ func rootVarReference(key string) *yaml.Node {
 	return yamlScalar("{{." + key + "}}")
 }
 
+// cloneYAMLNode returns a deep copy of node so promoted values can be reused
+// without aliasing the parsed module document.
 func cloneYAMLNode(node *yaml.Node) *yaml.Node {
 	if node == nil {
 		return nil
 	}
 
-	data, err := yaml.Marshal(node)
-	if err != nil {
+	clone := *node
+
+	clone.Content = cloneYAMLNodes(node.Content)
+
+	return &clone
+}
+
+func cloneYAMLNodes(nodes []*yaml.Node) []*yaml.Node {
+	if len(nodes) == consts.IndexZero {
 		return nil
 	}
 
-	var out yaml.Node
+	out := make([]*yaml.Node, consts.IndexZero, len(nodes))
 
-	err = yaml.Unmarshal(data, &out)
-
-	if err != nil || len(out.Content) == consts.IndexZero {
-		return nil
+	for i := range nodes {
+		out = append(out, cloneYAMLNode(nodes[i]))
 	}
 
-	return out.Content[consts.IndexZero]
+	return out
 }
 
 func newIncludeEntry(path, dir string, modVars *yaml.Node) *yaml.Node {

@@ -99,6 +99,7 @@ func IsGitRepo(workspace string) bool {
 func WriteLocalIdentity() {
 	// Commit identity is applied per command via -c; config files are not writable
 	// in GitHub Actions Docker containers.
+	iox.Discard(struct{}{})
 }
 
 func verifyExistingBranchOwned(ctx context.Context, ops BranchChecker, branch string) error {

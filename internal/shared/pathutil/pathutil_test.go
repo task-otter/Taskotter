@@ -298,7 +298,7 @@ func TestValidateTargetFolder(t *testing.T) {
 	}
 
 	if got != testTaskfilesGo {
-		t.Fatalf("ValidateTargetFolder() = %q", got)
+		t.Fatalf(fmtTargetFolder, got)
 	}
 }
 

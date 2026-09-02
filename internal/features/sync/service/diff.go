@@ -18,7 +18,6 @@ import (
 	"github.com/task-otter/Taskotter/internal/shared/consts"
 	"github.com/task-otter/Taskotter/internal/shared/iox"
 	"github.com/task-otter/Taskotter/internal/shared/pathutil"
-	yaml "go.yaml.in/yaml/v3"
 )
 
 const (
@@ -51,7 +50,7 @@ func marshalLockForCompare(lock *syncLock) ([]byte, error) {
 
 	cloned.Source.ResolvedCommit = consts.Empty
 
-	data, err := yaml.Marshal(lockmodel.EncodeLockFile(&cloned))
+	data, err := marshalYAML(lockmodel.EncodeLockFile(&cloned))
 	if err != nil {
 		return nil, fmt.Errorf("marshal lock file for compare: %w", err)
 	}
@@ -394,7 +393,7 @@ func sortedStagePaths(paths map[string]struct{}) []string {
 }
 
 func relativePathExists(workspace, rel string) bool {
-	info, err := os.Stat(pathutil.WorkspacePath(workspace, rel))
+	info, err := statPath(pathutil.WorkspacePath(workspace, rel))
 	iox.Discard(info)
 
 	return err == nil

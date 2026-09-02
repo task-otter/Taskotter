@@ -93,6 +93,8 @@ const (
 
 	storeRepo = "store"
 
+	gitObjectTypeTag = "tag"
+
 	httpClientTimeout = 60 * time.Second
 
 	defaultBaseURL = "https://api.github.com"
@@ -220,12 +222,9 @@ func closeOnArchiveStatusError(resp *http.Response) error {
 		return nil
 	}
 
-	cleanupErr := finalizeArchiveStatusError(resp, err)
-	if cleanupErr != nil {
-		return fmt.Errorf("finalize archive status error: %w", cleanupErr)
-	}
-
-	return fmt.Errorf(fmtArchiveDownloadStatusErr, err)
+	// finalizeArchiveStatusError always reports the status error, joined with any
+	// drain or close failure.
+	return fmt.Errorf("finalize archive status error: %w", finalizeArchiveStatusError(resp, err))
 }
 
 func finalizeArchiveStatusError(resp *http.Response, statusErr error) error {
@@ -573,7 +572,7 @@ func applyResolvedRef(ctx context.Context, req *resolvedRefRequest) error {
 }
 
 func (client *Client) resolveSHA(ctx context.Context, payload *tagRefPayload) (string, error) {
-	if payload.Object.Type != "tag" {
+	if payload.Object.Type != gitObjectTypeTag {
 		return payload.Object.SHA, nil
 	}
 

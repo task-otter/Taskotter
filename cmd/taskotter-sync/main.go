@@ -7,21 +7,39 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"time"
 
 	syncrun "github.com/task-otter/Taskotter/internal/features/syncrun/service"
 	"github.com/task-otter/Taskotter/internal/shared/config"
+	"github.com/task-otter/Taskotter/internal/shared/iox"
+)
+
+type (
+	// orchestrator runs a full sync for a configuration.
+	orchestrator interface {
+		Run(ctx context.Context, cfg *config.Config) (*syncrun.Result, error)
+	}
 )
 
 const (
-	runTimeout  = 15 * time.Minute
-	exitSuccess = 0
-	exitError   = 1
+	runTimeout     = 15 * time.Minute
+	exitSuccess    = 0
+	exitError      = 1
+	errWireOrchFmt = "wire orchestrator: %w"
+)
+
+//nolint:gochecknoglobals // seams so tests can drive main without exiting the test process
+var (
+	exitFunc                   = os.Exit
+	stdout           io.Writer = os.Stdout
+	stderr           io.Writer = os.Stderr
+	wireOrchestrator           = defaultWireOrchestrator
 )
 
 func main() {
-	os.Exit(run())
+	exitFunc(run())
 }
 
 func run() int {
@@ -58,10 +76,20 @@ func loadRunAndWrite(ctx context.Context) (*config.Config, *syncrun.Result, erro
 	return cfg, result, nil
 }
 
-func runOrchestrator(ctx context.Context, cfg *config.Config) (*syncrun.Result, error) {
+//nolint:ireturn,iface // the interface is the seam tests replace
+func defaultWireOrchestrator(ctx context.Context, cfg *config.Config) (orchestrator, error) {
 	orch, err := WireOrchestrator(ctx, cfg)
 	if err != nil {
-		return nil, fmt.Errorf("wire orchestrator: %w", err)
+		return nil, fmt.Errorf(errWireOrchFmt, err)
+	}
+
+	return orch, nil
+}
+
+func runOrchestrator(ctx context.Context, cfg *config.Config) (*syncrun.Result, error) {
+	orch, err := wireOrchestrator(ctx, cfg)
+	if err != nil {
+		return nil, fmt.Errorf(errWireOrchFmt, err)
 	}
 
 	result, err := orch.Run(ctx, cfg)
@@ -90,17 +118,12 @@ func reportResult(cfg *config.Config, result *syncrun.Result) int {
 }
 
 func reportError(err error, prefix string) {
-	n, writeErr := fmt.Fprintf(os.Stderr, "::error::%s%v\n", prefix, err)
-
-	if writeErr != nil || n < exitSuccess {
-		return
-	}
+	iox.FprintfBestEffortf(stderr, "::error::%s%v\n", prefix, err)
 }
 
 func handleChanged(cfg *config.Config, result *syncrun.Result) int {
-	n, writeErr := fmt.Fprintln(os.Stdout, "TaskOtter produced changes.")
-
-	if writeErr != nil || n < exitSuccess {
+	writeErr := iox.Fprintln(stdout, "TaskOtter produced changes.")
+	if writeErr != nil {
 		return exitError
 	}
 
@@ -114,9 +137,8 @@ func handleChanged(cfg *config.Config, result *syncrun.Result) int {
 }
 
 func handleUnchanged(cfg *config.Config, result *syncrun.Result) int {
-	n, writeErr := fmt.Fprintln(os.Stdout, "TaskOtter completed with no changes.")
-
-	if writeErr != nil || n < exitSuccess {
+	writeErr := iox.Fprintln(stdout, "TaskOtter completed with no changes.")
+	if writeErr != nil {
 		return exitError
 	}
 

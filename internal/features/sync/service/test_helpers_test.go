@@ -279,13 +279,8 @@ func writeLockFile(input *lockWriteInput) {
 	lock.Configuration.TargetFolder = input.targetFolder
 	lock.ManagedFiles = input.files
 
-	data, err := syncsvc.MarshalLock(&lock)
-	if err != nil {
-		input.t.Fatal(err)
-	}
-
 	lockPath := filepath.Join(input.workspace, input.targetFolder, testLockFileName)
-	writeFileWithDir(input.t, lockPath, data)
+	writeFileWithDir(input.t, lockPath, syncsvc.MarshalLock(&lock))
 }
 
 func writeMinimalLock(input *lockWriteInput) {

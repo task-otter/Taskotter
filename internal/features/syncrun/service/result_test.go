@@ -50,6 +50,13 @@ func TestReportSyncRequiredWithPullRequest(t *testing.T) {
 	assertContains(t, got, "::notice title=What happened::")
 }
 
+// TestReportSyncRequiredWritesToStderr verifies the stderr wrapper emits annotations.
+func TestReportSyncRequiredWritesToStderr(t *testing.T) {
+	t.Parallel()
+
+	service.ReportSyncRequired(changedResult())
+}
+
 // TestReportSyncRequiredWithUnknownPullRequestNumber verifies an unknown PR number falls back gracefully.
 func TestReportSyncRequiredWithUnknownPullRequestNumber(t *testing.T) {
 	t.Parallel()
@@ -72,6 +79,38 @@ func TestReportSyncRequiredWithoutPullRequest(t *testing.T) {
 
 	service.ReportSyncRequiredTo(&out, changedResult())
 	assertContains(t, out.String(), "did not return a pull request URL")
+}
+
+// TestReportSyncUpToDateWritesNotice verifies the up-to-date notice path runs.
+func TestReportSyncUpToDateWritesNotice(t *testing.T) {
+	t.Parallel()
+
+	result := emptyResult()
+
+	result.SourceSHA = testSourceSHA
+	service.ReportSyncUpToDate(result)
+}
+
+// TestResolvedTaskMarshalJSON verifies resolved tasks encode with snake_case keys.
+func TestResolvedTaskMarshalJSON(t *testing.T) {
+	t.Parallel()
+
+	task := &service.ResolvedTask{
+		SourceModule:      "eslint/node/pnpm",
+		DestinationModule: "eslint",
+		Path:              "taskfiles/eslint",
+	}
+
+	data, err := task.MarshalJSON()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assertContainsAll(t, string(data), []string{
+		`"source_module":"eslint/node/pnpm"`,
+		`"destination_module":"eslint"`,
+		`"path":"taskfiles/eslint"`,
+	})
 }
 
 // TestSyncRequired verifies changed results require sync and unchanged ones do not.
@@ -104,9 +143,19 @@ func TestWriteActionOutputsToFile(t *testing.T) {
 
 	assertContainsAll(t, data, []string{
 		"changed=true\n",
-		"source-sha=abc123\n",
+		"source-sha=" + testSourceSHA + "\n",
 		"pull-request-number=42\n",
 	})
+}
+
+// TestWriteActionOutputsToStdout verifies empty GitHubOutput prints key/value pairs.
+func TestWriteActionOutputsToStdout(t *testing.T) {
+	t.Parallel()
+
+	err := service.WriteActionOutputs(emptyConfig(), newResultWithOutputs())
+	if err != nil {
+		t.Fatal(err)
+	}
 }
 
 // TestWriteActionOutputsWrapsFileError verifies a missing output path returns a wrapped error.
@@ -201,10 +250,10 @@ func newResultWithOutputs() *service.Result {
 		Changed:              true,
 		StoreVersion:         "v1.2.3",
 		SourceRef:            "refs/tags/v1.2.3",
-		SourceSHA:            "abc123",
+		SourceSHA:            testSourceSHA,
 		TargetFolder:         testTargetFolder,
 		ResolvedTasksJSON:    "{}",
-		ResolvedDependencies: "[]",
+		ResolvedDependencies: emptyJSONArray,
 		PullRequestNumber:    testPRNumber42,
 		PullRequestURL:       testPullRequestURL,
 		Plan:                 nil,

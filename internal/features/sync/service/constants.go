@@ -8,12 +8,10 @@ const (
 	fileModeRegular  = 0o644
 	dirModePerm      = 0o755
 
+	stagingTempPattern = ".taskotter-*"
+
 	errFmtReadQuoted  = "read %q: %w"
 	errFmtWriteQuoted = "write %q: %w"
 
 	errDiscoverPreviousMetadata = "discover previous metadata: %w"
-
-	errMarshalLockFile = "marshal lock file: %w"
-
-	errMarshalMetadata = "marshal metadata: %w"
 )

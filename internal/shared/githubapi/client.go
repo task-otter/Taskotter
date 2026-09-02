@@ -84,6 +84,8 @@ type (
 )
 
 const (
+	defaultAPIHost = "api.github.com"
+
 	fmtListPullRequestsErr = "list pull requests: %w"
 
 	acceptJSON = "application/vnd.github+json"
@@ -126,7 +128,7 @@ func defaultAPIBaseURL() *url.URL {
 		Scheme:      "https",
 		Opaque:      consts.Empty,
 		User:        nil,
-		Host:        "api.github.com",
+		Host:        defaultAPIHost,
 		Path:        consts.PathSepString,
 		RawPath:     consts.Empty,
 		OmitHost:    false,

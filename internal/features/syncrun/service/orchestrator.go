@@ -30,13 +30,18 @@ type (
 
 	// Orchestrator coordinates store, git, and GitHub operations for a sync run.
 	Orchestrator struct {
-		Logger       *logging.Logger
-		StoreClient  ports.StoreClient
-		GitClient    gitports.Workspace
-		GitBrancher  ports.Brancher
-		GitIndexer   ports.Indexer
-		GitPublisher ports.Publisher
-		PRClient     ports.PRClient
+		Logger            *logging.Logger
+		StoreClient       ports.StoreClient
+		GitClient         gitports.Workspace
+		GitBrancher       ports.Brancher
+		GitIndexer        ports.Indexer
+		GitPublisher      ports.Publisher
+		PRClient          ports.PRClient
+		PrepareSyncInput  PrepareSyncInputFn
+		BuildPlan         BuildPlanFn
+		ApplyPlan         ApplyPlanFn
+		ResolveAll        ResolveAllFn
+		ResolveTransitive ResolveTransitiveFn
 	}
 
 	buildPlanInput struct {
@@ -270,7 +275,7 @@ func (orch *Orchestrator) buildPlanResult(inp *buildPlanInput, ref *refInfo) (pl
 
 //nolint:gocritic // single-line sig for whitespace
 func (orch *Orchestrator) buildSyncPlan(inp *buildPlanInput) (*syncIn, *syncPlan, error) {
-	syncInput, err := syncsvc.PrepareSyncInput(&syncsvc.PrepareSyncInputArgs{
+	syncInput, err := orch.PrepareSyncInput(&syncsvc.PrepareSyncInputArgs{
 		Cfg:         inp.cfg,
 		Snapshot:    inp.snapshot,
 		TaskfileOps: synctaskfile.Ops{},
@@ -356,7 +361,7 @@ func (orch *Orchestrator) compareManagedFiles(syncInput *syncIn) (*syncPlan, err
 	var plan *syncdomain.Plan
 
 	err := assignGrouped(orch.Logger, "Compare managed files", func() error {
-		built, planErr := syncsvc.BuildPlan(syncInput)
+		built, planErr := orch.BuildPlan(syncInput)
 		if planErr != nil {
 			return fmt.Errorf("build plan: %w", planErr)
 		}
@@ -376,7 +381,7 @@ func (orch *Orchestrator) compareManagedFiles(syncInput *syncIn) (*syncPlan, err
 
 func (orch *Orchestrator) copyTaskModules(plan *syncPlan, syncInput *syncIn) error {
 	err := runGroupNoResult(orch.Logger, "Copy task modules", func() error {
-		applyErr := syncsvc.ApplyPlan(plan, syncInput)
+		applyErr := orch.ApplyPlan(plan, syncInput)
 		if applyErr != nil {
 			return fmt.Errorf("apply plan: %w", applyErr)
 		}
@@ -732,7 +737,7 @@ func (orch *Orchestrator) planResult(args *planResultArgs) (planResult, error) {
 }
 
 func (orch *Orchestrator) resolveAllModules(cfg *config.Config, snap *snapInfo) ([]resItem, error) {
-	resolved, err := resolvesvc.ResolveAll(&resolvesvc.ResolveAllInput{
+	resolved, err := orch.ResolveAll(&resolvesvc.ResolveAllInput{
 		Tasks:          cfg.Tasks,
 		Catalog:        snap.Catalog,
 		PackageManager: cfg.NodePackageManager,
@@ -769,7 +774,7 @@ func (orch *Orchestrator) resolveDepSources(res []resItem, snap *snapInfo) ([]st
 func (orch *Orchestrator) resolveTransitiveDeps(res []resItem, snap *snapInfo) ([]string, error) {
 	requestedSources := sourceModulesOf(res)
 
-	resolved, err := resolvesvc.ResolveTransitive(requestedSources, snap.Deps)
+	resolved, err := orch.ResolveTransitive(requestedSources, snap.Deps)
 	if err != nil {
 		return nil, fmt.Errorf("resolve transitive dependencies: %w", err)
 	}
@@ -975,4 +980,5 @@ func (orch *Orchestrator) updateExistingPR(ctx context.Context, input *updatePRI
 
 func (orch *Orchestrator) wireDefaults() {
 	orch.ensureLogger()
+	orch.wireSyncHooks()
 }

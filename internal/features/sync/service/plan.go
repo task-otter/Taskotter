@@ -461,7 +461,7 @@ func copyDocPathsInto(rootContents, contents fMap, parentDocs map[string]struct{
 }
 
 func logicalRootReady(dir string) (bool, error) {
-	info, err := os.Stat(dir)
+	info, err := statPath(dir)
 	iox.Discard(info)
 
 	if err == nil {
@@ -582,7 +582,7 @@ func scanLogicalRootDocs(args *mergeParentDocsArgs) (fMap, error) {
 }
 
 func ensureSourceDirExists(sourceDir string, mod *moduleRecord) error {
-	info, err := os.Stat(sourceDir)
+	info, err := statPath(sourceDir)
 	iox.Discard(info)
 
 	if err != nil {
@@ -663,12 +663,7 @@ func isDestinationManaged(oldLock *syncLock, mod *moduleRecord) bool {
 }
 
 func mustMarshalMetadata(meta *domain.Metadata) []byte {
-	data, err := MarshalMetadata(meta)
-	if err != nil {
-		return nil
-	}
-
-	return data
+	return MarshalMetadata(meta)
 }
 
 func newPlanFromInputs(
@@ -895,7 +890,7 @@ func rootTemplateOrError(ops ports.TaskfileOps) ([]byte, error) {
 }
 
 func relSlashPath(sourceDir, absPath string) (string, error) {
-	rel, err := filepath.Rel(sourceDir, absPath)
+	rel, err := relPath(sourceDir, absPath)
 	if err != nil {
 		return consts.Empty, fmt.Errorf("rel path for %q: %w", absPath, err)
 	}
@@ -914,7 +909,7 @@ func resolveManagedTasks(args *planManagedInput) (managedTasks, managedRootTasks
 func scanModuleFiles(opts *collectOptions) (map[string]domain.FileEntry, error) {
 	contents := make(map[string]domain.FileEntry)
 
-	err := filepath.WalkDir(
+	err := walkDir(
 		opts.sourceDir,
 		collectModuleWalkFunc(opts, contents),
 	)
@@ -1043,7 +1038,7 @@ func rootUpdateInputFrom(input *updateRootArgs) *rootUpdateInput {
 }
 
 func validateDestination(destDirAbs string, mod *moduleRecord, oldLock *syncLock) error {
-	info, err := os.Stat(destDirAbs)
+	info, err := statPath(destDirAbs)
 
 	if os.IsNotExist(err) {
 		return nil

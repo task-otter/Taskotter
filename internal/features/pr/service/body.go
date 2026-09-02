@@ -43,18 +43,16 @@ func BuildPRBody(cfg *config.Config, plan *syncdomain.Plan, ref *domain.StoreRef
 	return body.String()
 }
 
+// builderWriteString appends text to body. Writes to a [strings.Builder] cannot
+// fail, so the error is consumed here.
 func builderWriteString(body *strings.Builder, text string) {
-	writeErr := iox.BuilderWriteString(body, text)
-	if writeErr != nil {
-		return
-	}
+	iox.Discard(iox.WriteStringFull(body, text))
 }
 
+// builderPrintf appends formatted text to body. Writes to a [strings.Builder]
+// cannot fail, so the error is consumed here.
 func builderPrintf(body *strings.Builder, format string, args ...any) {
-	writeErr := iox.BuilderPrintf(body, format, args...)
-	if writeErr != nil {
-		return
-	}
+	iox.Discard(iox.Fprintf(body, format, args...))
 }
 
 func writeMetadataSection(body *strings.Builder, cfg *config.Config, ref *domain.StoreRef) {

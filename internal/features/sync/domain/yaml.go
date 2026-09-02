@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"github.com/task-otter/Taskotter/internal/shared/consts"
+	"github.com/task-otter/Taskotter/internal/shared/iox"
 	"github.com/task-otter/Taskotter/internal/shared/yamlfmt"
 	yaml "go.yaml.in/yaml/v3"
 )
@@ -24,7 +25,6 @@ const (
 	YAMLMappingPairKeyValue = consts.IndexTwo
 
 	errDecode                = "decode %q: %w"
-	errMarshalMetadata       = "marshal metadata: %w"
 	yamlKeyConfigurationHash = "configuration_hash"
 	yamlKeyLockFile          = "lock_file"
 	yamlKeyTargetFolder      = "target_folder"
@@ -47,14 +47,13 @@ const (
 
 var errYAMLMappingNodeExpected = errors.New("expected YAML mapping node")
 
-// MarshalMetadata encodes metadata using stable on-disk keys.
-func MarshalMetadata(meta *Metadata) ([]byte, error) {
+// MarshalMetadata encodes metadata using stable on-disk keys. Encoding a plain
+// string map cannot fail, so no error is reported.
+func MarshalMetadata(meta *Metadata) []byte {
 	data, err := yamlfmt.Marshal(encodeMetadata(meta))
-	if err != nil {
-		return nil, fmt.Errorf(errMarshalMetadata, err)
-	}
+	iox.Discard(err)
 
-	return data, nil
+	return data
 }
 
 // UnmarshalYAMLMapping decodes YAML mapping keys into destinations in outs (key -> pointer).

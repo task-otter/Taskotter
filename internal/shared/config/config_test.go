@@ -53,6 +53,8 @@ const (
 	testJSBunWithFnm = "runtime: bun\nversion-manager: fnm\n"
 
 	inputIncludesDoc = "INPUT_INCLUDES_DOC"
+
+	inputRootTaskfile = "INPUT_ROOT_TASKFILE"
 )
 
 func targetFolderCases() []targetFolderCase {
@@ -347,7 +349,7 @@ func TestRootTaskfileCustomPath(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
 
-	env["INPUT_ROOT_TASKFILE"] = testBuildTaskfile
+	env[inputRootTaskfile] = testBuildTaskfile
 	setEnv(t, env)
 
 	cfg, err := config.LoadFromEnv()
@@ -380,6 +382,28 @@ func TestRootTaskfileFollowsTargetFolder(t *testing.T) {
 	}
 }
 
+// TestEmptyTasksRejected verifies a blank tasks input fails validation.
+//
+//nolint:paralleltest // LoadFromEnv uses t.Setenv; cannot run in parallel
+func TestEmptyTasksRejected(t *testing.T) {
+	dir := t.TempDir()
+	env := baseEnv(dir)
+
+	env[consts.InputTasks] = consts.Empty
+	loadEnvExpectError(t, env, "expected error for empty tasks")
+}
+
+// TestRootTaskfileMustStayInsideWorkspace verifies an escaping root-taskfile path is rejected.
+//
+//nolint:paralleltest // LoadFromEnv uses t.Setenv; cannot run in parallel
+func TestRootTaskfileMustStayInsideWorkspace(t *testing.T) {
+	dir := t.TempDir()
+	env := baseEnv(dir)
+
+	env[inputRootTaskfile] = "../outside/Taskfile.yml"
+	loadEnvExpectError(t, env, "expected error for escaping root-taskfile path")
+}
+
 // TestRootTaskfileMustBeYAML verifies a non-YAML root-taskfile path is rejected.
 //
 //nolint:paralleltest // LoadFromEnv uses t.Setenv; cannot run in parallel
@@ -387,7 +411,7 @@ func TestRootTaskfileMustBeYAML(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
 
-	env["INPUT_ROOT_TASKFILE"] = "build/Taskfile.txt"
+	env[inputRootTaskfile] = "build/Taskfile.txt"
 	loadEnvExpectError(t, env, "expected error for non-YAML root-taskfile path")
 }
 

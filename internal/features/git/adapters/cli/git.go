@@ -75,8 +75,6 @@ const (
 
 	gitConfigFlag = "-c"
 
-	gitBinary = "git"
-
 	fmtGitCmdErr = "git %s: %w: %s"
 
 	argSep = " "
@@ -95,6 +93,8 @@ const (
 
 	maxGitRefLen = 255
 
+	originHEADShortRef = "origin/HEAD"
+
 	httpExtraHeaderKey = "http.https://github.com/.extraheader"
 
 	gitConfigLocal = "--local"
@@ -106,6 +106,9 @@ const (
 )
 
 var (
+	//nolint:gochecknoglobals // seam so tests can stub the git command
+	gitBinary = "git"
+
 	errOriginHEADNotAvailable = errors.New("origin HEAD not available")
 
 	errNoRemoteBranchAtOriginHEAD = errors.New("no remote branch at origin HEAD commit")
@@ -217,6 +220,7 @@ func ValidateStagePath(workspace, path string) error {
 func WriteLocalIdentity() {
 	// Commit identity is applied per command via -c; config files are not writable
 	// in GitHub Actions Docker containers.
+	iox.Discard(struct{}{})
 }
 
 func checkBranchOwnership(msg, branch string) error {
@@ -387,7 +391,7 @@ func parseStatusPath(line string) (string, bool) {
 func plausibleBranchFromLine(line string) (string, bool) {
 	line = strings.TrimSpace(line)
 
-	if line == consts.Empty || line == "origin/HEAD" {
+	if line == consts.Empty || line == originHEADShortRef {
 		return consts.Empty, false
 	}
 
@@ -456,11 +460,7 @@ func (client *Client) BranchExists(ctx context.Context, branch string) (bool, er
 		return false, fmt.Errorf(fmtValidateGitRefErr, err)
 	}
 
-	if branchRefVerified(ctx, client, branch) {
-		return true, nil
-	}
-
-	if branchRefVerified(ctx, client, "refs/heads/"+branch) {
+	if client.branchExistsAnyRef(ctx, branch) {
 		return true, nil
 	}
 
@@ -558,6 +558,7 @@ func (client *Client) DefaultBranch(ctx context.Context) (string, error) {
 func (*Client) EnsureSafeDirectory() {
 	// Safe directory is applied per command via -c; global/local config files are
 	// not writable in GitHub Actions Docker containers (non-root user, read-only HOME).
+	iox.Discard(struct{}{})
 }
 
 // HasUnrelatedChanges reports whether the working tree has changes outside allowed paths.
@@ -634,6 +635,11 @@ func (client *Client) Stage(ctx context.Context, paths []string) error {
 	return nil
 }
 
+func (client *Client) branchExistsAnyRef(ctx context.Context, branch string) bool {
+	return branchRefVerified(ctx, client, branch) ||
+		branchRefVerified(ctx, client, "refs/heads/"+branch)
+}
+
 func (client *Client) branchFromCommand(ctx context.Context, args ...string) (string, bool) {
 	out, err := client.output(ctx, args...)
 	if err != nil {
@@ -653,12 +659,15 @@ func (client *Client) clearGitHubExtraHeader(ctx context.Context) {
 }
 
 func (client *Client) defaultBranchFromOriginHEAD(ctx context.Context) (string, error) {
-	if branch, ok := client.originHEADFromSymbolicRef(ctx); ok {
-		return branch, nil
+	lookups := []func(context.Context) (string, bool){
+		client.originHEADFromSymbolicRef,
+		client.originHEADFromAbbrevRef,
 	}
 
-	if branch, ok := client.originHEADFromAbbrevRef(ctx); ok {
-		return branch, nil
+	for i := range lookups {
+		if branch, ok := lookups[i](ctx); ok {
+			return branch, nil
+		}
 	}
 
 	branch, err := client.originHEADFromCommit(ctx)

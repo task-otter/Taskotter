@@ -23,6 +23,42 @@ func TestWireOrchestratorInvalidRepository(t *testing.T) {
 	}
 }
 
+// TestWireOrchestratorWithoutRepository verifies an empty repository leaves the PR client unset.
+func TestWireOrchestratorWithoutRepository(t *testing.T) {
+	t.Parallel()
+
+	cfg := invalidRepoOrchestratorConfig()
+
+	cfg.Repository = consts.Empty
+
+	orch, err := WireOrchestrator(t.Context(), cfg)
+	if err != nil {
+		t.Fatalf(consts.UnexpectedErr, err)
+	}
+
+	if orch.PRClient != nil {
+		t.Fatal("PRClient should stay nil without a repository")
+	}
+}
+
+// TestWireOrchestratorWithRepository verifies a valid repository wires a PR client.
+func TestWireOrchestratorWithRepository(t *testing.T) {
+	t.Parallel()
+
+	cfg := invalidRepoOrchestratorConfig()
+
+	cfg.Repository = testRepository
+
+	orch, err := WireOrchestrator(t.Context(), cfg)
+	if err != nil {
+		t.Fatalf(consts.UnexpectedErr, err)
+	}
+
+	if orch.PRClient == nil {
+		t.Fatal("PRClient should be wired for a valid repository")
+	}
+}
+
 func invalidRepoOrchestratorConfig() *config.Config {
 	return &config.Config{
 		Tasks:              nil,

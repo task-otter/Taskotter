@@ -5,7 +5,6 @@ package service
 
 import (
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"slices"
@@ -13,7 +12,6 @@ import (
 	"github.com/task-otter/Taskotter/internal/features/sync/domain"
 	"github.com/task-otter/Taskotter/internal/shared/consts"
 	"github.com/task-otter/Taskotter/internal/shared/iox"
-	"github.com/task-otter/Taskotter/internal/shared/pathutil"
 )
 
 // SetCopyFileToHookForTest installs a copy hook on plan for tests.
@@ -38,12 +36,12 @@ func writeFileAtomic(path string, data []byte, mode os.FileMode) error {
 }
 
 func createTempFile(dir string) (*os.File, error) {
-	err := os.MkdirAll(dir, dirModePerm)
+	err := mkdirAll(dir, dirModePerm)
 	if err != nil {
 		return nil, fmt.Errorf("create directory %q: %w", dir, err)
 	}
 
-	tmp, err := os.CreateTemp(dir, ".taskotter-*")
+	tmp, err := createTemp(dir, stagingTempPattern)
 	if err != nil {
 		return nil, fmt.Errorf("create temp file in %q: %w", dir, err)
 	}
@@ -83,26 +81,26 @@ func commitTempFile(args *finalizeTempArgs, tmpPath string, cleanup *bool) error
 
 func cleanupTempFile(tmp *os.File, tmpPath string, cleanup *bool) {
 	if *cleanup {
-		closeErr := tmp.Close()
+		closeErr := closeFile(tmp)
 		iox.Discard(closeErr)
 
-		removeErr := os.Remove(tmpPath)
+		removeErr := removePath(tmpPath)
 		iox.Discard(removeErr)
 	}
 }
 
 func writeAndFinalizeTemp(tmp *os.File, data []byte, mode os.FileMode) error {
-	err := iox.WriteFull(tmp, data)
+	err := writeFull(tmp, data)
 	if err != nil {
 		return fmt.Errorf("write temp file %q: %w", tmp.Name(), err)
 	}
 
-	err = tmp.Chmod(mode)
+	err = chmodFile(tmp, mode)
 	if err != nil {
 		return fmt.Errorf("chmod temp file %q: %w", tmp.Name(), err)
 	}
 
-	err = tmp.Close()
+	err = closeFile(tmp)
 	if err != nil {
 		return fmt.Errorf("close temp file %q: %w", tmp.Name(), err)
 	}
@@ -111,7 +109,7 @@ func writeAndFinalizeTemp(tmp *os.File, data []byte, mode os.FileMode) error {
 }
 
 func renameTempFile(tmpPath, path string) error {
-	err := os.Rename(tmpPath, path)
+	err := renamePath(tmpPath, path)
 	if err != nil {
 		return fmt.Errorf("rename temp file to %q: %w", path, err)
 	}
@@ -144,17 +142,17 @@ func CopyFile(args *copyFileArgs) error {
 }
 
 func readRelativeFile(root, rel string) ([]byte, error) {
-	source, err := pathutil.OpenRelativeFile(root, rel)
+	source, err := openRelativeFile(root, rel)
 	if err != nil {
 		return nil, fmt.Errorf("open %q: %w", rel, err)
 	}
 
 	defer func() {
-		closeErr := source.Close()
+		closeErr := closeFile(source)
 		iox.Discard(closeErr)
 	}()
 
-	data, err := io.ReadAll(source)
+	data, err := readAll(source)
 	if err != nil {
 		return nil, fmt.Errorf(errFmtReadQuoted, rel, err)
 	}

@@ -23,16 +23,7 @@ const (
 // WireOrchestrator builds an Orchestrator with concrete adapters from configuration.
 func WireOrchestrator(ctx context.Context, cfg *config.Config) (*syncrun.Orchestrator, error) {
 	client := gitcli.NewClient(cfg.Workspace)
-
-	orch := &syncrun.Orchestrator{
-		Logger:       logging.New(),
-		StoreClient:  storegithub.NewClient(ctx, cfg.GitHubToken),
-		GitClient:    client,
-		GitBrancher:  client,
-		GitIndexer:   client,
-		GitPublisher: client,
-		PRClient:     nil,
-	}
+	orch := newWiredOrchestrator(ctx, cfg, client)
 
 	err := wirePRClient(ctx, cfg, orch)
 	if err != nil {
@@ -40,6 +31,27 @@ func WireOrchestrator(ctx context.Context, cfg *config.Config) (*syncrun.Orchest
 	}
 
 	return orch, nil
+}
+
+func newWiredOrchestrator(
+	ctx context.Context,
+	cfg *config.Config,
+	client *gitcli.Client,
+) *syncrun.Orchestrator {
+	return &syncrun.Orchestrator{
+		Logger:            logging.New(),
+		StoreClient:       storegithub.NewClient(ctx, cfg.GitHubToken),
+		GitClient:         client,
+		GitBrancher:       client,
+		GitIndexer:        client,
+		GitPublisher:      client,
+		PRClient:          nil,
+		PrepareSyncInput:  nil,
+		BuildPlan:         nil,
+		ApplyPlan:         nil,
+		ResolveAll:        nil,
+		ResolveTransitive: nil,
+	}
 }
 
 func wirePRClient(ctx context.Context, cfg *config.Config, orch *syncrun.Orchestrator) error {

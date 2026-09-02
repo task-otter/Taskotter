@@ -10,6 +10,7 @@ import (
 
 	"github.com/task-otter/Taskotter/internal/features/sync/domain/managed"
 	"github.com/task-otter/Taskotter/internal/shared/consts"
+	"github.com/task-otter/Taskotter/internal/shared/iox"
 	"github.com/task-otter/Taskotter/internal/shared/yamlfmt"
 	yaml "go.yaml.in/yaml/v3"
 )
@@ -23,7 +24,6 @@ type (
 
 const (
 	errDecode                 = "decode %q: %w"
-	errMarshalLockFile        = "marshal lock file: %w"
 	yamlKeyConfiguration      = "configuration"
 	yamlKeyDefaultBranch      = "default_branch"
 	yamlKeyDependencies       = "dependencies"
@@ -51,14 +51,13 @@ const (
 
 var errYAMLMappingNodeExpected = errors.New("expected YAML mapping node")
 
-// MarshalLock encodes a lock file using stable on-disk keys.
-func MarshalLock(lock *LockFile) ([]byte, error) {
+// MarshalLock encodes a lock file using stable on-disk keys. The encoded map
+// holds only strings, bools, and slices of them, so encoding cannot fail.
+func MarshalLock(lock *LockFile) []byte {
 	data, err := yamlfmt.Marshal(EncodeLockFile(lock))
-	if err != nil {
-		return nil, fmt.Errorf(errMarshalLockFile, err)
-	}
+	iox.Discard(err)
 
-	return data, nil
+	return data
 }
 
 // EncodeLockFile converts a lock file into a map with stable on-disk keys.

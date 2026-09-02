@@ -265,7 +265,7 @@ func similarity(left, right string) int {
 	}
 
 	if strings.HasPrefix(right, left) || strings.HasPrefix(left, right) {
-		return scorePrefixMatchBase + minInt(len(left), len(right))
+		return scorePrefixMatchBase + min(len(left), len(right))
 	}
 
 	return levenshtein(left, right)
@@ -326,12 +326,4 @@ func (state *dpState) computeRow(row int) {
 
 func minInt3(first, second, third int) int {
 	return min(first, min(second, third))
-}
-
-func minInt(first, second int) int {
-	if first < second {
-		return first
-	}
-
-	return second
 }

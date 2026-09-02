@@ -131,7 +131,7 @@ func buildResolvedDependenciesJSON(deps []lockmodel.ModuleRecord) string {
 		})
 	}
 
-	//nolint:dogsled,errcheck,gosec // errchkjson: ResolvedTask slice is safe to marshal
+	//nolint:dogsled,errcheck,gosec // errchkjson: ResolvedTask values are safe to marshal
 	data, _ := json.MarshalIndent(out, consts.Empty, jsonIndent)
 
 	return string(data)
@@ -150,7 +150,7 @@ func buildResolvedTasksJSON(requested map[string]lockmodel.ModuleRecord) string 
 		}
 	}
 
-	//nolint:dogsled,errcheck,gosec // errchkjson: map[string]ResolvedTask is safe to marshal
+	//nolint:dogsled,errcheck,gosec // errchkjson: ResolvedTask values are safe to marshal
 	data, _ := json.MarshalIndent(out, consts.Empty, jsonIndent)
 
 	return string(data)
@@ -286,16 +286,15 @@ func writeSyncRequiredAnnotations(writer io.Writer, summary string) {
 }
 
 // MarshalJSON encodes a resolved task using the GitHub Actions output keys.
-func (t *ResolvedTask) MarshalJSON() ([]byte, error) {
-	//nolint:errchkjson // map[string]string is a safe type; json.Marshal cannot fail
-	data, err := json.Marshal(map[string]string{
-		"source_module":      t.SourceModule,
-		"destination_module": t.DestinationModule,
-		"path":               t.Path,
+//
+//nolint:unparam // json.Marshaler requires error; map[string]string cannot fail
+func (task *ResolvedTask) MarshalJSON() ([]byte, error) {
+	//nolint:dogsled,errcheck,gosec // map[string]string cannot fail to marshal
+	data, _ := json.Marshal(map[string]string{
+		"source_module":      task.SourceModule,
+		"destination_module": task.DestinationModule,
+		"path":               task.Path,
 	})
-	if err != nil {
-		return nil, fmt.Errorf("marshal resolved task: %w", err)
-	}
 
 	return data, nil
 }

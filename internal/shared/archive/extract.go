@@ -58,6 +58,9 @@ const (
 	errFmtEnsureValidTarPath = "ensure valid tar path: %w"
 )
 
+//nolint:gochecknoglobals // seam so tests can reach the filepath.Abs failure branches
+var absPath = filepath.Abs
+
 // ExtractTarGz extracts a gzip-compressed tar archive into destDir.
 func ExtractTarGz(reader io.Reader, destDir string) (string, error) {
 	err := os.MkdirAll(destDir, dirPerm)
@@ -74,12 +77,12 @@ func ExtractTarGz(reader io.Reader, destDir string) (string, error) {
 }
 
 func absPaths(base, target string) (absBase, absTarget string, err error) {
-	absBase, err = filepath.Abs(base)
+	absBase, err = absPath(base)
 	if err != nil {
 		return consts.Empty, consts.Empty, fmt.Errorf("resolve base path: %w", err)
 	}
 
-	absTarget, err = filepath.Abs(target)
+	absTarget, err = absPath(target)
 	if err != nil {
 		return consts.Empty, consts.Empty, fmt.Errorf("resolve target path: %w", err)
 	}
@@ -87,7 +90,7 @@ func absPaths(base, target string) (absBase, absTarget string, err error) {
 	return absBase, absTarget, nil
 }
 
-func closeGzipReader(gzipReader *gzip.Reader) error {
+func closeGzipReader(gzipReader io.Closer) error {
 	closeErr := gzipReader.Close()
 	if closeErr != nil {
 		return fmt.Errorf("close gzip reader: %w", closeErr)
@@ -119,11 +122,8 @@ func ensureInside(base, target string) error {
 	}
 
 	rel, err := filepath.Rel(absBase, absTarget)
-	if err != nil {
-		return &ExtractError{Message: fmt.Sprintf("path escapes extraction directory: %v", err)}
-	}
 
-	if isPathEscaping(rel) {
+	if err != nil || isPathEscaping(rel) {
 		return &ExtractError{Message: "path escapes extraction directory"}
 	}
 
@@ -146,11 +146,7 @@ func extractTarGzStream(reader io.Reader, destDir string) (string, error) {
 
 func extractFromGzipReader(gzipReader *gzip.Reader, destDir string) (root string, err error) {
 	defer func() {
-		closeErr := closeGzipReader(gzipReader)
-
-		if closeErr != nil && err == nil {
-			err = closeErr
-		}
+		err = preferErr(err, closeGzipReader(gzipReader))
 	}()
 
 	root, err = runTarExtractor(destDir, gzipReader)
@@ -159,6 +155,15 @@ func extractFromGzipReader(gzipReader *gzip.Reader, destDir string) (root string
 	}
 
 	return root, nil
+}
+
+// preferErr keeps err when set, otherwise reports the cleanup error.
+func preferErr(err, closeErr error) error {
+	if err != nil {
+		return err
+	}
+
+	return closeErr
 }
 
 func isPathEscaping(rel string) bool {
@@ -232,15 +237,9 @@ func safeTarFileMode(mode int64) (os.FileMode, error) {
 		return consts.IndexZero, &ExtractError{Message: fmt.Sprintf("invalid file mode %o", mode)}
 	}
 
-	perm := mode & maxTarFileMode
-
-	if perm > maxTarFileMode {
-		return consts.IndexZero, &ExtractError{
-			Message: fmt.Sprintf("file mode %o out of range", mode),
-		}
-	}
-
-	return os.FileMode(perm), nil
+	// Masking with maxTarFileMode keeps only the permission bits, dropping setuid,
+	// setgid, and sticky bits from the archive.
+	return os.FileMode(mode & maxTarFileMode), nil
 }
 
 func unsupportedEntryError(name string) error {
@@ -392,11 +391,8 @@ func (extractor *tarExtractor) processHeader(header *tar.Header) error {
 }
 
 func (extractor *tarExtractor) resolveRelativePath(name string) (string, bool) {
+	// strings.Split always yields at least one element, so parts[0] is safe here.
 	parts := strings.Split(strings.Trim(name, consts.PathSepString), consts.PathSepString)
-
-	if len(parts) == consts.IndexZero {
-		return consts.Empty, false
-	}
 
 	if !extractor.rootSet {
 		extractor.rootPrefix = parts[consts.IndexZero]

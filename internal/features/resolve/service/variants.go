@@ -80,13 +80,8 @@ func StripOneSuffix(name string) (string, bool) {
 			continue
 		}
 
-		stripped := name[:len(name)-len(suffix)]
-
-		if stripped == consts.Empty {
-			continue
-		}
-
-		return stripped, true
+		// hasSuffixLongerThan guarantees a non-empty remainder.
+		return name[:len(name)-len(suffix)], true
 	}
 
 	return name, false

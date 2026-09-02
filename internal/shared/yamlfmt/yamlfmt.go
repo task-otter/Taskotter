@@ -18,8 +18,8 @@ const (
 	indentSpaces = 2
 	// DocumentStart is the yamllint-required document-start marker.
 	documentStart       = "---\n"
-	errEncodeYAMLDoc    = "encode yaml document: %w"
-	errCloseYAMLEncoder = "close yaml encoder: %w"
+	errEncodeYAMLDoc    = "encode yaml document"
+	errCloseYAMLEncoder = "close yaml encoder"
 )
 
 // Marshal encodes value as a single YAML document prefixed with "---" using
@@ -53,22 +53,18 @@ func encodeAndClose(enc *yaml.Encoder, value any) error {
 	encErr := enc.Encode(value)
 	closeErr := enc.Close()
 
-	if encErr != nil && closeErr != nil {
-		return errors.Join(
-			fmt.Errorf(errEncodeYAMLDoc, encErr),
-			fmt.Errorf(errCloseYAMLEncoder, closeErr),
-		)
+	return errors.Join(
+		wrapNonNil(errEncodeYAMLDoc, encErr),
+		wrapNonNil(errCloseYAMLEncoder, closeErr),
+	)
+}
+
+func wrapNonNil(label string, err error) error {
+	if err == nil {
+		return nil
 	}
 
-	if encErr != nil {
-		return fmt.Errorf(errEncodeYAMLDoc, encErr)
-	}
-
-	if closeErr != nil {
-		return fmt.Errorf(errCloseYAMLEncoder, closeErr)
-	}
-
-	return nil
+	return fmt.Errorf("%s: %w", label, err)
 }
 
 // ensureSingleDocumentMarker strips any leading "---" the encoder may have emitted

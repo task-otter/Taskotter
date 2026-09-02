@@ -206,17 +206,12 @@ func parseNodePackageManager(raw string) (PackageManager, error) {
 	}
 }
 
+// validatePackageManager accepts only the node package managers; "bun" is rejected
+// by parseNodePackageManager and must be selected through js.runtime instead.
 func validatePackageManager(raw string) (PackageManager, error) {
 	packageManager, err := parseNodePackageManager(raw)
 	if err != nil {
 		return consts.Empty, fmt.Errorf("parse node package manager: %w", err)
-	}
-
-	if packageManager == PackageManager(JSRuntimeBun) {
-		return consts.Empty, &ValidationError{
-			Field:   fieldJSPackageManager,
-			Message: `use js.runtime "bun" instead of package-manager "bun"`,
-		}
 	}
 
 	return packageManager, nil

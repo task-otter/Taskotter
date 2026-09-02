@@ -32,6 +32,8 @@ const (
 	modPnpm = "pnpm"
 
 	testEslintChain = "eslint/node/pnpm"
+
+	addedFilePath = "taskfiles/go/Taskfile.yml"
 )
 
 // TestBuildPRBody verifies the pull request body includes requested and dependency modules.
@@ -42,6 +44,30 @@ func TestBuildPRBody(t *testing.T) {
 
 	if !strings.Contains(body, testEslintChain) {
 		t.Fatalf("missing module info: %s", body)
+	}
+}
+
+// TestBuildPRBodyWithoutNodeRuntime verifies file changes are listed and the package
+// manager line is omitted for non-Node runtimes.
+func TestBuildPRBodyWithoutNodeRuntime(t *testing.T) {
+	t.Parallel()
+
+	cfg := prBodyConfig()
+
+	cfg.JSRuntime = consts.Empty
+
+	plan := buildPRBodyPlan()
+
+	plan.Added = []string{addedFilePath}
+
+	body := prservice.BuildPRBody(cfg, plan, buildPRBodyStoreRef())
+
+	if strings.Contains(body, "Package manager") {
+		t.Fatalf("unexpected package manager line: %s", body)
+	}
+
+	if !strings.Contains(body, addedFilePath) {
+		t.Fatalf("missing added file: %s", body)
 	}
 }
 

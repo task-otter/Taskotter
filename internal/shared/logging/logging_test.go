@@ -5,10 +5,12 @@ package logging_test
 
 import (
 	"bytes"
+	"errors"
 	"testing"
 
 	"github.com/task-otter/Taskotter/internal/shared/consts"
 	"github.com/task-otter/Taskotter/internal/shared/logging"
+	"github.com/task-otter/Taskotter/internal/testsupport/faults"
 )
 
 // TestLoggerWritesGitHubActionsCommands verifies log levels emit GitHub Actions workflow commands.
@@ -31,28 +33,47 @@ func TestLoggerWritesGitHubActionsCommands(t *testing.T) {
 	}
 }
 
-func capturedLogOutput() string {
-	var buf bytes.Buffer
-
-	log := logging.NewWithWriter(&buf)
-
-	log.Printf("plain %s", "line")
-	log.Noticef("notice %d", consts.IndexOne)
-	log.Warningf("warning %d", consts.IndexTwo)
-	log.Errorf("error %d", consts.IndexThree)
-	log.Group("sync", func() {
-		log.Print("inside\n")
-	})
-
-	return buf.String()
-}
-
 // TestNew verifies New returns a non-nil logger.
 func TestNew(t *testing.T) {
 	t.Parallel()
 
 	if logging.New() == nil {
 		t.Fatal("New() returned nil")
+	}
+}
+
+// TestLoggerRecordsFirstWriteError verifies a failing writer is reported once and then ignored.
+func TestLoggerRecordsFirstWriteError(t *testing.T) {
+	t.Parallel()
+
+	writer := &faults.StubWriter{Count: consts.IndexZero, Err: faults.ErrFault}
+	log := logging.NewWithWriter(writer)
+
+	log.Print("first\n")
+
+	first := log.Err()
+	if first == nil {
+		t.Fatal("Err() = nil, want write error")
+	}
+
+	log.Print("second\n")
+
+	if !errors.Is(log.Err(), first) {
+		t.Fatal("Err() changed after the first failure")
+	}
+}
+
+// TestLoggerErrIsNilWhenWritesSucceed verifies a healthy logger reports no error.
+func TestLoggerErrIsNilWhenWritesSucceed(t *testing.T) {
+	t.Parallel()
+
+	var buf bytes.Buffer
+
+	log := logging.NewWithWriter(&buf)
+	log.Print("ok\n")
+
+	if log.Err() != nil {
+		t.Fatalf("Err() = %v, want nil", log.Err())
 	}
 }
 
@@ -76,4 +97,20 @@ func TestRedact(t *testing.T) {
 			t.Fatalf("Redact(%q) = %q, want %q", testCase.input, got, testCase.want)
 		}
 	}
+}
+
+func capturedLogOutput() string {
+	var buf bytes.Buffer
+
+	log := logging.NewWithWriter(&buf)
+
+	log.Printf("plain %s", "line")
+	log.Noticef("notice %d", consts.IndexOne)
+	log.Warningf("warning %d", consts.IndexTwo)
+	log.Errorf("error %d", consts.IndexThree)
+	log.Group("sync", func() {
+		log.Print("inside\n")
+	})
+
+	return buf.String()
 }

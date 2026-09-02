@@ -129,7 +129,7 @@ func loadStoreTaskMetadata(snapshot ports.Snapshot) (map[string]storeTaskMetadat
 	out := make(map[string]storeTaskMetadata)
 	root := filepath.Join(snapshot.WorkspaceRoot(), taskfilesDirName)
 
-	err := filepath.WalkDir(root, storeMetadataWalker(root, out))
+	err := walkDir(root, storeMetadataWalker(root, out))
 	if err != nil {
 		return nil, fmt.Errorf("load store metadata: %w", err)
 	}
@@ -138,7 +138,7 @@ func loadStoreTaskMetadata(snapshot ports.Snapshot) (map[string]storeTaskMetadat
 }
 
 func moduleNameFor(root, abs string) (string, error) {
-	relDir, err := filepath.Rel(root, filepath.Dir(abs))
+	relDir, err := relPath(root, filepath.Dir(abs))
 	if err != nil {
 		return consts.Empty, fmt.Errorf("metadata module path for %q: %w", abs, err)
 	}

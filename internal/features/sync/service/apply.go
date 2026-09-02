@@ -162,7 +162,7 @@ func buildCurrentPathSet(plan *domain.Plan) map[string]struct{} {
 	return currentPaths
 }
 
-func buildStagedFiles(plan *domain.Plan, syncInput *domain.SyncInput) ([]stagedFile, error) {
+func buildStagedFiles(plan *domain.Plan, syncInput *domain.SyncInput) []stagedFile {
 	staged := stageModuleFiles(plan, syncInput.Config.TargetFolder)
 
 	if syncInput.Config.SyncRoot {
@@ -172,12 +172,9 @@ func buildStagedFiles(plan *domain.Plan, syncInput *domain.SyncInput) ([]stagedF
 		})
 	}
 
-	lockAndMeta, err := stageLockAndMetadata(plan, syncInput.Config.MetadataPath())
-	if err != nil {
-		return nil, fmt.Errorf("stage lock and metadata: %w", err)
-	}
+	lockAndMeta := stageLockAndMetadata(plan, syncInput.Config.MetadataPath())
 
-	return append(staged, lockAndMeta...), nil
+	return append(staged, lockAndMeta...)
 }
 
 func cleanupAfterApply(plan *domain.Plan, workspace, metadataPath string) error {
@@ -195,7 +192,7 @@ func cleanupAfterApply(plan *domain.Plan, workspace, metadataPath string) error 
 }
 
 func cleanupFailedStaging(stagingRoot string, copyErr error) error {
-	removeErr := os.RemoveAll(stagingRoot)
+	removeErr := removeAll(stagingRoot)
 	if removeErr != nil {
 		return errors.Join(
 			copyErr,
@@ -255,7 +252,7 @@ func runOldTargetCleanupSteps(plan *domain.Plan, workspace string) error {
 }
 
 func cleanupStagingDir(stagingRoot string) error {
-	removeErr := os.RemoveAll(stagingRoot)
+	removeErr := removeAll(stagingRoot)
 	if removeErr != nil {
 		return fmt.Errorf(errFmtCleanupStagingDir, stagingRoot, removeErr)
 	}
@@ -291,13 +288,8 @@ func oldTargetUnchanged(plan *domain.Plan) bool {
 }
 
 func prepareStaging(input *prepareStagingInput) (stagingSession, error) {
-	staged, err := buildStagedFiles(input.plan, input.syncInput)
-	if err != nil {
-		return stagingSession{}, fmt.Errorf("build staged files: %w", err)
-	}
-
 	session, err := stagePreparedFiles(&stagePreparedInput{
-		staged:    staged,
+		staged:    buildStagedFiles(input.plan, input.syncInput),
 		plan:      input.plan,
 		syncInput: input.syncInput,
 		workspace: input.workspace,
@@ -315,12 +307,12 @@ func prepareStagingRoot(workspace, targetFolder string) (string, error) {
 		pathutil.JoinRelative(targetFolder, ".taskotter/staging"),
 	)
 
-	err := os.MkdirAll(stagingParent, dirModePerm)
+	err := mkdirAll(stagingParent, dirModePerm)
 	if err != nil {
 		return consts.Empty, fmt.Errorf(errCreateStagingDir, err)
 	}
 
-	stagingRoot, err := os.MkdirTemp(stagingParent, "apply-*")
+	stagingRoot, err := mkdirTemp(stagingParent, "apply-*")
 	if err != nil {
 		return consts.Empty, fmt.Errorf(errCreateStagingDir, err)
 	}
@@ -329,7 +321,7 @@ func prepareStagingRoot(workspace, targetFolder string) (string, error) {
 }
 
 func removeDirIfEmpty(dir, context string) error {
-	err := os.Remove(dir)
+	err := removePath(dir)
 
 	if err != nil && !os.IsNotExist(err) && !errorsIsDirectoryNotEmpty(err) {
 		return fmt.Errorf("%s: %w", context, err)
@@ -339,7 +331,7 @@ func removeDirIfEmpty(dir, context string) error {
 }
 
 func removeIfExists(workspace, rel string) error {
-	err := os.Remove(pathutil.WorkspacePath(workspace, rel))
+	err := removePath(pathutil.WorkspacePath(workspace, rel))
 
 	if err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("remove %q: %w", rel, err)
@@ -362,7 +354,7 @@ func removeLegacyMetadataDir(workspace string) error {
 func removeLegacyMetadataFile(workspace string) error {
 	legacy := pathutil.WorkspacePath(workspace, config.LegacyMetadataPath)
 
-	err := os.Remove(legacy)
+	err := removePath(legacy)
 
 	if err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("remove legacy metadata: %w", err)
@@ -394,7 +386,7 @@ func removeObsolete(plan *domain.Plan, workspace string) error {
 func removeObsoleteFile(workspace, path string) error {
 	abs := pathutil.WorkspacePath(workspace, path)
 
-	err := os.Remove(abs)
+	err := removePath(abs)
 
 	if err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf(errFmtRemoveObsoleteFile, path, err)
@@ -503,7 +495,7 @@ func removeEmptyParentDir(dir string) (bool, error) {
 }
 
 func pathPresent(path string) bool {
-	info, err := os.Stat(path)
+	info, err := statPath(path)
 	iox.Discard(info)
 
 	return err == nil
@@ -595,16 +587,9 @@ func stageContentRels(
 	return staged
 }
 
-func stageLockAndMetadata(plan *domain.Plan, metadataPath string) ([]stagedFile, error) {
-	lockBytes, err := MarshalLock(&plan.Lock)
-	if err != nil {
-		return nil, fmt.Errorf(errMarshalLockFile, err)
-	}
-
-	metaBytes, err := MarshalMetadata(&plan.Metadata)
-	if err != nil {
-		return nil, fmt.Errorf(errMarshalMetadata, err)
-	}
+func stageLockAndMetadata(plan *domain.Plan, metadataPath string) []stagedFile {
+	lockBytes := MarshalLock(&plan.Lock)
+	metaBytes := MarshalMetadata(&plan.Metadata)
 
 	return []stagedFile{
 		{
@@ -615,7 +600,7 @@ func stageLockAndMetadata(plan *domain.Plan, metadataPath string) ([]stagedFile,
 			finalRel: metadataPath,
 			entry:    domain.FileEntry{Data: metaBytes, Mode: fileModeRegular},
 		},
-	}, nil
+	}
 }
 
 func stageModuleFiles(plan *domain.Plan, targetFolder string) []stagedFile {
@@ -808,7 +793,7 @@ func writeStagedFiles(args *writeStagedArgs) error {
 		stagedEntry := &args.staged[i]
 		finalPath := pathutil.WorkspacePath(args.workspace, stagedEntry.finalRel)
 
-		err := os.MkdirAll(filepath.Dir(finalPath), dirModePerm)
+		err := mkdirAll(filepath.Dir(finalPath), dirModePerm)
 		if err != nil {
 			return fmt.Errorf("prepare %q: %w", stagedEntry.finalRel, err)
 		}

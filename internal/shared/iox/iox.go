@@ -23,12 +23,9 @@ const (
 
 var (
 	errShortWrite           = errors.New("short write")
-	errInvalidCopyCount     = errors.New("invalid copy count")
 	errInvalidFprintfCount  = errors.New("invalid fprintf count")
 	errInvalidFprintCount   = errors.New("invalid fprint count")
 	errInvalidFprintlnCount = errors.New("invalid fprintln count")
-	errBuilderShortWrite    = errors.New("builder short write")
-	errInvalidBuilderPrintf = errors.New("invalid builder printf count")
 )
 
 // Discard consumes v so callers can avoid blank identifiers under strict linters.
@@ -42,45 +39,6 @@ func Discard[T any](v T) {
 func Discard2[T, U any](first T, second U) {
 	Discard(first)
 	Discard(second)
-}
-
-func validateByteCount(count int, errInvalid error) error {
-	if count < consts.IndexZero {
-		return fmt.Errorf(errFmtWrappedInt, errInvalid, count)
-	}
-
-	return nil
-}
-
-func ignoreWriteResult(byteCount int, err error) {
-	if err != nil {
-		return
-	}
-
-	if byteCount < consts.IndexZero {
-		return
-	}
-}
-
-func formatWriteInvalid(operation string) error {
-	if operation == opFprint {
-		return errInvalidFprintCount
-	}
-
-	return errInvalidFprintlnCount
-}
-
-func finishStdFormatWrite(byteCount int, writeErr error, operation string) error {
-	if writeErr != nil {
-		return fmt.Errorf("%s: %w", operation, writeErr)
-	}
-
-	err := validateByteCount(byteCount, formatWriteInvalid(operation))
-	if err != nil {
-		return fmt.Errorf("%s count: %w", operation, err)
-	}
-
-	return nil
 }
 
 // WriteStringFull writes all of s to w or returns an error.
@@ -114,13 +72,10 @@ func WriteFull(w io.Writer, data []byte) error {
 // CopyDiscard copies r to [io.Discard] and returns any error.
 func CopyDiscard(r io.Reader) error {
 	byteCount, err := io.Copy(io.Discard, r)
+	Discard(byteCount)
+
 	if err != nil {
 		return fmt.Errorf("copy to discard: %w", err)
-	}
-
-	err = validateByteCount(int(byteCount), errInvalidCopyCount)
-	if err != nil {
-		return fmt.Errorf("copy discard count: %w", err)
 	}
 
 	return nil
@@ -183,47 +138,13 @@ func FprintlnBestEffort(w io.Writer, args ...any) {
 	ignoreWriteResult(byteCount, err)
 }
 
-// BuilderWriteString writes text to b.
-func BuilderWriteString(b *strings.Builder, text string) error {
-	written, err := b.WriteString(text)
-	if err != nil {
-		return fmt.Errorf("builder write string: %w", err)
-	}
-
-	if written != len(text) {
-		return fmt.Errorf("%w: wrote %d of %d", errBuilderShortWrite, written, len(text))
-	}
-
-	return nil
-}
-
-// BuilderPrintf formats and writes to b.
-func BuilderPrintf(b *strings.Builder, format string, args ...any) error {
-	byteCount, err := fmt.Fprintf(b, format, args...)
-	if err != nil {
-		return fmt.Errorf("builder printf: %w", err)
-	}
-
-	err = validateByteCount(byteCount, errInvalidBuilderPrintf)
-	if err != nil {
-		return fmt.Errorf("builder printf count: %w", err)
-	}
-
-	return nil
-}
-
 // WriteGitHubOutputs writes GitHub Actions step outputs to path.
 func WriteGitHubOutputs(path string, values map[string]string) error {
 	if path == consts.Empty {
 		return nil
 	}
 
-	payload, err := buildGitHubOutputs(values)
-	if err != nil {
-		return fmt.Errorf("build GitHub Actions outputs: %w", err)
-	}
-
-	err = os.WriteFile(path, payload, githubOutputPerm)
+	err := os.WriteFile(path, buildGitHubOutputs(values), githubOutputPerm)
 	if err != nil {
 		return fmt.Errorf("write GitHub Actions outputs: %w", err)
 	}
@@ -231,17 +152,27 @@ func WriteGitHubOutputs(path string, values map[string]string) error {
 	return nil
 }
 
-func buildGitHubOutputs(values map[string]string) ([]byte, error) {
-	var output strings.Builder
+func buildGitHubOutputs(values map[string]string) []byte {
+	payload := make([]byte, consts.IndexZero, len(values))
 
 	for key := range values {
-		writeErr := BuilderWriteString(&output, formatGitHubOutputLine(key, values[key]))
-		if writeErr != nil {
-			return nil, fmt.Errorf("write output buffer: %w", writeErr)
-		}
+		payload = append(payload, formatGitHubOutputLine(key, values[key])...)
 	}
 
-	return []byte(output.String()), nil
+	return payload
+}
+
+func finishStdFormatWrite(byteCount int, writeErr error, operation string) error {
+	if writeErr != nil {
+		return fmt.Errorf("%s: %w", operation, writeErr)
+	}
+
+	err := validateByteCount(byteCount, formatWriteInvalid(operation))
+	if err != nil {
+		return fmt.Errorf("%s count: %w", operation, err)
+	}
+
+	return nil
 }
 
 func formatGitHubOutputLine(key, value string) string {
@@ -250,4 +181,30 @@ func formatGitHubOutputLine(key, value string) string {
 	}
 
 	return key + "=" + value + consts.Newline
+}
+
+func formatWriteInvalid(operation string) error {
+	if operation == opFprint {
+		return errInvalidFprintCount
+	}
+
+	return errInvalidFprintlnCount
+}
+
+func ignoreWriteResult(byteCount int, err error) {
+	if err != nil {
+		return
+	}
+
+	if byteCount < consts.IndexZero {
+		return
+	}
+}
+
+func validateByteCount(count int, errInvalid error) error {
+	if count < consts.IndexZero {
+		return fmt.Errorf(errFmtWrappedInt, errInvalid, count)
+	}
+
+	return nil
 }

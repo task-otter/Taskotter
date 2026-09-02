@@ -267,9 +267,9 @@ func computeConfigurationHash(payload *hashPayload) (hash, branch string) {
 		"includes_doc":         payload.IncludesDoc,
 		"sync_root":            payload.SyncRoot,
 	})
-	if err != nil {
-		data = []byte("{}")
-	}
+	// The payload holds only strings, slices of strings, and bools, so marshaling
+	// cannot fail; the error is consumed to keep the hash input unchanged.
+	iox.Discard(err)
 
 	sum := sha256.Sum256(data)
 
@@ -289,14 +289,9 @@ func ensureNonEmptyTasks(tasks []string) ([]string, error) {
 	return tasks, nil
 }
 
+// jsSettingsFromConfig converts a parsed js config; parseJS always returns a
+// non-nil config when it reports no error, so jsCfg is never nil here.
 func jsSettingsFromConfig(jsCfg *jsConfig) jsSettings {
-	if jsCfg == nil {
-		return jsSettings{
-			jsRuntime:      consts.Empty,
-			packageManager: consts.Empty,
-		}
-	}
-
 	return jsSettings{
 		jsRuntime:      jsCfg.Runtime,
 		packageManager: jsCfg.NodePackageManager,

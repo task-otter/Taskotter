@@ -10,9 +10,9 @@ includes:
   nix:
     taskfile: ../nix/Taskfile.yml
 vars:
-  YAMLFIX_NIX_INSTALLABLE: nixpkgs#yamlfix
-  YAMLFIX_TARGETS: "."
-  YAMLFIX_EXTRA_ARGS: ""
+  YAMLFIX_NIX_INSTALLABLE: '{{.YAMLFIX_NIX_INSTALLABLE | default "nixpkgs#yamlfix"}}'
+  YAMLFIX_TARGETS: '{{.YAMLFIX_TARGETS | default "."}}'
+  YAMLFIX_EXTRA_ARGS: '{{.YAMLFIX_EXTRA_ARGS | default ""}}'
 tasks:
   default:
     run: once

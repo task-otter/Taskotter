@@ -17,11 +17,11 @@ includes:
 
 vars:
 
-  ACTIONLINT_NIX_INSTALLABLE: nixpkgs#actionlint
+  ACTIONLINT_NIX_INSTALLABLE: '{{.ACTIONLINT_NIX_INSTALLABLE | default "nixpkgs#actionlint"}}'
 
-  ACTIONLINT_EXTRA_ARGS: ""
+  ACTIONLINT_EXTRA_ARGS: '{{.ACTIONLINT_EXTRA_ARGS | default ""}}'
 
-  ACTIONLINT_TARGETS: ""
+  ACTIONLINT_TARGETS: '{{.ACTIONLINT_TARGETS | default ""}}'
 
 tasks:
   default:

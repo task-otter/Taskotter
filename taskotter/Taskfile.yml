@@ -69,6 +69,8 @@ vars:
   YAMLLINT_NIX_INSTALLABLE: nixpkgs#yamllint
   ZIZMOR_NIX_INSTALLABLE: nixpkgs#zizmor
   GO_JUNIT_REPORT_NIX_INSTALLABLE: nixpkgs#go nixpkgs#go-junit-report
+  GO_JUNIT_REPORT_IN: '{{.GO_JUNIT_REPORT_IN | default ""}}'
+  GO_JUNIT_REPORT_OUT: '{{.GO_JUNIT_REPORT_OUT | default ""}}'
 includes:
   go:
     taskfile: go/Taskfile.yml
@@ -174,6 +176,8 @@ includes:
       GO_JUNIT_REPORT_NIX_INSTALLABLE: '{{.GO_JUNIT_REPORT_NIX_INSTALLABLE}}'
       GO_JUNIT_REPORT: '{{.GO_JUNIT_REPORT}}'
       GO_COVER_PROFILE: '{{.GO_COVER_PROFILE}}'
+      GO_JUNIT_REPORT_IN: '{{.GO_JUNIT_REPORT_IN}}'
+      GO_JUNIT_REPORT_OUT: '{{.GO_JUNIT_REPORT_OUT}}'
 tasks:
   ci:
     desc: Run ci for synced TaskOtter modules
@@ -202,11 +206,6 @@ tasks:
       - task: zizmor:install
       - task: adrs:install
       - task: hadolint:install
-  test:
-    desc: Run test for synced TaskOtter modules
-    cmds:
-      - task: go:test
-      - task: go-junit-report:test
   verify:
     desc: Run verify for synced TaskOtter modules
     cmds:

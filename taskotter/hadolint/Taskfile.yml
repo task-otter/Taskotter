@@ -14,10 +14,10 @@ includes:
     taskfile: ../nix/Taskfile.yml
 
 vars:
-  HADOLINT_CONFIG: ""
-  HADOLINT_DOCKERFILE: "Dockerfile"
-  HADOLINT_EXTRA_ARGS: ""
-  HADOLINT_NIX_INSTALLABLE: nixpkgs#hadolint
+  HADOLINT_CONFIG: '{{.HADOLINT_CONFIG | default ""}}'
+  HADOLINT_DOCKERFILE: '{{.HADOLINT_DOCKERFILE | default "Dockerfile"}}'
+  HADOLINT_EXTRA_ARGS: '{{.HADOLINT_EXTRA_ARGS | default ""}}'
+  HADOLINT_NIX_INSTALLABLE: '{{.HADOLINT_NIX_INSTALLABLE | default "nixpkgs#hadolint"}}'
 
 tasks:
   default:

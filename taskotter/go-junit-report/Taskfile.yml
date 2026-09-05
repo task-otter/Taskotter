@@ -10,16 +10,19 @@ silent: true
 
 includes:
 
+  go:
+    taskfile: ../go/Taskfile.yml
+
   nix:
     taskfile: ../nix/Taskfile.yml
 
 vars:
 
-  GO_JUNIT_REPORT_NIX_INSTALLABLE: nixpkgs#go nixpkgs#go-junit-report
+  GO_JUNIT_REPORT_NIX_INSTALLABLE: '{{.GO_JUNIT_REPORT_NIX_INSTALLABLE | default "nixpkgs#go-junit-report"}}'
 
-  GO_JUNIT_REPORT: ""
+  GO_JUNIT_REPORT_IN: '{{.GO_JUNIT_REPORT_IN | default ""}}'
 
-  GO_COVER_PROFILE: ""
+  GO_JUNIT_REPORT_OUT: '{{.GO_JUNIT_REPORT_OUT | default ""}}'
 
 tasks:
   default:
@@ -35,7 +38,8 @@ tasks:
     summary: |
       Install go-junit-report into the user Nix profile when it is not already
       available on PATH. Override the GO_JUNIT_REPORT_NIX_INSTALLABLE
-      variable to pin a different package or version.
+      variable to pin a different package or version. Go is provided by the
+      included go Taskfile (go:install), not this installable.
     status:
       - command -v go-junit-report >/dev/null 2>&1
     cmds:
@@ -48,8 +52,9 @@ tasks:
     desc: Show the active go-junit-report version
     summary: |
       Print the version reported by the go-junit-report binary resolved from PATH.
-      Auto-installs go-junit-report if missing.
+      Auto-installs Go and go-junit-report if missing.
     deps:
+      - task: go:install
       - task: install
     cmds:
       - task: _version:unix
@@ -58,8 +63,11 @@ tasks:
   which:
     run: once
     desc: Show the path to the go-junit-report binary
-    summary: Print the go-junit-report binary resolved from PATH. Auto-installs if missing.
+    summary: |
+      Print the go-junit-report binary resolved from PATH. Auto-installs Go and
+      go-junit-report if missing.
     deps:
+      - task: go:install
       - task: install
     cmds:
       - task: _which:unix
@@ -70,38 +78,42 @@ tasks:
     desc: Verify the go-junit-report installation
     summary: |
       Check that go-junit-report is installed and print the active version for
-      quick installation diagnostics. Auto-installs if missing.
+      quick installation diagnostics. Auto-installs Go and go-junit-report if
+      missing.
     deps:
+      - task: go:install
       - task: install
     cmds:
       - task: _verify:unix
       - task: _verify:windows
 
-  test:
+  report:
     run: once
     dir: "{{.USER_WORKING_DIR}}"
-    desc: Run Go unit tests and write JUnit XML and coverage reports
+    desc: Convert a go test log file to JUnit XML
     summary: |
-      Run `go test -v` with coverage against all Go packages by default, stream
-      test output to stdout, write a JUnit XML report to GO_JUNIT_REPORT
-      (default junit.xml), and write a coverage profile to GO_COVER_PROFILE
-      (default coverage.out). Pass CLI arguments after -- to override the
-      default ./... target or add flags.
+      Convert an existing go test log file to JUnit XML via go-junit-report.
+      Requires GO_JUNIT_REPORT_IN (input log path) and GO_JUNIT_REPORT_OUT
+      (output XML path). Does not run go test or write coverage profiles.
+      Auto-installs Go (via go:install) and go-junit-report if missing.
     deps:
+      - task: go:install
       - task: install
-    vars:
-      GO_JUNIT_REPORT_OUT: '{{if .GO_JUNIT_REPORT}}{{.GO_JUNIT_REPORT}}{{else}}junit.xml{{end}}'
-      GO_COVER_OUT: '{{if .GO_COVER_PROFILE}}{{.GO_COVER_PROFILE}}{{else}}coverage.out{{end}}'
+    requires:
+      vars: [GO_JUNIT_REPORT_IN, GO_JUNIT_REPORT_OUT]
+    preconditions:
+      - sh: test -n "{{.GO_JUNIT_REPORT_IN}}"
+        msg: GO_JUNIT_REPORT_IN is required. Pass GO_JUNIT_REPORT_IN=path/to/gotest.log when running this task.
+      - sh: test -n "{{.GO_JUNIT_REPORT_OUT}}"
+        msg: GO_JUNIT_REPORT_OUT is required. Pass GO_JUNIT_REPORT_OUT=path/to/junit.xml when running this task.
     cmds:
       - cmd: >-
-          bash -lc '{{.NIX_LOAD}}; go test -v -covermode atomic -coverprofile "{{.GO_COVER_OUT}}"
-          {{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}./...{{end}} 2>&1 | go-junit-report
-          -set-exit-code -iocopy -out "{{.GO_JUNIT_REPORT_OUT}}"'
+          bash -lc '{{.NIX_LOAD}}; go-junit-report -in "{{.GO_JUNIT_REPORT_IN}}"
+          -out "{{.GO_JUNIT_REPORT_OUT}}" -set-exit-code'
         platforms: [linux, darwin]
       - cmd: >-
-          go test -v -covermode atomic -coverprofile "{{.GO_COVER_OUT}}"
-          {{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}./...{{end}} 2>&1 | go-junit-report
-          -set-exit-code -iocopy -out "{{.GO_JUNIT_REPORT_OUT}}"
+          go-junit-report -in "{{.GO_JUNIT_REPORT_IN}}"
+          -out "{{.GO_JUNIT_REPORT_OUT}}" -set-exit-code
         platforms: [windows]
 
   _which:unix:

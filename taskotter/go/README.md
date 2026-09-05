@@ -7,8 +7,8 @@ toolchain is installed through `nix:install:profile`.
 
 Linting and formatting live in the [`golangci-lint`](../golangci-lint/README.md)
 Taskfile, vulnerability scanning lives in the
-[`govulncheck`](../govulncheck/README.md) Taskfile, and JUnit XML plus coverage
-reports live in the [`go-junit-report`](../go-junit-report/README.md) Taskfile.
+[`govulncheck`](../govulncheck/README.md) Taskfile, and JUnit XML conversion
+lives in the [`go-junit-report`](../go-junit-report/README.md) Taskfile.
 
 ## Usage
 
@@ -59,8 +59,8 @@ task go:test -- -race -run TestName ./internal/...
 task go:bench -- -bench BenchmarkName ./internal/parser
 ```
 
-`test` runs plain `go test -v`. For JUnit XML and coverage reports, use
-`go-junit-report:test`.
+`test` runs plain `go test -v`. For converting a go test log to JUnit XML, use
+`go-junit-report:report`.
 `fuzz` runs a single target for `GO_FUZZTIME` (default `30s`); Go fuzzes one
 target in one package per run, so supply the `-fuzz` pattern and package after
 `--`:

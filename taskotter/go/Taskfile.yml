@@ -15,9 +15,9 @@ includes:
 
 vars:
 
-  GO_NIX_INSTALLABLE: nixpkgs#go
+  GO_NIX_INSTALLABLE: '{{.GO_NIX_INSTALLABLE | default "nixpkgs#go"}}'
 
-  GO_FUZZTIME: ""
+  GO_FUZZTIME: '{{.GO_FUZZTIME | default ""}}'
 
 tasks:
   default:
@@ -80,8 +80,8 @@ tasks:
     desc: Run Go unit tests
     summary: |
       Run `go test -v` against all Go packages by default. Pass CLI arguments
-      after -- to override the default ./... target or add flags. For JUnit XML
-      and coverage reports, use the go-junit-report Taskfile.
+      after -- to override the default ./... target or add flags. For converting a
+      go test log to JUnit XML, use go-junit-report:report.
     deps:
       - task: install
     cmds:

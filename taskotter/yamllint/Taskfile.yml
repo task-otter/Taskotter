@@ -10,10 +10,10 @@ includes:
   nix:
     taskfile: ../nix/Taskfile.yml
 vars:
-  YAMLLINT_NIX_INSTALLABLE: nixpkgs#yamllint
-  YAMLLINT_TARGETS: "."
-  YAMLLINT_CONFIG: ""
-  YAMLLINT_EXTRA_ARGS: ""
+  YAMLLINT_NIX_INSTALLABLE: '{{.YAMLLINT_NIX_INSTALLABLE | default "nixpkgs#yamllint"}}'
+  YAMLLINT_TARGETS: '{{.YAMLLINT_TARGETS | default "."}}'
+  YAMLLINT_CONFIG: '{{.YAMLLINT_CONFIG | default ""}}'
+  YAMLLINT_EXTRA_ARGS: '{{.YAMLLINT_EXTRA_ARGS | default ""}}'
 tasks:
   default:
     run: once

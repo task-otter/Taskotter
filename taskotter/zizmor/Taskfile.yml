@@ -14,9 +14,9 @@ includes:
     taskfile: ../nix/Taskfile.yml
 
 vars:
-  ZIZMOR_EXTRA_ARGS: "--offline"
-  ZIZMOR_TARGETS: ".github"
-  ZIZMOR_NIX_INSTALLABLE: nixpkgs#zizmor
+  ZIZMOR_EXTRA_ARGS: '{{.ZIZMOR_EXTRA_ARGS | default "--offline"}}'
+  ZIZMOR_TARGETS: '{{.ZIZMOR_TARGETS | default ".github"}}'
+  ZIZMOR_NIX_INSTALLABLE: '{{.ZIZMOR_NIX_INSTALLABLE | default "nixpkgs#zizmor"}}'
 
 tasks:
   default:

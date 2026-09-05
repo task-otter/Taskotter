@@ -10,29 +10,29 @@ output:
 silent: true
 
 vars:
-  NIX_INSTALL_URL: https://nixos.org/nix/install
-  NIX_VERSION: ""
-  NIX_CHANNEL: nixpkgs-unstable
-  NIX_CONF: ""
-  NIX_EXPERIMENTAL_FEATURES: nix-command flakes
-  NIX_NEEDED_FEATURES: nix-command flakes
+  NIX_INSTALL_URL: '{{.NIX_INSTALL_URL | default "https://nixos.org/nix/install"}}'
+  NIX_VERSION: '{{.NIX_VERSION | default ""}}'
+  NIX_CHANNEL: '{{.NIX_CHANNEL | default "nixpkgs-unstable"}}'
+  NIX_CONF: '{{.NIX_CONF | default ""}}'
+  NIX_EXPERIMENTAL_FEATURES: '{{.NIX_EXPERIMENTAL_FEATURES | default "nix-command flakes"}}'
+  NIX_NEEDED_FEATURES: '{{.NIX_NEEDED_FEATURES | default "nix-command flakes"}}'
   NIX_EXPERIMENTAL_FEATURES_ALL: >-
-    auto-allocate-uids blake3-hashes ca-derivations cgroups
-    configurable-impure-env daemon-trust-override dynamic-derivations
-    external-builders fetch-closure fetch-tree flakes git-hashing
-    impure-derivations local-overlay-store mounted-ssh-store nix-command
-    parse-toml-timestamps pipe-operators read-only-local-store
-    recursive-nix verified-fetches
-  NIX_INSTALLABLE: ""
-  NIX_COMMAND: ""
-  NIX_EXTRA_ARGS: ""
+    {{.NIX_EXPERIMENTAL_FEATURES_ALL | default "auto-allocate-uids blake3-hashes
+    ca-derivations cgroups configurable-impure-env daemon-trust-override
+    dynamic-derivations external-builders fetch-closure fetch-tree flakes
+    git-hashing impure-derivations local-overlay-store mounted-ssh-store
+    nix-command parse-toml-timestamps pipe-operators read-only-local-store
+    recursive-nix verified-fetches"}}
+  NIX_INSTALLABLE: '{{.NIX_INSTALLABLE | default ""}}'
+  NIX_COMMAND: '{{.NIX_COMMAND | default ""}}'
+  NIX_EXTRA_ARGS: '{{.NIX_EXTRA_ARGS | default ""}}'
   NIX_LOAD: >-
-    if [ -e /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh ]; then
-    . /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh;
-    elif [ -e "$HOME/.nix-profile/etc/profile.d/nix.sh" ]; then
-    . "$HOME/.nix-profile/etc/profile.d/nix.sh";
-    fi;
-    export PATH="/nix/var/nix/profiles/default/bin:$HOME/.nix-profile/bin:${PATH:-}"
+    {{.NIX_LOAD | default `if [ -e /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh ];
+    then . /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh;
+    elif [ -e "$HOME/.nix-profile/etc/profile.d/nix.sh" ];
+    then . "$HOME/.nix-profile/etc/profile.d/nix.sh"; fi;
+    export PATH="/nix/var/nix/profiles/default/bin:$HOME/.nix-profile/bin:${PATH:-}"`}}
+
 
 tasks:
   default:

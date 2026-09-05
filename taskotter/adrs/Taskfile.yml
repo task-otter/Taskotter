@@ -14,8 +14,8 @@ includes:
     taskfile: ../nix/Taskfile.yml
 
 vars:
-  ADRS_NIX_INSTALLABLE: nixpkgs#adrs
-  ADRS_EXTRA_ARGS: ""
+  ADRS_NIX_INSTALLABLE: '{{.ADRS_NIX_INSTALLABLE | default "nixpkgs#adrs"}}'
+  ADRS_EXTRA_ARGS: '{{.ADRS_EXTRA_ARGS | default ""}}'
 
 tasks:
   default:

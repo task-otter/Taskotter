@@ -13,7 +13,7 @@ includes:
     taskfile: ../nix/Taskfile.yml
 vars:
 
-  GOVULNCHECK_NIX_INSTALLABLE: nixpkgs#go nixpkgs#govulncheck
+  GOVULNCHECK_NIX_INSTALLABLE: '{{.GOVULNCHECK_NIX_INSTALLABLE | default "nixpkgs#go nixpkgs#govulncheck"}}'
 tasks:
   default:
     run: once

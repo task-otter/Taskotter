@@ -1,0 +1,8 @@
+---
+# Temporary: actionlint 1.7.12 does not recognize GitHub's $/ self-repository
+# uses: form (rhysd/actionlint#711). Remove once a release includes  # 732.
+paths:
+  '**/*':
+    ignore:
+      - specifying action "\$/.+" in invalid format because ref is missing\.
+      - reusable workflow call "\$/.+" at "uses" is not following the format

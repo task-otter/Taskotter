@@ -18,7 +18,7 @@ jobs:
           persist-credentials: true
       - name: TaskOtter
         id: taskotter
-        uses: ./
+        uses: $/
         with:
           github-token: ${{ github.token }}
           tasks: |

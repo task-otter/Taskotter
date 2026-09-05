@@ -26,20 +26,20 @@ func TestSnapshotAccessorsExposeRefInfo(t *testing.T) {
 
 	snapshot := newSnapshot(nil)
 
-	if snapshot.DefaultBranch() != testBranch {
-		t.Fatalf("DefaultBranch() = %q", snapshot.DefaultBranch())
+	if domain.DefaultBranch(snapshot) != testBranch {
+		t.Fatalf("DefaultBranch() = %q", domain.DefaultBranch(snapshot))
 	}
 
-	if snapshot.ResolvedCommit() != testCommit {
-		t.Fatalf("ResolvedCommit() = %q", snapshot.ResolvedCommit())
+	if domain.ResolvedCommit(snapshot) != testCommit {
+		t.Fatalf("ResolvedCommit() = %q", domain.ResolvedCommit(snapshot))
 	}
 
-	if snapshot.SourceRef() != testRef {
-		t.Fatalf("SourceRef() = %q", snapshot.SourceRef())
+	if domain.SourceRef(snapshot) != testRef {
+		t.Fatalf("SourceRef() = %q", domain.SourceRef(snapshot))
 	}
 
-	if snapshot.WorkspaceRoot() != testRootDir {
-		t.Fatalf("WorkspaceRoot() = %q", snapshot.WorkspaceRoot())
+	if domain.WorkspaceRoot(snapshot) != testRootDir {
+		t.Fatalf("WorkspaceRoot() = %q", domain.WorkspaceRoot(snapshot))
 	}
 }
 
@@ -47,12 +47,12 @@ func TestSnapshotAccessorsExposeRefInfo(t *testing.T) {
 func TestSnapshotCloseWithoutCleanup(t *testing.T) {
 	t.Parallel()
 
-	err := newSnapshot(nil).Close()
+	err := domain.Close(newSnapshot(nil))
 	if err != nil {
 		t.Fatalf(consts.UnexpectedErr, err)
 	}
 
-	err = newSnapshot(func() error { return nil }).Close()
+	err = domain.Close(newSnapshot(func() error { return nil }))
 	if err != nil {
 		t.Fatalf(consts.UnexpectedErr, err)
 	}
@@ -62,7 +62,7 @@ func TestSnapshotCloseWithoutCleanup(t *testing.T) {
 func TestSnapshotCloseReportsCleanupFailure(t *testing.T) {
 	t.Parallel()
 
-	err := newSnapshot(func() error { return errCleanup }).Close()
+	err := domain.Close(newSnapshot(func() error { return errCleanup }))
 
 	if !errors.Is(err, errCleanup) {
 		t.Fatalf("err = %v, want %v", err, errCleanup)
@@ -73,7 +73,7 @@ func TestSnapshotCloseReportsCleanupFailure(t *testing.T) {
 func TestSnapshotModuleDirJoinsStorePath(t *testing.T) {
 	t.Parallel()
 
-	dir := newSnapshot(nil).ModuleDir(consts.Go)
+	dir := domain.ModuleDir(newSnapshot(nil), consts.Go)
 
 	if dir == consts.Empty {
 		t.Fatal("ModuleDir() = empty")

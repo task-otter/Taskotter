@@ -18,12 +18,12 @@ import (
 )
 
 type (
-	storeTaskMetadata struct {
-		Schema        string
-		Module        string
-		Taskfile      string
-		ExportedTasks []string
-		Variants      []string
+	storeTaskMetadata = struct {
+		Schema        string   `yaml:"schema"`
+		Module        string   `yaml:"module"`
+		Taskfile      string   `yaml:"taskfile"`
+		ExportedTasks []string `yaml:"exported_tasks"`
+		Variants      []string `yaml:"variants"`
 	}
 )
 
@@ -214,19 +214,4 @@ func storeMetadataWalker(root string, out map[string]storeTaskMetadata) fs.WalkD
 
 		return loadOneStoreMetadataFile(root, abs, out)
 	}
-}
-
-func (meta *storeTaskMetadata) UnmarshalYAML(value *yaml.Node) error {
-	err := domain.UnmarshalYAMLMapping(value, "store task metadata", map[string]any{
-		domain.YAMLKeySchema:        &meta.Schema,
-		domain.YAMLKeyModule:        &meta.Module,
-		domain.YAMLKeyTaskfile:      &meta.Taskfile,
-		domain.YAMLKeyExportedTasks: &meta.ExportedTasks,
-		domain.YAMLKeyVariants:      &meta.Variants,
-	})
-	if err != nil {
-		return fmt.Errorf("unmarshal store task metadata: %w", err)
-	}
-
-	return nil
 }

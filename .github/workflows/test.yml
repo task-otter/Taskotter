@@ -23,7 +23,7 @@ jobs:
         with:
           github-token: ${{ github.token }}
           fail-on-changes: true
-          store-version: v0.0.8
+          store-version: v0.0.10
           tasks: |
             go
             go-junit-report
@@ -72,7 +72,7 @@ jobs:
         run: task taskotter:ci
       - name: Run Tests
         shell: bash
-        run: task taskotter:go-junit-report:test
+        run: task taskotter:go-junit-report:report
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f  # v7.0.0
         with:

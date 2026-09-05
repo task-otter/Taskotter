@@ -9,6 +9,7 @@ import (
 
 	"github.com/task-otter/Taskotter/internal/shared/consts"
 	"github.com/task-otter/Taskotter/internal/shared/iox"
+	yaml "go.yaml.in/yaml/v3"
 )
 
 type (
@@ -119,7 +120,7 @@ func TestUnmarshalYAMLReportsFailure(t *testing.T) {
 
 	var meta storeTaskMetadata
 
-	assertFails(t, meta.UnmarshalYAML(scalarYAMLNode("plain")))
+	assertFails(t, yaml.Unmarshal([]byte("plain\n"), &meta))
 }
 
 func (stubSnapshot) DefaultBranch() string { return consts.Empty }

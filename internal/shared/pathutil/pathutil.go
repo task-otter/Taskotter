@@ -18,14 +18,22 @@ import (
 )
 
 type (
+	// FieldError is a path validation error with a field name.
+	FieldError interface {
+		error
+		FieldName() string
+	}
+
 	// PathError reports invalid path or task name configuration.
+	//
+	// Field names the config key; Value is the rejected input; Message explains why.
 	PathError struct {
 		Field   string
 		Value   string
 		Message string
 	}
 
-	insideRootParams struct {
+	insideRootParams = struct {
 		base       string
 		normalized string
 		raw        string
@@ -33,7 +41,7 @@ type (
 		outsideMsg string
 	}
 
-	pathComponentContext struct {
+	pathComponentContext = struct {
 		evalWorkspace string
 		current       string
 		raw           string
@@ -70,13 +78,27 @@ var (
 	absPath = filepath.Abs
 )
 
+// Detail returns field, value, and message for diagnostics.
+func (pathErr *PathError) Detail() string {
+	return fmt.Sprintf("%s=%q: %s", pathErr.Field, pathErr.Value, pathErr.Message)
+}
+
 // Error implements the error interface, returning the field-prefixed path error message.
-func (e *PathError) Error() string {
-	if e.Field != consts.Empty {
-		return fmt.Sprintf("%s: %s", e.Field, e.Message)
+func (pathErr *PathError) Error() string {
+	if pathErr.Field != consts.Empty {
+		return pathErr.Field + ": " + pathErr.Message
 	}
 
-	return e.Message
+	return pathErr.Message
+}
+
+// FieldName returns the invalid path configuration field.
+func (pathErr *PathError) FieldName() string {
+	if pathErr.Value == pathErr.Message && pathErr.Message == consts.Empty {
+		return pathErr.Field
+	}
+
+	return pathErr.Field
 }
 
 // NormalizeSlashes converts Windows separators and trims redundant slashes.

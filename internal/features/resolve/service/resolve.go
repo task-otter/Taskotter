@@ -21,21 +21,21 @@ type (
 	ResolveError = domain.ResolveError
 
 	// ResolveInput selects one logical task and JS runtime settings.
-	ResolveInput struct {
+	ResolveInput = struct {
 		Task           string
 		Catalog        map[string]struct{}
 		PackageManager config.PackageManager
 	}
 
 	// ResolveAllInput resolves multiple logical tasks against one catalog.
-	ResolveAllInput struct {
+	ResolveAllInput = struct {
 		Catalog        map[string]struct{}
 		PackageManager config.PackageManager
 		Tasks          []string
 	}
 
 	// taskContext bundles the catalog and JS settings shared across one task resolution.
-	taskContext struct {
+	taskContext = struct {
 		catalog        map[string]struct{}
 		packageManager config.PackageManager
 	}

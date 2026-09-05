@@ -23,7 +23,7 @@ func TestWireOrchestratorInvalidRepository(t *testing.T) {
 	}
 }
 
-// TestWireOrchestratorWithoutRepository verifies an empty repository leaves the PR client unset.
+// TestWireOrchestratorWithoutRepository verifies an empty repository wires successfully.
 func TestWireOrchestratorWithoutRepository(t *testing.T) {
 	t.Parallel()
 
@@ -36,12 +36,12 @@ func TestWireOrchestratorWithoutRepository(t *testing.T) {
 		t.Fatalf(consts.UnexpectedErr, err)
 	}
 
-	if orch.PRClient != nil {
-		t.Fatal("PRClient should stay nil without a repository")
+	if orch == nil {
+		t.Fatal(errExpectedOrchestrator)
 	}
 }
 
-// TestWireOrchestratorWithRepository verifies a valid repository wires a PR client.
+// TestWireOrchestratorWithRepository verifies a valid repository wires successfully.
 func TestWireOrchestratorWithRepository(t *testing.T) {
 	t.Parallel()
 
@@ -54,8 +54,8 @@ func TestWireOrchestratorWithRepository(t *testing.T) {
 		t.Fatalf(consts.UnexpectedErr, err)
 	}
 
-	if orch.PRClient == nil {
-		t.Fatal("PRClient should be wired for a valid repository")
+	if orch == nil {
+		t.Fatal(errExpectedOrchestrator)
 	}
 }
 

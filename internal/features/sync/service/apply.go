@@ -13,6 +13,7 @@ import (
 	"syscall"
 
 	"github.com/task-otter/Taskotter/internal/features/sync/domain"
+	"github.com/task-otter/Taskotter/internal/features/sync/domain/lockmodel"
 	"github.com/task-otter/Taskotter/internal/shared/config"
 	"github.com/task-otter/Taskotter/internal/shared/consts"
 	"github.com/task-otter/Taskotter/internal/shared/iox"
@@ -21,12 +22,12 @@ import (
 )
 
 type (
-	stagedFile struct {
+	stagedFile = struct {
 		finalRel string
 		entry    domain.FileEntry
 	}
 
-	removeStaleFileArgs struct {
+	removeStaleFileArgs = struct {
 		old          *managedFile
 		current      map[string]struct{}
 		workspace    string
@@ -144,7 +145,15 @@ func applyStagedPlan(input *applyStagedInput) error {
 		return fmt.Errorf("validate and write staged files: %w", err)
 	}
 
-	err = cleanupAfterApply(input.plan, input.workspace, input.syncInput.Config.MetadataPath())
+	return cleanupAfterApplyPlan(input) //nolint:wrapcheck // thin apply wrapper
+}
+
+func cleanupAfterApplyPlan(input *applyStagedInput) error {
+	err := cleanupAfterApply(
+		input.plan,
+		input.workspace,
+		config.MetadataPath(input.syncInput.Config),
+	)
 	if err != nil {
 		return fmt.Errorf("clean up after apply: %w", err)
 	}
@@ -172,7 +181,7 @@ func buildStagedFiles(plan *domain.Plan, syncInput *domain.SyncInput) []stagedFi
 		})
 	}
 
-	lockAndMeta := stageLockAndMetadata(plan, syncInput.Config.MetadataPath())
+	lockAndMeta := stageLockAndMetadata(plan, config.MetadataPath(syncInput.Config))
 
 	return append(staged, lockAndMeta...)
 }
@@ -700,7 +709,7 @@ func validateGeneratedYAML(staged []stagedFile, rootPath string) error {
 func validateLockFileYAML(data []byte) error {
 	var lock syncLock
 
-	err := yaml.Unmarshal(data, &lock)
+	err := lockmodel.DecodeLockFileYAML(data, &lock)
 	if err != nil {
 		return fmt.Errorf(errValidateLockFile, err)
 	}

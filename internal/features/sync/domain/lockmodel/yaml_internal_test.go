@@ -8,7 +8,6 @@ import (
 
 	"github.com/task-otter/Taskotter/internal/features/sync/domain/managed"
 	"github.com/task-otter/Taskotter/internal/shared/consts"
-	yaml "go.yaml.in/yaml/v3"
 )
 
 type (
@@ -19,6 +18,8 @@ type (
 )
 
 const (
+	invalidYAMLColonTab = ":\t"
+
 	wantErrText     = "expected error"
 	taskGo          = "go"
 	moduleBase      = "base"
@@ -100,7 +101,7 @@ func TestOrderedRequestedUnmarshalRejectsSequence(t *testing.T) {
 
 	var requested OrderedRequested
 
-	assertFails(t, yaml.Unmarshal([]byte("- a\n"), &requested))
+	assertFails(t, DecodeOrderedRequestedYAML([]byte("- a\n"), &requested))
 }
 
 func assertFails(t *testing.T, err error) {
@@ -116,7 +117,7 @@ func assertLockFailCase(t *testing.T, testCase *lockYAMLCase) {
 
 	var lock LockFile
 
-	assertFails(t, yaml.Unmarshal([]byte(testCase.payload), &lock))
+	assertFails(t, DecodeLockFileYAML([]byte(testCase.payload), &lock))
 }
 
 func assertLockOKCase(t *testing.T, testCase *lockYAMLCase) {
@@ -124,7 +125,7 @@ func assertLockOKCase(t *testing.T, testCase *lockYAMLCase) {
 
 	var lock LockFile
 
-	assertNoErr(t, yaml.Unmarshal([]byte(testCase.payload), &lock))
+	assertNoErr(t, DecodeLockFileYAML([]byte(testCase.payload), &lock))
 }
 
 func assertNoErr(t *testing.T, err error) {
@@ -140,7 +141,7 @@ func assertRecordFailCase(t *testing.T, testCase *lockYAMLCase) {
 
 	var record ModuleRecord
 
-	assertFails(t, yaml.Unmarshal([]byte(testCase.payload), &record))
+	assertFails(t, DecodeModuleRecordYAML([]byte(testCase.payload), &record))
 }
 
 func assertRecordOKCase(t *testing.T, testCase *lockYAMLCase) {
@@ -148,7 +149,7 @@ func assertRecordOKCase(t *testing.T, testCase *lockYAMLCase) {
 
 	var record ModuleRecord
 
-	assertNoErr(t, yaml.Unmarshal([]byte(testCase.payload), &record))
+	assertNoErr(t, DecodeModuleRecordYAML([]byte(testCase.payload), &record))
 }
 
 func emptyLock() LockFile {
@@ -222,7 +223,7 @@ func roundTripLock(t *testing.T, lock *LockFile) {
 
 	var got LockFile
 
-	assertNoErr(t, yaml.Unmarshal(MarshalLock(lock), &got))
+	assertNoErr(t, DecodeLockFileYAML(MarshalLock(lock), &got))
 }
 
 func runLockFailCase(t *testing.T, testCase *lockYAMLCase) {
@@ -349,5 +350,41 @@ func sampleSource() LockSource {
 		SourceRef:        "refs/heads/main",
 		ResolvedCommit:   "abc",
 		DefaultBranch:    branchMain,
+	}
+}
+
+// TestDecodeHelpersCoverErrorPaths covers decode YAML failure paths.
+func TestDecodeHelpersCoverErrorPaths(t *testing.T) {
+	t.Parallel()
+
+	var lock LockFile
+
+	assertFails(t, DecodeLockFileYAML([]byte(invalidYAMLColonTab), &lock))
+
+	var record ModuleRecord
+
+	assertFails(t, DecodeModuleRecordYAML([]byte(invalidYAMLColonTab), &record))
+
+	var requested OrderedRequested
+
+	assertFails(t, DecodeOrderedRequestedYAML([]byte(invalidYAMLColonTab), &requested))
+}
+
+// TestDecodeHelpersCoverDocumentPaths covers successful decode and nil unwrap.
+func TestDecodeHelpersCoverDocumentPaths(t *testing.T) {
+	t.Parallel()
+
+	var requested OrderedRequested
+
+	assertNoErr(
+		t,
+		DecodeOrderedRequestedYAML(
+			[]byte("go:\n  source_module: go\n  destination_module: go\n"),
+			&requested,
+		),
+	)
+
+	if yamlDocumentContent(nil) != nil {
+		t.Fatal("nil document")
 	}
 }

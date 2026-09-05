@@ -27,7 +27,7 @@ type (
 
 	// planArtifacts bundles the intermediate outputs produced while planning managed
 	// files and the generated root Taskfile, before they're assembled into a plan.
-	planArtifacts struct {
+	planArtifacts = struct {
 		moduleContents     map[string]map[string]domain.FileEntry
 		plannedFiles       []managedFile
 		rootBytes          []byte
@@ -36,7 +36,7 @@ type (
 		rootState          rootState
 	}
 
-	appendManagedArgs struct {
+	appendManagedArgs = struct {
 		mod        *moduleRecord
 		contents   map[string]domain.FileEntry
 		parentDocs map[string]struct{}
@@ -44,14 +44,14 @@ type (
 		planned    []managedFile
 	}
 
-	mergeParentDocsArgs struct {
+	mergeParentDocsArgs = struct {
 		collect    *collectModuleArgs
 		contents   fMap
 		parentDocs map[string]struct{}
 		destRoot   string
 	}
 
-	fileEntryArgs struct {
+	fileEntryArgs = struct {
 		ops          ports.TaskfileOps
 		entry        os.DirEntry
 		sourceToDest map[string]string
@@ -61,7 +61,7 @@ type (
 		absPath      string
 	}
 
-	walkCollectArgs struct {
+	walkCollectArgs = struct {
 		entry    os.DirEntry
 		walkErr  error
 		opts     *collectOptions
@@ -241,7 +241,7 @@ func finalizeBuiltPlan(input *finalizeBuiltPlanInput) (*domain.Plan, error) {
 		rootState:    input.artifacts.rootState,
 		syncRoot:     syncRootFromConfig(input.syncInput.Config),
 		meta:         input.meta,
-		metadataPath: input.syncInput.Config.MetadataPath(),
+		metadataPath: config.MetadataPath(input.syncInput.Config),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("finalize plan diff: %w", err)
@@ -670,23 +670,26 @@ func newPlanFromInputs(
 	syncIn *domain.SyncInput,
 	art *planArtifacts,
 	prev *previousState,
-) (*domain.Plan, *domain.Metadata) {
+) (plan *domain.Plan, meta *domain.Metadata) {
 	lock := buildLock(syncIn, art.plannedFiles, art.generatedRootTasks)
-	meta := newPlanMetadata(syncIn)
 
-	return assemblePlan(&assemblePlanInput{
+	meta = newPlanMetadata(syncIn)
+
+	plan = assemblePlan(&assemblePlanInput{
 		syncInput: syncIn,
 		artifacts: art,
 		prev:      *prev,
 		lock:      lock,
 		meta:      meta,
-	}), meta
+	})
+
+	return plan, meta
 }
 
 func newPlanMetadata(syncInput *domain.SyncInput) *domain.Metadata {
 	return &domain.Metadata{
 		TargetFolder:      syncInput.Config.TargetFolder,
-		LockFile:          syncInput.Config.LockFilePath(),
+		LockFile:          config.LockFilePath(syncInput.Config),
 		ConfigurationHash: syncInput.Config.ConfigurationHash,
 	}
 }
@@ -923,13 +926,13 @@ func scanModuleFiles(opts *collectOptions) (map[string]domain.FileEntry, error) 
 func setLockConfiguration(lock *syncLock, cfg *config.Config) {
 	lock.Configuration.TargetFolder = cfg.TargetFolder
 	lock.Configuration.Tasks = append([]string{}, cfg.Tasks...)
-	lock.Configuration.NodePackageManager = string(cfg.NodePackageManager)
+	lock.Configuration.NodePackageManager = cfg.NodePackageManager
 	lock.Configuration.IncludesDoc = cfg.IncludesDoc
 	lock.Configuration.SyncRoot = cfg.SyncRoot
 }
 
 func setLockResolvedModules(lock *syncLock, syncInput *domain.SyncInput) {
-	lock.Requested = orderedRequested(syncInput.Requested)
+	lock.Requested = syncInput.Requested
 	lock.Dependencies = append([]moduleRecord{}, syncInput.Dependencies...)
 }
 

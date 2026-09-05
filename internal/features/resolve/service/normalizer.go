@@ -21,7 +21,7 @@ type (
 	}
 
 	// Mapping records a source module and its normalized destination name.
-	Mapping struct {
+	Mapping = struct {
 		Source      string
 		Destination string
 	}

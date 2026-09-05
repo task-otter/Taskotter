@@ -71,7 +71,7 @@ func writeCoreMetadata(body *strings.Builder, cfg *config.Config, ref *domain.St
 	builderPrintf(body, "- Target folder: `%s`\n", cfg.TargetFolder)
 	builderPrintf(body, "- Documentation included: `%t`\n", cfg.IncludesDoc)
 	builderPrintf(body, "- Root Taskfile synchronized: `%t`\n", cfg.SyncRoot)
-	builderPrintf(body, "- JS runtime: `%s`\n", emptyDash(string(cfg.JSRuntime)))
+	builderPrintf(body, "- JS runtime: `%s`\n", emptyDash(cfg.JSRuntime))
 }
 
 func writeJSRuntimeMetadata(body *strings.Builder, cfg *config.Config) {

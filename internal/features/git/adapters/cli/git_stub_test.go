@@ -93,7 +93,7 @@ func TestDefaultBranchUsesRemoteShow(t *testing.T) {
 func TestDefaultBranchReportsMissingHeadLine(t *testing.T) {
 	client := stubbedClient(t, stubShowBad)
 
-	branch, err := client.defaultBranchFromRemoteShow(t.Context())
+	branch, err := defaultBranchFromRemoteShow(t.Context(), client)
 	iox.Discard(branch)
 
 	if !errors.Is(err, errHEADBranchNotFound) {
@@ -135,7 +135,7 @@ func assertOriginHeadCommitFails(t *testing.T, mode string) {
 
 	client := stubbedClient(t, mode)
 
-	branch, err := client.defaultBranchFromOriginHEADCommit(t.Context())
+	branch, err := defaultBranchFromOriginHEADCommit(t.Context(), client)
 	iox.Discard(branch)
 
 	if err == nil {

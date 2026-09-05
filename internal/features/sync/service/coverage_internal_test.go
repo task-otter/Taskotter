@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"github.com/task-otter/Taskotter/internal/features/sync/domain"
-	"github.com/task-otter/Taskotter/internal/features/sync/domain/rootupd"
+	"github.com/task-otter/Taskotter/internal/features/sync/ports"
 	"github.com/task-otter/Taskotter/internal/shared/config"
 	"github.com/task-otter/Taskotter/internal/shared/consts"
 	"github.com/task-otter/Taskotter/internal/shared/iox"
@@ -329,7 +329,7 @@ func (failingOps) RewriteIncludes([]byte, map[string]string, string) ([]byte, er
 	return nil, errStub
 }
 
-func (failingOps) UpdateRootTaskfile([]byte, *rootupd.RootUpdateInput) ([]byte, error) {
+func (failingOps) UpdateRootTaskfile([]byte, *ports.RootUpdateInput) ([]byte, error) {
 	return nil, errStub
 }
 

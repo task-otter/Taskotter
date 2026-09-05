@@ -33,8 +33,11 @@ func buildPlanFrom(input *buildPlanFromInput) *syncdomain.Plan {
 	input.t.Helper()
 
 	syncInput, err := syncsvc.PrepareSyncInput(&syncsvc.PrepareSyncInputArgs{
-		Cfg: input.cfg, Snapshot: input.snap, TaskfileOps: synctaskfile.Ops{},
-		Resolutions: input.resolutions, DepSources: input.depSources,
+		Cfg:         input.cfg,
+		Snapshot:    syncsvc.SnapshotPort(input.snap),
+		TaskfileOps: synctaskfile.NewOps(),
+		Resolutions: input.resolutions,
+		DepSources:  input.depSources,
 	})
 	if err != nil {
 		input.t.Fatal(err)
@@ -219,10 +222,18 @@ func assertRemovedDocPaths(t *testing.T, removed []string) {
 	assertRemovedContains(t, removed, docNestedNoteMD)
 }
 
-func applyGoWithDocsPlan(t *testing.T) (string, *config.Config) {
+func applyGoWithDocsPlan(t *testing.T) (workspace string, cfg *config.Config) {
 	t.Helper()
 
-	workspace := t.TempDir()
+	workspace = t.TempDir()
+	cfg = applyGoWithDocsToWorkspace(t, workspace)
+
+	return workspace, cfg
+}
+
+func applyGoWithDocsToWorkspace(t *testing.T, workspace string) *config.Config {
+	t.Helper()
+
 	cfg, syncInput, plan := setupPlan(
 		&setupPlanArgs{t: t, workspace: workspace, mutate: mutateGoWithDocs},
 	)
@@ -237,7 +248,7 @@ func applyGoWithDocsPlan(t *testing.T) (string, *config.Config) {
 		filepath.Join(workspace, config.DefaultTargetFolder, consts.Go, docsDirName, "guide.md"),
 	)
 
-	return workspace, cfg
+	return cfg
 }
 
 func assertIncludesDocToggleRemovesDocs(t *testing.T, workspace string, cfg *config.Config) {

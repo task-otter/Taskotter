@@ -22,6 +22,8 @@ type (
 )
 
 const (
+	testFieldTasks = "tasks"
+
 	testBaseBranch = "release/2026"
 
 	testInvalidBool = "yes"
@@ -506,12 +508,15 @@ func assertDefaultPaths(t *testing.T, cfg *config.Config) {
 		t.Fatalf("RootTaskfile = %q, want taskfiles/Taskfile.yml", cfg.RootTaskfile)
 	}
 
-	if cfg.LockFilePath() != "taskfiles/.taskotter-lock.yml" {
-		t.Fatalf("LockFilePath = %q, want taskfiles/.taskotter-lock.yml", cfg.LockFilePath())
+	if config.LockFilePath(cfg) != "taskfiles/.taskotter-lock.yml" {
+		t.Fatalf("LockFilePath = %q, want taskfiles/.taskotter-lock.yml", config.LockFilePath(cfg))
 	}
 
-	if cfg.MetadataPath() != "taskfiles/.taskotter/metadata.yml" {
-		t.Fatalf("MetadataPath = %q, want taskfiles/.taskotter/metadata.yml", cfg.MetadataPath())
+	if config.MetadataPath(cfg) != "taskfiles/.taskotter/metadata.yml" {
+		t.Fatalf(
+			"MetadataPath = %q, want taskfiles/.taskotter/metadata.yml",
+			config.MetadataPath(cfg),
+		)
 	}
 }
 
@@ -653,5 +658,27 @@ func setEnv(t *testing.T, kv map[string]string) {
 
 	for k := range kv {
 		t.Setenv(k, kv[k])
+	}
+}
+
+// TestValidationErrorFieldName covers FieldName.
+func TestValidationErrorFieldName(t *testing.T) {
+	t.Parallel()
+
+	err := &config.ValidationError{Field: testFieldTasks, Message: "required"}
+
+	if err.FieldName() != testFieldTasks {
+		t.Fatalf("FieldName = %q", err.FieldName())
+	}
+}
+
+// TestValidationErrorFieldNameEmptyMessage covers FieldName when Message is empty.
+func TestValidationErrorFieldNameEmptyMessage(t *testing.T) {
+	t.Parallel()
+
+	err := &config.ValidationError{Field: testFieldTasks, Message: consts.Empty}
+
+	if err.FieldName() != testFieldTasks {
+		t.Fatalf("FieldName() = %q", err.FieldName())
 	}
 }

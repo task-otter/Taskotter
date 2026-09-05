@@ -17,10 +17,9 @@ import (
 )
 
 type (
-	// orchestrator runs a full sync for a configuration.
-	orchestrator interface {
-		Run(ctx context.Context, cfg *config.Config) (*syncrun.Result, error)
-	}
+	runSyncFn = func(context.Context, *config.Config) (*syncrun.Result, error)
+
+	wireRunFn = func(context.Context, *config.Config) (runSyncFn, error)
 )
 
 const (
@@ -32,10 +31,10 @@ const (
 
 //nolint:gochecknoglobals // seams so tests can drive main without exiting the test process
 var (
-	exitFunc                   = os.Exit
-	stdout           io.Writer = os.Stdout
-	stderr           io.Writer = os.Stderr
-	wireOrchestrator           = defaultWireOrchestrator
+	exitFunc           = os.Exit
+	stdout   io.Writer = os.Stdout
+	stderr   io.Writer = os.Stderr
+	wireRun  wireRunFn = defaultWireRun
 )
 
 func main() {
@@ -57,13 +56,13 @@ func run() int {
 	return reportResult(cfg, result)
 }
 
-func loadRunAndWrite(ctx context.Context) (*config.Config, *syncrun.Result, error) {
-	cfg, err := config.LoadFromEnv()
+func loadRunAndWrite(ctx context.Context) (cfg *config.Config, result *syncrun.Result, err error) {
+	cfg, err = config.LoadFromEnv()
 	if err != nil {
 		return nil, nil, fmt.Errorf("load config: %w", err)
 	}
 
-	result, err := runOrchestrator(ctx, cfg)
+	result, err = runOrchestrator(ctx, cfg)
 	if err != nil {
 		return nil, nil, fmt.Errorf("run sync: %w", err)
 	}
@@ -76,23 +75,22 @@ func loadRunAndWrite(ctx context.Context) (*config.Config, *syncrun.Result, erro
 	return cfg, result, nil
 }
 
-//nolint:ireturn,iface // the interface is the seam tests replace
-func defaultWireOrchestrator(ctx context.Context, cfg *config.Config) (orchestrator, error) {
+func defaultWireRun(ctx context.Context, cfg *config.Config) (runSyncFn, error) {
 	orch, err := WireOrchestrator(ctx, cfg)
 	if err != nil {
 		return nil, fmt.Errorf(errWireOrchFmt, err)
 	}
 
-	return orch, nil
+	return orch.Run, nil
 }
 
 func runOrchestrator(ctx context.Context, cfg *config.Config) (*syncrun.Result, error) {
-	orch, err := wireOrchestrator(ctx, cfg)
+	runSync, err := wireRun(ctx, cfg)
 	if err != nil {
 		return nil, fmt.Errorf(errWireOrchFmt, err)
 	}
 
-	result, err := orch.Run(ctx, cfg)
+	result, err := runSync(ctx, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("run orchestrator: %w", err)
 	}

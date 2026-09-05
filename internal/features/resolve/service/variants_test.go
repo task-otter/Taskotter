@@ -70,7 +70,7 @@ func TestBuildSourceModule(t *testing.T) {
 	})
 	assertBuildSourceModule(t, &buildSourceModuleCase{
 		task:   taskESLint,
-		pkgMgr: config.PackageManager(config.JSRuntimeBun),
+		pkgMgr: config.JSRuntimeBun,
 		want:   srcESLintBun,
 	})
 	assertBuildSourceModuleError(t, &buildSourceModuleCase{

@@ -26,31 +26,31 @@ func TestOrchestratorHookFailures(t *testing.T) {
 }
 
 func applyApplyPlanFail(env *failEnv) {
-	env.orch.ApplyPlan = func(*syncdomain.Plan, *syncdomain.SyncInput) error {
+	env.deps.ApplyPlan = func(*syncdomain.Plan, *syncdomain.SyncInput) error {
 		return errTestBoom
 	}
 }
 
 func applyBuildPlanFail(env *failEnv) {
-	env.orch.BuildPlan = func(*syncdomain.SyncInput) (*syncdomain.Plan, error) {
+	env.deps.BuildPlan = func(*syncdomain.SyncInput) (*syncdomain.Plan, error) {
 		return nil, errTestBoom
 	}
 }
 
 func applyPrepareFail(env *failEnv) {
-	env.orch.PrepareSyncInput = func(*syncsvc.PrepareSyncInputArgs) (syncdomain.SyncInput, error) {
+	env.deps.PrepareSyncInput = func(*syncsvc.PrepareSyncInputArgs) (syncdomain.SyncInput, error) {
 		return syncdomain.SyncInput{}, errTestBoom
 	}
 }
 
 func applyResolveAllFail(env *failEnv) {
-	env.orch.ResolveAll = func(*resolvesvc.ResolveAllInput) ([]resolvesvc.Resolution, error) {
+	env.deps.ResolveAll = func(*resolvesvc.ResolveAllInput) ([]resolvesvc.Resolution, error) {
 		return nil, errTestBoom
 	}
 }
 
 func applyResolveDepsFail(env *failEnv) {
-	env.orch.ResolveTransitive = func([]string, map[string][]string) ([]string, error) {
+	env.deps.ResolveTransitive = func([]string, map[string][]string) ([]string, error) {
 		return nil, errTestBoom
 	}
 }
@@ -82,15 +82,18 @@ func bindFailEnv(t *testing.T, workspace string) *failEnv {
 	work := newMockWorkspace()
 	pullReq := newMockPR(nil)
 
+	deps, orch := newTestOrchestratorParts(&testOrchInput{
+		t: t, store: store, gitOps: gitOps, gitWork: work, pullReq: pullReq,
+	})
+
 	return &failEnv{
 		store: store,
 		git:   gitOps,
 		work:  work,
 		pr:    pullReq,
 		cfg:   testConfigWithRepo(workspace),
-		orch: newTestOrchestratorParts(&testOrchInput{
-			t: t, store: store, gitOps: gitOps, gitWork: work, pullReq: pullReq,
-		}),
+		deps:  deps,
+		orch:  orch,
 	}
 }
 

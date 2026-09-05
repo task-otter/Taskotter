@@ -2,8 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0.
 
 // Package github fetches TaskOtter store module snapshots from GitHub.
-//
-//nolint:funcorder // HTTP helpers and ref resolution grouped by call flow
 package github
 
 import (
@@ -33,54 +31,69 @@ type (
 	Snapshot = domain.Snapshot
 
 	// HTTPDoer performs HTTP requests for the store client.
-	HTTPDoer interface {
+	HTTPDoer = interface {
 		Do(req *http.Request) (*http.Response, error)
 	}
 
 	httpRsp = *http.Response
 
 	// Client resolves store refs and downloads store archives from GitHub.
+	decodeTagArgs = struct {
+		rsp httpRsp
+		val string
+	}
+
+	getJSONArgs = struct {
+		payload any
+		reqPath string
+	}
+
+	clientFns = struct {
+		do      func(*http.Request) (*http.Response, error)
+		token   string
+		baseURL string
+	}
+
+	// Client resolves store refs and downloads store archives from GitHub.
 	Client struct {
-		httpClient HTTPDoer
-		token      string
-		baseURL    string
+		fns clientFns
 	}
 
 	// tagRefPayload is the GitHub API response shape for a tag ref lookup.
-	tagRefPayload struct {
+	tagRefPayload = struct {
 		Object tagRefObject `json:"object"`
 	}
 
-	tagRefObject struct {
+	tagRefObject = struct {
 		SHA  string `json:"sha"`
 		Type string `json:"type"`
 	}
 
-	annotatedTagPayload struct {
+	annotatedTagPayload = struct {
 		Object annotatedTagObject `json:"object"`
 	}
 
-	annotatedTagObject struct {
+	annotatedTagObject = struct {
 		SHA string `json:"sha"`
 	}
 
-	branchHeadPayload struct {
+	branchHeadPayload = struct {
 		SHA string `json:"sha"`
 	}
 
-	extractedStore struct {
+	extractedStore = struct {
 		catalog map[string]struct{}
 		deps    map[string][]string
 		root    string
 	}
 
-	versionRefRequest struct {
+	versionRefRequest = struct {
 		info             *RefInfo
 		requestedVersion string
 		defaultBranch    string
 	}
 
-	resolvedRefRequest struct {
+	resolvedRefRequest = struct {
 		info      *RefInfo
 		resolve   func(context.Context) (string, error)
 		sourceRef string
@@ -130,27 +143,29 @@ var (
 func NewClient(ctx context.Context, token string) *Client {
 	iox.Discard(ctx)
 
-	return &Client{
-		httpClient: &http.Client{
-			Timeout:       httpClientTimeout,
-			Transport:     nil,
-			CheckRedirect: nil,
-			Jar:           nil,
-		},
+	httpClient := &http.Client{
+		Timeout:       httpClientTimeout,
+		Transport:     nil,
+		CheckRedirect: nil,
+		Jar:           nil,
+	}
+
+	return &Client{fns: clientFns{
+		do:      httpClient.Do,
 		token:   token,
 		baseURL: defaultBaseURL,
-	}
+	}}
 }
 
 // NewClientWithHTTP returns a store client that uses a custom HTTP doer.
 func NewClientWithHTTP(ctx context.Context, token string, httpClient HTTPDoer) *Client {
 	iox.Discard(ctx)
 
-	return &Client{
-		httpClient: httpClient,
-		token:      token,
-		baseURL:    defaultBaseURL,
-	}
+	return &Client{fns: clientFns{
+		do:      httpClient.Do,
+		token:   token,
+		baseURL: defaultBaseURL,
+	}}
 }
 
 // LocalSnapshot creates a snapshot from an on-disk directory (tests/fixtures).
@@ -381,7 +396,13 @@ func snapshotCleanup(tmpDir string) func() error {
 //
 // DownloadSnapshot downloads and extracts a store archive for the given ref.
 func (client *Client) DownloadSnapshot(ctx context.Context, ref *RefInfo) (*Snapshot, error) {
-	resp, err := client.fetchArchive(ctx, ref)
+	iox.Discard(client.fns)
+
+	return downloadSnapshot(ctx, client, ref) //nolint:wrapcheck // thin adapter
+}
+
+func downloadSnapshot(ctx context.Context, client *Client, ref *RefInfo) (*Snapshot, error) {
+	resp, err := fetchArchive(ctx, client, ref)
 	if err != nil {
 		return nil, fmt.Errorf("fetch archive: %w", err)
 	}
@@ -398,14 +419,20 @@ func (client *Client) DownloadSnapshot(ctx context.Context, ref *RefInfo) (*Snap
 
 // ResolveRef resolves a requested store version to a commit SHA.
 func (client *Client) ResolveRef(ctx context.Context, requestedVersion string) (RefInfo, error) {
-	defaultBranch, err := client.getDefaultBranch(ctx)
+	iox.Discard(client.fns)
+
+	return resolveRef(ctx, client, requestedVersion) //nolint:wrapcheck // thin adapter
+}
+
+func resolveRef(ctx context.Context, client *Client, requestedVersion string) (RefInfo, error) {
+	defaultBranch, err := getDefaultBranch(ctx, client)
 	if err != nil {
 		return RefInfo{}, fmt.Errorf("get default branch: %w", err)
 	}
 
 	info := newRefInfo(requestedVersion, defaultBranch)
 
-	err = client.resolveVersionRef(ctx, &versionRefRequest{
+	err = resolveVersionRef(ctx, client, &versionRefRequest{
 		info:             &info,
 		requestedVersion: requestedVersion,
 		defaultBranch:    defaultBranch,
@@ -419,27 +446,33 @@ func (client *Client) ResolveRef(ctx context.Context, requestedVersion string) (
 
 // WithBaseURL overrides the GitHub API base URL, primarily for tests.
 func (client *Client) WithBaseURL(baseURL string) *Client {
-	client.baseURL = strings.TrimRight(baseURL, "/")
+	iox.Discard(client.fns)
+
+	return withBaseURL(client, baseURL)
+}
+
+func withBaseURL(client *Client, baseURL string) *Client {
+	client.fns.baseURL = strings.TrimRight(baseURL, "/")
 
 	return client
 }
 
-func (client *Client) apiURL(reqPath string) string {
-	return client.baseURL + reqPath
+func apiURL(client *Client, reqPath string) string {
+	return client.fns.baseURL + reqPath
 }
 
-func (client *Client) applyHeaders(req *http.Request) {
+func applyHeaders(client *Client, req *http.Request) {
 	req.Header.Set("Accept", "application/vnd.github+json")
 	req.Header.Set("X-Github-Api-Version", "2022-11-28")
 	req.Header.Set("User-Agent", "TaskOtter")
 
-	if client.token != consts.Empty {
-		req.Header.Set("Authorization", "Bearer "+client.token)
+	if client.fns.token != consts.Empty {
+		req.Header.Set("Authorization", "Bearer "+client.fns.token)
 	}
 }
 
-func (client *Client) decodeTag(ctx context.Context, rsp httpRsp, val string) (string, error) {
-	sha, err := client.tagSHA(ctx, rsp, val)
+func decodeTag(ctx context.Context, client *Client, args decodeTagArgs) (string, error) {
+	sha, err := tagSHA(ctx, client, decodeTagArgs{rsp: args.rsp, val: args.val})
 	if err != nil {
 		return consts.Empty, fmt.Errorf("resolve tag from payload: %w", err)
 	}
@@ -447,15 +480,20 @@ func (client *Client) decodeTag(ctx context.Context, rsp httpRsp, val string) (s
 	return sha, nil
 }
 
-func (client *Client) doGet(ctx context.Context, reqPath string) (*http.Response, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, client.apiURL(reqPath), http.NoBody)
+func doGet(ctx context.Context, client *Client, reqPath string) (*http.Response, error) {
+	req, err := http.NewRequestWithContext(
+		ctx,
+		http.MethodGet,
+		apiURL(client, reqPath),
+		http.NoBody,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("create API request: %w", err)
 	}
 
-	client.applyHeaders(req)
+	applyHeaders(client, req)
 
-	resp, err := client.httpClient.Do(req)
+	resp, err := client.fns.do(req)
 	if err != nil {
 		return nil, fmt.Errorf("GitHub API request: %w", err)
 	}
@@ -463,7 +501,7 @@ func (client *Client) doGet(ctx context.Context, reqPath string) (*http.Response
 	return resp, nil
 }
 
-func (client *Client) fetchArchive(ctx context.Context, ref *RefInfo) (*http.Response, error) {
+func fetchArchive(ctx context.Context, client *Client, ref *RefInfo) (*http.Response, error) {
 	downloadPath := fmt.Sprintf(
 		"/repos/%s/%s/tarball/%s",
 		storeOwner,
@@ -471,7 +509,7 @@ func (client *Client) fetchArchive(ctx context.Context, ref *RefInfo) (*http.Res
 		ref.ResolvedCommit,
 	)
 
-	resp, err := client.doGet(ctx, downloadPath)
+	resp, err := doGet(ctx, client, downloadPath)
 	if err != nil {
 		return nil, fmt.Errorf("get archive: %w", err)
 	}
@@ -484,7 +522,7 @@ func (client *Client) fetchArchive(ctx context.Context, ref *RefInfo) (*http.Res
 	return resp, nil
 }
 
-func (client *Client) fetchTagRef(ctx context.Context, tag string) (*http.Response, error) {
+func fetchTagRef(ctx context.Context, client *Client, tag string) (*http.Response, error) {
 	reqPath := fmt.Sprintf(
 		"/repos/%s/%s/git/ref/tags/%s",
 		storeOwner,
@@ -492,7 +530,7 @@ func (client *Client) fetchTagRef(ctx context.Context, tag string) (*http.Respon
 		url.PathEscape(tag),
 	)
 
-	resp, err := client.doGet(ctx, reqPath)
+	resp, err := doGet(ctx, client, reqPath)
 	if err != nil {
 		return nil, fmt.Errorf("get tag ref: %w", err)
 	}
@@ -500,11 +538,11 @@ func (client *Client) fetchTagRef(ctx context.Context, tag string) (*http.Respon
 	return resp, nil
 }
 
-func (client *Client) getDefaultBranch(ctx context.Context) (string, error) {
+func getDefaultBranch(ctx context.Context, client *Client) (string, error) {
 	payload := make(map[string]json.RawMessage)
 	reqPath := fmt.Sprintf("/repos/%s/%s", storeOwner, storeRepo)
 
-	err := client.getJSON(ctx, reqPath, &payload)
+	err := getJSON(ctx, client, &getJSONArgs{reqPath: reqPath, payload: &payload})
 	if err != nil {
 		return consts.Empty, fmt.Errorf("fetch store repository metadata: %w", err)
 	}
@@ -517,15 +555,15 @@ func (client *Client) getDefaultBranch(ctx context.Context) (string, error) {
 	return branch, nil
 }
 
-func (client *Client) getJSON(ctx context.Context, reqPath string, payload any) error {
-	resp, err := client.doGet(ctx, reqPath)
+func getJSON(ctx context.Context, client *Client, args *getJSONArgs) error {
+	resp, err := doGet(ctx, client, args.reqPath)
 	if err != nil {
-		return fmt.Errorf("get %q: %w", reqPath, err)
+		return fmt.Errorf("get %q: %w", args.reqPath, err)
 	}
 
 	defer func() { iox.Discard2(drainArchiveBody(resp)) }()
 
-	err = readJSONResponse(resp, reqPath, payload)
+	err = readJSONResponse(resp, args.reqPath, args.payload)
 	if err != nil {
 		return fmt.Errorf("read JSON response: %w", err)
 	}
@@ -533,12 +571,12 @@ func (client *Client) getJSON(ctx context.Context, reqPath string, payload any) 
 	return nil
 }
 
-func (client *Client) peelAnnotatedTag(ctx context.Context, sha string) (string, error) {
+func peelAnnotatedTag(ctx context.Context, client *Client, sha string) (string, error) {
 	var payload annotatedTagPayload
 
 	reqPath := fmt.Sprintf("/repos/%s/%s/git/tags/%s", storeOwner, storeRepo, sha)
 
-	err := client.getJSON(ctx, reqPath, &payload)
+	err := getJSON(ctx, client, &getJSONArgs{reqPath: reqPath, payload: &payload})
 	if err != nil {
 		return consts.Empty, fmt.Errorf("resolve annotated tag: %w", err)
 	}
@@ -546,12 +584,12 @@ func (client *Client) peelAnnotatedTag(ctx context.Context, sha string) (string,
 	return payload.Object.SHA, nil
 }
 
-func (client *Client) resolveBranchHead(ctx context.Context, branch string) (string, error) {
+func resolveBranchHead(ctx context.Context, client *Client, branch string) (string, error) {
 	var payload branchHeadPayload
 
 	reqPath := fmt.Sprintf("/repos/%s/%s/commits/%s", storeOwner, storeRepo, url.PathEscape(branch))
 
-	err := client.getJSON(ctx, reqPath, &payload)
+	err := getJSON(ctx, client, &getJSONArgs{reqPath: reqPath, payload: &payload})
 	if err != nil {
 		return consts.Empty, fmt.Errorf("resolve branch %q: %w", branch, err)
 	}
@@ -571,12 +609,12 @@ func applyResolvedRef(ctx context.Context, req *resolvedRefRequest) error {
 	return nil
 }
 
-func (client *Client) resolveSHA(ctx context.Context, payload *tagRefPayload) (string, error) {
+func resolveSHA(ctx context.Context, client *Client, payload *tagRefPayload) (string, error) {
 	if payload.Object.Type != gitObjectTypeTag {
 		return payload.Object.SHA, nil
 	}
 
-	sha, err := client.peelAnnotatedTag(ctx, payload.Object.SHA)
+	sha, err := peelAnnotatedTag(ctx, client, payload.Object.SHA)
 	if err != nil {
 		return consts.Empty, fmt.Errorf("peel annotated tag: %w", err)
 	}
@@ -585,14 +623,14 @@ func (client *Client) resolveSHA(ctx context.Context, payload *tagRefPayload) (s
 }
 
 //nolint:nestif,funlen,maintidx // branch/tag ref paths share applyResolvedRef wiring
-func (client *Client) resolveVersionRef(ctx context.Context, req *versionRefRequest) error {
+func resolveVersionRef(ctx context.Context, client *Client, req *versionRefRequest) error {
 	if req.requestedVersion == consts.Empty {
 		err := applyResolvedRef(ctx, &resolvedRefRequest{
 			info:      req.info,
 			sourceRef: "refs/heads/" + req.defaultBranch,
 			wrapMsg:   "resolve branch head",
 			resolve: func(callCtx context.Context) (string, error) {
-				return client.resolveBranchHead(callCtx, req.defaultBranch)
+				return resolveBranchHead(callCtx, client, req.defaultBranch)
 			},
 		})
 		if err != nil {
@@ -607,7 +645,7 @@ func (client *Client) resolveVersionRef(ctx context.Context, req *versionRefRequ
 		sourceRef: "refs/tags/" + req.requestedVersion,
 		wrapMsg:   "resolve tag",
 		resolve: func(callCtx context.Context) (string, error) {
-			return client.resolveTag(callCtx, req.requestedVersion)
+			return resolveTag(callCtx, client, req.requestedVersion)
 		},
 	})
 	if err != nil {
@@ -617,15 +655,15 @@ func (client *Client) resolveVersionRef(ctx context.Context, req *versionRefRequ
 	return nil
 }
 
-func (client *Client) resolveTag(ctx context.Context, tag string) (string, error) {
-	resp, err := client.fetchTagRef(ctx, tag)
+func resolveTag(ctx context.Context, client *Client, tag string) (string, error) {
+	resp, err := fetchTagRef(ctx, client, tag)
 	if err != nil {
 		return consts.Empty, fmt.Errorf("fetch tag ref: %w", err)
 	}
 
 	defer func() { iox.Discard2(drainArchiveBody(resp)) }()
 
-	sha, err := client.decodeTag(ctx, resp, tag)
+	sha, err := decodeTag(ctx, client, decodeTagArgs{rsp: resp, val: tag})
 	if err != nil {
 		return consts.Empty, fmt.Errorf("decode and resolve tag: %w", err)
 	}
@@ -633,13 +671,13 @@ func (client *Client) resolveTag(ctx context.Context, tag string) (string, error
 	return sha, nil
 }
 
-func (client *Client) tagSHA(ctx context.Context, rsp httpRsp, val string) (string, error) {
-	payload, err := decodeTagPayload(rsp, val)
+func tagSHA(ctx context.Context, client *Client, args decodeTagArgs) (string, error) {
+	payload, err := decodeTagPayload(args.rsp, args.val)
 	if err != nil {
 		return consts.Empty, fmt.Errorf("decode tag payload: %w", err)
 	}
 
-	sha, err := client.resolveSHA(ctx, &payload)
+	sha, err := resolveSHA(ctx, client, &payload)
 	if err != nil {
 		return consts.Empty, fmt.Errorf("resolve sha: %w", err)
 	}

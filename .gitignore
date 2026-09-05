@@ -17,3 +17,5 @@ junit.xml
 .cursor
 .qodo
 .task
+custom-golangci-lint
+test-result.txt

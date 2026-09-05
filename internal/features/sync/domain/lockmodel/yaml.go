@@ -16,37 +16,39 @@ import (
 )
 
 type (
-	yamlDecodeTarget struct {
+	yamlDecodeTarget = struct {
 		Out any
 		Key string
 	}
 )
 
 const (
-	errDecode                 = "decode %q: %w"
-	yamlKeyConfiguration      = "configuration"
-	yamlKeyDefaultBranch      = "default_branch"
-	yamlKeyDependencies       = "dependencies"
-	yamlKeyDestinationModule  = "destination_module"
-	yamlKeyGeneratedRootTasks = "generated_root_tasks"
-	yamlKeyIncludesDoc        = "includes_doc"
-	yamlKeyManagedFiles       = "managed_files"
-	yamlKeyNodePackageManager = "node_package_manager"
-	yamlKeyPath               = "path"
-	yamlKeyRepository         = "repository"
-	yamlKeyRequested          = "requested"
-	yamlKeyRequestedVersion   = "requested_version"
-	yamlKeyResolvedCommit     = "resolved_commit"
-	yamlKeyResolvedModules    = "resolved_modules"
-	yamlKeySHA256             = "sha256"
-	yamlKeySource             = "source"
-	yamlKeySourceModule       = "source_module"
-	yamlKeySourcePath         = "source_path"
-	yamlKeySourceRef          = "source_ref"
-	yamlKeySyncRoot           = "sync_root"
-	yamlKeyTargetFolder       = "target_folder"
-	yamlKeyTasks              = "tasks"
-	yamlMappingPairKeyValue   = consts.IndexTwo
+	errDecode                   = "decode %q: %w"
+	errUnmarshalModuleRecordFmt = "unmarshal module record: %w"
+	yamlLabelModuleRecord       = "module record"
+	yamlKeyConfiguration        = "configuration"
+	yamlKeyDefaultBranch        = "default_branch"
+	yamlKeyDependencies         = "dependencies"
+	yamlKeyDestinationModule    = "destination_module"
+	yamlKeyGeneratedRootTasks   = "generated_root_tasks"
+	yamlKeyIncludesDoc          = "includes_doc"
+	yamlKeyManagedFiles         = "managed_files"
+	yamlKeyNodePackageManager   = "node_package_manager"
+	yamlKeyPath                 = "path"
+	yamlKeyRepository           = "repository"
+	yamlKeyRequested            = "requested"
+	yamlKeyRequestedVersion     = "requested_version"
+	yamlKeyResolvedCommit       = "resolved_commit"
+	yamlKeyResolvedModules      = "resolved_modules"
+	yamlKeySHA256               = "sha256"
+	yamlKeySource               = "source"
+	yamlKeySourceModule         = "source_module"
+	yamlKeySourcePath           = "source_path"
+	yamlKeySourceRef            = "source_ref"
+	yamlKeySyncRoot             = "sync_root"
+	yamlKeyTargetFolder         = "target_folder"
+	yamlKeyTasks                = "tasks"
+	yamlMappingPairKeyValue     = consts.IndexTwo
 )
 
 var errYAMLMappingNodeExpected = errors.New("expected YAML mapping node")
@@ -79,8 +81,8 @@ func EncodeLockFile(lock *LockFile) map[string]any {
 	return out
 }
 
-// UnmarshalYAML decodes the TaskOtter lock file from its stable on-disk keys.
-func (lock *LockFile) UnmarshalYAML(value *yaml.Node) error {
+// UnmarshalLockFile decodes the TaskOtter lock file from its stable on-disk keys.
+func UnmarshalLockFile(value *yaml.Node, lock *LockFile) error {
 	fields, err := yamlFields(value)
 	if err != nil {
 		return fmt.Errorf("decode lock file: %w", err)
@@ -103,23 +105,45 @@ func (lock *LockFile) UnmarshalYAML(value *yaml.Node) error {
 	return nil
 }
 
-// UnmarshalYAML decodes a module record from the lock file's snake_case keys.
-func (record *ModuleRecord) UnmarshalYAML(value *yaml.Node) error {
+// DecodeLockFileYAML unmarshals YAML bytes into a lock file.
+func DecodeLockFileYAML(data []byte, lock *LockFile) error {
+	return decodeYAMLDocument( //nolint:wrapcheck // thin decode wrapper
+		data,
+		"lock file",
+		func(node *yaml.Node) error {
+			return UnmarshalLockFile(node, lock)
+		},
+	)
+}
+
+// UnmarshalModuleRecord decodes a module record from the lock file's snake_case keys.
+func UnmarshalModuleRecord(value *yaml.Node, record *ModuleRecord) error {
 	err := unmarshalYAMLTargets(
-		value, "module record",
+		value, yamlLabelModuleRecord,
 		yamlDecodeTarget{Key: yamlKeySourceModule, Out: &record.SourceModule},
 		yamlDecodeTarget{Key: yamlKeyDestinationModule, Out: &record.DestinationModule},
 		yamlDecodeTarget{Key: yamlKeyPath, Out: &record.Path},
 	)
 	if err != nil {
-		return fmt.Errorf("unmarshal module record: %w", err)
+		return fmt.Errorf(errUnmarshalModuleRecordFmt, err)
 	}
 
 	return nil
 }
 
-// UnmarshalYAML decodes ordered requested modules from the lock file.
-func (requested *OrderedRequested) UnmarshalYAML(value *yaml.Node) error {
+// DecodeModuleRecordYAML unmarshals YAML bytes into a module record.
+func DecodeModuleRecordYAML(data []byte, record *ModuleRecord) error {
+	return decodeYAMLDocument( //nolint:wrapcheck // thin decode wrapper
+		data,
+		yamlLabelModuleRecord,
+		func(node *yaml.Node) error {
+			return UnmarshalModuleRecord(node, record)
+		},
+	)
+}
+
+// UnmarshalOrderedRequested decodes ordered requested modules from the lock file.
+func UnmarshalOrderedRequested(value *yaml.Node, requested *OrderedRequested) error {
 	var raw map[string]ModuleRecord
 
 	err := value.Decode(&raw)
@@ -127,9 +151,44 @@ func (requested *OrderedRequested) UnmarshalYAML(value *yaml.Node) error {
 		return fmt.Errorf("decode ordered requested modules: %w", err)
 	}
 
-	*requested = OrderedRequested(raw)
+	*requested = raw
 
 	return nil
+}
+
+// DecodeOrderedRequestedYAML unmarshals YAML bytes into ordered requested modules.
+func DecodeOrderedRequestedYAML(data []byte, requested *OrderedRequested) error {
+	return decodeYAMLDocument( //nolint:wrapcheck // thin decode wrapper
+		data,
+		"ordered requested",
+		func(node *yaml.Node) error {
+			return UnmarshalOrderedRequested(node, requested)
+		},
+	)
+}
+
+func decodeYAMLDocument(data []byte, label string, unmarshal func(*yaml.Node) error) error {
+	var node yaml.Node
+
+	err := yaml.Unmarshal(data, &node)
+	if err != nil {
+		return fmt.Errorf("decode %s yaml: %w", label, err)
+	}
+
+	err = unmarshal(yamlDocumentContent(&node))
+	if err != nil {
+		return fmt.Errorf("unmarshal %s: %w", label, err)
+	}
+
+	return nil
+}
+
+func yamlDocumentContent(node *yaml.Node) *yaml.Node {
+	if node != nil && node.Kind == yaml.DocumentNode && len(node.Content) > consts.IndexZero {
+		return node.Content[consts.IndexZero]
+	}
+
+	return node
 }
 
 func decodeLockConfiguration(fields map[string]*yaml.Node, lock *LockFile) error {

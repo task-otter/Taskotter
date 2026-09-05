@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/task-otter/Taskotter/internal/shared/consts"
-	yaml "go.yaml.in/yaml/v3"
 )
 
 type (
@@ -65,7 +64,7 @@ func assertFileFailCase(t *testing.T, testCase *fileYAMLCase) {
 
 	var file File
 
-	assertFails(t, yaml.Unmarshal([]byte(testCase.payload), &file))
+	assertFails(t, DecodeFileYAML([]byte(testCase.payload), &file))
 }
 
 func assertFileOKCase(t *testing.T, testCase *fileYAMLCase) {
@@ -143,5 +142,18 @@ func runFileOKCases(t *testing.T, cases []fileYAMLCase) {
 
 func unmarshalFileOK(t *testing.T, payload string, file *File) {
 	t.Helper()
-	assertNoErr(t, yaml.Unmarshal([]byte(payload), file))
+	assertNoErr(t, DecodeFileYAML([]byte(payload), file))
+}
+
+// TestDecodeFileYAMLRejectsInvalidYAML covers decode failure and non-document unwrap.
+func TestDecodeFileYAMLRejectsInvalidYAML(t *testing.T) {
+	t.Parallel()
+
+	var file File
+
+	assertFails(t, DecodeFileYAML([]byte(":\t"), &file))
+
+	if yamlDocumentContent(nil) != nil {
+		t.Fatal("nil document")
+	}
 }

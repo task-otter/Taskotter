@@ -11,6 +11,7 @@ import (
 	"slices"
 
 	"github.com/task-otter/Taskotter/internal/features/sync/domain"
+	"github.com/task-otter/Taskotter/internal/features/sync/domain/lockmodel"
 	"github.com/task-otter/Taskotter/internal/shared/config"
 	"github.com/task-otter/Taskotter/internal/shared/consts"
 	"github.com/task-otter/Taskotter/internal/shared/pathutil"
@@ -54,7 +55,7 @@ func LoadLock(workspace, rel string) (*syncLock, error) {
 
 	var lock syncLock
 
-	err = yaml.Unmarshal(data, &lock)
+	err = lockmodel.DecodeLockFileYAML(data, &lock)
 	if err != nil {
 		return nil, fmt.Errorf("parse lock file %q: %w", rel, err)
 	}
@@ -78,7 +79,7 @@ func loadPreviousState(workspace string, cfg *config.Config) (previousState, err
 }
 
 func loadCurrentMetadata(workspace string, cfg *config.Config) (*domain.Metadata, error) {
-	meta, found, err := loadMetadataIfExists(workspace, cfg.MetadataPath())
+	meta, found, err := loadMetadataIfExists(workspace, config.MetadataPath(cfg))
 
 	if err != nil && !errors.Is(err, errMetadataNotFound) {
 		return nil, fmt.Errorf("load metadata: %w", err)
@@ -88,7 +89,7 @@ func loadCurrentMetadata(workspace string, cfg *config.Config) (*domain.Metadata
 		return meta, nil
 	}
 
-	meta, err = loadMetadataFallbacks(workspace, cfg.MetadataPath())
+	meta, err = loadMetadataFallbacks(workspace, config.MetadataPath(cfg))
 	if err != nil {
 		return nil, fmt.Errorf("load metadata fallbacks: %w", err)
 	}
@@ -115,12 +116,14 @@ func loadMetadataFallbacks(workspace, currentMetadataPath string) (*domain.Metad
 	return discovered, nil
 }
 
-func tryLegacyMetadata(workspace, currentMetadataPath string) (*domain.Metadata, bool, error) {
+func tryLegacyMetadata(
+	workspace, currentMetadataPath string,
+) (meta *domain.Metadata, found bool, err error) {
 	if currentMetadataPath == config.LegacyMetadataPath {
 		return nil, false, errMetadataNotFound
 	}
 
-	meta, found, err := loadMetadataIfExists(workspace, config.LegacyMetadataPath)
+	meta, found, err = loadMetadataIfExists(workspace, config.LegacyMetadataPath)
 
 	if err != nil && !errors.Is(err, errMetadataNotFound) {
 		return nil, false, fmt.Errorf("load legacy metadata: %w", err)
@@ -133,8 +136,10 @@ func tryLegacyMetadata(workspace, currentMetadataPath string) (*domain.Metadata,
 	return meta, true, nil
 }
 
-func loadMetadataIfExists(workspace, metadataPath string) (*domain.Metadata, bool, error) {
-	meta, err := LoadMetadata(workspace, metadataPath)
+func loadMetadataIfExists(
+	workspace, metadataPath string,
+) (meta *domain.Metadata, found bool, err error) {
+	meta, err = LoadMetadata(workspace, metadataPath)
 
 	if errors.Is(err, os.ErrNotExist) {
 		return nil, false, errMetadataNotFound
@@ -170,7 +175,7 @@ func loadPreviousLock(
 }
 
 func resolveOldLockPathAndTarget(args resolveLockArgs) lockPathResult {
-	oldLockPath := args.cfg.LockFilePath()
+	oldLockPath := config.LockFilePath(args.cfg)
 
 	if args.oldMeta == nil {
 		return lockPathResult{lockPath: oldLockPath, target: consts.Empty}

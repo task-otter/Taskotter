@@ -60,23 +60,30 @@ func preparePlan(
 	t *testing.T,
 	_ string,
 	cfg *config.Config,
-) (syncdomain.SyncInput, *syncdomain.Plan) {
+) (syncInput syncdomain.SyncInput, plan *syncdomain.Plan) {
+	t.Helper()
+
+	syncInput = prepareSyncInputForTest(t, cfg)
+	plan = buildPlanFromSyncInput(t, &syncInput)
+
+	return syncInput, plan
+}
+
+func prepareSyncInputForTest(t *testing.T, cfg *config.Config) syncdomain.SyncInput {
 	t.Helper()
 
 	snap := fixtureStore(t)
 	resolutions, depSources := resolveModsForTest(&moduleTestInput{t: t, cfg: cfg, snap: snap})
 
 	syncInput, err := syncsvc.PrepareSyncInput(&syncsvc.PrepareSyncInputArgs{
-		Cfg: cfg, Snapshot: snap, TaskfileOps: synctaskfile.Ops{},
+		Cfg: cfg, Snapshot: syncsvc.SnapshotPort(snap), TaskfileOps: synctaskfile.NewOps(),
 		Resolutions: resolutions, DepSources: depSources,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	plan := buildPlanFromSyncInput(t, &syncInput)
-
-	return syncInput, plan
+	return syncInput
 }
 
 func resolveModsForTest(input *moduleTestInput) (res []resolvesvc.Resolution, dep []string) {
@@ -127,7 +134,9 @@ func mutateGoWithDocsNoSyncRoot(cfg *config.Config) {
 	cfg.SyncRoot = false
 }
 
-func setupPlanWithRootContent(args *setupPlanRootArgs) (syncdomain.SyncInput, *syncdomain.Plan) {
+func setupPlanWithRootContent(
+	args *setupPlanRootArgs,
+) (syncInput syncdomain.SyncInput, plan *syncdomain.Plan) {
 	args.t.Helper()
 
 	writeFileWithDir(
@@ -159,7 +168,7 @@ func writeLegacyMetadataFixture(t *testing.T, workspace string) {
 func assertMetadataMigrated(t *testing.T, workspace string, cfg *config.Config) {
 	t.Helper()
 
-	assertFileExists(t, filepath.Join(workspace, cfg.MetadataPath()))
+	assertFileExists(t, filepath.Join(workspace, config.MetadataPath(cfg)))
 
 	stat, err := os.Stat(filepath.Join(workspace, config.LegacyMetadataPath))
 	iox.Discard(stat)
@@ -184,7 +193,7 @@ func TestApplyPlanWritesFiles(t *testing.T) {
 	}
 
 	assertFileExists(t, filepath.Join(workspace, config.DefaultTargetFolder, testGoTaskfilePath))
-	assertFileExists(t, filepath.Join(workspace, cfg.MetadataPath()))
+	assertFileExists(t, filepath.Join(workspace, config.MetadataPath(cfg)))
 }
 
 // TestApplyPlanMigratesLegacyMetadataPath verifies legacy metadata is migrated and the old file removed.

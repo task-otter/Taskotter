@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/task-otter/Taskotter/internal/features/sync/domain/rootupd"
+	"github.com/task-otter/Taskotter/internal/features/sync/ports"
 	"github.com/task-otter/Taskotter/internal/shared/consts"
 	"github.com/task-otter/Taskotter/internal/shared/iox"
 	yaml "go.yaml.in/yaml/v3"
@@ -33,7 +33,7 @@ const (
 func TestOpsDelegatesToPackageHelpers(t *testing.T) {
 	t.Parallel()
 
-	ops := Ops{}
+	ops := NewOps()
 
 	if len(ops.NewRootTemplate()) == consts.IndexZero {
 		t.Fatal("NewRootTemplate() = empty")
@@ -52,7 +52,7 @@ func TestOpsDelegatesToPackageHelpers(t *testing.T) {
 func TestOpsReportsFailures(t *testing.T) {
 	t.Parallel()
 
-	ops := Ops{}
+	ops := NewOps()
 
 	out, err := ops.RewriteIncludes([]byte(badYAML), nil, consts.Empty)
 	iox.Discard(out)
@@ -356,7 +356,7 @@ func assertRewriteFails(t *testing.T, content []byte) {
 	assertFails(t, err)
 }
 
-func assertRootUpdateFails(t *testing.T, content []byte, input *rootupd.RootUpdateInput) {
+func assertRootUpdateFails(t *testing.T, content []byte, input *ports.RootUpdateInput) {
 	t.Helper()
 
 	out, err := UpdateRootTaskfile(content, input)
@@ -368,8 +368,8 @@ func bytesContain(content []byte, want string) bool {
 	return strings.Contains(string(content), want)
 }
 
-func goRootInput() *rootupd.RootUpdateInput {
-	return &rootupd.RootUpdateInput{
+func goRootInput() *ports.RootUpdateInput {
+	return &ports.RootUpdateInput{
 		Tasks:            []string{goTask},
 		TargetFolder:     folderTaskfile,
 		RootTaskfileDir:  consts.Empty,

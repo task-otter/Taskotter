@@ -19,6 +19,7 @@ const (
 	pnpmInclude  = "../../../pnpm/Taskfile.yml"
 	absolutePath = "/abs/dest"
 	varKeyName   = "GO_VERSION"
+	goVersion122 = "1.22"
 )
 
 // TestRewriteIncludesRejectsLiteralBlockPath verifies a literal block include path fails.
@@ -215,11 +216,67 @@ func assertRewriteNoop(t *testing.T, content []byte) {
 
 func moduleVarsNode() *yaml.Node {
 	vars := newYAMLMappingNode()
-	appendMappingPair(vars, yamlScalar(varKeyName), yamlScalar("1.22"))
+	appendMappingPair(vars, yamlScalar(varKeyName), yamlScalar(goVersion122))
 
 	return vars
 }
 
 func pnpmMapping() map[string]string {
 	return map[string]string{pnpmModule: pnpmModule}
+}
+
+// TestOverridableRootVarSkipsNilAndNonScalar covers early-return branches.
+func TestOverridableRootVarSkipsNilAndNonScalar(t *testing.T) {
+	t.Parallel()
+
+	if overridableRootVar(varKeyName, nil) != nil {
+		t.Fatal("nil value should pass through")
+	}
+
+	mapping := newYAMLMappingNode()
+
+	if overridableRootVar(varKeyName, mapping) != mapping {
+		t.Fatal("non-scalar should pass through")
+	}
+}
+
+// TestOverridableRootVarPreservesExistingDefault covers the | default short-circuit.
+func TestOverridableRootVarPreservesExistingDefault(t *testing.T) {
+	t.Parallel()
+
+	already := yamlScalar(`{{.GO_VERSION | default "` + goVersion122 + `"}}`)
+
+	if overridableRootVar(varKeyName, already) != already {
+		t.Fatal("existing default should pass through")
+	}
+}
+
+// TestOverridableRootVarWrapsScalars covers plain and quote-containing defaults.
+func TestOverridableRootVarWrapsScalars(t *testing.T) {
+	t.Parallel()
+
+	plain := overridableRootVar(varKeyName, yamlScalar(goVersion122))
+
+	if plain == nil || !strings.Contains(plain.Value, `| default "`+goVersion122+`"`) {
+		t.Fatalf("plain default = %v", plain)
+	}
+
+	quoted := overridableRootVar(varKeyName, yamlScalar(`say "hi"`))
+
+	if quoted == nil || !strings.Contains(quoted.Value, "`say \"hi\"`") {
+		t.Fatalf("quoted default = %v", quoted)
+	}
+}
+
+// TestOverridableDefaultArgBranches covers quote vs backtick wrapping.
+func TestOverridableDefaultArgBranches(t *testing.T) {
+	t.Parallel()
+
+	if got := overridableDefaultArg("plain"); got != `"plain"` {
+		t.Fatalf("plain = %q", got)
+	}
+
+	if got := overridableDefaultArg(`has "quote"`); got != "`has \"quote\"`" {
+		t.Fatalf("quoted = %q", got)
+	}
 }

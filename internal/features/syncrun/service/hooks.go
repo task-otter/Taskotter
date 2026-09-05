@@ -26,28 +26,28 @@ type (
 	ResolveTransitiveFn func([]string, map[string][]string) ([]string, error)
 )
 
-func (orch *Orchestrator) wireSyncHooks() {
-	if orch.PrepareSyncInput == nil {
-		orch.PrepareSyncInput = syncsvc.PrepareSyncInput
+func wireSyncHooks(deps *Deps) {
+	if deps.PrepareSyncInput == nil {
+		deps.PrepareSyncInput = syncsvc.PrepareSyncInput
 	}
 
-	if orch.BuildPlan == nil {
-		orch.BuildPlan = syncsvc.BuildPlan
+	if deps.BuildPlan == nil {
+		deps.BuildPlan = syncsvc.BuildPlan
 	}
 
-	if orch.ApplyPlan == nil {
-		orch.ApplyPlan = syncsvc.ApplyPlan
+	if deps.ApplyPlan == nil {
+		deps.ApplyPlan = syncsvc.ApplyPlan
 	}
 
-	orch.wireResolveHooks()
+	wireResolveHooks(deps)
 }
 
-func (orch *Orchestrator) wireResolveHooks() {
-	if orch.ResolveAll == nil {
-		orch.ResolveAll = resolvesvc.ResolveAll
+func wireResolveHooks(deps *Deps) {
+	if deps.ResolveAll == nil {
+		deps.ResolveAll = resolvesvc.ResolveAll
 	}
 
-	if orch.ResolveTransitive == nil {
-		orch.ResolveTransitive = resolvesvc.ResolveTransitive
+	if deps.ResolveTransitive == nil {
+		deps.ResolveTransitive = resolvesvc.ResolveTransitive
 	}
 }

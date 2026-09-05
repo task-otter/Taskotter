@@ -7,13 +7,11 @@ package domain
 import (
 	"fmt"
 	"path/filepath"
-
-	"github.com/task-otter/Taskotter/internal/shared/config"
 )
 
 type (
 	// RefInfo describes a resolved store ref and commit.
-	RefInfo struct {
+	RefInfo = struct {
 		Repository       string
 		RequestedVersion string
 		SourceRef        string
@@ -22,7 +20,7 @@ type (
 	}
 
 	// Snapshot holds an extracted store tree and module metadata.
-	Snapshot struct {
+	Snapshot = struct {
 		Catalog map[string]struct{}
 		Deps    map[string][]string
 		Cleanup func() error
@@ -31,9 +29,13 @@ type (
 	}
 )
 
+const (
+	defaultTaskfilesDir = "taskfiles"
+)
+
 // Close removes temporary snapshot files when present.
-func (s *Snapshot) Close() error {
-	if s.Cleanup == nil {
+func Close(s *Snapshot) error {
+	if s == nil || s.Cleanup == nil {
 		return nil
 	}
 
@@ -45,27 +47,27 @@ func (s *Snapshot) Close() error {
 	return nil
 }
 
-// DefaultBranch returns the store repository default branch.
-func (s *Snapshot) DefaultBranch() string {
+// DefaultBranch returns the store repository default branch from Ref.
+func DefaultBranch(s *Snapshot) string {
 	return s.Ref.DefaultBranch
 }
 
-// ModuleDir returns the on-disk path for a source module directory.
-func (s *Snapshot) ModuleDir(sourceModule string) string {
-	return filepath.Join(s.RootDir, config.DefaultTargetFolder, sourceModule)
+// ModuleDir returns the on-disk path for a source module directory under RootDir.
+func ModuleDir(s *Snapshot, sourceModule string) string {
+	return filepath.Join(s.RootDir, defaultTaskfilesDir, sourceModule)
 }
 
-// ResolvedCommit returns the resolved commit SHA.
-func (s *Snapshot) ResolvedCommit() string {
+// ResolvedCommit returns the resolved commit SHA from Ref.
+func ResolvedCommit(s *Snapshot) string {
 	return s.Ref.ResolvedCommit
 }
 
-// SourceRef returns the resolved source ref label.
-func (s *Snapshot) SourceRef() string {
+// SourceRef returns the resolved source ref label from Ref.
+func SourceRef(s *Snapshot) string {
 	return s.Ref.SourceRef
 }
 
-// WorkspaceRoot returns the extracted store tree root.
-func (s *Snapshot) WorkspaceRoot() string {
+// WorkspaceRoot returns the extracted store tree root in RootDir.
+func WorkspaceRoot(s *Snapshot) string {
 	return s.RootDir
 }

@@ -34,23 +34,23 @@ type (
 
 	storeTaskMetaMap map[string]storeTaskMetadata
 
-	buildRootPlanInput struct {
+	buildRootPlanInput = struct {
 		syncInput      *domain.SyncInput
 		oldLock        *syncLock
 		moduleContents mcMap
 	}
 
-	planManagedInput struct {
+	planManagedInput = struct {
 		syncInput *domain.SyncInput
 		oldLock   *syncLock
 	}
 
-	rootTaskfilesInput struct {
+	rootTaskfilesInput = struct {
 		requested      map[string]moduleRecord
 		moduleContents mcMap
 	}
 
-	diffInput struct {
+	diffInput = struct {
 		plan         *domain.Plan
 		workspace    string
 		metadataPath string
@@ -59,31 +59,31 @@ type (
 		syncRoot     syncRootPolicy
 	}
 
-	diffLists struct {
+	diffLists = struct {
 		added   []string
 		updated []string
 		removed []string
 	}
 
-	previousState struct {
+	previousState = struct {
 		lock   *syncLock
 		target string
 	}
 
-	rootPlanResult struct {
+	rootPlanResult = struct {
 		rootBytes          []byte
 		newRoot            []byte
 		generatedRootTasks []generatedRootTask
 		rootState          rootState
 	}
 
-	stagingSession struct {
+	stagingSession = struct {
 		copyFile    func(string, *domain.FileEntry) error
 		stagingRoot string
 		staged      []stagedFile
 	}
 
-	collectOptions struct {
+	collectOptions = struct {
 		ops          ports.TaskfileOps
 		sourceToDest map[string]string
 		sourceDir    string
@@ -92,7 +92,7 @@ type (
 	}
 
 	// CollectOptions bundles inputs for CollectModuleFiles.
-	CollectOptions struct {
+	CollectOptions = struct {
 		TaskfileOps  ports.TaskfileOps
 		SourceToDest map[string]string
 		SourceDir    string
@@ -100,7 +100,7 @@ type (
 		DocPolicy    DocPolicy
 	}
 
-	moduleCollectArgs struct {
+	moduleCollectArgs = struct {
 		ops          ports.TaskfileOps
 		entry        os.DirEntry
 		sourceToDest map[string]string
@@ -111,12 +111,12 @@ type (
 		docPolicy    docPolicy
 	}
 
-	lockPathResult struct {
+	lockPathResult = struct {
 		lockPath string
 		target   string
 	}
 
-	finalizePlanArgs struct {
+	finalizePlanArgs = struct {
 		plan         *domain.Plan
 		meta         *domain.Metadata
 		workspace    string
@@ -126,49 +126,49 @@ type (
 		syncRoot     syncRootPolicy
 	}
 
-	diffLockArgs struct {
+	diffLockArgs = struct {
 		plan      *domain.Plan
 		workspace string
 		lockPath  string
 		lists     diffLists
 	}
 
-	diffMetadataArgs struct {
+	diffMetadataArgs = struct {
 		workspace    string
 		metadataPath string
 		plannedMeta  []byte
 		lists        diffLists
 	}
 
-	stagePathsInput struct {
+	stagePathsInput = struct {
 		plan         *domain.Plan
 		workspace    string
 		metadataPath string
 		syncRoot     syncRootPolicy
 	}
 
-	diffRootInput struct {
+	diffRootInput = struct {
 		oldRoot  []byte
 		newRoot  []byte
 		rootPath string
 		lists    diffLists
 	}
 
-	copyFileArgs struct {
+	copyFileArgs = struct {
 		root string
 		rel  string
 		dst  string
 		mode os.FileMode
 	}
 
-	finalizeTempArgs struct {
+	finalizeTempArgs = struct {
 		tmp  *os.File
 		path string
 		data []byte
 		mode os.FileMode
 	}
 
-	modulePlanArgs struct {
+	modulePlanArgs = struct {
 		syncInput      *domain.SyncInput
 		mod            *moduleRecord
 		oldLock        *syncLock
@@ -176,83 +176,83 @@ type (
 		planned        []managedFile
 	}
 
-	collectModuleArgs struct {
+	collectModuleArgs = struct {
 		syncInput  *domain.SyncInput
 		mod        *moduleRecord
 		sourceDir  string
 		destDirRel string
 	}
 
-	validateStagedArgs struct {
+	validateStagedArgs = struct {
 		rootPath string
 		staged   []stagedFile
 	}
 
-	writeStagedArgs struct {
+	writeStagedArgs = struct {
 		copyFile  func(string, *domain.FileEntry) error
 		workspace string
 		staged    []stagedFile
 	}
 
-	stagePlanArgs struct {
+	stagePlanArgs = struct {
 		copyFile     func(string, *domain.FileEntry) error
 		workspace    string
 		targetFolder string
 		staged       []stagedFile
 	}
 
-	buildRootArgs struct {
+	buildRootArgs = struct {
 		syncInput      *domain.SyncInput
 		oldLock        *syncLock
 		moduleContents map[string]map[string]domain.FileEntry
 		rootBytes      []byte
 	}
 
-	resolveLockArgs struct {
+	resolveLockArgs = struct {
 		cfg     *config.Config
 		oldMeta *domain.Metadata
 	}
 
-	metadataWalkerArgs struct {
+	metadataWalkerArgs = struct {
 		candidates          *[]string
 		workspace           string
 		currentMetadataPath string
 	}
 
-	metadataCandidateArgs struct {
+	metadataCandidateArgs = struct {
 		entry               os.DirEntry
 		workspace           string
 		currentMetadataPath string
 		abs                 string
 	}
 
-	applyStagedInput struct {
+	applyStagedInput = struct {
 		plan      *domain.Plan
 		syncInput *domain.SyncInput
 		workspace string
 		session   stagingSession
 	}
 
-	prepareStagingInput struct {
+	prepareStagingInput = struct {
 		plan      *domain.Plan
 		syncInput *domain.SyncInput
 		workspace string
 	}
 
-	stagePreparedInput struct {
+	stagePreparedInput = struct {
 		plan      *domain.Plan
 		syncInput *domain.SyncInput
 		workspace string
 		staged    []stagedFile
 	}
 
-	validateWriteStagedInput struct {
+	validateWriteStagedInput = struct {
 		copyFile  func(string, *domain.FileEntry) error
 		workspace string
 		args      validateStagedArgs
 	}
 
-	assemblePlanInput struct {
+	assemblePlanInput = struct {
 		syncInput *domain.SyncInput
 		artifacts *planArtifacts
 		meta      *domain.Metadata
@@ -260,21 +260,21 @@ type (
 		lock      syncLock
 	}
 
-	finalizeBuiltPlanInput struct {
+	finalizeBuiltPlanInput = struct {
 		syncInput *domain.SyncInput
 		plan      *domain.Plan
 		meta      *domain.Metadata
 		artifacts *planArtifacts
 	}
 
-	modulePlanDirsInput struct {
+	modulePlanDirsInput = struct {
 		syncInput *domain.SyncInput
 		mod       *moduleRecord
 		oldLock   *syncLock
 		sourceDir string
 	}
 
-	rewriteModuleArgs struct {
+	rewriteModuleArgs = struct {
 		ops          ports.TaskfileOps
 		sourceToDest map[string]string
 		sourceDir    string
@@ -283,7 +283,7 @@ type (
 		absPath      string
 	}
 
-	updateRootArgs struct {
+	updateRootArgs = struct {
 		moduleTaskfiles    map[string][]byte
 		args               buildRootArgs
 		generatedRootTasks []generatedRootTask
@@ -291,7 +291,7 @@ type (
 		managedRootTasks   []string
 	}
 
-	finishRootPlanInput struct {
+	finishRootPlanInput = struct {
 		syncInput      *domain.SyncInput
 		oldLock        *syncLock
 		moduleContents map[string]map[string]domain.FileEntry
@@ -299,7 +299,7 @@ type (
 		rootStateVal   rootState
 	}
 
-	groupModulesInput struct {
+	groupModulesInput = struct {
 		requestedRecords map[string]moduleRecord
 		metadata         map[string]storeTaskMetadata
 		common           map[string]struct{}

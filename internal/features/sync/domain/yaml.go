@@ -14,7 +14,7 @@ import (
 )
 
 type (
-	yamlDecodeTarget struct {
+	yamlDecodeTarget = struct {
 		Out any
 		Key string
 	}
@@ -25,6 +25,7 @@ const (
 	YAMLMappingPairKeyValue = consts.IndexTwo
 
 	errDecode                = "decode %q: %w"
+	errUnmarshalMetadataFmt  = "unmarshal metadata: %w"
 	yamlKeyConfigurationHash = "configuration_hash"
 	yamlKeyLockFile          = "lock_file"
 	yamlKeyTargetFolder      = "target_folder"
@@ -72,18 +73,43 @@ func UnmarshalYAMLMapping(value *yaml.Node, label string, outs map[string]any) e
 	return nil
 }
 
-// UnmarshalYAML decodes TaskOtter metadata from its stable on-disk keys.
-func (meta *Metadata) UnmarshalYAML(value *yaml.Node) error {
+// UnmarshalMetadata decodes TaskOtter metadata from its stable on-disk keys.
+func UnmarshalMetadata(value *yaml.Node, meta *Metadata) error {
 	err := UnmarshalYAMLMapping(value, "metadata", map[string]any{
 		yamlKeyTargetFolder:      &meta.TargetFolder,
 		yamlKeyLockFile:          &meta.LockFile,
 		yamlKeyConfigurationHash: &meta.ConfigurationHash,
 	})
 	if err != nil {
-		return fmt.Errorf("unmarshal metadata: %w", err)
+		return fmt.Errorf(errUnmarshalMetadataFmt, err)
 	}
 
 	return nil
+}
+
+// DecodeMetadataYAML unmarshals YAML bytes into metadata.
+func DecodeMetadataYAML(data []byte, meta *Metadata) error {
+	var node yaml.Node
+
+	err := yaml.Unmarshal(data, &node)
+	if err != nil {
+		return fmt.Errorf("decode metadata yaml: %w", err)
+	}
+
+	err = UnmarshalMetadata(yamlDocumentContent(&node), meta)
+	if err != nil {
+		return fmt.Errorf(errUnmarshalMetadataFmt, err)
+	}
+
+	return nil
+}
+
+func yamlDocumentContent(node *yaml.Node) *yaml.Node {
+	if node != nil && node.Kind == yaml.DocumentNode && len(node.Content) > consts.IndexZero {
+		return node.Content[consts.IndexZero]
+	}
+
+	return node
 }
 
 func decodeYAMLField(fields map[string]*yaml.Node, key string, out any) error {

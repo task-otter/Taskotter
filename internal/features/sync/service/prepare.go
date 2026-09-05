@@ -16,7 +16,7 @@ import (
 
 type (
 	// PrepareSyncInputArgs bundles inputs for PrepareSyncInput.
-	PrepareSyncInputArgs struct {
+	PrepareSyncInputArgs = struct {
 		Cfg         *config.Config
 		Snapshot    ports.Snapshot
 		TaskfileOps ports.TaskfileOps
@@ -24,7 +24,7 @@ type (
 		DepSources  []string
 	}
 
-	buildReqArgs struct {
+	buildReqArgs = struct {
 		cfg *config.Config
 		src map[string]string
 		res []resolvesvc.Resolution

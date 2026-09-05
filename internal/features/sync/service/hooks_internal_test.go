@@ -15,7 +15,6 @@ import (
 	"github.com/task-otter/Taskotter/internal/shared/config"
 	"github.com/task-otter/Taskotter/internal/shared/consts"
 	"github.com/task-otter/Taskotter/internal/shared/iox"
-	yaml "go.yaml.in/yaml/v3"
 )
 
 type (
@@ -188,15 +187,6 @@ func newStagingSession(copyFile func(string, *domain.FileEntry) error) stagingSe
 	session.copyFile = copyFile
 
 	return session
-}
-
-func scalarYAMLNode(value string) *yaml.Node {
-	var node yaml.Node
-
-	node.Kind = yaml.ScalarNode
-	node.Value = value
-
-	return &node
 }
 
 func zeroDiffLists() *diffLists {

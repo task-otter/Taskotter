@@ -60,10 +60,10 @@ func IsNodeToolVariant(moduleName, logicalTask string) bool {
 // BuildSourceModule constructs the store module name for a logical task and JS configuration.
 func BuildSourceModule(task string, packageManager pkgMgr) (string, error) {
 	switch packageManager {
-	case config.PackageManager(config.JSRuntimeBun):
-		return path.Join(task, string(packageManager)), nil
+	case config.JSRuntimeBun:
+		return path.Join(task, packageManager), nil
 	case config.PMNPM, config.PMYarn, config.PMPnpm:
-		return path.Join(task, "node", string(packageManager)), nil
+		return path.Join(task, "node", packageManager), nil
 	default:
 		return consts.Empty, fmt.Errorf(fmtWrapQuoted, errInvalidPackageManager, packageManager)
 	}

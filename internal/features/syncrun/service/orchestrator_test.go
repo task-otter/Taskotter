@@ -8,7 +8,10 @@ import (
 	"testing"
 
 	prdomain "github.com/task-otter/Taskotter/internal/features/pr/domain"
+	"github.com/task-otter/Taskotter/internal/features/syncrun/service"
+	"github.com/task-otter/Taskotter/internal/shared/config"
 	"github.com/task-otter/Taskotter/internal/shared/consts"
+	"github.com/task-otter/Taskotter/internal/shared/iox"
 )
 
 // TestOrchestratorCreatesPRAgainstTriggerBranch verifies the PR targets the configured base branch.
@@ -100,9 +103,12 @@ func TestOrchestratorReportsCleanupFailureQuietly(t *testing.T) {
 
 	store.cleanupErr = errTestBoom
 
-	orch := newTestOrchestratorParts(&testOrchInput{
+	deps, orch := newTestOrchestratorParts(&testOrchInput{
 		t: t, store: store, gitOps: nil, gitWork: nil, pullReq: nil,
 	})
+
+	iox.Discard(deps)
+
 	runOrchestrator(t, orch, cfg)
 }
 
@@ -151,8 +157,23 @@ func runPreparedGitWorkspace(t *testing.T, gitWork *mockWorkspace) {
 
 	initGitWorkspace(t, workspace)
 
-	orch := newTestOrchestratorParts(&testOrchInput{
+	deps, orch := newTestOrchestratorParts(&testOrchInput{
 		t: t, store: newLocalStore(t), gitOps: gitOps, gitWork: gitWork, pullReq: newMockPR(nil),
 	})
+
+	iox.Discard(deps)
+
 	runOrchestrator(t, orch, cfg)
+}
+
+// TestOrchestratorRunRequiresConfiguration covers an unconfigured orchestrator.
+func TestOrchestratorRunRequiresConfiguration(t *testing.T) {
+	t.Parallel()
+
+	result, err := (&service.Orchestrator{}).Run(t.Context(), &config.Config{})
+	iox.Discard(result)
+
+	if err == nil {
+		t.Fatal("expected configuration error")
+	}
 }

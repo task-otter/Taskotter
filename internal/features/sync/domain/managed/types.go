@@ -6,11 +6,11 @@ package managed
 
 type (
 	// File tracks a synced file in the lock file.
-	File struct {
-		SourceModule      string
-		DestinationModule string
-		SourcePath        string
-		Path              string
-		SHA256            string
+	File = struct {
+		SourceModule      string `yaml:"source_module"`
+		DestinationModule string `yaml:"destination_module"`
+		SourcePath        string `yaml:"source_path"`
+		Path              string `yaml:"path"`
+		SHA256            string `yaml:"sha256"`
 	}
 )

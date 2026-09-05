@@ -101,6 +101,7 @@ type (
 		work  *mockWorkspace
 		pr    *mockPR
 		cfg   *config.Config
+		deps  *service.Deps
 		orch  *service.Orchestrator
 	}
 
@@ -281,20 +282,24 @@ func newTestOrchestrator(
 ) *service.Orchestrator {
 	t.Helper()
 
-	return newTestOrchestratorParts(&testOrchInput{
+	deps, orch := newTestOrchestratorParts(&testOrchInput{
 		t:       t,
 		store:   newLocalStore(t),
 		gitOps:  gitOps,
 		gitWork: nil,
 		pullReq: pullReq,
 	})
+
+	iox.Discard(deps)
+
+	return orch
 }
 
-func newTestOrchestratorParts(input *testOrchInput) *service.Orchestrator {
+func newTestOrchestratorParts(input *testOrchInput) (*service.Deps, *service.Orchestrator) {
 	input.t.Helper()
 
 	//nolint:exhaustruct_v5 // optional sync/resolve hooks default in wireDefaults
-	orch := &service.Orchestrator{
+	deps := &service.Deps{
 		Logger:       nil,
 		StoreClient:  input.store,
 		GitClient:    nil,
@@ -305,10 +310,10 @@ func newTestOrchestratorParts(input *testOrchInput) *service.Orchestrator {
 	}
 
 	if input.gitWork != nil {
-		orch.GitClient = input.gitWork
+		deps.GitClient = input.gitWork
 	}
 
-	return orch
+	return deps, service.NewOrchestrator(deps)
 }
 
 func resolveGitRepoConfig(cfg *config.Config, workspace string) *config.Config {

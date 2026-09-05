@@ -10,6 +10,39 @@ linters:
     - godot
     - exhaustruct
   settings:
+    custom:
+      vulner:
+        type: module
+        description: Report reachable Go vulnerabilities
+      coverlint:
+        type: module
+        settings:
+          rules:
+            - pattern: '**'
+              min: 1.0
+          test-result-path: test-result.txt
+          coverage-result-path: coverage.out
+      distance:
+        type: module
+        description: Enforce Go main-sequence distance policy thresholds
+        settings:
+          tests: false
+          generated: false
+          dependency-scope: module
+          rules:
+            - pattern: '**'
+              max: 0.3
+      reusability:
+        type: module
+        description: Enforce Go type reusability policy thresholds
+        settings:
+          dependency-scope: module
+          field-usage: direct
+          rules:
+            - pattern: '**'
+              min: 0.80
+            - pattern: '**/*_test'
+              min: 0.0
     asasalint:
       exclude: []
       use-builtin-exclusions: false

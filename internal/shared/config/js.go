@@ -14,15 +14,15 @@ import (
 type (
 
 	// JSRuntime selects the JavaScript runtime for Node-oriented task resolution.
-	JSRuntime string
+	JSRuntime = string
 
-	jsInput struct {
+	jsInput = struct {
 		Runtime        string
 		PackageManager string
 		VersionManager string
 	}
 
-	jsConfig struct {
+	jsConfig = struct {
 		Runtime            JSRuntime
 		NodePackageManager PackageManager
 	}
@@ -51,7 +51,7 @@ func defaultedJSRuntime(rawRuntime string) string {
 	runtime := strings.TrimSpace(rawRuntime)
 
 	if runtime == consts.Empty {
-		runtime = string(JSRuntimeNodeJS)
+		runtime = JSRuntimeNodeJS
 	}
 
 	return runtime
@@ -82,7 +82,7 @@ func dispatchJSRuntime(yamlInput *jsInput) (*jsConfig, error) {
 }
 
 func parseWithJSRuntime(yamlInput *jsInput, runtime string) (*jsConfig, error) {
-	parser, ok := jsRuntimeParsers()[JSRuntime(runtime)]
+	parser, ok := jsRuntimeParsers()[runtime]
 
 	if !ok {
 		return nil, &ValidationError{
@@ -149,7 +149,7 @@ func parseJSBun(yamlInput *jsInput) (*jsConfig, error) {
 
 	return &jsConfig{
 		Runtime:            JSRuntimeBun,
-		NodePackageManager: PackageManager(JSRuntimeBun),
+		NodePackageManager: JSRuntimeBun,
 	}, nil
 }
 
@@ -169,7 +169,7 @@ func parseJSInput(raw string) (jsInput, error) {
 }
 
 func parseJSNodeJS(yamlInput *jsInput) (*jsConfig, error) {
-	packageManagerRaw := defaultedRaw(yamlInput.PackageManager, string(PMNPM))
+	packageManagerRaw := defaultedRaw(yamlInput.PackageManager, PMNPM)
 
 	packageManager, err := validatePackageManager(packageManagerRaw)
 	if err != nil {
@@ -197,7 +197,7 @@ func parseJSYAML(raw string) (jsInput, error) {
 func parseNodePackageManager(raw string) (PackageManager, error) {
 	switch raw {
 	case "npm", "yarn", "pnpm":
-		return PackageManager(raw), nil
+		return raw, nil
 	default:
 		return consts.Empty, &ValidationError{
 			Field:   fieldJSPackageManager,

@@ -15,6 +15,7 @@ import (
 	"regexp"
 	"strings"
 
+	gitports "github.com/task-otter/Taskotter/internal/features/git/ports"
 	"github.com/task-otter/Taskotter/internal/shared/consts"
 	"github.com/task-otter/Taskotter/internal/shared/iox"
 	"github.com/task-otter/Taskotter/internal/shared/pathutil"
@@ -24,37 +25,20 @@ import (
 type (
 	pathSet = map[string]struct{}
 
-	// BranchChecker reads branch metadata used for ownership checks.
-	BranchChecker interface {
-		BranchExists(ctx context.Context, branch string) (bool, error)
-		LastCommitMessage(ctx context.Context, branch string) (string, error)
+	credArgs = struct {
+		token      string
+		repository string
 	}
 
-	// Brancher manages local branch refs.
-	Brancher interface {
-		CheckoutBranch(ctx context.Context, branch string) error
-		CreateOrResetBranch(ctx context.Context, branch string) error
-		BranchExists(ctx context.Context, branch string) (bool, error)
-		LastCommitMessage(ctx context.Context, branch string) (string, error)
-		DefaultBranch(ctx context.Context) (string, error)
-	}
-
-	// Indexer inspects and stages the working tree.
-	Indexer interface {
-		HasUnrelatedChanges(ctx context.Context, set map[string]struct{}) (bool, error)
-		Stage(ctx context.Context, paths []string) error
-		Commit(ctx context.Context, message string) error
-	}
-
-	// Publisher pushes branches to origin.
-	Publisher interface {
-		Push(ctx context.Context, branch string) error
-		PushForceWithLease(ctx context.Context, branch string) error
+	clientFns = struct {
+		run       func(ctx context.Context, args ...string) error
+		output    func(ctx context.Context, args ...string) (string, error)
+		workspace string
 	}
 
 	// Client runs git commands in a workspace directory.
 	Client struct {
-		workspace string
+		fns clientFns
 	}
 )
 
@@ -134,7 +118,15 @@ var (
 
 // NewClient returns a git client bound to the given workspace path.
 func NewClient(workspace string) *Client {
-	return &Client{workspace: workspace}
+	return &Client{fns: clientFns{
+		workspace: workspace,
+		run: func(ctx context.Context, args ...string) error {
+			return runGitCommand(ctx, workspace, args...)
+		},
+		output: func(ctx context.Context, args ...string) (string, error) {
+			return outputGitCommand(ctx, workspace, args...)
+		},
+	}}
 }
 
 // AllowedPathSet converts staged path strings into a lookup set.
@@ -149,7 +141,7 @@ func AllowedPathSet(paths []string) map[string]struct{} {
 }
 
 // EnsureBranchOwned allows new sync branches and rejects foreign branch reuse.
-func EnsureBranchOwned(ctx context.Context, ops BranchChecker, branch string) error {
+func EnsureBranchOwned(ctx context.Context, ops gitports.BranchChecker, branch string) error {
 	exists, err := ops.BranchExists(ctx, branch)
 	if err != nil {
 		return fmt.Errorf("check branch exists: %w", err)
@@ -432,7 +424,11 @@ func validateStagePaths(workspace string, paths []string) error {
 	return nil
 }
 
-func verifyExistingBranchOwned(ctx context.Context, ops BranchChecker, branch string) error {
+func verifyExistingBranchOwned(
+	ctx context.Context,
+	ops gitports.BranchChecker,
+	branch string,
+) error {
 	msg, err := ops.LastCommitMessage(ctx, branch)
 	if err != nil {
 		return fmt.Errorf("read last commit message: %w", err)
@@ -447,7 +443,7 @@ func verifyExistingBranchOwned(ctx context.Context, ops BranchChecker, branch st
 }
 
 func branchRefVerified(ctx context.Context, client *Client, ref string) bool {
-	out, err := client.output(ctx, consts.GitRevParse, gitVerifyFlag, ref)
+	out, err := output(ctx, client, consts.GitRevParse, gitVerifyFlag, ref)
 	iox.Discard(out)
 
 	return err == nil
@@ -455,12 +451,18 @@ func branchRefVerified(ctx context.Context, client *Client, ref string) bool {
 
 // BranchExists reports whether a local branch ref exists.
 func (client *Client) BranchExists(ctx context.Context, branch string) (bool, error) {
+	iox.Discard(client.fns)
+
+	return branchExists(ctx, client, branch) //nolint:wrapcheck // thin adapter
+}
+
+func branchExists(ctx context.Context, client *Client, branch string) (bool, error) {
 	err := ValidateGitRef(branch)
 	if err != nil {
 		return false, fmt.Errorf(fmtValidateGitRefErr, err)
 	}
 
-	if client.branchExistsAnyRef(ctx, branch) {
+	if branchExistsAnyRef(ctx, client, branch) {
 		return true, nil
 	}
 
@@ -469,12 +471,18 @@ func (client *Client) BranchExists(ctx context.Context, branch string) (bool, er
 
 // CheckoutBranch checks out an existing branch.
 func (client *Client) CheckoutBranch(ctx context.Context, branch string) error {
+	iox.Discard(client.fns)
+
+	return checkoutBranch(ctx, client, branch) //nolint:wrapcheck // thin adapter
+}
+
+func checkoutBranch(ctx context.Context, client *Client, branch string) error {
 	err := ValidateGitRef(branch)
 	if err != nil {
 		return fmt.Errorf(fmtValidateGitRefErr, err)
 	}
 
-	err = client.run(ctx, gitCheckout, branch)
+	err = run(ctx, client, gitCheckout, branch)
 	if err != nil {
 		return fmt.Errorf(fmtCheckoutBranchErr, err)
 	}
@@ -488,7 +496,13 @@ func isNothingToCommit(err error) bool {
 
 // Commit creates a commit with the given message.
 func (client *Client) Commit(ctx context.Context, message string) error {
-	err := client.run(ctx, "commit", "-m", message)
+	iox.Discard(client.fns)
+
+	return commit(ctx, client, message) //nolint:wrapcheck // thin adapter
+}
+
+func commit(ctx context.Context, client *Client, message string) error {
+	err := run(ctx, client, "commit", "-m", message)
 
 	if isNothingToCommit(err) {
 		return nil
@@ -503,18 +517,41 @@ func (client *Client) Commit(ctx context.Context, message string) error {
 
 // ConfigureCredentials clears checkout extraheader auth and sets origin to a token URL.
 func (client *Client) ConfigureCredentials(ctx context.Context, token, repository string) error {
-	if token == consts.Empty || repository == consts.Empty {
+	iox.Discard(client.fns)
+
+	err := configureCredentials(
+		ctx,
+		client,
+		&credArgs{token: token, repository: repository},
+	)
+	if err != nil {
+		return fmt.Errorf("configure credentials: %w", err)
+	}
+
+	return nil
+}
+
+func configureCredentials(ctx context.Context, client *Client, creds *credArgs) error {
+	if creds.token == consts.Empty || creds.repository == consts.Empty {
 		return nil
 	}
 
-	err := validateRepositoryCoordinate(repository)
+	return applyOriginCredentials(ctx, client, creds) //nolint:wrapcheck // thin guard wrapper
+}
+
+func applyOriginCredentials(ctx context.Context, client *Client, creds *credArgs) error {
+	err := validateRepositoryCoordinate(creds.repository)
 	if err != nil {
-		return fmt.Errorf("validate repository: %w", err)
+		return fmt.Errorf("validate creds.repository: %w", err)
 	}
 
-	client.clearGitHubExtraHeader(ctx)
+	clearGitHubExtraHeader(ctx, client)
 
-	err = client.setOriginRemoteURL(ctx, fmt.Sprintf(originAccessURLFmt, token, repository))
+	err = setOriginRemoteURL(
+		ctx,
+		client,
+		fmt.Sprintf(originAccessURLFmt, creds.token, creds.repository),
+	)
 	if err != nil {
 		return fmt.Errorf("set origin url: %w", err)
 	}
@@ -524,12 +561,18 @@ func (client *Client) ConfigureCredentials(ctx context.Context, token, repositor
 
 // CreateOrResetBranch creates or resets a branch and checks it out.
 func (client *Client) CreateOrResetBranch(ctx context.Context, branch string) error {
+	iox.Discard(client.fns)
+
+	return createOrResetBranch(ctx, client, branch) //nolint:wrapcheck // thin adapter
+}
+
+func createOrResetBranch(ctx context.Context, client *Client, branch string) error {
 	err := ValidateGitRef(branch)
 	if err != nil {
 		return fmt.Errorf(fmtValidateGitRefErr, err)
 	}
 
-	err = client.run(ctx, gitCheckout, "-B", branch)
+	err = run(ctx, client, gitCheckout, "-B", branch)
 	if err != nil {
 		return fmt.Errorf(fmtCheckoutBranchErr, err)
 	}
@@ -539,14 +582,20 @@ func (client *Client) CreateOrResetBranch(ctx context.Context, branch string) er
 
 // DefaultBranch resolves the repository default branch from origin metadata.
 func (client *Client) DefaultBranch(ctx context.Context) (string, error) {
-	branch, err := client.defaultBranchFromOriginHEAD(ctx)
+	iox.Discard(client.fns)
+
+	return defaultBranch(ctx, client) //nolint:wrapcheck // thin adapter
+}
+
+func defaultBranch(ctx context.Context, client *Client) (string, error) {
+	branch, err := defaultBranchFromOriginHEAD(ctx, client)
 	if err == nil {
 		return branch, nil
 	}
 
-	refreshErr := client.run(ctx, gitRemote, "set-head", consts.GitOrigin, "-a")
+	refreshErr := run(ctx, client, gitRemote, "set-head", consts.GitOrigin, "-a")
 
-	branch, err = client.detectDefaultBranch(ctx)
+	branch, err = detectDefaultBranch(ctx, client)
 	if err == nil {
 		return branch, nil
 	}
@@ -563,7 +612,13 @@ func (*Client) EnsureSafeDirectory() {
 
 // HasUnrelatedChanges reports whether the working tree has changes outside allowed paths.
 func (client *Client) HasUnrelatedChanges(ctx context.Context, set pathSet) (bool, error) {
-	out, err := client.output(ctx, "status", "--porcelain")
+	iox.Discard(client.fns)
+
+	return hasUnrelatedChanges(ctx, client, set) //nolint:wrapcheck // thin adapter
+}
+
+func hasUnrelatedChanges(ctx context.Context, client *Client, set pathSet) (bool, error) {
+	out, err := output(ctx, client, "status", "--porcelain")
 	if err != nil {
 		return false, fmt.Errorf("git status: %w", err)
 	}
@@ -573,12 +628,18 @@ func (client *Client) HasUnrelatedChanges(ctx context.Context, set pathSet) (boo
 
 // LastCommitMessage returns the subject of the latest commit on a branch.
 func (client *Client) LastCommitMessage(ctx context.Context, branch string) (string, error) {
+	iox.Discard(client.fns)
+
+	return lastCommitMessage(ctx, client, branch) //nolint:wrapcheck // thin adapter
+}
+
+func lastCommitMessage(ctx context.Context, client *Client, branch string) (string, error) {
 	err := ValidateGitRef(branch)
 	if err != nil {
 		return consts.Empty, fmt.Errorf(fmtValidateGitRefErr, err)
 	}
 
-	out, err := client.output(ctx, "log", "-1", "--format=%s", branch)
+	out, err := output(ctx, client, "log", "-1", "--format=%s", branch)
 	if err != nil {
 		return consts.Empty, fmt.Errorf("git log: %w", err)
 	}
@@ -588,12 +649,18 @@ func (client *Client) LastCommitMessage(ctx context.Context, branch string) (str
 
 // Push pushes a branch to origin.
 func (client *Client) Push(ctx context.Context, branch string) error {
+	iox.Discard(client.fns)
+
+	return push(ctx, client, branch) //nolint:wrapcheck // thin adapter
+}
+
+func push(ctx context.Context, client *Client, branch string) error {
 	err := ValidateGitRef(branch)
 	if err != nil {
 		return fmt.Errorf(fmtValidateGitRefErr, err)
 	}
 
-	err = client.run(ctx, gitPush, consts.GitOrigin, branch)
+	err = run(ctx, client, gitPush, consts.GitOrigin, branch)
 	if err != nil {
 		return fmt.Errorf(fmtGitPushErr, err)
 	}
@@ -603,12 +670,18 @@ func (client *Client) Push(ctx context.Context, branch string) error {
 
 // PushForceWithLease pushes a branch to origin with force-with-lease.
 func (client *Client) PushForceWithLease(ctx context.Context, branch string) error {
+	iox.Discard(client.fns)
+
+	return pushForceWithLease(ctx, client, branch) //nolint:wrapcheck // thin adapter
+}
+
+func pushForceWithLease(ctx context.Context, client *Client, branch string) error {
 	err := ValidateGitRef(branch)
 	if err != nil {
 		return fmt.Errorf(fmtValidateGitRefErr, err)
 	}
 
-	err = client.run(ctx, gitPush, "--force-with-lease", consts.GitOrigin, branch)
+	err = run(ctx, client, gitPush, "--force-with-lease", consts.GitOrigin, branch)
 	if err != nil {
 		return fmt.Errorf(fmtGitPushErr, err)
 	}
@@ -618,16 +691,22 @@ func (client *Client) PushForceWithLease(ctx context.Context, branch string) err
 
 // Stage force-adds the given paths to the index.
 func (client *Client) Stage(ctx context.Context, paths []string) error {
+	iox.Discard(client.fns)
+
+	return stage(ctx, client, paths) //nolint:wrapcheck // thin adapter
+}
+
+func stage(ctx context.Context, client *Client, paths []string) error {
 	if len(paths) == consts.IndexZero {
 		return nil
 	}
 
-	err := validateStagePaths(client.workspace, paths)
+	err := validateStagePaths(client.fns.workspace, paths)
 	if err != nil {
 		return fmt.Errorf("validate stage paths: %w", err)
 	}
 
-	err = client.runStageAdd(ctx, paths)
+	err = runStageAdd(ctx, client, paths)
 	if err != nil {
 		return fmt.Errorf("run stage add: %w", err)
 	}
@@ -635,13 +714,13 @@ func (client *Client) Stage(ctx context.Context, paths []string) error {
 	return nil
 }
 
-func (client *Client) branchExistsAnyRef(ctx context.Context, branch string) bool {
+func branchExistsAnyRef(ctx context.Context, client *Client, branch string) bool {
 	return branchRefVerified(ctx, client, branch) ||
 		branchRefVerified(ctx, client, "refs/heads/"+branch)
 }
 
-func (client *Client) branchFromCommand(ctx context.Context, args ...string) (string, bool) {
-	out, err := client.output(ctx, args...)
+func branchFromCommand(ctx context.Context, client *Client, args ...string) (string, bool) {
+	out, err := output(ctx, client, args...)
 	if err != nil {
 		return consts.Empty, false
 	}
@@ -651,26 +730,23 @@ func (client *Client) branchFromCommand(ctx context.Context, args ...string) (st
 	return branch, isPlausibleDefaultBranch(branch)
 }
 
-func (client *Client) clearGitHubExtraHeader(ctx context.Context) {
+func clearGitHubExtraHeader(ctx context.Context, client *Client) {
 	// Missing key is expected when checkout did not persist credentials.
 	iox.Discard(
-		client.run(ctx, consts.GitConfig, gitConfigLocal, gitConfigUnsetAll, httpExtraHeaderKey),
+		run(ctx, client, consts.GitConfig, gitConfigLocal, gitConfigUnsetAll, httpExtraHeaderKey),
 	)
 }
 
-func (client *Client) defaultBranchFromOriginHEAD(ctx context.Context) (string, error) {
-	lookups := []func(context.Context) (string, bool){
-		client.originHEADFromSymbolicRef,
-		client.originHEADFromAbbrevRef,
+func defaultBranchFromOriginHEAD(ctx context.Context, client *Client) (string, error) {
+	if branch, ok := originHEADFromSymbolicRef(ctx, client); ok {
+		return branch, nil
 	}
 
-	for i := range lookups {
-		if branch, ok := lookups[i](ctx); ok {
-			return branch, nil
-		}
+	if branch, ok := originHEADFromAbbrevRef(ctx, client); ok {
+		return branch, nil
 	}
 
-	branch, err := client.originHEADFromCommit(ctx)
+	branch, err := originHEADFromCommit(ctx, client)
 	if err != nil {
 		return consts.Empty, fmt.Errorf("origin HEAD from commit: %w", err)
 	}
@@ -678,13 +754,13 @@ func (client *Client) defaultBranchFromOriginHEAD(ctx context.Context) (string, 
 	return branch, nil
 }
 
-func (client *Client) defaultBranchFromOriginHEADCommit(ctx context.Context) (string, error) {
-	sha, err := client.originHEADSHA(ctx)
+func defaultBranchFromOriginHEADCommit(ctx context.Context, client *Client) (string, error) {
+	sha, err := originHEADSHA(ctx, client)
 	if err != nil {
 		return consts.Empty, fmt.Errorf("origin HEAD SHA: %w", err)
 	}
 
-	refs, err := client.refsAtOriginHEAD(ctx, sha)
+	refs, err := refsAtOriginHEAD(ctx, client, sha)
 	if err != nil {
 		return consts.Empty, fmt.Errorf("refs at origin HEAD: %w", err)
 	}
@@ -697,8 +773,8 @@ func (client *Client) defaultBranchFromOriginHEADCommit(ctx context.Context) (st
 	return branch, nil
 }
 
-func (client *Client) defaultBranchFromRemoteShow(ctx context.Context) (string, error) {
-	out, err := client.output(ctx, gitRemote, "show", consts.GitOrigin)
+func defaultBranchFromRemoteShow(ctx context.Context, client *Client) (string, error) {
+	out, err := output(ctx, client, gitRemote, "show", consts.GitOrigin)
 	if err != nil {
 		return consts.Empty, fmt.Errorf("git remote show: %w", err)
 	}
@@ -712,51 +788,48 @@ func (client *Client) defaultBranchFromRemoteShow(ctx context.Context) (string, 
 	return branch, nil
 }
 
-func (client *Client) detectDefaultBranch(ctx context.Context) (string, error) {
-	detectors := []func(context.Context) (string, error){
-		client.defaultBranchFromOriginHEAD,
-		client.defaultBranchFromRemoteShow,
+func detectDefaultBranch(ctx context.Context, client *Client) (string, error) {
+	branch, err := defaultBranchFromOriginHEAD(ctx, client)
+	if err == nil {
+		return branch, nil
 	}
 
-	for i := range detectors {
-		branch, err := detectors[i](ctx)
-		if err == nil {
-			return branch, nil
-		}
+	branch, err = defaultBranchFromRemoteShow(ctx, client)
+	if err == nil {
+		return branch, nil
 	}
 
 	return consts.Empty, errDefaultBranchDetectionFailed
 }
 
-func (client *Client) gitArgs(args ...string) []string {
+func gitArgs(workspace string, args ...string) []string {
 	return append([]string{
-		gitConfigFlag, "safe.directory=" + client.workspace,
+		gitConfigFlag, "safe.directory=" + workspace,
 		gitConfigFlag, "user.email=" + commitUserEmail,
 		gitConfigFlag, "user.name=" + commitUserName,
 	}, args...)
 }
 
-func (client *Client) newGitCommand(ctx context.Context, args ...string) *exec.Cmd {
-	gitArgs := client.gitArgs(args...)
+func newGitCommand(ctx context.Context, workspace string, args ...string) *exec.Cmd {
+	cmdArgs := gitArgs(workspace, args...)
 	cmd := exec.CommandContext(ctx, gitBinary)
 
-	cmd.Args = append([]string{gitBinary}, gitArgs...)
-	cmd.Dir = client.workspace
+	cmd.Args = append([]string{gitBinary}, cmdArgs...)
+	cmd.Dir = workspace
 
 	return cmd
 }
 
-func (client *Client) originHEADFromAbbrevRef(ctx context.Context) (string, bool) {
-	return client.branchFromCommand(
-		ctx,
+func originHEADFromAbbrevRef(ctx context.Context, client *Client) (string, bool) {
+	return branchFromCommand(ctx, client,
 		consts.GitRevParse,
 		"--abbrev-ref",
 		consts.GitRemoteHeadRef,
 	)
 }
 
-func (client *Client) originHEADFromCommit(ctx context.Context) (string, error) {
-	branch, err := client.defaultBranchFromOriginHEADCommit(ctx)
+func originHEADFromCommit(ctx context.Context, client *Client) (string, error) {
+	branch, err := defaultBranchFromOriginHEADCommit(ctx, client)
 	if err == nil {
 		return branch, nil
 	}
@@ -764,12 +837,12 @@ func (client *Client) originHEADFromCommit(ctx context.Context) (string, error) 
 	return consts.Empty, errOriginHEADNotAvailable
 }
 
-func (client *Client) originHEADFromSymbolicRef(ctx context.Context) (string, bool) {
-	return client.branchFromCommand(ctx, "symbolic-ref", "--short", "refs/remotes/origin/HEAD")
+func originHEADFromSymbolicRef(ctx context.Context, client *Client) (string, bool) {
+	return branchFromCommand(ctx, client, "symbolic-ref", "--short", "refs/remotes/origin/HEAD")
 }
 
-func (client *Client) originHEADSHA(ctx context.Context) (string, error) {
-	sha, err := client.output(ctx, consts.GitRevParse, consts.GitRemoteHeadRef)
+func originHEADSHA(ctx context.Context, client *Client) (string, error) {
+	sha, err := output(ctx, client, consts.GitRevParse, consts.GitRemoteHeadRef)
 	if err != nil {
 		return consts.Empty, fmt.Errorf("resolve origin head sha: %w", err)
 	}
@@ -778,7 +851,13 @@ func (client *Client) originHEADSHA(ctx context.Context) (string, error) {
 }
 
 func (client *Client) output(ctx context.Context, args ...string) (string, error) {
-	cmd := client.newGitCommand(ctx, args...)
+	iox.Discard(client.fns)
+
+	return client.fns.output(ctx, args...) //nolint:wrapcheck // fns closure
+}
+
+func outputGitCommand(ctx context.Context, workspace string, args ...string) (string, error) {
+	cmd := newGitCommand(ctx, workspace, args...)
 
 	var stdout, stderr bytes.Buffer
 
@@ -799,7 +878,7 @@ func (client *Client) output(ctx context.Context, args ...string) (string, error
 	return stdout.String(), nil
 }
 
-func (client *Client) refsAtOriginHEAD(ctx context.Context, sha string) (string, error) {
+func refsAtOriginHEAD(ctx context.Context, client *Client, sha string) (string, error) {
 	refs, err := client.output(
 		ctx,
 		"for-each-ref",
@@ -815,8 +894,8 @@ func (client *Client) refsAtOriginHEAD(ctx context.Context, sha string) (string,
 	return refs, nil
 }
 
-func (client *Client) run(ctx context.Context, args ...string) error {
-	cmd := client.newGitCommand(ctx, args...)
+func runGitCommand(ctx context.Context, workspace string, args ...string) error {
+	cmd := newGitCommand(ctx, workspace, args...)
 
 	var stderr bytes.Buffer
 
@@ -835,10 +914,10 @@ func (client *Client) run(ctx context.Context, args ...string) error {
 	return nil
 }
 
-func (client *Client) runStageAdd(ctx context.Context, paths []string) error {
+func runStageAdd(ctx context.Context, client *Client, paths []string) error {
 	args := append([]string{consts.GitAdd, "-f", "--"}, paths...)
 
-	err := client.run(ctx, args...)
+	err := run(ctx, client, args...)
 	if err != nil {
 		return fmt.Errorf("stage paths: %w", err)
 	}
@@ -846,8 +925,15 @@ func (client *Client) runStageAdd(ctx context.Context, paths []string) error {
 	return nil
 }
 
-func (client *Client) setOriginRemoteURL(ctx context.Context, remoteURL string) error {
-	cmd := client.newGitCommand(ctx, gitRemote, "set-url", consts.GitOrigin, remoteURL)
+func setOriginRemoteURL(ctx context.Context, client *Client, remoteURL string) error {
+	cmd := newGitCommand(
+		ctx,
+		client.fns.workspace,
+		gitRemote,
+		"set-url",
+		consts.GitOrigin,
+		remoteURL,
+	)
 
 	err := cmd.Run()
 	if err != nil {
@@ -856,4 +942,12 @@ func (client *Client) setOriginRemoteURL(ctx context.Context, remoteURL string) 
 	}
 
 	return nil
+}
+
+func run(ctx context.Context, client *Client, args ...string) error {
+	return client.fns.run(ctx, args...) //nolint:wrapcheck // fns closure
+}
+
+func output(ctx context.Context, client *Client, args ...string) (string, error) {
+	return client.fns.output(ctx, args...) //nolint:wrapcheck // fns closure
 }

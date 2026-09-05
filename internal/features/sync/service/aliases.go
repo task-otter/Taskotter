@@ -6,14 +6,13 @@ package service
 import (
 	"github.com/task-otter/Taskotter/internal/features/sync/domain/lockmodel"
 	"github.com/task-otter/Taskotter/internal/features/sync/domain/managed"
-	"github.com/task-otter/Taskotter/internal/features/sync/domain/rootupd"
+	"github.com/task-otter/Taskotter/internal/features/sync/ports"
 )
 
 type (
 	syncLock          = lockmodel.LockFile
 	moduleRecord      = lockmodel.ModuleRecord
 	managedFile       = managed.File
-	orderedRequested  = lockmodel.OrderedRequested
-	generatedRootTask = rootupd.GeneratedRootTask
-	rootUpdateInput   = rootupd.RootUpdateInput
+	generatedRootTask = ports.GeneratedRootTask
+	rootUpdateInput   = ports.RootUpdateInput
 )

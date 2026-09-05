@@ -10,7 +10,7 @@ import (
 
 type (
 	// LockSource records the store repository and resolved ref for a sync run.
-	LockSource struct {
+	LockSource = struct {
 		Repository       string
 		RequestedVersion string
 		SourceRef        string
@@ -19,10 +19,10 @@ type (
 	}
 
 	// OrderedRequested preserves lock-file request order for YAML round-trips.
-	OrderedRequested map[string]ModuleRecord
+	OrderedRequested = map[string]ModuleRecord
 
 	// LockConfiguration captures consumer sync settings stored in the lock file.
-	LockConfiguration struct {
+	LockConfiguration = struct {
 		TargetFolder       string
 		NodePackageManager string
 		Tasks              []string
@@ -31,7 +31,7 @@ type (
 	}
 
 	// LockFile is the on-disk sync state under the target folder.
-	LockFile struct {
+	LockFile = struct {
 		Source             LockSource
 		Requested          OrderedRequested
 		Dependencies       []ModuleRecord
@@ -41,9 +41,9 @@ type (
 	}
 
 	// ModuleRecord maps a logical task to its source module and destination path.
-	ModuleRecord struct {
-		SourceModule      string
-		DestinationModule string
-		Path              string
+	ModuleRecord = struct {
+		SourceModule      string `yaml:"source_module"`
+		DestinationModule string `yaml:"destination_module"`
+		Path              string `yaml:"path"`
 	}
 )

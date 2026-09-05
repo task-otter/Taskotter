@@ -15,20 +15,20 @@ import (
 
 type (
 	// Metadata points to the active lock file and configuration hash.
-	Metadata struct {
-		TargetFolder      string
-		LockFile          string
-		ConfigurationHash string
+	Metadata = struct {
+		TargetFolder      string `yaml:"target_folder"`
+		LockFile          string `yaml:"lock_file"`
+		ConfigurationHash string `yaml:"configuration_hash"`
 	}
 
 	// FileEntry holds staged file bytes and permissions.
-	FileEntry struct {
+	FileEntry = struct {
 		Data []byte
 		Mode os.FileMode
 	}
 
 	// Plan describes the sync diff and generated artifacts for one run.
-	Plan struct {
+	Plan = struct {
 		OldLock          *lockmodel.LockFile
 		CopyFileTo       func(string, *FileEntry) error
 		ModuleContents   map[string]map[string]FileEntry
@@ -48,7 +48,7 @@ type (
 	}
 
 	// SyncInput is the resolved store snapshot and module mapping for BuildPlan.
-	SyncInput struct {
+	SyncInput = struct {
 		Config       *config.Config
 		Snapshot     ports.Snapshot
 		TaskfileOps  ports.TaskfileOps

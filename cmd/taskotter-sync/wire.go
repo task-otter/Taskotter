@@ -23,22 +23,22 @@ const (
 // WireOrchestrator builds an Orchestrator with concrete adapters from configuration.
 func WireOrchestrator(ctx context.Context, cfg *config.Config) (*syncrun.Orchestrator, error) {
 	client := gitcli.NewClient(cfg.Workspace)
-	orch := newWiredOrchestrator(ctx, cfg, client)
+	deps := newWiredDeps(ctx, cfg, client)
 
-	err := wirePRClient(ctx, cfg, orch)
+	err := wirePRClient(ctx, cfg, deps)
 	if err != nil {
 		return nil, fmt.Errorf("wire PR client: %w", err)
 	}
 
-	return orch, nil
+	return syncrun.NewOrchestrator(deps), nil
 }
 
-func newWiredOrchestrator(
+func newWiredDeps(
 	ctx context.Context,
 	cfg *config.Config,
 	client *gitcli.Client,
-) *syncrun.Orchestrator {
-	return &syncrun.Orchestrator{
+) *syncrun.Deps {
+	return &syncrun.Deps{
 		Logger:            logging.New(),
 		StoreClient:       storegithub.NewClient(ctx, cfg.GitHubToken),
 		GitClient:         client,
@@ -54,7 +54,7 @@ func newWiredOrchestrator(
 	}
 }
 
-func wirePRClient(ctx context.Context, cfg *config.Config, orch *syncrun.Orchestrator) error {
+func wirePRClient(ctx context.Context, cfg *config.Config, deps *syncrun.Deps) error {
 	if cfg.Repository == consts.Empty {
 		return nil
 	}
@@ -64,7 +64,7 @@ func wirePRClient(ctx context.Context, cfg *config.Config, orch *syncrun.Orchest
 		return fmt.Errorf(errCreatePRClient, err)
 	}
 
-	orch.PRClient = prClient
+	deps.PRClient = prClient
 
 	return nil
 }

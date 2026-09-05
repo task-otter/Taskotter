@@ -40,6 +40,8 @@ type (
 )
 
 const (
+	testFieldTasks = "tasks"
+
 	folderTaskfiles = "taskfiles"
 	folderTask      = "task"
 	pathTaskfileYML = "Taskfile.yml"
@@ -236,7 +238,7 @@ func TestNormalizeSlashes(t *testing.T) {
 func TestPathErrorString(t *testing.T) {
 	t.Parallel()
 
-	withField := (&pathutil.PathError{Field: "tasks", Value: consts.Empty, Message: pathErrorMsgBad}).Error()
+	withField := (&pathutil.PathError{Field: testFieldTasks, Value: consts.Empty, Message: pathErrorMsgBad}).Error()
 
 	if withField != "tasks: bad" {
 		t.Fatalf(fmtErrorEquals, withField)
@@ -438,5 +440,31 @@ func isDocPathCases() []boolCase {
 		{"docs", false},
 		{"readme.md", false},
 		{pathTaskfileYML, false},
+	}
+}
+
+// TestPathErrorFieldNameAndDetail covers FieldName and Detail helpers.
+func TestPathErrorFieldNameAndDetail(t *testing.T) {
+	t.Parallel()
+
+	err := &pathutil.PathError{Field: testFieldTasks, Value: "bad", Message: "nope"}
+
+	if err.FieldName() != testFieldTasks {
+		t.Fatalf("FieldName = %q", err.FieldName())
+	}
+
+	if err.Detail() == "" {
+		t.Fatal("Detail empty")
+	}
+}
+
+// TestPathErrorFieldNameEmptyExtras covers FieldName when value and message are empty.
+func TestPathErrorFieldNameEmptyExtras(t *testing.T) {
+	t.Parallel()
+
+	err := &pathutil.PathError{Field: testFieldTasks, Value: consts.Empty, Message: consts.Empty}
+
+	if err.FieldName() != testFieldTasks {
+		t.Fatalf("FieldName() = %q", err.FieldName())
 	}
 }

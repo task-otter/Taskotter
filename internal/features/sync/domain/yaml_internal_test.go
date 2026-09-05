@@ -107,7 +107,7 @@ func assertMetaFailCase(t *testing.T, testCase *metaYAMLCase) {
 
 	var meta Metadata
 
-	assertFails(t, yaml.Unmarshal([]byte(testCase.payload), &meta))
+	assertFails(t, DecodeMetadataYAML([]byte(testCase.payload), &meta))
 }
 
 func assertMetaOKCase(t *testing.T, testCase *metaYAMLCase) {
@@ -201,10 +201,23 @@ func sampleMetadata() Metadata {
 
 func unmarshalMetaOK(t *testing.T, payload string, meta *Metadata) {
 	t.Helper()
-	assertNoErr(t, yaml.Unmarshal([]byte(payload), meta))
+	assertNoErr(t, DecodeMetadataYAML([]byte(payload), meta))
 }
 
 func yamlScalarNode(value string) *yaml.Node {
 	//nolint:exhaustruct_v5 // only kind and value matter for this fixture
 	return &yaml.Node{Kind: yaml.ScalarNode, Value: value}
+}
+
+// TestDecodeMetadataYAMLRejectsInvalidYAML covers decode failure and non-document unwrap.
+func TestDecodeMetadataYAMLRejectsInvalidYAML(t *testing.T) {
+	t.Parallel()
+
+	var meta Metadata
+
+	assertFails(t, DecodeMetadataYAML([]byte(":\t"), &meta))
+
+	if yamlDocumentContent(nil) != nil {
+		t.Fatal("nil document")
+	}
 }

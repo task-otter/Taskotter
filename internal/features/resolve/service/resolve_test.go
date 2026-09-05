@@ -71,7 +71,7 @@ func TestMissingTaskCloseMatches(t *testing.T) {
 		resolveInput(&resolveInputParams{
 			task:           "eslit",
 			cat:            catalog(srcESLintBun, moduleEslintNpm),
-			packageManager: config.PackageManager(config.JSRuntimeBun),
+			packageManager: config.JSRuntimeBun,
 		}),
 	)
 	if err == nil {
@@ -296,7 +296,7 @@ func nodeVariantWantRows() []nodeVariantWant {
 		{config.PMNPM, moduleEslintNpm},
 		{config.PMYarn, moduleEslintYarn},
 		{config.PMPnpm, srcESLintPnpm},
-		{config.PackageManager(config.JSRuntimeBun), srcESLintBun},
+		{config.JSRuntimeBun, srcESLintBun},
 	}
 }
 

@@ -30,7 +30,7 @@ type (
 	generatedRootTask = rootupd.GeneratedRootTask
 
 	// includesUpdateParams carries state for merging managed includes into the root Taskfile.
-	includesUpdateParams struct {
+	includesUpdateParams = struct {
 		includesNode *yaml.Node
 		existing     map[string]*yaml.Node
 		moduleVars   map[string]*yaml.Node
@@ -38,7 +38,7 @@ type (
 	}
 
 	// includeUpsertParams carries state for upserting one managed include entry.
-	includeUpsertParams struct {
+	includeUpsertParams = struct {
 		includesNode *yaml.Node
 		existing     map[string]*yaml.Node
 		moduleVars   map[string]*yaml.Node
@@ -162,7 +162,7 @@ type (
 	}
 
 	// collectIncludeReplacementsParams carries state for collecting include path edits.
-	collectIncludeReplacementsParams struct {
+	collectIncludeReplacementsParams = struct {
 		includes     *yaml.Node
 		entry        *yaml.Node
 		sourceToDest map[string]string
@@ -184,6 +184,7 @@ const (
 	keyVars        = "vars"
 	keyTasks       = "tasks"
 	taskfileSuffix = "Taskfile.yml"
+	doubleQuote    = `"`
 
 	errParseTaskfileRoot  = "parse taskfile root: %w"
 	errMarshalAndValidate = "marshal and validate: %w"
@@ -1477,7 +1478,11 @@ func addMissingPromotedVar(params *addPromotedVarParams) {
 		return
 	}
 
-	appendMappingPair(params.rootVars, yamlScalar(params.key), value)
+	appendMappingPair(
+		params.rootVars,
+		yamlScalar(params.key),
+		overridableRootVar(params.key, value),
+	)
 }
 
 func firstVarValue(tasks []string, moduleVarsByTask map[string]*yaml.Node, key string) *yaml.Node {
@@ -1570,6 +1575,33 @@ func includeVarsNode(moduleVars *yaml.Node) *yaml.Node {
 
 func rootVarReference(key string) *yaml.Node {
 	return yamlScalar("{{." + key + "}}")
+}
+
+// overridableRootVar wraps a newly promoted scalar as Task's overridable default form
+// ('{{.KEY | default "..."}}'). Non-scalars and values that already use | default are
+// returned unchanged. Defaults containing " use Go-template raw backticks.
+func overridableRootVar(key string, value *yaml.Node) *yaml.Node {
+	if value == nil || value.Kind != yaml.ScalarNode {
+		return value
+	}
+
+	if strings.Contains(value.Value, "| default") {
+		return value
+	}
+
+	node := yamlScalar("{{." + key + " | default " + overridableDefaultArg(value.Value) + "}}")
+
+	node.Style = yaml.SingleQuotedStyle
+
+	return node
+}
+
+func overridableDefaultArg(value string) string {
+	if strings.Contains(value, doubleQuote) {
+		return "`" + value + "`"
+	}
+
+	return doubleQuote + value + doubleQuote
 }
 
 // cloneYAMLNode returns a deep copy of node so promoted values can be reused

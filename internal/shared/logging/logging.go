@@ -14,26 +14,56 @@ import (
 )
 
 type (
+	// Emitter is the logging surface used by sync orchestration.
+	Emitter interface {
+		Err() error
+		Errorf(format string, args ...any)
+		Noticef(format string, args ...any)
+		Printf(format string, args ...any)
+		Warningf(format string, args ...any)
+	}
+
 	// Logger emits GitHub Actions log commands.
 	Logger struct {
-		out io.Writer
-		err error
+		write func(string)
+		err   func() error
 	}
 )
 
 // New returns a logger writing to stdout.
 func New() *Logger {
-	return &Logger{out: os.Stdout, err: nil}
+	return NewWithWriter(os.Stdout)
 }
 
 // NewWithWriter returns a logger writing to w.
-func NewWithWriter(w io.Writer) *Logger {
-	return &Logger{out: w, err: nil}
+func NewWithWriter(writer io.Writer) *Logger {
+	var writeErr error
+
+	return &Logger{
+		write: func(text string) {
+			if writeErr != nil {
+				return
+			}
+
+			err := iox.WriteStringFull(writer, text)
+			if err != nil {
+				writeErr = fmt.Errorf("write log output: %w", err)
+			}
+		},
+		err: func() error {
+			return writeErr
+		},
+	}
 }
 
 // Err returns the first write error encountered by the logger, if any.
 func (logger *Logger) Err() error {
-	return logger.err
+	if logger.err == nil {
+		return nil
+	}
+
+	//nolint:wrapcheck // write path already wraps; preserve stable error identity for callers
+	return logger.err()
 }
 
 // Errorf writes a GitHub Actions error annotation.
@@ -68,17 +98,6 @@ func (logger *Logger) Printf(format string, args ...any) {
 // Warningf writes a GitHub Actions warning annotation.
 func (logger *Logger) Warningf(format string, args ...any) {
 	logger.write(fmt.Sprintf("::warning::"+format+"\n", args...))
-}
-
-func (logger *Logger) write(text string) {
-	if logger.err != nil {
-		return
-	}
-
-	err := iox.WriteStringFull(logger.out, text)
-	if err != nil {
-		logger.err = fmt.Errorf("write log output: %w", err)
-	}
 }
 
 // Redact replaces s with asterisks for safe logging.

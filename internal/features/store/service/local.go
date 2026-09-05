@@ -26,7 +26,7 @@ type (
 		entries []os.DirEntry
 	}
 
-	localSnapshotArgs struct {
+	localSnapshotArgs = struct {
 		ref     *domain.RefInfo
 		catalog map[string]struct{}
 		deps    map[string][]string

@@ -14,6 +14,7 @@ import (
 	"testing"
 
 	"github.com/task-otter/Taskotter/internal/features/store/adapters/github"
+	"github.com/task-otter/Taskotter/internal/features/store/domain"
 	"github.com/task-otter/Taskotter/internal/shared/config"
 	"github.com/task-otter/Taskotter/internal/shared/consts"
 	"github.com/task-otter/Taskotter/internal/shared/iox"
@@ -390,8 +391,8 @@ func assertModuleDir(t *testing.T, snap *github.Snapshot, root string) {
 
 	wantDir := filepath.Join(root, "taskfiles", "eslint", "node", "pnpm")
 
-	if snap.ModuleDir(testESLintNodePnpm) != wantDir {
-		t.Fatalf("unexpected module dir: %s", snap.ModuleDir(testESLintNodePnpm))
+	if domain.ModuleDir(snap, testESLintNodePnpm) != wantDir {
+		t.Fatalf("unexpected module dir: %s", domain.ModuleDir(snap, testESLintNodePnpm))
 	}
 }
 
@@ -451,7 +452,7 @@ func buildStoreTarGz(t *testing.T) []byte {
 func closeAndAssertRemoved(t *testing.T, snap *github.Snapshot) {
 	t.Helper()
 
-	err := snap.Close()
+	err := domain.Close(snap)
 	if err != nil {
 		t.Fatal(err)
 	}

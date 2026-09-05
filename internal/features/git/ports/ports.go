@@ -10,8 +10,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-
-	"github.com/task-otter/Taskotter/internal/shared/iox"
 )
 
 type (
@@ -90,16 +88,17 @@ func EnsureBranchOwned(ctx context.Context, ops BranchChecker, branch string) er
 // IsGitRepo reports whether workspace contains a .git directory.
 func IsGitRepo(workspace string) bool {
 	info, err := os.Stat(filepath.Join(workspace, ".git"))
-	iox.Discard(info)
+	if err != nil {
+		return false
+	}
 
-	return err == nil
+	return info != nil
 }
 
 // WriteLocalIdentity configures commit author metadata for sync commits.
 func WriteLocalIdentity() {
 	// Commit identity is applied per command via -c; config files are not writable
 	// in GitHub Actions Docker containers.
-	iox.Discard(struct{}{})
 }
 
 func verifyExistingBranchOwned(ctx context.Context, ops BranchChecker, branch string) error {

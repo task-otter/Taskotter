@@ -45,7 +45,7 @@ func TestParseJSBun(t *testing.T) {
 		t.Fatalf("JSRuntime = %q, want bun", cfg.JSRuntime)
 	}
 
-	if cfg.NodePackageManager != config.PackageManager(config.JSRuntimeBun) {
+	if cfg.NodePackageManager != config.JSRuntimeBun {
 		t.Fatalf("NodePackageManager = %q, want bun", cfg.NodePackageManager)
 	}
 }

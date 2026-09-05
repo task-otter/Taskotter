@@ -205,7 +205,10 @@ func TestCopyAndCloseReportsCopyFailure(t *testing.T) {
 		t.Fatalf(unexpectText, err)
 	}
 
-	err = extractor.copyAndClose(file, int64(len(payloadText)), path)
+	err = copyAndClose(
+		extractor,
+		&copyCloseArgs{file: file, size: int64(len(payloadText)), path: path},
+	)
 	if err == nil {
 		t.Fatal(wantErrText)
 	}
@@ -225,7 +228,7 @@ func TestCopyAndCloseReportsCloseFailure(t *testing.T) {
 
 	iox.Discard(file.Close())
 
-	err = extractor.copyAndClose(file, consts.IndexZero, path)
+	err = copyAndClose(extractor, &copyCloseArgs{file: file, size: consts.IndexZero, path: path})
 	if err == nil {
 		t.Fatal(wantErrText)
 	}
@@ -237,7 +240,10 @@ func TestCopyToReportsTruncatedPayload(t *testing.T) {
 
 	extractor := truncatedEntryExtractor(t)
 
-	written, err := extractor.copyLim(io.Discard, int64(len(payloadText)), fileName)
+	written, err := copyLim(
+		extractor,
+		&copyLimArgs{dst: io.Discard, size: int64(len(payloadText)), path: fileName},
+	)
 	iox.Discard(written)
 
 	if err == nil {
@@ -251,11 +257,11 @@ func TestWriteRegularFileReportsCopyFailure(t *testing.T) {
 
 	extractor := truncatedEntryExtractor(t)
 
-	err := extractor.writeRegularFile(
-		filepath.Join(t.TempDir(), fileName),
-		consts.FilePerm644,
-		int64(len(payloadText)),
-	)
+	err := writeRegularFile(extractor, &writeRegularArgs{
+		path: filepath.Join(t.TempDir(), fileName),
+		mode: consts.FilePerm644,
+		size: int64(len(payloadText)),
+	})
 	if err == nil {
 		t.Fatal(wantErrText)
 	}
@@ -270,7 +276,7 @@ func TestWriteRegEntryReportsParentFailure(t *testing.T) {
 
 	writeFileOrFail(t, blocker)
 
-	err := extractor.writeRegTarget(
+	err := writeRegTarget(extractor,
 		testHeader(tar.TypeReg, fileName, consts.IndexZero),
 		filepath.Join(blocker, subName, fileName),
 	)
@@ -285,7 +291,10 @@ func TestCopyLimReportsSizeMismatch(t *testing.T) {
 
 	extractor := extractorWithReader(t, tar.NewReader(strings.NewReader(consts.Empty)))
 
-	written, err := extractor.copyLim(io.Discard, int64(len(payloadText)), fileName)
+	written, err := copyLim(
+		extractor,
+		&copyLimArgs{dst: io.Discard, size: int64(len(payloadText)), path: fileName},
+	)
 	iox.Discard(written)
 
 	if err == nil {
@@ -299,7 +308,7 @@ func TestNextHeaderReportsCorruptArchive(t *testing.T) {
 
 	extractor := extractorWithReader(t, tar.NewReader(strings.NewReader(corruptTar)))
 
-	header, err := extractor.nextHeader()
+	header, err := nextHeader(extractor)
 	iox.Discard(header)
 
 	if err == nil || errors.Is(err, io.EOF) {
@@ -313,7 +322,7 @@ func TestStepReportsHeaderFailure(t *testing.T) {
 
 	extractor := extractorWithReader(t, tar.NewReader(strings.NewReader(corruptTar)))
 
-	cont, err := extractor.step()
+	cont, err := step(extractor)
 
 	if cont || err == nil {
 		t.Fatalf("step() = %t, %v", cont, err)
@@ -338,7 +347,7 @@ func TestValidateSizeReportsTotalLimit(t *testing.T) {
 
 	extractor.total = MaxTotalExtracted
 
-	err := extractor.validateSize(consts.IndexOne, fileName)
+	err := validateSize(extractor, consts.IndexOne, fileName)
 	if err == nil {
 		t.Fatal(wantErrText)
 	}
@@ -350,7 +359,7 @@ func TestWriteRegEntryReportsSizeFailure(t *testing.T) {
 
 	extractor := extractorWithReader(t, tar.NewReader(strings.NewReader(consts.Empty)))
 
-	err := extractor.writeRegTarget(
+	err := writeRegTarget(extractor,
 		testHeader(tar.TypeReg, fileName, MaxFileBytes+consts.IndexOne),
 		filepath.Join(t.TempDir(), fileName),
 	)
@@ -365,11 +374,11 @@ func TestWriteRegularFileReportsOpenFailure(t *testing.T) {
 
 	extractor := extractorWithReader(t, tar.NewReader(strings.NewReader(consts.Empty)))
 
-	err := extractor.writeRegularFile(
-		filepath.Join(t.TempDir(), "missing", fileName),
-		consts.FilePerm644,
-		consts.IndexZero,
-	)
+	err := writeRegularFile(extractor, &writeRegularArgs{
+		path: filepath.Join(t.TempDir(), "missing", fileName),
+		mode: consts.FilePerm644,
+		size: consts.IndexZero,
+	})
 	if err == nil {
 		t.Fatal(wantErrText)
 	}
@@ -381,7 +390,7 @@ func TestWriteResolvedEntryRejectsEscape(t *testing.T) {
 
 	extractor := extractorWithReader(t, tar.NewReader(strings.NewReader(consts.Empty)))
 
-	err := extractor.writeResolvedEntry(
+	err := writeResolvedEntry(extractor,
 		testHeader(tar.TypeReg, fileName, consts.IndexZero),
 		escapePath,
 	)
@@ -399,7 +408,7 @@ func TestWriteResolvedEntryReportsWriteFailure(t *testing.T) {
 
 	writeFileOrFail(t, blocker)
 
-	err := extractor.writeResolvedEntry(
+	err := writeResolvedEntry(extractor,
 		testHeader(tar.TypeDir, fileName, consts.IndexZero),
 		fileName+"/"+subName,
 	)
@@ -453,7 +462,7 @@ func assertAbsPathsFail(t *testing.T, failAfter int) {
 func assertSkipMetadataFails(t *testing.T, extractor *tarExtractor, header *tar.Header) {
 	t.Helper()
 
-	skip, err := extractor.shouldSkipEntry(header)
+	skip, err := shouldSkipEntry(extractor, header)
 	iox.Discard(skip)
 
 	if err == nil {

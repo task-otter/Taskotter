@@ -244,7 +244,7 @@ func TestDefaultBranchReportsDetectionFailure(t *testing.T) {
 func TestDefaultBranchFromRemoteShowReportsFailure(t *testing.T) {
 	t.Parallel()
 
-	branch, err := NewClient(t.TempDir()).defaultBranchFromRemoteShow(t.Context())
+	branch, err := defaultBranchFromRemoteShow(t.Context(), NewClient(t.TempDir()))
 	iox.Discard(branch)
 	assertFails(t, err)
 }
@@ -253,7 +253,7 @@ func TestDefaultBranchFromRemoteShowReportsFailure(t *testing.T) {
 func TestRefsAtOriginHEADReportsFailure(t *testing.T) {
 	t.Parallel()
 
-	refs, err := NewClient(t.TempDir()).refsAtOriginHEAD(t.Context(), "deadbeef")
+	refs, err := refsAtOriginHEAD(t.Context(), NewClient(t.TempDir()), "deadbeef")
 	iox.Discard(refs)
 	assertFails(t, err)
 }

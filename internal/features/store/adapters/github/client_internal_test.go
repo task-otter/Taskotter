@@ -68,9 +68,9 @@ func TestClientRequestsReportTransportFailures(t *testing.T) {
 	client := NewClientWithHTTP(t.Context(), consts.Empty, &stubDoer{err: errStub})
 	ctx := t.Context()
 
-	assertFails(t, secondOf(client.resolveBranchHead(ctx, testBranch)))
-	assertFails(t, secondOf(client.resolveTag(ctx, testTag)))
-	assertFails(t, secondOf(client.peelAnnotatedTag(ctx, testSHA)))
+	assertFails(t, secondOf(resolveBranchHead(ctx, client, testBranch)))
+	assertFails(t, secondOf(resolveTag(ctx, client, testTag)))
+	assertFails(t, secondOf(peelAnnotatedTag(ctx, client, testSHA)))
 	assertFails(t, secondOf(client.ResolveRef(ctx, consts.Empty)))
 	assertFails(t, secondOf(client.DownloadSnapshot(ctx, newRefInfoForTest())))
 }
@@ -82,7 +82,7 @@ func TestResolveVersionRefReportsTagFailure(t *testing.T) {
 	client := NewClientWithHTTP(t.Context(), consts.Empty, &stubDoer{err: errStub})
 	info := newRefInfo(testTag, testBranch)
 
-	err := client.resolveVersionRef(t.Context(), &versionRefRequest{
+	err := resolveVersionRef(t.Context(), client, &versionRefRequest{
 		info:             &info,
 		requestedVersion: testTag,
 		defaultBranch:    testBranch,
@@ -112,7 +112,7 @@ func TestTagSHAReportsPeelFailure(t *testing.T) {
 	}}
 	client := NewClientWithHTTP(t.Context(), consts.Empty, doer)
 
-	assertFails(t, secondOf(client.resolveTag(t.Context(), testTag)))
+	assertFails(t, secondOf(resolveTag(t.Context(), client, testTag)))
 }
 
 // TestBuildSnapshotReportsTempDirFailure verifies an unusable temp directory is reported.
@@ -131,7 +131,7 @@ func TestDoGetReportsInvalidURL(t *testing.T) {
 	client := NewClientWithHTTP(t.Context(), "token", &stubDoer{err: errStub}).WithBaseURL("://bad")
 
 	//nolint:bodyclose // the request is never sent, so there is no body
-	resp, err := client.doGet(t.Context(), "\n")
+	resp, err := doGet(t.Context(), client, "\n")
 	iox.Discard(resp)
 	assertFails(t, err)
 }
@@ -227,7 +227,7 @@ func TestResolveSHAReportsPeelFailure(t *testing.T) {
 	client := NewClientWithHTTP(t.Context(), consts.Empty, &stubDoer{err: errStub})
 	payload := annotatedTagRefPayload()
 
-	sha, err := client.resolveSHA(t.Context(), &payload)
+	sha, err := resolveSHA(t.Context(), client, &payload)
 	iox.Discard(sha)
 	assertFails(t, err)
 }

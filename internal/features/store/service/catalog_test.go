@@ -32,8 +32,8 @@ func TestLocalSnapshotLoadsFixtureStore(t *testing.T) {
 		t.Fatalf(consts.UnexpectedErr, err)
 	}
 
-	if snapshot.WorkspaceRoot() != fixtureStoreRoot {
-		t.Fatalf("WorkspaceRoot() = %q", snapshot.WorkspaceRoot())
+	if domain.WorkspaceRoot(snapshot) != fixtureStoreRoot {
+		t.Fatalf("WorkspaceRoot() = %q", domain.WorkspaceRoot(snapshot))
 	}
 }
 

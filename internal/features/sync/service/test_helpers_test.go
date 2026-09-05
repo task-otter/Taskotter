@@ -162,8 +162,8 @@ func buildSingleSyncIn(input *moduleTestInput) syncdomain.SyncInput {
 func variantModuleSyncInput(args *variantModuleSyncArgs) syncdomain.SyncInput {
 	return syncdomain.SyncInput{
 		Config:      args.cfg,
-		TaskfileOps: synctaskfile.Ops{},
-		Snapshot:    args.snap,
+		TaskfileOps: synctaskfile.NewOps(),
+		Snapshot:    syncsvc.SnapshotPort(args.snap),
 		Requested: map[string]lockmodel.ModuleRecord{
 			args.task: {
 				SourceModule:      args.source,
@@ -304,13 +304,15 @@ func writeModuleFile(input *moduleFileInput) {
 	writeFileWithDir(input.t, filepath.Join(input.dir, input.rel), []byte(input.content))
 }
 
-func setupPlan(args *setupPlanArgs) (*config.Config, syncdomain.SyncInput, *syncdomain.Plan) {
+func setupPlan(
+	args *setupPlanArgs,
+) (cfg *config.Config, syncInput syncdomain.SyncInput, plan *syncdomain.Plan) {
 	args.t.Helper()
 
 	writeRootTaskfile(args.t, args.workspace)
 
-	cfg := testConfig(args.workspace, args.mutate)
-	syncInput, plan := preparePlan(args.t, args.workspace, cfg)
+	cfg = testConfig(args.workspace, args.mutate)
+	syncInput, plan = preparePlan(args.t, args.workspace, cfg)
 
 	return cfg, syncInput, plan
 }
@@ -357,10 +359,12 @@ func assertApplyPlanPreservesPath(input *preservePathInput) {
 	assertFileExists(input.t, input.path)
 }
 
-func setupPlanInput(args *setupPlanArgs) (syncdomain.SyncInput, *syncdomain.Plan) {
+func setupPlanInput(args *setupPlanArgs) (syncInput syncdomain.SyncInput, plan *syncdomain.Plan) {
 	args.t.Helper()
 
-	cfg, syncInput, plan := setupPlan(args)
+	var cfg *config.Config
+
+	cfg, syncInput, plan = setupPlan(args)
 	discardCfg(cfg)
 
 	return syncInput, plan

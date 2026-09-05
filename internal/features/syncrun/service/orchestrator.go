@@ -2,8 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0.
 
 // Package service orchestrates the sync, apply, and pull request workflow.
-//
-//nolint:funcorder // methods follow pipeline phases, not strict alphabetical order
 package service
 
 import (
@@ -14,29 +12,37 @@ import (
 
 	gitports "github.com/task-otter/Taskotter/internal/features/git/ports"
 	prdomain "github.com/task-otter/Taskotter/internal/features/pr/domain"
+	prports "github.com/task-otter/Taskotter/internal/features/pr/ports"
 	prservice "github.com/task-otter/Taskotter/internal/features/pr/service"
 	resolvesvc "github.com/task-otter/Taskotter/internal/features/resolve/service"
 	storedomain "github.com/task-otter/Taskotter/internal/features/store/domain"
 	synctaskfile "github.com/task-otter/Taskotter/internal/features/sync/adapters/taskfile"
 	syncdomain "github.com/task-otter/Taskotter/internal/features/sync/domain"
 	syncsvc "github.com/task-otter/Taskotter/internal/features/sync/service"
-	"github.com/task-otter/Taskotter/internal/features/syncrun/ports"
 	"github.com/task-otter/Taskotter/internal/shared/config"
 	"github.com/task-otter/Taskotter/internal/shared/consts"
 	"github.com/task-otter/Taskotter/internal/shared/logging"
 )
 
 type (
+	// storeClient resolves store refs and downloads snapshots for the sync pipeline.
+	storeClient interface {
+		ResolveRef(ctx context.Context, requestedVersion string) (storedomain.RefInfo, error)
+		DownloadSnapshot(
+			ctx context.Context,
+			ref *storedomain.RefInfo,
+		) (*storedomain.Snapshot, error)
+	}
 
-	// Orchestrator coordinates store, git, and GitHub operations for a sync run.
-	Orchestrator struct {
+	// Deps holds collaborators for one sync run pipeline.
+	Deps = struct {
 		Logger            *logging.Logger
-		StoreClient       ports.StoreClient
+		StoreClient       storeClient
 		GitClient         gitports.Workspace
-		GitBrancher       ports.Brancher
-		GitIndexer        ports.Indexer
-		GitPublisher      ports.Publisher
-		PRClient          ports.PRClient
+		GitBrancher       gitports.Brancher
+		GitIndexer        gitports.Indexer
+		GitPublisher      gitports.Publisher
+		PRClient          prports.PRClient
 		PrepareSyncInput  PrepareSyncInputFn
 		BuildPlan         BuildPlanFn
 		ApplyPlan         ApplyPlanFn
@@ -44,14 +50,19 @@ type (
 		ResolveTransitive ResolveTransitiveFn
 	}
 
-	buildPlanInput struct {
+	// Orchestrator coordinates store, git, and GitHub operations for a sync run.
+	Orchestrator struct {
+		run func(context.Context, *config.Config) (*Result, error)
+	}
+
+	buildPlanInput = struct {
 		cfg         *config.Config
 		snapshot    *storedomain.Snapshot
 		resolutions []resolvesvc.Resolution
 		depSources  []string
 	}
 
-	changedPlanInput struct {
+	changedPlanInput = struct {
 		cfg       *config.Config
 		plan      *syncdomain.Plan
 		syncInput *syncdomain.SyncInput
@@ -59,14 +70,14 @@ type (
 		result    *Result
 	}
 
-	createPRInput struct {
+	createPRInput = struct {
 		result        *Result
 		branch        string
 		defaultBranch string
 		body          string
 	}
 
-	finishSyncInput struct {
+	finishSyncInput = struct {
 		cfg       *config.Config
 		plan      *syncdomain.Plan
 		syncInput *syncdomain.SyncInput
@@ -79,13 +90,18 @@ type (
 		msg string
 	}
 
-	planResult struct {
+	branchPair = struct {
+		name          string
+		defaultBranch string
+	}
+
+	planResult = struct {
 		syncInput *syncdomain.SyncInput
 		plan      *syncdomain.Plan
 		result    *Result
 	}
 
-	prPhaseInput struct {
+	prPhaseInput = struct {
 		cfg           *config.Config
 		plan          *syncdomain.Plan
 		ref           *storedomain.RefInfo
@@ -93,38 +109,38 @@ type (
 		defaultBranch string
 	}
 
-	updatePRInput struct {
+	updatePRInput = struct {
 		existing *prdomain.PullRequest
 		result   *Result
 		body     string
 	}
 
-	prResolveInput struct {
+	prResolveInput = struct {
 		phase    *prPhaseInput
 		existing *prdomain.PullRequest
 		body     string
 	}
 
-	plannedSyncInput struct {
+	plannedSyncInput = struct {
 		cfg      *config.Config
 		ref      *storedomain.RefInfo
 		snapshot *storedomain.Snapshot
 	}
-	branchPlanIn struct {
+	branchPlanIn = struct {
 		inp       *changedPlanInput
 		defBranch string
 	}
 
-	gitPlanIn struct {
+	gitPlanIn = struct {
 		cfg  *config.Config
 		plan *syncPlan
 	}
 
-	fetchIn struct {
+	fetchIn = struct {
 		cfg *config.Config
 	}
 
-	planResultArgs struct {
+	planResultArgs = struct {
 		cfg  *config.Config
 		snap *snapInfo
 		ref  *refInfo
@@ -156,6 +172,8 @@ const (
 
 	errFmtResolveStoreRef = "resolve store ref: %w"
 
+	errFmtRun = "run: %w"
+
 	errFmtResolveDependencies = "resolve dependencies: %w"
 
 	errFmtResolveRequestedModules = "resolve requested modules: %w"
@@ -165,7 +183,10 @@ const (
 	fmtRunGroupedErr = "run grouped: %w"
 )
 
-var errUnrelatedChanges = errors.New("unrelated uncommitted changes detected in workspace")
+var (
+	errUnrelatedChanges          = errors.New("unrelated uncommitted changes detected in workspace")
+	errOrchestratorNotConfigured = errors.New("orchestrator is not configured")
+)
 
 func runGitSyncSteps(steps []gitSyncStep) error {
 	for i := range steps {
@@ -222,25 +243,41 @@ func sourceModulesOf(resolutions []resolvesvc.Resolution) []string {
 	return requestedSources
 }
 
+// NewOrchestrator builds an Orchestrator that runs the sync pipeline with deps.
+func NewOrchestrator(deps *Deps) *Orchestrator {
+	return &Orchestrator{run: func(ctx context.Context, cfg *config.Config) (*Result, error) {
+		wireDefaults(deps)
+
+		result, err := execPipeline(ctx, deps, cfg)
+		if err != nil {
+			return nil, fmt.Errorf(errFmtRun, err)
+		}
+
+		return result, nil
+	}}
+}
+
 // Run executes the full sync pipeline.
 func (orch *Orchestrator) Run(ctx context.Context, cfg *config.Config) (*Result, error) {
-	orch.wireDefaults()
+	if orch == nil || orch.run == nil {
+		return nil, errOrchestratorNotConfigured
+	}
 
-	result, err := orch.execPipeline(ctx, cfg)
+	result, err := orch.run(ctx, cfg)
 	if err != nil {
-		return nil, fmt.Errorf("run: %w", err)
+		return nil, fmt.Errorf(errFmtRun, err)
 	}
 
 	return result, nil
 }
 
-func (orch *Orchestrator) applyChangedPlan(ctx context.Context, input *changedPlanInput) error {
-	defaultBranch, err := orch.maybeDefBranch(ctx, &gitPlanIn{cfg: input.cfg, plan: input.plan})
+func applyChangedPlan(ctx context.Context, deps *Deps, input *changedPlanInput) error {
+	defaultBranch, err := maybeDefBranch(ctx, deps, &gitPlanIn{cfg: input.cfg, plan: input.plan})
 	if err != nil {
 		return fmt.Errorf("resolve default branch: %w", err)
 	}
 
-	err = orch.applySyncChanges(ctx, &branchPlanIn{inp: input, defBranch: defaultBranch})
+	err = applySyncChanges(ctx, deps, &branchPlanIn{inp: input, defBranch: defaultBranch})
 	if err != nil {
 		return fmt.Errorf("apply sync changes: %w", err)
 	}
@@ -248,13 +285,13 @@ func (orch *Orchestrator) applyChangedPlan(ctx context.Context, input *changedPl
 	return nil
 }
 
-func (orch *Orchestrator) applySyncChanges(ctx context.Context, args *branchPlanIn) error {
-	err := orch.copyTaskModules(args.inp.plan, args.inp.syncInput)
+func applySyncChanges(ctx context.Context, deps *Deps, args *branchPlanIn) error {
+	err := copyTaskModules(deps, args.inp.plan, args.inp.syncInput)
 	if err != nil {
 		return fmt.Errorf("copy task modules: %w", err)
 	}
 
-	err = orch.commitAndMaybePR(ctx, args)
+	err = commitAndMaybePR(ctx, deps, args)
 	if err != nil {
 		return fmt.Errorf("commit and maybe PR: %w", err)
 	}
@@ -262,8 +299,8 @@ func (orch *Orchestrator) applySyncChanges(ctx context.Context, args *branchPlan
 	return nil
 }
 
-func (orch *Orchestrator) buildPlanResult(inp *buildPlanInput, ref *refInfo) (planResult, error) {
-	syncInput, plan, err := orch.buildSyncPlan(inp)
+func buildPlanResult(deps *Deps, inp *buildPlanInput, ref *refInfo) (planResult, error) {
+	syncInput, plan, err := buildSyncPlan(deps, inp)
 	if err != nil {
 		return planResult{}, fmt.Errorf(errFmtBuildSyncPlan, err)
 	}
@@ -274,11 +311,11 @@ func (orch *Orchestrator) buildPlanResult(inp *buildPlanInput, ref *refInfo) (pl
 }
 
 //nolint:gocritic // single-line sig for whitespace
-func (orch *Orchestrator) buildSyncPlan(inp *buildPlanInput) (*syncIn, *syncPlan, error) {
-	syncInput, err := orch.PrepareSyncInput(&syncsvc.PrepareSyncInputArgs{
+func buildSyncPlan(deps *Deps, inp *buildPlanInput) (*syncIn, *syncPlan, error) {
+	syncInput, err := deps.PrepareSyncInput(&syncsvc.PrepareSyncInputArgs{
 		Cfg:         inp.cfg,
-		Snapshot:    inp.snapshot,
-		TaskfileOps: synctaskfile.Ops{},
+		Snapshot:    syncsvc.SnapshotPort(inp.snapshot),
+		TaskfileOps: synctaskfile.NewOps(),
 		Resolutions: inp.resolutions,
 		DepSources:  inp.depSources,
 	})
@@ -286,9 +323,9 @@ func (orch *Orchestrator) buildSyncPlan(inp *buildPlanInput) (*syncIn, *syncPlan
 		return nil, nil, fmt.Errorf("prepare sync input: %w", err)
 	}
 
-	orch.logDestinationNormalization(&syncInput)
+	logDestinationNormalization(deps, &syncInput)
 
-	plan, err := orch.compareManagedFiles(&syncInput)
+	plan, err := compareManagedFiles(deps, &syncInput)
 	if err != nil {
 		return nil, nil, fmt.Errorf(errFmtBuildSyncPlan, err)
 	}
@@ -296,10 +333,10 @@ func (orch *Orchestrator) buildSyncPlan(inp *buildPlanInput) (*syncIn, *syncPlan
 	return &syncInput, plan, nil
 }
 
-func (orch *Orchestrator) checkUnrelatedChanges(ctx context.Context, plan *syncPlan) error {
+func checkUnrelatedChanges(ctx context.Context, deps *Deps, plan *syncPlan) error {
 	allowed := gitports.AllowedPathSet(plan.StagePaths)
 
-	unrelated, err := orch.GitIndexer.HasUnrelatedChanges(ctx, allowed)
+	unrelated, err := deps.GitIndexer.HasUnrelatedChanges(ctx, allowed)
 	if err != nil {
 		return fmt.Errorf(errFmtCheckUnrelatedChanges, err)
 	}
@@ -311,13 +348,13 @@ func (orch *Orchestrator) checkUnrelatedChanges(ctx context.Context, plan *syncP
 	return nil
 }
 
-func (orch *Orchestrator) commitAndMaybePR(ctx context.Context, args *branchPlanIn) error {
-	err := orch.maybeCommitPush(ctx, &gitPlanIn{cfg: args.inp.cfg, plan: args.inp.plan})
+func commitAndMaybePR(ctx context.Context, deps *Deps, args *branchPlanIn) error {
+	err := maybeCommitPush(ctx, deps, &gitPlanIn{cfg: args.inp.cfg, plan: args.inp.plan})
 	if err != nil {
 		return fmt.Errorf("commit and push: %w", err)
 	}
 
-	err = orch.runPRPhase(ctx, args)
+	err = runPRPhase(ctx, deps, args)
 	if err != nil {
 		return fmt.Errorf("run PR phase: %w", err)
 	}
@@ -325,8 +362,8 @@ func (orch *Orchestrator) commitAndMaybePR(ctx context.Context, args *branchPlan
 	return nil
 }
 
-func (orch *Orchestrator) runPRPhase(ctx context.Context, args *branchPlanIn) error {
-	err := orch.maybeCreateOrUpdatePR(ctx, &prPhaseInput{
+func runPRPhase(ctx context.Context, deps *Deps, args *branchPlanIn) error {
+	err := maybeCreateOrUpdatePR(ctx, deps, &prPhaseInput{
 		cfg:           args.inp.cfg,
 		plan:          args.inp.plan,
 		ref:           args.inp.ref,
@@ -340,10 +377,10 @@ func (orch *Orchestrator) runPRPhase(ctx context.Context, args *branchPlanIn) er
 	return nil
 }
 
-func (orch *Orchestrator) closeSnapshotQuietly(snapshot *storedomain.Snapshot) {
-	closeErr := snapshot.Close()
+func closeSnapshotQuietly(deps *Deps, snapshot *storedomain.Snapshot) {
+	closeErr := storedomain.Close(snapshot)
 	if closeErr != nil {
-		orch.Logger.Printf("close store snapshot: %v", closeErr)
+		deps.Logger.Printf("close store snapshot: %v", closeErr)
 	}
 }
 
@@ -357,16 +394,16 @@ func logBuiltPlan(logger *logging.Logger, built *syncdomain.Plan) {
 	)
 }
 
-func (orch *Orchestrator) compareManagedFiles(syncInput *syncIn) (*syncPlan, error) {
+func compareManagedFiles(deps *Deps, syncInput *syncIn) (*syncPlan, error) {
 	var plan *syncdomain.Plan
 
-	err := assignGrouped(orch.Logger, "Compare managed files", func() error {
-		built, planErr := orch.BuildPlan(syncInput)
+	err := assignGrouped(deps.Logger, "Compare managed files", func() error {
+		built, planErr := deps.BuildPlan(syncInput)
 		if planErr != nil {
 			return fmt.Errorf("build plan: %w", planErr)
 		}
 
-		logBuiltPlan(orch.Logger, built)
+		logBuiltPlan(deps.Logger, built)
 
 		plan = built
 
@@ -379,14 +416,14 @@ func (orch *Orchestrator) compareManagedFiles(syncInput *syncIn) (*syncPlan, err
 	return plan, nil
 }
 
-func (orch *Orchestrator) copyTaskModules(plan *syncPlan, syncInput *syncIn) error {
-	err := runGroupNoResult(orch.Logger, "Copy task modules", func() error {
-		applyErr := orch.ApplyPlan(plan, syncInput)
+func copyTaskModules(deps *Deps, plan *syncPlan, syncInput *syncIn) error {
+	err := runGroupNoResult(deps.Logger, "Copy task modules", func() error {
+		applyErr := deps.ApplyPlan(plan, syncInput)
 		if applyErr != nil {
 			return fmt.Errorf("apply plan: %w", applyErr)
 		}
 
-		orch.Logger.Printf("Copied modules and validated generated YAML")
+		deps.Logger.Printf("Copied modules and validated generated YAML")
 
 		return nil
 	})
@@ -397,8 +434,8 @@ func (orch *Orchestrator) copyTaskModules(plan *syncPlan, syncInput *syncIn) err
 	return nil
 }
 
-func (orch *Orchestrator) createNewPR(ctx context.Context, input *createPRInput) error {
-	pullReq, err := orch.PRClient.CreatePR(ctx, &prdomain.CreatePRRequest{
+func createNewPR(ctx context.Context, deps *Deps, input *createPRInput) error {
+	pullReq, err := deps.PRClient.CreatePR(ctx, &prdomain.CreatePRRequest{
 		Branch: input.branch,
 		Base:   input.defaultBranch,
 		Body:   input.body,
@@ -409,17 +446,17 @@ func (orch *Orchestrator) createNewPR(ctx context.Context, input *createPRInput)
 
 	input.result.PullRequestNumber = strconv.Itoa(pullReq.Number)
 	input.result.PullRequestURL = pullReq.URL
-	orch.Logger.Printf("Created pull request #%d", pullReq.Number)
+	deps.Logger.Printf("Created pull request #%d", pullReq.Number)
 
 	return nil
 }
 
-func (orch *Orchestrator) prBaseBranch(ctx context.Context, cfg *config.Config) (string, error) {
+func prBaseBranch(ctx context.Context, deps *Deps, cfg *config.Config) (string, error) {
 	if cfg.BaseBranch != consts.Empty {
 		return cfg.BaseBranch, nil
 	}
 
-	defaultBranch, err := orch.GitBrancher.DefaultBranch(ctx)
+	defaultBranch, err := deps.GitBrancher.DefaultBranch(ctx)
 	if err != nil {
 		return consts.Empty, fmt.Errorf("resolve pull request base branch: %w", err)
 	}
@@ -427,22 +464,22 @@ func (orch *Orchestrator) prBaseBranch(ctx context.Context, cfg *config.Config) 
 	return defaultBranch, nil
 }
 
-func (orch *Orchestrator) groupedSnap(ctx context.Context, ref *refInfo) (*snapInfo, error) {
-	snap, downloadErr := orch.StoreClient.DownloadSnapshot(ctx, ref)
+func groupedSnap(ctx context.Context, deps *Deps, ref *refInfo) (*snapInfo, error) {
+	snap, downloadErr := deps.StoreClient.DownloadSnapshot(ctx, ref)
 	if downloadErr != nil {
 		return nil, fmt.Errorf("download snapshot: %w", downloadErr)
 	}
 
-	orch.Logger.Printf("Loaded store snapshot from %s", ref.ResolvedCommit)
+	deps.Logger.Printf("Loaded store snapshot from %s", ref.ResolvedCommit)
 
 	return snap, nil
 }
 
-func (orch *Orchestrator) downloadSnap(ctx context.Context, ref *refInfo) (*snapInfo, error) {
+func downloadSnap(ctx context.Context, deps *Deps, ref *refInfo) (*snapInfo, error) {
 	var snapshot *storedomain.Snapshot
 
-	err := assignGrouped(orch.Logger, "Download store", func() error {
-		snap, downloadErr := orch.groupedSnap(ctx, ref)
+	err := assignGrouped(deps.Logger, "Download store", func() error {
+		snap, downloadErr := groupedSnap(ctx, deps, ref)
 		if downloadErr != nil {
 			return fmt.Errorf("fetch grouped snapshot: %w", downloadErr)
 		}
@@ -458,15 +495,15 @@ func (orch *Orchestrator) downloadSnap(ctx context.Context, ref *refInfo) (*snap
 	return snapshot, nil
 }
 
-func (orch *Orchestrator) ensureGitReadyForSync(ctx context.Context, cfg *config.Config) error {
-	err := orch.prepareGitWorkspace(ctx, cfg)
+func ensureGitReadyForSync(ctx context.Context, deps *Deps, cfg *config.Config) error {
+	err := prepareGitWorkspace(ctx, deps, cfg)
 	if err != nil {
 		return fmt.Errorf("prepare git workspace: %w", err)
 	}
 
 	gitports.WriteLocalIdentity()
 
-	err = gitports.EnsureBranchOwned(ctx, orch.GitBrancher, cfg.BranchName)
+	err = gitports.EnsureBranchOwned(ctx, deps.GitBrancher, cfg.BranchName)
 	if err != nil {
 		return fmt.Errorf("ensure branch owned: %w", err)
 	}
@@ -474,14 +511,14 @@ func (orch *Orchestrator) ensureGitReadyForSync(ctx context.Context, cfg *config
 	return nil
 }
 
-func (orch *Orchestrator) prepareGitWorkspace(ctx context.Context, cfg *config.Config) error {
-	if orch.GitClient == nil {
+func prepareGitWorkspace(ctx context.Context, deps *Deps, cfg *config.Config) error {
+	if deps.GitClient == nil {
 		return nil
 	}
 
-	orch.GitClient.EnsureSafeDirectory()
+	deps.GitClient.EnsureSafeDirectory()
 
-	err := orch.GitClient.ConfigureCredentials(ctx, cfg.GitHubToken, cfg.Repository)
+	err := deps.GitClient.ConfigureCredentials(ctx, cfg.GitHubToken, cfg.Repository)
 	if err != nil {
 		return fmt.Errorf("configure credentials: %w", err)
 	}
@@ -489,16 +526,16 @@ func (orch *Orchestrator) prepareGitWorkspace(ctx context.Context, cfg *config.C
 	return nil
 }
 
-func (orch *Orchestrator) ensureLogger() {
-	if orch.Logger == nil {
-		orch.Logger = logging.New()
+func ensureLogger(deps *Deps) {
+	if deps.Logger == nil {
+		deps.Logger = logging.New()
 	}
 }
 
-func (orch *Orchestrator) execPipeline(ctx context.Context, cfg *config.Config) (*Result, error) {
-	orch.logValidateInputs(cfg)
+func execPipeline(ctx context.Context, deps *Deps, cfg *config.Config) (*Result, error) {
+	logValidateInputs(deps, cfg)
 
-	result, err := orch.runPipeline(ctx, cfg)
+	result, err := runPipeline(ctx, deps, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("run pipeline: %w", err)
 	}
@@ -507,26 +544,26 @@ func (orch *Orchestrator) execPipeline(ctx context.Context, cfg *config.Config) 
 }
 
 //nolint:gocritic // single-line sig for whitespace
-func (orch *Orchestrator) getStore(ctx context.Context, in *fetchIn) (*refInfo, *snapInfo, error) {
-	ref, err := orch.storeRef(ctx, in.cfg)
+func getStore(ctx context.Context, deps *Deps, in *fetchIn) (*refInfo, *snapInfo, error) {
+	ref, err := storeRef(ctx, deps, in.cfg)
 	if err != nil {
 		return nil, nil, fmt.Errorf(errFmtResolveStoreRef, err)
 	}
 
-	snapshot, err := orch.downloadSnap(ctx, &ref)
+	snapshot, err := downloadSnap(ctx, deps, &ref)
 	if err != nil {
 		return nil, nil, fmt.Errorf("download store snapshot: %w", err)
 	}
 
-	orch.Logger.Group("Load module catalog", func() {
-		orch.Logger.Printf("Catalog modules: %d", len(snapshot.Catalog))
+	deps.Logger.Group("Load module catalog", func() {
+		deps.Logger.Printf("Catalog modules: %d", len(snapshot.Catalog))
 	})
 
 	return &ref, snapshot, nil
 }
 
-func (orch *Orchestrator) openPR(ctx context.Context, brn, def string) (*pullReq, error) {
-	existing, err := orch.PRClient.FindOpenPR(ctx, brn, def)
+func openPR(ctx context.Context, deps *Deps, branches *branchPair) (*pullReq, error) {
+	existing, err := deps.PRClient.FindOpenPR(ctx, branches.name, branches.defaultBranch)
 
 	if err != nil && !errors.Is(err, prdomain.ErrPullRequestNotFound) {
 		return nil, fmt.Errorf(errFmtFindOpenPullRequest, err)
@@ -535,8 +572,8 @@ func (orch *Orchestrator) openPR(ctx context.Context, brn, def string) (*pullReq
 	return existing, nil
 }
 
-func (orch *Orchestrator) finishChangedPlan(ctx context.Context, input *finishSyncInput) error {
-	err := orch.applyChangedPlan(ctx, &changedPlanInput{
+func finishChangedPlan(ctx context.Context, deps *Deps, input *finishSyncInput) error {
+	err := applyChangedPlan(ctx, deps, &changedPlanInput{
 		cfg:       input.cfg,
 		plan:      input.plan,
 		syncInput: input.syncInput,
@@ -547,8 +584,8 @@ func (orch *Orchestrator) finishChangedPlan(ctx context.Context, input *finishSy
 		return fmt.Errorf("apply changed plan: %w", err)
 	}
 
-	orch.logSummary(&summaryInput{
-		Log:    orch.Logger,
+	logSummary(deps, &summaryInput{
+		Log:    deps.Logger,
 		Cfg:    input.cfg,
 		Plan:   input.plan,
 		Result: input.result,
@@ -558,10 +595,10 @@ func (orch *Orchestrator) finishChangedPlan(ctx context.Context, input *finishSy
 	return nil
 }
 
-func (orch *Orchestrator) finishSync(ctx context.Context, input *finishSyncInput) (*Result, error) {
+func finishSync(ctx context.Context, deps *Deps, input *finishSyncInput) (*Result, error) {
 	if !input.plan.Changed {
-		orch.logSummary(&summaryInput{
-			Log:    orch.Logger,
+		logSummary(deps, &summaryInput{
+			Log:    deps.Logger,
 			Cfg:    input.cfg,
 			Plan:   input.plan,
 			Result: input.result,
@@ -571,7 +608,7 @@ func (orch *Orchestrator) finishSync(ctx context.Context, input *finishSyncInput
 		return input.result, nil
 	}
 
-	err := orch.finishChangedPlan(ctx, input)
+	err := finishChangedPlan(ctx, deps, input)
 	if err != nil {
 		return nil, fmt.Errorf("finish changed plan: %w", err)
 	}
@@ -579,78 +616,78 @@ func (orch *Orchestrator) finishSync(ctx context.Context, input *finishSyncInput
 	return input.result, nil
 }
 
-func (orch *Orchestrator) gitStepDefs(ctx context.Context, args *gitPlanIn) []gitSyncStep {
+func gitStepDefs(ctx context.Context, deps *Deps, args *gitPlanIn) []gitSyncStep {
 	return append(
-		[]gitSyncStep{orch.gitCheckoutStep(ctx, args.cfg)},
-		orch.gitStepsAfter(ctx, args)...,
+		[]gitSyncStep{gitCheckoutStep(ctx, deps, args.cfg)},
+		gitStepsAfter(ctx, deps, args)...,
 	)
 }
 
-func (orch *Orchestrator) gitCheckoutStep(ctx context.Context, cfg *config.Config) gitSyncStep {
+func gitCheckoutStep(ctx context.Context, deps *Deps, cfg *config.Config) gitSyncStep {
 	return gitSyncStep{
-		fn:  func() error { return orch.GitBrancher.CreateOrResetBranch(ctx, cfg.BranchName) },
+		fn:  func() error { return deps.GitBrancher.CreateOrResetBranch(ctx, cfg.BranchName) },
 		msg: "checkout branch",
 	}
 }
 
-func (orch *Orchestrator) gitStepsAfter(ctx context.Context, args *gitPlanIn) []gitSyncStep {
+func gitStepsAfter(ctx context.Context, deps *Deps, args *gitPlanIn) []gitSyncStep {
 	return []gitSyncStep{
 		{
-			fn:  func() error { return orch.GitIndexer.Stage(ctx, args.plan.StagePaths) },
+			fn:  func() error { return deps.GitIndexer.Stage(ctx, args.plan.StagePaths) },
 			msg: "stage paths",
 		},
 		{
-			fn:  func() error { return orch.GitIndexer.Commit(ctx, gitports.SyncCommitMessage) },
+			fn:  func() error { return deps.GitIndexer.Commit(ctx, gitports.SyncCommitMessage) },
 			msg: "commit changes",
 		},
 		{
-			fn:  func() error { return orch.GitPublisher.PushForceWithLease(ctx, args.cfg.BranchName) },
+			fn:  func() error { return deps.GitPublisher.PushForceWithLease(ctx, args.cfg.BranchName) },
 			msg: "push branch",
 		},
 	}
 }
 
-func (orch *Orchestrator) logDependencies(deps []string) {
-	for i := range deps {
-		orch.Logger.Printf("dependency: %s", deps[i])
+func logDependencies(deps *Deps, modules []string) {
+	for i := range modules {
+		deps.Logger.Printf("dependency: %s", modules[i])
 	}
 }
 
-func (orch *Orchestrator) logDestinationNormalization(syncInput *syncIn) {
-	orch.Logger.Group("Normalize destination names", func() {
+func logDestinationNormalization(deps *Deps, syncInput *syncIn) {
+	deps.Logger.Group("Normalize destination names", func() {
 		for source := range syncInput.SourceToDest {
-			orch.Logger.Printf(fmtArrow, source, syncInput.SourceToDest[source])
+			deps.Logger.Printf(fmtArrow, source, syncInput.SourceToDest[source])
 		}
 	})
 }
 
-func (orch *Orchestrator) logResolutions(resolved []resItem) {
+func logResolutions(deps *Deps, resolved []resItem) {
 	for i := range resolved {
 		res := &resolved[i]
-		orch.Logger.Printf(fmtArrow, res.LogicalTask, res.SourceModule)
+		deps.Logger.Printf(fmtArrow, res.LogicalTask, res.SourceModule)
 	}
 }
 
-func (orch *Orchestrator) logValidateInputs(cfg *config.Config) {
-	orch.Logger.Group("Validate inputs", func() {
-		orch.Logger.Printf("Validated %d task(s)", len(cfg.Tasks))
-		orch.Logger.Printf(fmtTargetFolder, cfg.TargetFolder)
+func logValidateInputs(deps *Deps, cfg *config.Config) {
+	deps.Logger.Group("Validate inputs", func() {
+		deps.Logger.Printf("Validated %d task(s)", len(cfg.Tasks))
+		deps.Logger.Printf(fmtTargetFolder, cfg.TargetFolder)
 	})
 }
 
-func (orch *Orchestrator) logSummary(in *summaryInput) {
-	orch.Logger.Group(groupSummary, func() {
+func logSummary(deps *Deps, in *summaryInput) {
+	deps.Logger.Group(groupSummary, func() {
 		printSummary(in)
 	})
 }
 
-func (orch *Orchestrator) maybeCommitPush(ctx context.Context, args *gitPlanIn) error {
+func maybeCommitPush(ctx context.Context, deps *Deps, args *gitPlanIn) error {
 	if !gitports.IsGitRepo(args.cfg.Workspace) {
 		return nil
 	}
 
-	err := runGroupNoResult(orch.Logger, "Create synchronization commit", func() error {
-		runErr := orch.runGitSync(ctx, args)
+	err := runGroupNoResult(deps.Logger, "Create synchronization commit", func() error {
+		runErr := runGitSync(ctx, deps, args)
 		if runErr != nil {
 			return fmt.Errorf("run git sync: %w", runErr)
 		}
@@ -664,13 +701,13 @@ func (orch *Orchestrator) maybeCommitPush(ctx context.Context, args *gitPlanIn) 
 	return nil
 }
 
-func (orch *Orchestrator) maybeCreateOrUpdatePR(ctx context.Context, input *prPhaseInput) error {
-	if !gitports.IsGitRepo(input.cfg.Workspace) || orch.PRClient == nil {
+func maybeCreateOrUpdatePR(ctx context.Context, deps *Deps, input *prPhaseInput) error {
+	if !gitports.IsGitRepo(input.cfg.Workspace) || deps.PRClient == nil {
 		return nil
 	}
 
-	err := runGroupNoResult(orch.Logger, "Create or update pull request", func() error {
-		runErr := orch.runPR(ctx, input)
+	err := runGroupNoResult(deps.Logger, "Create or update pull request", func() error {
+		runErr := runPR(ctx, deps, input)
 		if runErr != nil {
 			return fmt.Errorf("run PR: %w", runErr)
 		}
@@ -684,12 +721,12 @@ func (orch *Orchestrator) maybeCreateOrUpdatePR(ctx context.Context, input *prPh
 	return nil
 }
 
-func (orch *Orchestrator) maybeDefBranch(ctx context.Context, args *gitPlanIn) (string, error) {
+func maybeDefBranch(ctx context.Context, deps *Deps, args *gitPlanIn) (string, error) {
 	if !gitports.IsGitRepo(args.cfg.Workspace) {
 		return consts.Empty, nil
 	}
 
-	base, err := orch.runGitPre(ctx, args)
+	base, err := runGitPre(ctx, deps, args)
 	if err != nil {
 		return consts.Empty, fmt.Errorf("run git preconditions: %w", err)
 	}
@@ -697,13 +734,16 @@ func (orch *Orchestrator) maybeDefBranch(ctx context.Context, args *gitPlanIn) (
 	return base, nil
 }
 
-func (orch *Orchestrator) planFinish(ctx context.Context, inp *planIn) (*Result, error) {
-	planned, err := orch.planResult(&planResultArgs{cfg: inp.cfg, snap: inp.snapshot, ref: inp.ref})
+func planFinish(ctx context.Context, deps *Deps, inp *planIn) (*Result, error) {
+	planned, err := computePlanResult(
+		deps,
+		&planResultArgs{cfg: inp.cfg, snap: inp.snapshot, ref: inp.ref},
+	)
 	if err != nil {
 		return nil, fmt.Errorf("plan and build result: %w", err)
 	}
 
-	result, err := orch.finishSync(ctx, &finishSyncInput{
+	result, err := finishSync(ctx, deps, &finishSyncInput{
 		cfg:       inp.cfg,
 		plan:      planned.plan,
 		syncInput: planned.syncInput,
@@ -717,13 +757,13 @@ func (orch *Orchestrator) planFinish(ctx context.Context, inp *planIn) (*Result,
 	return result, nil
 }
 
-func (orch *Orchestrator) planResult(args *planResultArgs) (planResult, error) {
-	resolutions, depSources, err := orch.modDeps(args.cfg, args.snap)
+func computePlanResult(deps *Deps, args *planResultArgs) (planResult, error) {
+	resolutions, depSources, err := modDeps(deps, args.cfg, args.snap)
 	if err != nil {
 		return planResult{}, fmt.Errorf("resolve modules and deps: %w", err)
 	}
 
-	planned, err := orch.buildPlanResult(&buildPlanInput{
+	planned, err := buildPlanResult(deps, &buildPlanInput{
 		cfg:         args.cfg,
 		snapshot:    args.snap,
 		resolutions: resolutions,
@@ -736,8 +776,8 @@ func (orch *Orchestrator) planResult(args *planResultArgs) (planResult, error) {
 	return planned, nil
 }
 
-func (orch *Orchestrator) resolveAllModules(cfg *config.Config, snap *snapInfo) ([]resItem, error) {
-	resolved, err := orch.ResolveAll(&resolvesvc.ResolveAllInput{
+func resolveAllModules(deps *Deps, cfg *config.Config, snap *snapInfo) ([]resItem, error) {
+	resolved, err := deps.ResolveAll(&resolvesvc.ResolveAllInput{
 		Tasks:          cfg.Tasks,
 		Catalog:        snap.Catalog,
 		PackageManager: cfg.NodePackageManager,
@@ -746,21 +786,21 @@ func (orch *Orchestrator) resolveAllModules(cfg *config.Config, snap *snapInfo) 
 		return nil, fmt.Errorf("resolve modules: %w", err)
 	}
 
-	orch.logResolutions(resolved)
+	logResolutions(deps, resolved)
 
 	return resolved, nil
 }
 
-func (orch *Orchestrator) resolveDepSources(res []resItem, snap *snapInfo) ([]string, error) {
-	var deps []string
+func resolveDepSources(deps *Deps, res []resItem, snap *snapInfo) ([]string, error) {
+	var depSources []string
 
-	err := assignGrouped(orch.Logger, "Resolve dependencies", func() error {
-		resolved, depErr := orch.resolveTransitiveDeps(res, snap)
+	err := assignGrouped(deps.Logger, "Resolve dependencies", func() error {
+		resolved, depErr := resolveTransitiveDeps(deps, res, snap)
 		if depErr != nil {
 			return fmt.Errorf(errFmtResolveTransitiveDeps, depErr)
 		}
 
-		deps = resolved
+		depSources = resolved
 
 		return nil
 	})
@@ -768,30 +808,30 @@ func (orch *Orchestrator) resolveDepSources(res []resItem, snap *snapInfo) ([]st
 		return nil, fmt.Errorf(errFmtResolveDependencies, err)
 	}
 
-	return deps, nil
+	return depSources, nil
 }
 
-func (orch *Orchestrator) resolveTransitiveDeps(res []resItem, snap *snapInfo) ([]string, error) {
+func resolveTransitiveDeps(deps *Deps, res []resItem, snap *snapInfo) ([]string, error) {
 	requestedSources := sourceModulesOf(res)
 
-	resolved, err := orch.ResolveTransitive(requestedSources, snap.Deps)
+	resolved, err := deps.ResolveTransitive(requestedSources, snap.Deps)
 	if err != nil {
 		return nil, fmt.Errorf("resolve transitive dependencies: %w", err)
 	}
 
-	orch.logDependencies(resolved)
+	logDependencies(deps, resolved)
 
 	return resolved, nil
 }
 
 //nolint:gocritic // single-line sig for whitespace
-func (orch *Orchestrator) modDeps(cfg *config.Config, snap *snapInfo) ([]resItem, []string, error) {
-	resolutions, err := orch.resolveReqMods(cfg, snap)
+func modDeps(deps *Deps, cfg *config.Config, snap *snapInfo) ([]resItem, []string, error) {
+	resolutions, err := resolveReqMods(deps, cfg, snap)
 	if err != nil {
 		return nil, nil, fmt.Errorf(errFmtResolveRequestedModules, err)
 	}
 
-	depSources, err := orch.resolveDepSources(resolutions, snap)
+	depSources, err := resolveDepSources(deps, resolutions, snap)
 	if err != nil {
 		return nil, nil, fmt.Errorf(errFmtResolveDependencies, err)
 	}
@@ -800,9 +840,9 @@ func (orch *Orchestrator) modDeps(cfg *config.Config, snap *snapInfo) ([]resItem
 }
 
 //nolint:nestif // create vs update PR paths require branching on existing PR
-func (orch *Orchestrator) resolveOrCreatePR(ctx context.Context, input *prResolveInput) error {
+func resolveOrCreatePR(ctx context.Context, deps *Deps, input *prResolveInput) error {
 	if input.existing == nil {
-		err := orch.createResolvedPR(ctx, input)
+		err := createResolvedPR(ctx, deps, input)
 		if err != nil {
 			return fmt.Errorf("create resolved PR: %w", err)
 		}
@@ -810,7 +850,7 @@ func (orch *Orchestrator) resolveOrCreatePR(ctx context.Context, input *prResolv
 		return nil
 	}
 
-	err := orch.updateResolvedPR(ctx, input)
+	err := updateResolvedPR(ctx, deps, input)
 	if err != nil {
 		return fmt.Errorf("update resolved PR: %w", err)
 	}
@@ -818,8 +858,8 @@ func (orch *Orchestrator) resolveOrCreatePR(ctx context.Context, input *prResolv
 	return nil
 }
 
-func (orch *Orchestrator) createResolvedPR(ctx context.Context, input *prResolveInput) error {
-	err := orch.createNewPR(ctx, &createPRInput{
+func createResolvedPR(ctx context.Context, deps *Deps, input *prResolveInput) error {
+	err := createNewPR(ctx, deps, &createPRInput{
 		result:        input.phase.result,
 		branch:        input.phase.cfg.BranchName,
 		defaultBranch: input.phase.defaultBranch,
@@ -832,8 +872,8 @@ func (orch *Orchestrator) createResolvedPR(ctx context.Context, input *prResolve
 	return nil
 }
 
-func (orch *Orchestrator) updateResolvedPR(ctx context.Context, input *prResolveInput) error {
-	err := orch.updateExistingPR(ctx, &updatePRInput{
+func updateResolvedPR(ctx context.Context, deps *Deps, input *prResolveInput) error {
+	err := updateExistingPR(ctx, deps, &updatePRInput{
 		existing: input.existing,
 		body:     input.body,
 		result:   input.phase.result,
@@ -845,11 +885,11 @@ func (orch *Orchestrator) updateResolvedPR(ctx context.Context, input *prResolve
 	return nil
 }
 
-func (orch *Orchestrator) resolveReqMods(cfg *config.Config, snap *snapInfo) ([]resItem, error) {
+func resolveReqMods(deps *Deps, cfg *config.Config, snap *snapInfo) ([]resItem, error) {
 	var resolved []resolvesvc.Resolution
 
-	err := assignGrouped(orch.Logger, "Resolve requested modules", func() error {
-		modules, resolveErr := orch.resolveAllModules(cfg, snap)
+	err := assignGrouped(deps.Logger, "Resolve requested modules", func() error {
+		modules, resolveErr := resolveAllModules(deps, cfg, snap)
 		if resolveErr != nil {
 			return fmt.Errorf("resolve all modules: %w", resolveErr)
 		}
@@ -865,11 +905,11 @@ func (orch *Orchestrator) resolveReqMods(cfg *config.Config, snap *snapInfo) ([]
 	return resolved, nil
 }
 
-func (orch *Orchestrator) storeRef(ctx context.Context, cfg *config.Config) (refInfo, error) {
+func storeRef(ctx context.Context, deps *Deps, cfg *config.Config) (refInfo, error) {
 	var ref refInfo
 
-	err := assignGrouped(orch.Logger, "Resolve source version", func() error {
-		resolved, resolveErr := orch.storeRefGrp(ctx, cfg)
+	err := assignGrouped(deps.Logger, "Resolve source version", func() error {
+		resolved, resolveErr := storeRefGrp(ctx, deps, cfg)
 		if resolveErr != nil {
 			return fmt.Errorf("resolve store ref in group: %w", resolveErr)
 		}
@@ -885,30 +925,30 @@ func (orch *Orchestrator) storeRef(ctx context.Context, cfg *config.Config) (ref
 	return ref, nil
 }
 
-func (orch *Orchestrator) storeRefGrp(ctx context.Context, cfg *config.Config) (refInfo, error) {
-	resolved, err := orch.StoreClient.ResolveRef(ctx, cfg.StoreVersion)
+func storeRefGrp(ctx context.Context, deps *Deps, cfg *config.Config) (refInfo, error) {
+	resolved, err := deps.StoreClient.ResolveRef(ctx, cfg.StoreVersion)
 	if err != nil {
 		return refInfo{}, fmt.Errorf(errFmtResolveStoreRef, err)
 	}
 
-	orch.Logger.Printf("Source ref: %s", resolved.SourceRef)
-	orch.Logger.Printf("Resolved commit: %s", resolved.ResolvedCommit)
+	deps.Logger.Printf("Source ref: %s", resolved.SourceRef)
+	deps.Logger.Printf("Resolved commit: %s", resolved.ResolvedCommit)
 
 	return resolved, nil
 }
 
-func (orch *Orchestrator) runGitPre(ctx context.Context, args *gitPlanIn) (string, error) {
-	err := orch.ensureGitReadyForSync(ctx, args.cfg)
+func runGitPre(ctx context.Context, deps *Deps, args *gitPlanIn) (string, error) {
+	err := ensureGitReadyForSync(ctx, deps, args.cfg)
 	if err != nil {
 		return consts.Empty, fmt.Errorf("ensure git ready: %w", err)
 	}
 
-	err = orch.checkUnrelatedChanges(ctx, args.plan)
+	err = checkUnrelatedChanges(ctx, deps, args.plan)
 	if err != nil {
 		return consts.Empty, fmt.Errorf(errFmtCheckUnrelatedChanges, err)
 	}
 
-	base, err := orch.prBaseBranch(ctx, args.cfg)
+	base, err := prBaseBranch(ctx, deps, args.cfg)
 	if err != nil {
 		return consts.Empty, fmt.Errorf("determine PR base branch: %w", err)
 	}
@@ -916,8 +956,8 @@ func (orch *Orchestrator) runGitPre(ctx context.Context, args *gitPlanIn) (strin
 	return base, nil
 }
 
-func (orch *Orchestrator) runGitSync(ctx context.Context, args *gitPlanIn) error {
-	err := runGitSyncSteps(orch.gitStepDefs(ctx, args))
+func runGitSync(ctx context.Context, deps *Deps, args *gitPlanIn) error {
+	err := runGitSyncSteps(gitStepDefs(ctx, deps, args))
 	if err != nil {
 		return fmt.Errorf("run git sync steps: %w", err)
 	}
@@ -925,15 +965,18 @@ func (orch *Orchestrator) runGitSync(ctx context.Context, args *gitPlanIn) error
 	return nil
 }
 
-func (orch *Orchestrator) runPR(ctx context.Context, input *prPhaseInput) error {
+func runPR(ctx context.Context, deps *Deps, input *prPhaseInput) error {
 	body := prservice.BuildPRBody(input.cfg, input.plan, prservice.StoreRefFrom(input.ref))
 
-	existing, err := orch.openPR(ctx, input.cfg.BranchName, input.defaultBranch)
+	existing, err := openPR(ctx, deps, &branchPair{
+		name:          input.cfg.BranchName,
+		defaultBranch: input.defaultBranch,
+	})
 	if err != nil {
 		return fmt.Errorf(errFmtFindOpenPullRequest, err)
 	}
 
-	err = orch.resolveOrCreatePR(ctx, &prResolveInput{
+	err = resolveOrCreatePR(ctx, deps, &prResolveInput{
 		phase:    input,
 		body:     body,
 		existing: existing,
@@ -945,15 +988,15 @@ func (orch *Orchestrator) runPR(ctx context.Context, input *prPhaseInput) error 
 	return nil
 }
 
-func (orch *Orchestrator) runPipeline(ctx context.Context, cfg *config.Config) (*Result, error) {
-	ref, snapshot, err := orch.getStore(ctx, &fetchIn{cfg: cfg})
+func runPipeline(ctx context.Context, deps *Deps, cfg *config.Config) (*Result, error) {
+	ref, snapshot, err := getStore(ctx, deps, &fetchIn{cfg: cfg})
 	if err != nil {
 		return nil, fmt.Errorf("fetch store data: %w", err)
 	}
 
-	defer orch.closeSnapshotQuietly(snapshot)
+	defer closeSnapshotQuietly(deps, snapshot)
 
-	planned, err := orch.planFinish(ctx, &plannedSyncInput{
+	planned, err := planFinish(ctx, deps, &plannedSyncInput{
 		cfg:      cfg,
 		ref:      ref,
 		snapshot: snapshot,
@@ -965,20 +1008,20 @@ func (orch *Orchestrator) runPipeline(ctx context.Context, cfg *config.Config) (
 	return planned, nil
 }
 
-func (orch *Orchestrator) updateExistingPR(ctx context.Context, input *updatePRInput) error {
-	err := orch.PRClient.UpdatePRBody(ctx, input.existing.Number, input.body)
+func updateExistingPR(ctx context.Context, deps *Deps, input *updatePRInput) error {
+	err := deps.PRClient.UpdatePRBody(ctx, input.existing.Number, input.body)
 	if err != nil {
 		return fmt.Errorf("update pull request body: %w", err)
 	}
 
 	input.result.PullRequestNumber = strconv.Itoa(input.existing.Number)
 	input.result.PullRequestURL = input.existing.URL
-	orch.Logger.Printf("Updated pull request #%d", input.existing.Number)
+	deps.Logger.Printf("Updated pull request #%d", input.existing.Number)
 
 	return nil
 }
 
-func (orch *Orchestrator) wireDefaults() {
-	orch.ensureLogger()
-	orch.wireSyncHooks()
+func wireDefaults(deps *Deps) {
+	ensureLogger(deps)
+	wireSyncHooks(deps)
 }

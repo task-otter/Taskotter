@@ -15,7 +15,6 @@ import (
 
 const (
 	emptyAfterNorm = `\\`
-	folderTasks    = "tasks"
 	linkName       = "link"
 	wantErrorMsg   = "expected error, got %v"
 
@@ -65,12 +64,12 @@ func TestValidateTargetFolderFollowsInternalSymlink(t *testing.T) {
 	workspace := t.TempDir()
 	linkTargetSymlink(t, workspace)
 
-	got, err := pathutil.ValidateTargetFolder(linkName+"/"+folderTasks, workspace)
+	got, err := pathutil.ValidateTargetFolder(linkName+"/"+testFieldTasks, workspace)
 	if err != nil {
 		t.Fatalf(consts.UnexpectedErr, err)
 	}
 
-	if got != linkName+"/"+folderTasks {
+	if got != linkName+"/"+testFieldTasks {
 		t.Fatalf(fmtTargetFolder, got)
 	}
 }
@@ -82,7 +81,7 @@ func TestValidateTargetFolderRejectsDanglingSymlink(t *testing.T) {
 	workspace := t.TempDir()
 	symlinkOrSkip(t, filepath.Join(workspace, "nowhere"), filepath.Join(workspace, linkName))
 
-	got, err := pathutil.ValidateTargetFolder(linkName+"/"+folderTasks, workspace)
+	got, err := pathutil.ValidateTargetFolder(linkName+"/"+testFieldTasks, workspace)
 	if err == nil {
 		t.Fatalf(wantErrorMsg, got)
 	}
@@ -99,7 +98,7 @@ func TestValidateTargetFolderReportsStatFailure(t *testing.T) {
 	workspace := t.TempDir()
 	blockDir(t, filepath.Join(workspace, "blocked"))
 
-	got, err := pathutil.ValidateTargetFolder("blocked/"+folderTasks, workspace)
+	got, err := pathutil.ValidateTargetFolder("blocked/"+testFieldTasks, workspace)
 	if err == nil {
 		t.Fatalf(wantErrorMsg, got)
 	}
@@ -147,7 +146,7 @@ func linkTargetSymlink(t *testing.T, workspace string) {
 	t.Helper()
 
 	target := filepath.Join(workspace, "real")
-	mkdirOrFail(t, filepath.Join(target, folderTasks), consts.FilePerm755)
+	mkdirOrFail(t, filepath.Join(target, testFieldTasks), consts.FilePerm755)
 	symlinkOrSkip(t, target, filepath.Join(workspace, linkName))
 }
 

@@ -13,6 +13,10 @@ import (
 )
 
 type (
+	// DepsResolver resolves transitive module dependencies.
+	DepsResolver interface {
+		Resolve(requested []string, deps map[string][]string) ([]string, error)
+	}
 
 	// CycleError reports a circular dependency chain.
 	CycleError struct {
@@ -26,23 +30,34 @@ type (
 	}
 
 	// visitState holds the dependency graph and visited-module set shared across a visitModule recursion.
-	visitState struct {
+	visitState = struct {
 		deps   map[string][]string
 		needed map[string]struct{}
 	}
 
 	// visitContext holds stack and state for dependency traversal.
-	visitContext struct {
+	visitContext = struct {
 		state *visitState
 		stack []string
 	}
+
+	transitiveResolver struct{}
 )
 
 const (
 	errFmtVisitModule = "visit module %q: %w"
 )
 
-var errModuleNotDefined = errors.New("module is not defined in .deps.yml")
+var (
+	errModuleNotDefined = errors.New("module is not defined in .deps.yml")
+
+	_ DepsResolver = transitiveResolver{}
+)
+
+// Resolve implements DepsResolver.
+func (transitiveResolver) Resolve(requested []string, deps map[string][]string) ([]string, error) {
+	return ResolveTransitive(requested, deps) //nolint:wrapcheck // package entrypoint
+}
 
 // Error implements the error interface, returning the cyclic dependency chain.
 func (e *CycleError) Error() string {
@@ -58,12 +73,12 @@ func stringsJoinArrow(parts []string) string {
 	return strings.Join(parts, " -> ")
 }
 
-func (s *visitState) markVisited(module string) bool {
-	if _, ok := s.needed[module]; ok {
+func markVisited(state *visitState, module string) bool {
+	if _, ok := state.needed[module]; ok {
 		return true
 	}
 
-	s.needed[module] = struct{}{}
+	state.needed[module] = struct{}{}
 
 	return false
 }
@@ -88,7 +103,7 @@ func visitModule(module string, stack []string, state *visitState) error {
 		return fmt.Errorf("validate visit module %q: %w", module, err)
 	}
 
-	if state.markVisited(module) {
+	if markVisited(state, module) {
 		return nil
 	}
 

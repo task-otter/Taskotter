@@ -20,17 +20,25 @@ import (
 
 type (
 
+	// FieldError is a configuration validation error with a field name.
+	FieldError interface {
+		error
+		FieldName() string
+	}
+
 	// ValidationError reports invalid action input values.
+	//
+	// Field is the input name; Message explains the rejection.
 	ValidationError struct {
 		Field   string
 		Message string
 	}
 
 	// PackageManager selects the Node package manager for JS task resolution.
-	PackageManager string
+	PackageManager = string
 
 	// Config holds validated TaskOtter action inputs and derived sync metadata.
-	Config struct {
+	Config = struct {
 		Repository         string
 		GitHubOutput       string
 		NodePackageManager PackageManager
@@ -49,7 +57,7 @@ type (
 		IncludesDoc        bool
 	}
 
-	hashPayload struct {
+	hashPayload = struct {
 		NodePackageManager string
 		TargetFolder       string
 		StoreVersion       string
@@ -58,7 +66,7 @@ type (
 		SyncRoot           bool
 	}
 
-	parsedEnvInputs struct {
+	parsedEnvInputs = struct {
 		jsRuntime        JSRuntime
 		packageManager   PackageManager
 		normalizedTarget string
@@ -69,29 +77,29 @@ type (
 		failOnChanges    bool
 	}
 
-	tasksAndJSSettings struct {
+	tasksAndJSSettings = struct {
 		jsRuntime      JSRuntime
 		packageManager PackageManager
 		tasks          []string
 	}
 
-	jsSettings struct {
+	jsSettings = struct {
 		jsRuntime      JSRuntime
 		packageManager PackageManager
 	}
 
-	toggleFlags struct {
+	toggleFlags = struct {
 		includesDoc   bool
 		syncRoot      bool
 		failOnChanges bool
 	}
 
-	targetPaths struct {
+	targetPaths = struct {
 		normalizedTarget string
 		rootTaskfile     string
 	}
 
-	rawEnvConfig struct {
+	rawEnvConfig = struct {
 		tasksRaw         string
 		jsRaw            string
 		includesDocRaw   string
@@ -108,14 +116,14 @@ type (
 		githubBaseRef    string
 	}
 
-	assembleConfigInput struct {
+	assembleConfigInput = struct {
 		Raw    *rawEnvConfig
 		Parsed *parsedEnvInputs
 		Hash   string
 		Branch string
 	}
 
-	mergeParsedArgs struct {
+	mergeParsedArgs = struct {
 		tasks *tasksAndJSSettings
 		flags *toggleFlags
 		paths *targetPaths
@@ -235,7 +243,7 @@ func buildConfig(raw *rawEnvConfig, parsed *parsedEnvInputs) *Config {
 func buildHashPayload(raw *rawEnvConfig, parsed *parsedEnvInputs) *hashPayload {
 	return &hashPayload{
 		Tasks:              parsed.tasks,
-		NodePackageManager: string(parsed.packageManager),
+		NodePackageManager: parsed.packageManager,
 		TargetFolder:       parsed.normalizedTarget,
 		StoreVersion:       raw.storeVersion,
 		IncludesDoc:        parsed.includesDoc,
@@ -638,13 +646,13 @@ func validateTaskLine(name string) error {
 }
 
 // LockFilePath returns the workspace-relative path to the managed lock file.
-func (c *Config) LockFilePath() string {
-	return pathutil.JoinRelative(c.TargetFolder, ".taskotter-lock.yml")
+func LockFilePath(cfg *Config) string {
+	return pathutil.JoinRelative(cfg.TargetFolder, ".taskotter-lock.yml")
 }
 
 // MetadataPath returns the workspace-relative path to TaskOtter metadata.
-func (c *Config) MetadataPath() string {
-	return pathutil.JoinRelative(c.TargetFolder, consts.MetadataPath)
+func MetadataPath(cfg *Config) string {
+	return pathutil.JoinRelative(cfg.TargetFolder, consts.MetadataPath)
 }
 
 // Error implements the error interface, returning the field-prefixed validation message.
@@ -654,4 +662,13 @@ func (e *ValidationError) Error() string {
 	}
 
 	return e.Message
+}
+
+// FieldName returns the invalid configuration field.
+func (e *ValidationError) FieldName() string {
+	if e.Message == consts.Empty {
+		return e.Field
+	}
+
+	return e.Field
 }

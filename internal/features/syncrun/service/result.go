@@ -23,7 +23,7 @@ import (
 type (
 
 	// Result captures sync outcomes for logging, GitHub Actions output, and PR metadata.
-	Result struct {
+	Result = struct {
 		Plan                 *syncdomain.Plan
 		Ref                  storedomain.RefInfo
 		StoreVersion         string
@@ -44,7 +44,7 @@ type (
 		Path              string
 	}
 
-	summaryInput struct {
+	summaryInput = struct {
 		Log    *logging.Logger
 		Cfg    *config.Config
 		Plan   *syncdomain.Plan

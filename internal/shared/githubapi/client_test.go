@@ -50,8 +50,8 @@ func TestNewClientUsesDefaultBaseURL(t *testing.T) {
 
 	client := NewClient(t.Context(), "token")
 
-	if client.baseURL.Host != defaultAPIHost {
-		t.Fatalf("baseURL = %q", client.baseURL.Host)
+	if client.fns.baseURL.Host != defaultAPIHost {
+		t.Fatalf("baseURL = %q", client.fns.baseURL.Host)
 	}
 }
 
@@ -199,7 +199,7 @@ func TestDoRequestReportsBuildError(t *testing.T) {
 	client := newStubClient(t, http.StatusOK, consts.Empty)
 
 	//nolint:bodyclose // the request never leaves the client, so no response body exists
-	resp, err := client.doRequest(t.Context(), newCall(badMethod, nil))
+	resp, err := doRequest(t.Context(), client, newCall(badMethod, nil))
 	iox.Discard(resp)
 
 	if err == nil {

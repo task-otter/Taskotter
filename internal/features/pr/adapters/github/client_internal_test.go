@@ -36,7 +36,11 @@ func newTestClient(t *testing.T, handler http.HandlerFunc) (client *Client, clea
 		t.Fatal(err)
 	}
 
-	return &Client{api: api, owner: testOwner, repo: testRepoName}, srv.Close
+	return &Client{fns: clientFns{
+		createPR:   makeCreatePR(api, testOwner, testRepoName),
+		findOpenPR: makeFindOpenPR(api, testOwner, testRepoName),
+		updateBody: makeUpdateBody(api, testOwner, testRepoName),
+	}}, srv.Close
 }
 
 func writeTestResponse(writer http.ResponseWriter, payload []byte) {
@@ -55,7 +59,7 @@ func TestNewClientParsesRepository(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if client.owner != testOwner || client.repo != testRepoName {
+	if client.fns.createPR == nil || client.fns.findOpenPR == nil || client.fns.updateBody == nil {
 		t.Fatalf("NewClient() = %#v", client)
 	}
 }

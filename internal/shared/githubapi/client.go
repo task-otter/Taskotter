@@ -25,19 +25,28 @@ import (
 type (
 
 	// Client wraps GitHub pull request API calls.
+	doer interface {
+		Do(req *http.Request) (*http.Response, error)
+	}
+
+	clientFns = struct {
+		do      func(*http.Request) (*http.Response, error)
+		baseURL *url.URL
+	}
+
+	// Client wraps GitHub pull request API calls.
 	Client struct {
-		httpClient *http.Client
-		baseURL    *url.URL
+		fns clientFns
 	}
 
 	// PullRequest is a minimal pull request view.
-	PullRequest struct {
+	PullRequest = struct {
 		HTMLURL string `json:"html_url"`
 		Number  int    `json:"number"`
 	}
 
 	// ListOpenPROptions selects open pull requests for a head/base pair.
-	ListOpenPROptions struct {
+	ListOpenPROptions = struct {
 		Owner string
 		Repo  string
 		Head  string
@@ -45,7 +54,7 @@ type (
 	}
 
 	// CreatePROptions opens a new pull request.
-	CreatePROptions struct {
+	CreatePROptions = struct {
 		Owner string
 		Repo  string
 		Title string
@@ -55,25 +64,25 @@ type (
 	}
 
 	// EditPRBodyOptions replaces an existing pull request body.
-	EditPRBodyOptions struct {
+	EditPRBodyOptions = struct {
 		Owner  string
 		Repo   string
 		Body   string
 		Number int
 	}
 
-	createPRBody struct {
+	createPRBody = struct {
 		Title string `json:"title"`
 		Head  string `json:"head"`
 		Base  string `json:"base"`
 		Body  string `json:"body"`
 	}
 
-	editPRBody struct {
+	editPRBody = struct {
 		Body string `json:"body"`
 	}
 
-	jsonCall struct {
+	jsonCall = struct {
 		payload any
 		dest    any
 		method  string
@@ -95,7 +104,11 @@ const (
 	apiVersion = "2022-11-28"
 )
 
-var errGitHubAPIStatus = errors.New("GitHub API status error")
+var (
+	_ doer = (*http.Client)(nil)
+
+	errGitHubAPIStatus = errors.New("GitHub API status error")
+)
 
 // NewClient builds an authenticated GitHub API client.
 func NewClient(ctx context.Context, token string) *Client {
@@ -107,10 +120,12 @@ func NewClient(ctx context.Context, token string) *Client {
 		ExpiresIn:    0,
 	})
 
-	return &Client{
-		httpClient: oauth2.NewClient(ctx, tokenSource),
-		baseURL:    defaultAPIBaseURL(),
-	}
+	httpClient := oauth2.NewClient(ctx, tokenSource)
+
+	return &Client{fns: clientFns{
+		do:      httpClient.Do,
+		baseURL: defaultAPIBaseURL(),
+	}}
 }
 
 // NewClientWithHTTP builds a client that sends requests through httpClient to baseURL.
@@ -120,7 +135,7 @@ func NewClientWithHTTP(baseURL string, httpClient *http.Client) (*Client, error)
 		return nil, fmt.Errorf("parse GitHub base URL: %w", err)
 	}
 
-	return &Client{httpClient: httpClient, baseURL: parsedURL}, nil
+	return &Client{fns: clientFns{do: httpClient.Do, baseURL: parsedURL}}, nil
 }
 
 func defaultAPIBaseURL() *url.URL {
@@ -141,9 +156,19 @@ func defaultAPIBaseURL() *url.URL {
 
 // CreatePR opens a new pull request.
 func (client *Client) CreatePR(ctx context.Context, opts *CreatePROptions) (PullRequest, error) {
+	iox.Discard(client.fns)
+
+	return invokeCreatePR(ctx, client, opts) //nolint:wrapcheck // thin adapter
+}
+
+func invokeCreatePR(
+	ctx context.Context,
+	client *Client,
+	opts *CreatePROptions,
+) (PullRequest, error) {
 	var pull PullRequest
 
-	err := client.doJSON(ctx, &jsonCall{
+	err := doJSON(ctx, client, &jsonCall{
 		method:  http.MethodPost,
 		path:    pullsPath(opts.Owner, opts.Repo),
 		payload: newCreatePRBody(opts),
@@ -158,7 +183,13 @@ func (client *Client) CreatePR(ctx context.Context, opts *CreatePROptions) (Pull
 
 // EditPRBody replaces the body of an existing pull request.
 func (client *Client) EditPRBody(ctx context.Context, opts *EditPRBodyOptions) error {
-	err := client.doJSON(ctx, &jsonCall{
+	iox.Discard(client.fns)
+
+	return invokeEditPRBody(ctx, client, opts) //nolint:wrapcheck // thin adapter
+}
+
+func invokeEditPRBody(ctx context.Context, client *Client, opts *EditPRBodyOptions) error {
+	err := doJSON(ctx, client, &jsonCall{
 		method:  http.MethodPatch,
 		path:    pullPath(opts.Owner, opts.Repo, opts.Number),
 		payload: editPRBody{Body: opts.Body},
@@ -173,9 +204,19 @@ func (client *Client) EditPRBody(ctx context.Context, opts *EditPRBodyOptions) e
 
 // ListOpenPRs returns open pull requests matching head and base.
 func (client *Client) ListOpenPRs(ctx context.Context, opt *listPROpts) ([]PullRequest, error) {
+	iox.Discard(client.fns)
+
+	return invokeListOpenPRs(ctx, client, opt) //nolint:wrapcheck // thin adapter
+}
+
+func invokeListOpenPRs(
+	ctx context.Context,
+	client *Client,
+	opt *listPROpts,
+) ([]PullRequest, error) {
 	var prs []PullRequest
 
-	err := client.doJSON(ctx, &jsonCall{
+	err := doJSON(ctx, client, &jsonCall{
 		method:  http.MethodGet,
 		path:    listOpenPRsPath(opt),
 		payload: nil,
@@ -190,14 +231,14 @@ func (client *Client) ListOpenPRs(ctx context.Context, opt *listPROpts) ([]PullR
 	return append(out, prs...), nil
 }
 
-func (client *Client) apiURL(reqPath string) string {
+func apiURL(client *Client, reqPath string) string {
 	pathPart, rawQuery := splitPathQuery(reqPath)
 
-	return client.baseURL.ResolveReference(newRelativeURL(pathPart, rawQuery)).String()
+	return client.fns.baseURL.ResolveReference(newRelativeURL(pathPart, rawQuery)).String()
 }
 
-func (client *Client) doJSON(ctx context.Context, call *jsonCall) (err error) {
-	resp, err := client.doRequest(ctx, call)
+func doJSON(ctx context.Context, client *Client, call *jsonCall) (err error) {
+	resp, err := doRequest(ctx, client, call)
 	if err != nil {
 		return fmt.Errorf("do request: %w", err)
 	}
@@ -235,13 +276,13 @@ func appendBodyClose(err error, resp *http.Response) error {
 	return nil
 }
 
-func (client *Client) doRequest(ctx context.Context, call *jsonCall) (*http.Response, error) {
-	req, err := newAPIRequest(ctx, call, client.apiURL(call.path))
+func doRequest(ctx context.Context, client *Client, call *jsonCall) (*http.Response, error) {
+	req, err := newAPIRequest(ctx, call, apiURL(client, call.path))
 	if err != nil {
 		return nil, fmt.Errorf("create API request: %w", err)
 	}
 
-	resp, err := client.httpClient.Do(req)
+	resp, err := client.fns.do(req)
 	if err != nil {
 		return nil, fmt.Errorf("GitHub API request: %w", err)
 	}

@@ -202,7 +202,7 @@ jobs:
 
 With the default `sync-root: true`, TaskOtter creates a root `Taskfile.yml` when one is missing, then adds managed `includes` entries for synced modules. If a root Taskfile already exists, TaskOtter updates only its managed includes and leaves other content unchanged. Set `sync-root: false` to synchronize modules and TaskOtter state without reading, creating, or modifying the root `Taskfile.yml`.
 
-When synced modules share exported task names in store metadata, TaskOtter also generates root tasks that fan out to those modules. For example, syncing `go` and `eslint` can generate root `lint`, `lint:fix`, `install`, and `version` tasks that call `go:lint`, `eslint:lint`, and so on. Shared module variables are promoted to editable root `vars`, while include-level vars reference those root values.
+When synced modules share exported task names in store metadata, TaskOtter also generates root tasks that fan out to those modules. For example, syncing `go` and `eslint` can generate root `lint`, `lint:fix`, `install`, and `version` tasks that call `go:lint`, `eslint:lint`, and so on. Shared module variables are promoted to editable root `vars` using Task’s `{{.VAR | default "..."}}` form so CLI/env overrides work, while include-level vars reference those root values.
 
 ## Behavior
 

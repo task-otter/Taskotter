@@ -4,6 +4,9 @@ version: "3.5"
 includes:
   taskotter:
     taskfile: taskotter/Taskfile.yml
+    vars:
+      GO_JUNIT_REPORT_IN: test-result.txt
+      GO_JUNIT_REPORT_OUT: junit.xml
 tasks:
   default:
     run: once

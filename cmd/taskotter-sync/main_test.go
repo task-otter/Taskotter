@@ -26,11 +26,12 @@ type (
 )
 
 const (
-	exitFmt        = "exit code = %d, want %d"
-	sourceSHAHex   = "0123456789abcdef"
-	errWantFmt     = "err = %v, want %v"
-	outputFileName = "out.txt"
-	testRepository = "owner/repo"
+	exitFmt                 = "exit code = %d, want %d"
+	sourceSHAHex            = "0123456789abcdef"
+	errWantFmt              = "err = %v, want %v"
+	outputFileName          = "out.txt"
+	testRepository          = "owner/repo"
+	errExpectedOrchestrator = "expected orchestrator"
 )
 
 var errStubRun = errors.New("stub run failure")
@@ -124,17 +125,17 @@ func TestLoadRunAndWriteReportsRunFailure(t *testing.T) {
 	}
 }
 
-// TestDefaultWireOrchestratorBuildsOrchestrator verifies the production seam wires adapters.
-func TestDefaultWireOrchestratorBuildsOrchestrator(t *testing.T) {
+// TestDefaultWireRunBuildsRunFunc verifies the production seam wires adapters.
+func TestDefaultWireRunBuildsRunFunc(t *testing.T) {
 	t.Parallel()
 
-	orch, err := defaultWireOrchestrator(t.Context(), emptyConfig())
+	runSync, err := defaultWireRun(t.Context(), emptyConfig())
 	if err != nil {
 		t.Fatalf(consts.UnexpectedErr, err)
 	}
 
-	if orch == nil {
-		t.Fatal("expected an orchestrator")
+	if runSync == nil {
+		t.Fatal("expected a run function")
 	}
 }
 
@@ -231,10 +232,16 @@ func (stub *stubOrchestrator) Run(
 	return stub.result, stub.err
 }
 
-func captureStreams(t *testing.T) {
+func swapOrchestrator(t *testing.T, stub *stubOrchestrator) {
 	t.Helper()
-	swapStdout(t, io.Discard)
-	swapStderr(t, io.Discard)
+
+	original := wireRun
+
+	wireRun = func(context.Context, *config.Config) (runSyncFn, error) {
+		return stub.Run, nil
+	}
+
+	t.Cleanup(func() { wireRun = original })
 }
 
 func changedResult() *syncrun.Result {
@@ -287,16 +294,10 @@ func swapExitFunc(t *testing.T, stub func(int)) {
 	t.Cleanup(func() { exitFunc = original })
 }
 
-func swapOrchestrator(t *testing.T, stub *stubOrchestrator) {
+func captureStreams(t *testing.T) {
 	t.Helper()
-
-	original := wireOrchestrator
-
-	wireOrchestrator = func(context.Context, *config.Config) (orchestrator, error) {
-		return stub, nil
-	}
-
-	t.Cleanup(func() { wireOrchestrator = original })
+	swapStdout(t, io.Discard)
+	swapStderr(t, io.Discard)
 }
 
 func swapStderr(t *testing.T, writer io.Writer) {

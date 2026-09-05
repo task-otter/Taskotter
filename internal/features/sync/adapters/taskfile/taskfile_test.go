@@ -41,8 +41,8 @@ const (
 	pathUnknownTaskfile     = "../unknown/Taskfile.yml"
 	fmtExpectedInRewritten  = "expected %q in rewritten Taskfile: %s"
 	pathTaskfileYML         = "Taskfile.yml"
-	wantGoVersionEmpty      = `GO_VERSION: ""`
-	wantGoCmdUnixDefault    = `GO_CMD_UNIX: /usr/local/go/bin/go`
+	wantGoVersionEmpty      = `GO_VERSION: '{{.GO_VERSION | default ""}}'`
+	wantGoCmdUnixDefault    = `GO_CMD_UNIX: '{{.GO_CMD_UNIX | default "/usr/local/go/bin/go"}}'`
 	wantGoVersionRef        = `GO_VERSION: '{{.GO_VERSION}}'`
 	wantGoCmdUnixRef        = `GO_CMD_UNIX: '{{.GO_CMD_UNIX}}'`
 	wantIncludeDirDot       = "dir: ."
@@ -500,7 +500,7 @@ func assertGeneratedTasksAndPromotedVars(t *testing.T, text string) {
 		"VERSION: '{{.VERSION}}'",
 		wantGoVersionEmpty,
 		wantGoVersionRef,
-		"CONFIG: \"\"",
+		`CONFIG: '{{.CONFIG | default ""}}'`,
 		"CONFIG: '{{.CONFIG}}'",
 		wantIncludeDirDot,
 		"task: go:lint",

@@ -114,3 +114,14 @@ func capturedLogOutput() string {
 
 	return buf.String()
 }
+
+// TestLoggerErrNilWriteFunc covers Err when the logger has no err hook.
+func TestLoggerErrNilWriteFunc(t *testing.T) {
+	t.Parallel()
+
+	logger := &logging.Logger{}
+
+	if logger.Err() != nil {
+		t.Fatalf("Err = %v", logger.Err())
+	}
+}

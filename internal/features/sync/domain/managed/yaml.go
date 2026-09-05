@@ -12,7 +12,7 @@ import (
 )
 
 type (
-	yamlDecodeTarget struct {
+	yamlDecodeTarget = struct {
 		Out any
 		Key string
 	}
@@ -20,6 +20,7 @@ type (
 
 const (
 	errDecode                = "decode %q: %w"
+	errUnmarshalManagedFmt   = "unmarshal managed file: %w"
 	yamlKeyDestinationModule = "destination_module"
 	yamlKeyPath              = "path"
 	yamlKeySHA256            = "sha256"
@@ -30,8 +31,8 @@ const (
 
 var errYAMLMappingNodeExpected = errors.New("expected YAML mapping node")
 
-// UnmarshalYAML decodes a managed file from the lock file's snake_case keys.
-func (file *File) UnmarshalYAML(value *yaml.Node) error {
+// UnmarshalFile decodes a managed file from the lock file's snake_case keys.
+func UnmarshalFile(value *yaml.Node, file *File) error {
 	fields, err := yamlFields(value)
 	if err != nil {
 		return fmt.Errorf("decode managed file: %w", err)
@@ -46,10 +47,35 @@ func (file *File) UnmarshalYAML(value *yaml.Node) error {
 		yamlDecodeTarget{Key: yamlKeySHA256, Out: &file.SHA256},
 	)
 	if err != nil {
-		return fmt.Errorf("unmarshal managed file: %w", err)
+		return fmt.Errorf(errUnmarshalManagedFmt, err)
 	}
 
 	return nil
+}
+
+// DecodeFileYAML unmarshals YAML bytes into a managed file.
+func DecodeFileYAML(data []byte, file *File) error {
+	var node yaml.Node
+
+	err := yaml.Unmarshal(data, &node)
+	if err != nil {
+		return fmt.Errorf("decode managed file yaml: %w", err)
+	}
+
+	err = UnmarshalFile(yamlDocumentContent(&node), file)
+	if err != nil {
+		return fmt.Errorf(errUnmarshalManagedFmt, err)
+	}
+
+	return nil
+}
+
+func yamlDocumentContent(node *yaml.Node) *yaml.Node {
+	if node != nil && node.Kind == yaml.DocumentNode && len(node.Content) > consts.IndexZero {
+		return node.Content[consts.IndexZero]
+	}
+
+	return node
 }
 
 func decodeYAMLField(fields map[string]*yaml.Node, key string, out any) error {

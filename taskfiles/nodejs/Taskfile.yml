@@ -1,0 +1,77 @@
+---
+version: "3.5"
+
+output:
+
+  group:
+    begin: "::group::{{.TASK}}"
+    end: "::endgroup::"
+    error_only: false
+
+silent: true
+
+includes:
+
+  nix:
+    taskfile: ../nix/Taskfile.yml
+
+vars:
+
+  NODEJS_NIX_INSTALLABLE: '{{.NODEJS_NIX_INSTALLABLE | default "nixpkgs#nodejs"}}'
+
+tasks:
+  default:
+    run: once
+    desc: Show available Node.js automation tasks
+    summary: Display the list of available Node.js-related tasks defined in this Taskfile.
+    cmds:
+      - task --list
+
+  install:
+    run: once
+    desc: Install Node.js via the Nix profile
+    summary: |
+      Install Node.js into the user Nix profile when it is not already
+      available on PATH. Override the NODEJS_NIX_INSTALLABLE
+      variable to pin a different package or version.
+    status:
+      - bash -lc '{{.NIX_LOAD}}; command -v node >/dev/null 2>&1'
+    cmds:
+      - task: nix:install:profile
+        vars:
+          NIX_INSTALLABLE: "{{.NODEJS_NIX_INSTALLABLE}}"
+
+  version:
+    run: once
+    desc: Show the active Node.js version
+    summary: |
+      Print the version reported by the node binary resolved from PATH.
+      Auto-installs Node.js if missing.
+    deps:
+      - task: install
+    cmds:
+      - task: _version:unix
+      - task: _version:windows
+
+  _version:unix:
+    run: once
+    internal: true
+    desc: Show Node.js version on macOS or Linux
+    summary: Print the node version on macOS or Linux.
+    platforms: [linux, darwin]
+    cmds:
+      - bash -lc '{{.NIX_LOAD}}; node --version'
+
+  _version:windows:
+    run: once
+    internal: true
+    desc: Show Node.js version on Windows
+    summary: Print the node version on Windows.
+    platforms: [windows]
+    preconditions:
+      - sh: >-
+          powershell -NoProfile -ExecutionPolicy Bypass -Command "if (Get-Command node -ErrorAction SilentlyContinue) {
+          exit 0 } else { exit 1 }"
+        msg: Node.js is not installed or not available in PATH.
+    cmds:
+      - node --version

@@ -9,11 +9,15 @@ output:
 silent: true
 includes:
 
+  go:
+    taskfile: ../go/Taskfile.yml
   nix:
     taskfile: ../nix/Taskfile.yml
 vars:
 
   GOVULNCHECK_NIX_INSTALLABLE: '{{.GOVULNCHECK_NIX_INSTALLABLE | default "nixpkgs#go nixpkgs#govulncheck"}}'
+
+  GOVULNCHECK_GO_PKG: '{{.GOVULNCHECK_GO_PKG | default "golang.org/x/vuln/cmd/govulncheck@latest"}}'
 tasks:
   default:
     run: once
@@ -36,17 +40,34 @@ tasks:
 
   install:
     run: once
-    desc: Install govulncheck via the Nix profile
+    desc: Install govulncheck via Nix (Unix) or go install (Windows)
     summary: |
-      Install govulncheck into the user Nix profile when it is not already
-      available on PATH. Override the GOVULNCHECK_NIX_INSTALLABLE
-      variable to pin a different package or version.
+      Install govulncheck into the user Nix profile on Linux and macOS when
+      it is not already on PATH (the installable also provides Go). On
+      Windows, installs via go:install:pkg using GOVULNCHECK_GO_PKG.
+      Override GOVULNCHECK_NIX_INSTALLABLE or GOVULNCHECK_GO_PKG to pin a
+      different package or version.
     status:
       - command -v govulncheck >/dev/null 2>&1
+    cmds:
+      - task: _install:unix
+      - task: _install:windows
+
+  _install:unix:
+    internal: true
+    platforms: [linux, darwin]
     cmds:
       - task: nix:install:profile
         vars:
           NIX_INSTALLABLE: "{{.GOVULNCHECK_NIX_INSTALLABLE}}"
+
+  _install:windows:
+    internal: true
+    platforms: [windows]
+    cmds:
+      - task: go:install:pkg
+        vars:
+          GO_PKG: "{{.GOVULNCHECK_GO_PKG}}"
 
   version:
     run: once

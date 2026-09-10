@@ -9,8 +9,11 @@ silent: true
 includes:
   nix:
     taskfile: ../nix/Taskfile.yml
+  uv:
+    taskfile: ../uv/Taskfile.yml
 vars:
   YAMLFIX_NIX_INSTALLABLE: '{{.YAMLFIX_NIX_INSTALLABLE | default "nixpkgs#yamlfix"}}'
+  YAMLFIX_UV_TOOL: '{{.YAMLFIX_UV_TOOL | default "yamlfix"}}'
   YAMLFIX_TARGETS: '{{.YAMLFIX_TARGETS | default "."}}'
   YAMLFIX_EXTRA_ARGS: '{{.YAMLFIX_EXTRA_ARGS | default ""}}'
 tasks:
@@ -22,17 +25,33 @@ tasks:
       - task --list
   install:
     run: once
-    desc: Install yamlfix via the Nix profile
+    desc: Install yamlfix via Nix (Unix) or uv tool (Windows)
     summary: |
-      Install yamlfix into the user Nix profile when it is not already
-      available on PATH. Override the YAMLFIX_NIX_INSTALLABLE
-      variable to pin a different package or version.
+      Install yamlfix into the user Nix profile on Linux and macOS when it
+      is not already on PATH. On Windows, installs via uv tool install
+      (YAMLFIX_UV_TOOL). Override YAMLFIX_NIX_INSTALLABLE or
+      YAMLFIX_UV_TOOL to pin a different package or version.
     status:
       - command -v yamlfix >/dev/null 2>&1
+    cmds:
+      - task: _install:unix
+      - task: _install:windows
+  _install:unix:
+    internal: true
+    platforms: [linux, darwin]
     cmds:
       - task: nix:install:profile
         vars:
           NIX_INSTALLABLE: "{{.YAMLFIX_NIX_INSTALLABLE}}"
+
+  _install:windows:
+    internal: true
+    platforms: [windows]
+    cmds:
+      - task: uv:tool:install
+        vars:
+          UV_TOOL: "{{.YAMLFIX_UV_TOOL}}"
+
   version:
     run: once
     desc: Show the active yamlfix version

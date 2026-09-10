@@ -64,19 +64,21 @@ dependents run `go:install`.
 | `which`   | Show the path to the go-junit-report binary       |
 | `verify`  | Print go-junit-report version                     |
 | `report`  | Convert a go test log file to JUnit XML           |
-| `install` | Install go-junit-report via the Nix profile       |
+| `install` | Install go-junit-report via Nix (Unix) or go install (Windows) |
 | `version` | Show the active go-junit-report version           |
 
 ## Variables
 
-| Variable                          | Default                    | Description                                        |
-| --------------------------------- | -------------------------- | -------------------------------------------------- |
-| `GO_JUNIT_REPORT_NIX_INSTALLABLE` | `nixpkgs#go-junit-report`  | Flake installable passed to `nix:install:profile`  |
-| `GO_JUNIT_REPORT_IN`              | empty (required)           | Input path of the go test log file                 |
-| `GO_JUNIT_REPORT_OUT`             | empty (required)           | Output path for the JUnit XML report               |
+| Variable                          | Default                                              | Description                                        |
+| --------------------------------- | ---------------------------------------------------- | -------------------------------------------------- |
+| `GO_JUNIT_REPORT_NIX_INSTALLABLE` | `nixpkgs#go-junit-report`                            | Flake installable passed to `nix:install:profile`  |
+| `GO_JUNIT_REPORT_GO_PKG`          | `github.com/jstemmer/go-junit-report/v2@latest`      | Go module passed to `go:install:pkg` on Windows    |
+| `GO_JUNIT_REPORT_IN`              | empty (required)                                     | Input path of the go test log file                 |
+| `GO_JUNIT_REPORT_OUT`             | empty (required)                                     | Output path for the JUnit XML report               |
 
 ## Notes
 
-- Install goes through `nix:install:profile` (Nix is installed first if missing). Native Windows is not supported; use WSL2.
+- Unix install uses Nix (`GO_JUNIT_REPORT_NIX_INSTALLABLE`). On Windows, install uses `go:install:pkg` with `GO_JUNIT_REPORT_GO_PKG`.
+
 - Go is provided by the included [`go`](../go/README.md) module. Operational tasks depend on `go:install`.
 - `report`, `which`, `verify`, and `version` auto-install Go and `go-junit-report`.

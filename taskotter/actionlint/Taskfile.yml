@@ -14,10 +14,13 @@ includes:
 
   nix:
     taskfile: ../nix/Taskfile.yml
+  winget:
+    taskfile: ../winget/Taskfile.yml
 
 vars:
 
   ACTIONLINT_NIX_INSTALLABLE: '{{.ACTIONLINT_NIX_INSTALLABLE | default "nixpkgs#actionlint"}}'
+  ACTIONLINT_WINGET_INSTALLABLE: '{{.ACTIONLINT_WINGET_INSTALLABLE | default "rhysd.actionlint"}}'
 
   ACTIONLINT_EXTRA_ARGS: '{{.ACTIONLINT_EXTRA_ARGS | default ""}}'
 
@@ -33,17 +36,33 @@ tasks:
 
   install:
     run: once
-    desc: Install actionlint via the Nix profile
+    desc: Install actionlint via Nix (Unix) or WinGet (Windows)
     summary: |
-      Install actionlint into the user Nix profile when it is not already
-      available on PATH. Override the ACTIONLINT_NIX_INSTALLABLE
-      variable to pin a different package or version.
+      Install actionlint on Linux and macOS via the user Nix profile, and on
+      Windows via WinGet, when it is not already on PATH. Override
+      ACTIONLINT_NIX_INSTALLABLE or ACTIONLINT_WINGET_INSTALLABLE to pin a
+      different package or version.
     status:
       - command -v actionlint >/dev/null 2>&1
+    cmds:
+      - task: _install:unix
+      - task: _install:windows
+
+  _install:unix:
+    internal: true
+    platforms: [linux, darwin]
     cmds:
       - task: nix:install:profile
         vars:
           NIX_INSTALLABLE: "{{.ACTIONLINT_NIX_INSTALLABLE}}"
+
+  _install:windows:
+    internal: true
+    platforms: [windows]
+    cmds:
+      - task: winget:install:package
+        vars:
+          WINGET_INSTALLABLE: "{{.ACTIONLINT_WINGET_INSTALLABLE}}"
 
   version:
     run: once

@@ -20,6 +20,8 @@ vars:
 
   GO_JUNIT_REPORT_NIX_INSTALLABLE: '{{.GO_JUNIT_REPORT_NIX_INSTALLABLE | default "nixpkgs#go-junit-report"}}'
 
+  GO_JUNIT_REPORT_GO_PKG: '{{.GO_JUNIT_REPORT_GO_PKG | default "github.com/jstemmer/go-junit-report/v2@latest"}}'
+
   GO_JUNIT_REPORT_IN: '{{.GO_JUNIT_REPORT_IN | default ""}}'
 
   GO_JUNIT_REPORT_OUT: '{{.GO_JUNIT_REPORT_OUT | default ""}}'
@@ -34,18 +36,35 @@ tasks:
 
   install:
     run: once
-    desc: Install go-junit-report via the Nix profile
+    desc: Install go-junit-report via Nix (Unix) or go install (Windows)
     summary: |
-      Install go-junit-report into the user Nix profile when it is not already
-      available on PATH. Override the GO_JUNIT_REPORT_NIX_INSTALLABLE
-      variable to pin a different package or version. Go is provided by the
-      included go Taskfile (go:install), not this installable.
+      Install go-junit-report into the user Nix profile on Linux and macOS
+      when it is not already on PATH. Go comes from the included go Taskfile
+      (go:install), not this installable. On Windows, installs via
+      go:install:pkg using GO_JUNIT_REPORT_GO_PKG. Override
+      GO_JUNIT_REPORT_NIX_INSTALLABLE or GO_JUNIT_REPORT_GO_PKG to pin a
+      package or version.
     status:
       - command -v go-junit-report >/dev/null 2>&1
+    cmds:
+      - task: _install:unix
+      - task: _install:windows
+
+  _install:unix:
+    internal: true
+    platforms: [linux, darwin]
     cmds:
       - task: nix:install:profile
         vars:
           NIX_INSTALLABLE: "{{.GO_JUNIT_REPORT_NIX_INSTALLABLE}}"
+
+  _install:windows:
+    internal: true
+    platforms: [windows]
+    cmds:
+      - task: go:install:pkg
+        vars:
+          GO_PKG: "{{.GO_JUNIT_REPORT_GO_PKG}}"
 
   version:
     run: once

@@ -41,7 +41,7 @@ task actionlint:ci
 | Task | Description |
 |---|---|
 | `ci` | Lint GitHub Actions workflow files with actionlint |
-| `install` | Install actionlint via the Nix profile |
+| `install` | Install actionlint via Nix (Unix) or WinGet (Windows) |
 | `version` | Show the active actionlint version |
 
 ## Variables
@@ -49,6 +49,7 @@ task actionlint:ci
 | Variable | Default | Description |
 |---|---|---|
 | `ACTIONLINT_NIX_INSTALLABLE` | `nixpkgs#actionlint` | Flake installable passed to `nix:install:profile` |
+| `ACTIONLINT_WINGET_INSTALLABLE` | `rhysd.actionlint` | WinGet package ID for `winget:install:package` |
 | `ACTIONLINT_EXTRA_ARGS` | `""` | Additional flags passed to `actionlint` (e.g. `-ignore`, `-format`) |
 | `ACTIONLINT_TARGETS` | `""` | Paths to workflow files; empty = auto-discover `.github/workflows` |
 
@@ -57,6 +58,7 @@ Pin a revision by overriding the installable, for example
 
 ## Notes
 
-- Install goes through `nix:install:profile` (Nix is installed first if missing). Native Windows is not supported; use WSL2.
+- Install uses Nix on Linux and macOS (`ACTIONLINT_NIX_INSTALLABLE`) and WinGet on Windows (`ACTIONLINT_WINGET_INSTALLABLE`, default `rhysd.actionlint`).
+
 - When `ACTIONLINT_TARGETS` is empty, actionlint automatically discovers all files under `.github/workflows/` in the current working directory.
 - The `ci` task auto-installs actionlint if it is not already present in `PATH`.

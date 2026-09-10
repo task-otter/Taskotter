@@ -54,19 +54,20 @@ task govulncheck:ci -- -test ./...
 | Task | Description |
 | ---- | ----------- |
 | `ci` | Scan Go packages for known vulnerabilities |
-| `install` | Install govulncheck via the Nix profile |
+| `install` | Install govulncheck via Nix (Unix) or go install (Windows) |
 | `version` | Show the active govulncheck version |
 
 ## Variables
 
-| Variable                        | Default                              | Description |
-| --------------------------------- | -------------------------------------- | ----------- |
-| `GOVULNCHECK_NIX_INSTALLABLE`    | `nixpkgs#go nixpkgs#govulncheck`      | Flake installables passed to `nix:install:profile` |
+| Variable                        | Default                                        | Description |
+| --------------------------------- | ---------------------------------------------- | ----------- |
+| `GOVULNCHECK_NIX_INSTALLABLE`    | `nixpkgs#go nixpkgs#govulncheck`              | Flake installables passed to `nix:install:profile` |
+| `GOVULNCHECK_GO_PKG`             | `golang.org/x/vuln/cmd/govulncheck@latest`    | Go module passed to `go:install:pkg` on Windows |
 
 Pin a revision by overriding the installable, for example
 `GOVULNCHECK_NIX_INSTALLABLE=github:NixOS/nixpkgs/<rev>#govulncheck`.
 
 ## Notes
 
-- Install goes through `nix:install:profile` (Nix is installed first if missing). Native Windows is not supported; use WSL2.
-- govulncheck needs `go` on PATH, so the default installable includes both `nixpkgs#go` and `nixpkgs#govulncheck`.
+- Unix install uses Nix (`GOVULNCHECK_NIX_INSTALLABLE`). On Windows, install uses `go:install:pkg` with `GOVULNCHECK_GO_PKG`.
+- On Unix the default Nix installable includes both `nixpkgs#go` and `nixpkgs#govulncheck`. On Windows, Go comes from the included go Taskfile.

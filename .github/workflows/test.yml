@@ -23,7 +23,7 @@ jobs:
         with:
           github-token: ${{ github.token }}
           fail-on-changes: true
-          store-version: v0.0.10
+          store-version: v0.0.11
           tasks: |
             go
             go-junit-report

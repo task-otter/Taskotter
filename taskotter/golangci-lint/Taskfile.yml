@@ -9,11 +9,16 @@ output:
 silent: true
 includes:
 
+  go:
+    taskfile: ../go/Taskfile.yml
   nix:
     taskfile: ../nix/Taskfile.yml
+  winget:
+    taskfile: ../winget/Taskfile.yml
 vars:
 
   GOLANGCI_LINT_NIX_INSTALLABLE: '{{.GOLANGCI_LINT_NIX_INSTALLABLE | default "nixpkgs#go nixpkgs#golangci-lint"}}'
+  GOLANGCI_LINT_WINGET_INSTALLABLE: '{{.GOLANGCI_LINT_WINGET_INSTALLABLE | default "GolangCI.golangci-lint"}}'
 
   # Formatter selection shared by every golangci-lint fmt invocation on Unix and
 
@@ -33,20 +38,34 @@ tasks:
 
   install:
     run: once
-    desc: Install golangci-lint via the Nix profile
+    desc: Install golangci-lint via Nix (Unix) or WinGet (Windows)
     summary: |
-      Install golangci-lint into the user Nix profile when it is not already
-      available on PATH. Override the GOLANGCI_LINT_NIX_INSTALLABLE
-      variable to pin a different package or version.
+      Install golangci-lint on Linux and macOS via the user Nix profile
+      (which also provides Go), and on Windows via go:install then WinGet,
+      when it is not already on PATH. Override GOLANGCI_LINT_NIX_INSTALLABLE
+      or GOLANGCI_LINT_WINGET_INSTALLABLE to pin a package or version.
     status:
-      - >-
-        bash -lc '{{.NIX_LOAD}};
-        {{if .GO_GLOBAL_BIN}}export PATH="{{.GO_GLOBAL_BIN}}:$PATH";
-        {{end}}command -v golangci-lint >/dev/null 2>&1'
+      - command -v golangci-lint >/dev/null 2>&1
+    cmds:
+      - task: _install:unix
+      - task: _install:windows
+
+  _install:unix:
+    internal: true
+    platforms: [linux, darwin]
     cmds:
       - task: nix:install:profile
         vars:
           NIX_INSTALLABLE: "{{.GOLANGCI_LINT_NIX_INSTALLABLE}}"
+
+  _install:windows:
+    internal: true
+    platforms: [windows]
+    cmds:
+      - task: go:install
+      - task: winget:install:package
+        vars:
+          WINGET_INSTALLABLE: "{{.GOLANGCI_LINT_WINGET_INSTALLABLE}}"
 
   version:
     run: once

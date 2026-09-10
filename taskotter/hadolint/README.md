@@ -45,7 +45,7 @@ task hadolint:ci HADOLINT_DOCKERFILE=services/api/Dockerfile
 | Task | Description                     | Key variables                                              |
 | ---- | ------------------------------- | ---------------------------------------------------------- |
 | `ci` | Lint a Dockerfile with hadolint | `HADOLINT_DOCKERFILE`, `HADOLINT_CONFIG`, `HADOLINT_EXTRA_ARGS` |
-| `install` | Install hadolint via the Nix profile | `HADOLINT_NIX_INSTALLABLE` |
+| `install` | Install hadolint via Nix (Unix) or WinGet (Windows) | `HADOLINT_NIX_INSTALLABLE` |
 | `version` | Show the active hadolint version | — |
 
 ## Variables
@@ -53,6 +53,7 @@ task hadolint:ci HADOLINT_DOCKERFILE=services/api/Dockerfile
 | Variable                     | Default      | Description                                            |
 | ---------------------------- | ------------ | ------------------------------------------------------ |
 | `HADOLINT_NIX_INSTALLABLE`   | `nixpkgs#hadolint` | Flake installable passed to `nix:install:profile` |
+| `HADOLINT_WINGET_INSTALLABLE` | `hadolint.hadolint` | WinGet package ID for `winget:install:package` |
 | `HADOLINT_DOCKERFILE`        | `Dockerfile` | Path to the Dockerfile to lint                         |
 | `HADOLINT_CONFIG`            | empty        | Path to a hadolint config file passed via `--config`   |
 | `HADOLINT_EXTRA_ARGS`        | empty        | Extra arguments appended when CLI_ARGS is not provided |
@@ -62,5 +63,6 @@ Pin a revision by overriding the installable, for example
 
 ## Notes
 
-- Install goes through `nix:install:profile` (Nix is installed first if missing). Native Windows is not supported; use WSL2.
+- Install uses Nix on Linux and macOS (`HADOLINT_NIX_INSTALLABLE`) and WinGet on Windows (`HADOLINT_WINGET_INSTALLABLE`, default `hadolint.hadolint`).
+
 - The `ci` task auto-installs hadolint if it is not already present in `PATH`.

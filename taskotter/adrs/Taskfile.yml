@@ -10,11 +10,14 @@ output:
 silent: true
 
 includes:
+  cargo:
+    taskfile: ../cargo/Taskfile.yml
   nix:
     taskfile: ../nix/Taskfile.yml
 
 vars:
   ADRS_NIX_INSTALLABLE: '{{.ADRS_NIX_INSTALLABLE | default "nixpkgs#adrs"}}'
+  ADRS_CARGO_CRATE: '{{.ADRS_CARGO_CRATE | default "adrs"}}'
   ADRS_EXTRA_ARGS: '{{.ADRS_EXTRA_ARGS | default ""}}'
 
 tasks:
@@ -27,17 +30,33 @@ tasks:
 
   install:
     run: once
-    desc: Install adrs via the Nix profile
+    desc: Install adrs via Nix (Unix) or cargo install (Windows)
     summary: |
-      Install adrs into the user Nix profile when it is not already
-      available on PATH. Override the ADRS_NIX_INSTALLABLE
-      variable to pin a different package or version.
+      Install adrs into the user Nix profile on Linux and macOS when it
+      is not already on PATH. On Windows, install via cargo:install:crate
+      (ADRS_CARGO_CRATE). Override ADRS_NIX_INSTALLABLE or ADRS_CARGO_CRATE
+      to pin a different package or crate.
     status:
       - command -v adrs >/dev/null 2>&1
+    cmds:
+      - task: _install:unix
+      - task: _install:windows
+
+  _install:unix:
+    internal: true
+    platforms: [linux, darwin]
     cmds:
       - task: nix:install:profile
         vars:
           NIX_INSTALLABLE: "{{.ADRS_NIX_INSTALLABLE}}"
+
+  _install:windows:
+    internal: true
+    platforms: [windows]
+    cmds:
+      - task: cargo:install:crate
+        vars:
+          CARGO_CRATE: "{{.ADRS_CARGO_CRATE}}"
 
   version:
     run: once

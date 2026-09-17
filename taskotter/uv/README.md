@@ -52,6 +52,7 @@ Pin a revision by overriding the installable, for example
 | -------------------- | -------------------- | ------------------------------------------------------- |
 | `UV_NIX_INSTALLABLE` | `nixpkgs#uv`         | Flake installable passed to `nix:install:profile`       |
 | `UV_WINGET_INSTALLABLE` | `astral-sh.uv` | WinGet package ID for `winget:install:package` |
+| `UV_LOAD`            | reloads User Path; prepends `%USERPROFILE%\.local\bin` | PowerShell snippet so `uv` and uv-installed tools from earlier in the same Task process are on PATH |
 | `UV_VENV`            | `.venv`              | Virtual environment directory for `venv`                |
 | `UV_REQUIREMENTS`    | `requirements.txt`   | Requirements file for `pip:install`                     |
 | `UV_FILE`            | _(empty)_            | Script path; required by `run`                          |
@@ -66,3 +67,4 @@ Pin a revision by overriding the installable, for example
 
 - Remaining uv tasks auto-install the uv binary if it is missing.
 - **`tool:install`** creates an isolated environment for each tool so their dependencies never conflict with your project. The tool's binary is shimmed into `~/.local/bin` (Unix) or `%USERPROFILE%\.local\bin` (Windows).
+- On Windows, `UV_LOAD` reloads User Path and prepends `%USERPROFILE%\.local\bin` so uv-installed tools from earlier in the same Task process are on PATH.

@@ -91,7 +91,7 @@ upgrade it (`--no-upgrade`). Use `upgrade` to move to a newer release.
 | `WINGET_SCOPE`      | _(empty)_   | Optional `user` or `machine` scope |
 | `WINGET_SOURCE`     | `winget`    | WinGet source; default avoids Microsoft Store agreement prompts |
 | `WINGET_EXTRA_ARGS` | _(empty)_   | Extra flags forwarded to `winget install` / `uninstall` / `upgrade` |
-| `WINGET_LOAD`       | prepends `%LOCALAPPDATA%\Microsoft\WindowsApps` | PowerShell snippet that puts `winget` on PATH |
+| `WINGET_LOAD`       | reloads Machine/User Path; prepends WinGet Links; appends WindowsApps | PowerShell snippet so `winget` and packages installed earlier in the same Task process are on PATH. WindowsApps is last so Store aliases do not shadow real installs. |
 
 ## Notes
 

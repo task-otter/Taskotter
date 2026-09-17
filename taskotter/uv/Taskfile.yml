@@ -21,6 +21,16 @@ vars:
 
   UV_NIX_INSTALLABLE: '{{.UV_NIX_INSTALLABLE | default "nixpkgs#uv"}}'
   UV_WINGET_INSTALLABLE: '{{.UV_WINGET_INSTALLABLE | default "astral-sh.uv"}}'
+  # \$ so Task's POSIX shell (mvdan/sh) leaves literal $ for PowerShell.
+  # Reload User Path and prepend %USERPROFILE%\.local\bin so uv and
+  # uv-installed tools from earlier in this Task process are visible.
+  UV_LOAD: >-
+    {{.UV_LOAD | default `
+    \$u = [Environment]::GetEnvironmentVariable('Path', 'User');
+    if (\$u) { \$env:Path = \$u + ';' + \$env:Path };
+    \$localBin = Join-Path \$env:USERPROFILE '.local\bin';
+    if (Test-Path -LiteralPath \$localBin) { \$env:Path = \$localBin + ';' + \$env:Path }
+    `}}
 
   UV_VENV: '{{.UV_VENV | default ".venv"}}'
 
@@ -125,7 +135,7 @@ tasks:
           UV_ARGS: 'venv "{{.UV_VENV}}" {{.UV_EXTRA_ARGS}}'
       - task: _uv:windows
         vars:
-          UV_ARGS: 'venv "{{.UV_VENV}}" {{.UV_EXTRA_ARGS}}'
+          UV_ARGS: "venv '{{.UV_VENV}}' {{.UV_EXTRA_ARGS}}"
 
   pip:install:
     run: once
@@ -142,7 +152,7 @@ tasks:
           UV_ARGS: 'pip install -r "{{.UV_REQUIREMENTS}}" {{.UV_EXTRA_ARGS}}'
       - task: _uv:windows
         vars:
-          UV_ARGS: 'pip install -r "{{.UV_REQUIREMENTS}}" {{.UV_EXTRA_ARGS}}'
+          UV_ARGS: "pip install -r '{{.UV_REQUIREMENTS}}' {{.UV_EXTRA_ARGS}}"
 
   run:
     run: once
@@ -169,7 +179,7 @@ tasks:
       - task: _uv:windows
         vars:
           UV_ARGS: >-
-            run "{{.UV_FILE}}"
+            run '{{.UV_FILE}}'
             {{.UV_ARGS}}
             {{.UV_EXTRA_ARGS}}
 
@@ -200,7 +210,7 @@ tasks:
         vars:
           UV_ARGS: >-
             tool install
-            "{{.UV_TOOL}}"
+            '{{.UV_TOOL}}'
             {{.UV_EXTRA_ARGS}}
 
   tool:upgrade:
@@ -229,11 +239,10 @@ tasks:
         vars:
           UV_ARGS: >-
             tool upgrade
-            "{{.UV_TOOL}}"
+            '{{.UV_TOOL}}'
             {{.UV_EXTRA_ARGS}}
 
   _uv:unix:
-    run: once
     internal: true
     platforms: [linux, darwin]
     set: [errexit, nounset, pipefail]
@@ -243,13 +252,16 @@ tasks:
       - bash -lc '{{.NIX_LOAD}}; uv {{.UV_ARGS}}'
 
   _uv:windows:
-    run: once
     internal: true
     platforms: [windows]
     requires:
       vars: [UV_ARGS]
     cmds:
-      - uv {{.UV_ARGS}}
+      - >-
+        powershell -NoProfile -ExecutionPolicy Bypass -Command
+        "{{.WINGET_LOAD}}; {{.UV_LOAD}};
+        uv {{.UV_ARGS}};
+        exit \$LASTEXITCODE"
 
   _version:unix:
     run: once
@@ -268,8 +280,12 @@ tasks:
     platforms: [windows]
     preconditions:
       - sh: >-
-          powershell -NoProfile -ExecutionPolicy Bypass -Command "if (Get-Command uv -ErrorAction SilentlyContinue) {
+          powershell -NoProfile -ExecutionPolicy Bypass -Command
+          "{{.WINGET_LOAD}}; {{.UV_LOAD}};
+          if (Get-Command uv -ErrorAction SilentlyContinue) {
           exit 0 } else { exit 1 }"
         msg: uv is not installed or not available in PATH.
     cmds:
-      - uv --version
+      - >-
+        powershell -NoProfile -ExecutionPolicy Bypass -Command
+        "{{.WINGET_LOAD}}; {{.UV_LOAD}}; uv --version; exit \$LASTEXITCODE"

@@ -76,7 +76,7 @@ task golangci-lint:fmt
 ```
 
 The formatter runs `golangci-lint fmt` with `gci`, `gofmt`, `gofumpt`,
-`goimports`, `golines`, and `swaggo` enabled. It defaults to `.` and accepts
+`goimports`, and `golines` enabled. It defaults to `.` and accepts
 CLI arguments after `--`:
 
 ```sh
@@ -102,7 +102,7 @@ task golangci-lint:fmt -- ./internal/...
 | ------------------------------------- | ------------------------------------------ | ------------------------------------------------------------------ |
 | `GOLANGCI_LINT_NIX_INSTALLABLE`       | `nixpkgs#go nixpkgs#golangci-lint`         | Flake installables passed to `nix:install:profile` (Go plus the linter) |
 | `GOLANGCI_LINT_WINGET_INSTALLABLE` | `GolangCI.golangci-lint` | WinGet package ID for `winget:install:package` |
-| `GOLANGCI_LINT_FMT_FORMATTER_FLAGS`   | `-E gci -E gofmt -E gofumpt -E goimports -E golines -E swaggo` | Formatter set passed to `golangci-lint fmt`     |
+| `GOLANGCI_LINT_FMT_FORMATTER_FLAGS`   | `-E gci -E gofmt -E gofumpt -E goimports -E golines` | Formatter set passed to `golangci-lint fmt`     |
 
 Pin a revision by overriding the installable, for example
 `GOLANGCI_LINT_NIX_INSTALLABLE=github:NixOS/nixpkgs/<rev>#golangci-lint`.

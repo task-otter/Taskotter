@@ -15,9 +15,22 @@ vars:
   WINGET_SCOPE: '{{.WINGET_SCOPE | default ""}}'
   WINGET_SOURCE: '{{.WINGET_SOURCE | default "winget"}}'
   WINGET_EXTRA_ARGS: '{{.WINGET_EXTRA_ARGS | default ""}}'
+  # \$ so Task's POSIX shell (mvdan/sh) leaves literal $ for PowerShell.
+  # Reload Machine/User Path so packages installed earlier in this Task process
+  # (winget updates the registry, not the parent env) are visible. Prepend
+  # WinGet Links for portable shims. Append WindowsApps last so Store aliases
+  # (python.exe) cannot shadow a real install on Machine/User Path.
   WINGET_LOAD: >-
-    {{.WINGET_LOAD | default `$wa = Join-Path $env:LOCALAPPDATA 'Microsoft\WindowsApps';
-    if (Test-Path -LiteralPath $wa) { $env:Path = $wa + ';' + $env:Path }`}}
+    {{.WINGET_LOAD | default `
+    \$m = [Environment]::GetEnvironmentVariable('Path', 'Machine');
+    \$u = [Environment]::GetEnvironmentVariable('Path', 'User');
+    if (\$m) { \$env:Path = \$m + ';' + \$env:Path };
+    if (\$u) { \$env:Path = \$u + ';' + \$env:Path };
+    \$links = Join-Path \$env:LOCALAPPDATA 'Microsoft\WinGet\Links';
+    if (Test-Path -LiteralPath \$links) { \$env:Path = \$links + ';' + \$env:Path };
+    \$wa = Join-Path \$env:LOCALAPPDATA 'Microsoft\WindowsApps';
+    if (Test-Path -LiteralPath \$wa) { \$env:Path = \$env:Path + ';' + \$wa }
+    `}}
 
 tasks:
   default:
@@ -162,7 +175,7 @@ tasks:
         -MainPackage Microsoft.DesktopAppInstaller_8wekyb3d8bbwe;
         {{.WINGET_LOAD}};
         if (Get-Command winget -ErrorAction SilentlyContinue) { exit 0 };
-        $progressPreference = 'silentlyContinue';
+        \$progressPreference = 'silentlyContinue';
         Install-PackageProvider -Name NuGet -Force | Out-Null;
         Install-Module -Name Microsoft.WinGet.Client -Force
         -Repository PSGallery | Out-Null;
@@ -190,36 +203,36 @@ tasks:
       - >-
         powershell -NoProfile -ExecutionPolicy Bypass -Command
         "{{.WINGET_LOAD}};
-        $id = '{{.WINGET_INSTALLABLE}}'.Trim();
-        $sub = '{{.WINGET_SUBCMD}}';
-        $wingetArgs = @($sub, '--id', $id, '--exact',
+        \$id = '{{.WINGET_INSTALLABLE}}'.Trim();
+        \$sub = '{{.WINGET_SUBCMD}}';
+        \$wingetArgs = @(\$sub, '--id', \$id, '--exact',
         '--disable-interactivity', '--accept-source-agreements');
-        if ($sub -ne 'show') { $wingetArgs += '--silent' };
-        if ($sub -eq 'install' -or $sub -eq 'upgrade') {
-        $wingetArgs += '--accept-package-agreements' };
-        if ($sub -eq 'install') { $wingetArgs += '--no-upgrade' };
-        $ver = '{{.WINGET_VERSION}}'.Trim();
-        if ($ver) { $wingetArgs += @('--version', $ver) };
-        $scope = '{{.WINGET_SCOPE}}'.Trim();
-        if ($scope) { $wingetArgs += @('--scope', $scope) };
-        $src = '{{.WINGET_SOURCE}}'.Trim();
-        if ($src) { $wingetArgs += @('--source', $src) };
-        $extra = '{{.WINGET_EXTRA_ARGS}}'.Trim();
-        if ($extra) { $wingetArgs += $extra.Split(' ',
+        if (\$sub -ne 'show') { \$wingetArgs += '--silent' };
+        if (\$sub -eq 'install' -or \$sub -eq 'upgrade') {
+        \$wingetArgs += '--accept-package-agreements' };
+        if (\$sub -eq 'install') { \$wingetArgs += '--no-upgrade' };
+        \$ver = '{{.WINGET_VERSION}}'.Trim();
+        if (\$ver) { \$wingetArgs += @('--version', \$ver) };
+        \$scope = '{{.WINGET_SCOPE}}'.Trim();
+        if (\$scope) { \$wingetArgs += @('--scope', \$scope) };
+        \$src = '{{.WINGET_SOURCE}}'.Trim();
+        if (\$src) { \$wingetArgs += @('--source', \$src) };
+        \$extra = '{{.WINGET_EXTRA_ARGS}}'.Trim();
+        if (\$extra) { \$wingetArgs += \$extra.Split(' ',
         [System.StringSplitOptions]::RemoveEmptyEntries) };
         & winget @wingetArgs;
-        $code = $LASTEXITCODE;
-        if ($code -eq 0) { exit 0 };
-        if ($sub -eq 'install' -and $code -eq -1978335217) { exit 0 };
-        if ($sub -eq 'upgrade' -and $code -eq -1978335189) { exit 0 };
-        if ($sub -eq 'uninstall' -and $code -eq -1978335215) { exit 0 };
-        exit $code"
+        \$code = \$LASTEXITCODE;
+        if (\$code -eq 0) { exit 0 };
+        if (\$sub -eq 'install' -and (\$code -eq -1978335135 -or \$code -eq -1978334963)) { exit 0 };
+        if (\$sub -eq 'upgrade' -and \$code -eq -1978335189) { exit 0 };
+        if (\$sub -eq 'uninstall' -and (\$code -eq -1978335212 -or \$code -eq -1978335185)) { exit 0 };
+        exit \$code"
 
   _version:windows:
     run: once
     internal: true
     desc: Show WinGet version on Windows
-    summary: Print winget --version after loading WindowsApps onto PATH.
+    summary: Print winget --version after reloading Machine/User Path and WinGet Links.
     platforms: [windows]
     preconditions:
       - sh: >-

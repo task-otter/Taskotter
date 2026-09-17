@@ -100,10 +100,11 @@ tasks:
         platforms: [linux, darwin]
       - cmd: >-
           powershell -NoProfile -ExecutionPolicy Bypass -Command
-          "actionlint {{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}
+          "{{.WINGET_LOAD}};
+          actionlint {{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}
             {{.ACTIONLINT_EXTRA_ARGS}}
             {{.ACTIONLINT_TARGETS}}{{end}};
-          exit $LASTEXITCODE"
+          exit \$LASTEXITCODE"
         platforms: [windows]
 
   _version:unix:
@@ -124,8 +125,11 @@ tasks:
     preconditions:
       - sh: >-
           powershell -NoProfile -ExecutionPolicy Bypass -Command
-          "if (Get-Command actionlint -ErrorAction SilentlyContinue) {
+          "{{.WINGET_LOAD}};
+          if (Get-Command actionlint -ErrorAction SilentlyContinue) {
           exit 0 } else { exit 1 }"
         msg: actionlint is not installed or not available in PATH.
     cmds:
-      - actionlint -version
+      - cmd: >-
+          powershell -NoProfile -ExecutionPolicy Bypass -Command
+          "{{.WINGET_LOAD}}; actionlint -version; exit \$LASTEXITCODE"

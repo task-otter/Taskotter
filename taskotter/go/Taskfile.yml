@@ -23,6 +23,19 @@ vars:
   GO_FUZZTIME: '{{.GO_FUZZTIME | default ""}}'
 
   GO_PKG: '{{.GO_PKG | default ""}}'
+  # \$ so Task's POSIX shell (mvdan/sh) leaves literal $ for PowerShell.
+  # Reload User Path (install:pkg writes GOPATH\bin there) and prepend
+  # GOPATH\bin so go-installed tools from earlier in this Task process are
+  # visible to later PowerShell cmds.
+  GO_LOAD: >-
+    {{.GO_LOAD | default `
+    \$u = [Environment]::GetEnvironmentVariable('Path', 'User');
+    if (\$u) { \$env:Path = \$u + ';' + \$env:Path };
+    if (Get-Command go -ErrorAction SilentlyContinue) {
+      \$goBin = Join-Path ((go env GOPATH).Trim()) 'bin';
+      if (Test-Path -LiteralPath \$goBin) { \$env:Path = \$goBin + ';' + \$env:Path }
+    }
+    `}}
 
 tasks:
   default:
@@ -61,14 +74,15 @@ tasks:
           WINGET_INSTALLABLE: "{{.GO_WINGET_INSTALLABLE}}"
 
   install:pkg:
-    run: once
     desc: Install a Go package with go install (GO_PKG=module@version)
     summary: |
       Run go install GO_PKG to install a Go module binary onto GOPATH/bin.
       Pass GO_PKG as a module path with version, for example
       github.com/example/cmd@latest. Auto-installs Go if missing. On Windows,
       idempotently prepends $(go env GOPATH)\bin to the User Path when absent
-      so the installed binary is discoverable.
+      so the installed binary is discoverable. Must not use run: once: each
+      caller passes a different GO_PKG, and skipping the second call leaves
+      that package uninstalled.
     deps:
       - task: install
     requires:
@@ -79,37 +93,50 @@ tasks:
         msg: GO_PKG is required. Pass GO_PKG=module@version when running this task.
     cmds:
       - task: _install:pkg:unix
+        vars:
+          GO_PKG: "{{.GO_PKG}}"
       - task: _install:pkg:windows
+        vars:
+          GO_PKG: "{{.GO_PKG}}"
 
   _install:pkg:unix:
     internal: true
     platforms: [linux, darwin]
+    requires:
+      vars:
+        - GO_PKG
     cmds:
       - bash -lc '{{.NIX_LOAD}}; go install "{{.GO_PKG}}"'
 
   _install:pkg:windows:
     internal: true
     platforms: [windows]
+    requires:
+      vars:
+        - GO_PKG
     cmds:
-      - go install "{{.GO_PKG}}"
       - >-
         powershell -NoProfile -ExecutionPolicy Bypass -Command
-        "$ErrorActionPreference = 'Stop';
-        $goBin = Join-Path ((go env GOPATH).Trim()) 'bin';
-        $userPath = [Environment]::GetEnvironmentVariable('Path', 'User');
-        if (-not $userPath) { $userPath = '' };
-        $normalized = $goBin.TrimEnd('\');
-        $found = $false;
-        foreach ($part in ($userPath -split ';')) {
-          if ($part -and $part.TrimEnd('\').Equals($normalized, [StringComparison]::OrdinalIgnoreCase)) {
-            $found = $true; break
+        "{{.WINGET_LOAD}}; go install '{{.GO_PKG}}'; exit \$LASTEXITCODE"
+      # \$ so Task's POSIX shell leaves literal $ for PowerShell.
+      - >-
+        powershell -NoProfile -ExecutionPolicy Bypass -Command
+        "{{.WINGET_LOAD}}; \$ErrorActionPreference = 'Stop';
+        \$goBin = Join-Path ((go env GOPATH).Trim()) 'bin';
+        \$userPath = [Environment]::GetEnvironmentVariable('Path', 'User');
+        if (-not \$userPath) { \$userPath = '' };
+        \$normalized = \$goBin.TrimEnd('\');
+        \$found = \$false;
+        foreach (\$part in (\$userPath -split ';')) {
+          if (\$part -and \$part.TrimEnd('\').Equals(\$normalized, [StringComparison]::OrdinalIgnoreCase)) {
+            \$found = \$true; break
           }
         };
-        if (-not $found) {
-          $newPath = if ($userPath) { ($goBin + ';' + $userPath) } else { $goBin };
-          [Environment]::SetEnvironmentVariable('Path', $newPath, 'User')
+        if (-not \$found) {
+          \$newPath = if (\$userPath) { (\$goBin + ';' + \$userPath) } else { \$goBin };
+          [Environment]::SetEnvironmentVariable('Path', \$newPath, 'User')
         };
-        $env:Path = $goBin + ';' + $env:Path"
+        \$env:Path = \$goBin + ';' + \$env:Path"
 
   version:
     run: once
@@ -161,7 +188,10 @@ tasks:
           bash -lc '{{.NIX_LOAD}}; go test -v
           {{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}./...{{end}}'
         platforms: [linux, darwin]
-      - cmd: go test -v {{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}./...{{end}}
+      - cmd: >-
+          powershell -NoProfile -ExecutionPolicy Bypass -Command
+          "{{.WINGET_LOAD}}; {{.GO_LOAD}}; go test -v {{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}./...{{end}};
+          exit \$LASTEXITCODE"
         platforms: [windows]
 
   bench:
@@ -180,7 +210,11 @@ tasks:
           bash -lc '{{.NIX_LOAD}}; go test -run "^$" -bench . -benchmem
           {{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}./...{{end}}'
         platforms: [linux, darwin]
-      - cmd: go test -run '^$' -bench . -benchmem {{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}./...{{end}}
+      - cmd: >-
+          powershell -NoProfile -ExecutionPolicy Bypass -Command
+          "{{.WINGET_LOAD}}; {{.GO_LOAD}}; go test -run '^\$' -bench . -benchmem
+          {{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}./...{{end}};
+          exit \$LASTEXITCODE"
         platforms: [windows]
 
   fuzz:
@@ -201,7 +235,11 @@ tasks:
           bash -lc '{{.NIX_LOAD}}; go test -run "^$" -fuzztime "{{.GO_FUZZ_TIME}}"
           {{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}-fuzz . .{{end}}'
         platforms: [linux, darwin]
-      - cmd: go test -run '^$' -fuzztime '{{.GO_FUZZ_TIME}}' {{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}-fuzz . .{{end}}
+      - cmd: >-
+          powershell -NoProfile -ExecutionPolicy Bypass -Command
+          "{{.WINGET_LOAD}}; {{.GO_LOAD}}; go test -run '^\$' -fuzztime '{{.GO_FUZZ_TIME}}'
+          {{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}-fuzz . .{{end}};
+          exit \$LASTEXITCODE"
         platforms: [windows]
 
   _which:unix:
@@ -221,11 +259,15 @@ tasks:
     platforms: [windows]
     preconditions:
       - sh: >-
-          powershell -NoProfile -ExecutionPolicy Bypass -Command "if (Get-Command go -ErrorAction SilentlyContinue) {
+          powershell -NoProfile -ExecutionPolicy Bypass -Command
+          "{{.WINGET_LOAD}}; {{.GO_LOAD}};
+          if (Get-Command go -ErrorAction SilentlyContinue) {
           exit 0 } else { exit 1 }"
         msg: Go is not installed or not available in PATH.
     cmds:
-      - powershell -NoProfile -ExecutionPolicy Bypass -Command "(Get-Command go).Source"
+      - >-
+        powershell -NoProfile -ExecutionPolicy Bypass -Command
+        "{{.WINGET_LOAD}}; {{.GO_LOAD}}; (Get-Command go).Source"
 
   _verify:unix:
     run: once
@@ -244,12 +286,15 @@ tasks:
     platforms: [windows]
     preconditions:
       - sh: >-
-          powershell -NoProfile -ExecutionPolicy Bypass -Command "if (Get-Command go -ErrorAction SilentlyContinue) {
+          powershell -NoProfile -ExecutionPolicy Bypass -Command
+          "{{.WINGET_LOAD}}; {{.GO_LOAD}};
+          if (Get-Command go -ErrorAction SilentlyContinue) {
           exit 0 } else { exit 1 }"
         msg: Go is not installed or not available in PATH.
     cmds:
-      - go version
-      - go env GOROOT GOPATH
+      - >-
+        powershell -NoProfile -ExecutionPolicy Bypass -Command
+        "{{.WINGET_LOAD}}; {{.GO_LOAD}}; go version; go env GOROOT GOPATH; exit \$LASTEXITCODE"
 
   _version:unix:
     run: once
@@ -268,8 +313,12 @@ tasks:
     platforms: [windows]
     preconditions:
       - sh: >-
-          powershell -NoProfile -ExecutionPolicy Bypass -Command "if (Get-Command go -ErrorAction SilentlyContinue) {
+          powershell -NoProfile -ExecutionPolicy Bypass -Command
+          "{{.WINGET_LOAD}}; {{.GO_LOAD}};
+          if (Get-Command go -ErrorAction SilentlyContinue) {
           exit 0 } else { exit 1 }"
         msg: Go is not installed or not available in PATH.
     cmds:
-      - go version
+      - >-
+        powershell -NoProfile -ExecutionPolicy Bypass -Command
+        "{{.WINGET_LOAD}}; {{.GO_LOAD}}; go version; exit \$LASTEXITCODE"

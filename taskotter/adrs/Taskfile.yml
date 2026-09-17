@@ -88,7 +88,9 @@ tasks:
         platforms: [linux, darwin]
       - cmd: >-
           powershell -NoProfile -ExecutionPolicy Bypass -Command
-          "adrs init {{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}{{.ADRS_EXTRA_ARGS}}{{end}}"
+          "{{.WINGET_LOAD}}; {{.CARGO_LOAD}};
+          adrs init {{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}{{.ADRS_EXTRA_ARGS}}{{end}};
+          exit \$LASTEXITCODE"
         platforms: [windows]
 
   new:
@@ -108,7 +110,9 @@ tasks:
         platforms: [linux, darwin]
       - cmd: >-
           powershell -NoProfile -ExecutionPolicy Bypass -Command
-          "adrs new {{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}{{.ADRS_EXTRA_ARGS}}{{end}}"
+          "{{.WINGET_LOAD}}; {{.CARGO_LOAD}};
+          adrs new {{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}{{.ADRS_EXTRA_ARGS}}{{end}};
+          exit \$LASTEXITCODE"
         platforms: [windows]
 
   list:
@@ -129,7 +133,9 @@ tasks:
         platforms: [linux, darwin]
       - cmd: >-
           powershell -NoProfile -ExecutionPolicy Bypass -Command
-          "adrs list {{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}{{.ADRS_EXTRA_ARGS}}{{end}}"
+          "{{.WINGET_LOAD}}; {{.CARGO_LOAD}};
+          adrs list {{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}{{.ADRS_EXTRA_ARGS}}{{end}};
+          exit \$LASTEXITCODE"
         platforms: [windows]
 
   generate:
@@ -150,7 +156,9 @@ tasks:
         platforms: [linux, darwin]
       - cmd: >-
           powershell -NoProfile -ExecutionPolicy Bypass -Command
-          "adrs generate {{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}{{.ADRS_EXTRA_ARGS}}{{end}}"
+          "{{.WINGET_LOAD}}; {{.CARGO_LOAD}};
+          adrs generate {{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}{{.ADRS_EXTRA_ARGS}}{{end}};
+          exit \$LASTEXITCODE"
         platforms: [windows]
 
   exec:
@@ -170,7 +178,9 @@ tasks:
         platforms: [linux, darwin]
       - cmd: >-
           powershell -NoProfile -ExecutionPolicy Bypass -Command
-          "adrs {{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}{{.ADRS_EXTRA_ARGS}}{{end}}"
+          "{{.WINGET_LOAD}}; {{.CARGO_LOAD}};
+          adrs {{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}{{.ADRS_EXTRA_ARGS}}{{end}};
+          exit \$LASTEXITCODE"
         platforms: [windows]
 
   _version:unix:
@@ -191,8 +201,11 @@ tasks:
     preconditions:
       - sh: >-
           powershell -NoProfile -ExecutionPolicy Bypass -Command
-          "if (Get-Command adrs -ErrorAction SilentlyContinue) {
+          "{{.WINGET_LOAD}}; {{.CARGO_LOAD}};
+          if (Get-Command adrs -ErrorAction SilentlyContinue) {
           exit 0 } else { exit 1 }"
         msg: adrs is not installed or not available in PATH.
     cmds:
-      - adrs --version
+      - >-
+        powershell -NoProfile -ExecutionPolicy Bypass -Command
+        "{{.WINGET_LOAD}}; {{.CARGO_LOAD}}; adrs --version; exit \$LASTEXITCODE"

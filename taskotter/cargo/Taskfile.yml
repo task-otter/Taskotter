@@ -21,6 +21,16 @@ vars:
 
   CARGO_NIX_INSTALLABLE: '{{.CARGO_NIX_INSTALLABLE | default "nixpkgs#cargo"}}'
   CARGO_WINGET_INSTALLABLE: '{{.CARGO_WINGET_INSTALLABLE | default "Rustlang.Rustup"}}'
+  # \$ so Task's POSIX shell (mvdan/sh) leaves literal $ for PowerShell.
+  # Reload User Path and prepend %USERPROFILE%\.cargo\bin so cargo and
+  # cargo-installed crates from earlier in this Task process are visible.
+  CARGO_LOAD: >-
+    {{.CARGO_LOAD | default `
+    \$u = [Environment]::GetEnvironmentVariable('Path', 'User');
+    if (\$u) { \$env:Path = \$u + ';' + \$env:Path };
+    \$cargoBin = Join-Path \$env:USERPROFILE '.cargo\bin';
+    if (Test-Path -LiteralPath \$cargoBin) { \$env:Path = \$cargoBin + ';' + \$env:Path }
+    `}}
 
   RUST_TOOLCHAIN: '{{.RUST_TOOLCHAIN | default ""}}'
 
@@ -79,12 +89,13 @@ tasks:
       - task: _version:windows
 
   install:crate:
-    run: once
     desc: Install a crate with cargo install (CARGO_CRATE=name)
     summary: |
       Run cargo install CARGO_CRATE to install a binary crate from crates.io
       or another source. Pass CARGO_EXTRA_ARGS for cargo flags such as --git,
       --locked, or --force. Auto-installs the Rust toolchain if missing.
+      Must not use run: once: each caller passes a different CARGO_CRATE, and
+      skipping the second call leaves that crate uninstalled.
     deps:
       - task: install
     requires:
@@ -272,7 +283,7 @@ tasks:
     cmds:
       - >-
         powershell -NoProfile -ExecutionPolicy Bypass -Command
-        "(Get-Command cargo).Source"
+        "{{.WINGET_LOAD}}; {{.CARGO_LOAD}}; (Get-Command cargo).Source"
 
   _verify:unix:
     run: once
@@ -288,10 +299,10 @@ tasks:
     cmds:
       - >-
         powershell -NoProfile -ExecutionPolicy Bypass -Command
-        "cargo --version; rustc --version"
+        "{{.WINGET_LOAD}}; {{.CARGO_LOAD}};
+        cargo --version; rustc --version; exit \$LASTEXITCODE"
 
   _cargo:unix:
-    run: once
     internal: true
     platforms: [linux, darwin]
     dir: "{{.USER_WORKING_DIR}}"
@@ -302,18 +313,18 @@ tasks:
           {{.CARGO_EXTRA_ARGS}}'
 
   _cargo:windows:
-    run: once
     internal: true
     platforms: [windows]
     dir: "{{.USER_WORKING_DIR}}"
     cmds:
       - >-
         powershell -NoProfile -ExecutionPolicy Bypass -Command
-        "$c = (Get-Command cargo -ErrorAction SilentlyContinue).Source;
-        if (-not $c) { $c = Join-Path $env:USERPROFILE '.cargo\bin\cargo.exe' };
-        & $c {{if .RUST_TOOLCHAIN}}+{{.RUST_TOOLCHAIN}} {{end}}{{.CARGO_SUBCMD}}
+        "{{.WINGET_LOAD}}; {{.CARGO_LOAD}};
+        \$c = (Get-Command cargo -ErrorAction SilentlyContinue).Source;
+        if (-not \$c) { \$c = Join-Path \$env:USERPROFILE '.cargo\bin\cargo.exe' };
+        & \$c {{if .RUST_TOOLCHAIN}}+{{.RUST_TOOLCHAIN}} {{end}}{{.CARGO_SUBCMD}}
           {{.CARGO_EXTRA_ARGS}};
-        exit $LASTEXITCODE"
+        exit \$LASTEXITCODE"
 
   _version:unix:
     run: once
@@ -332,8 +343,12 @@ tasks:
     platforms: [windows]
     preconditions:
       - sh: >-
-          powershell -NoProfile -ExecutionPolicy Bypass -Command "if (Get-Command cargo -ErrorAction SilentlyContinue) {
+          powershell -NoProfile -ExecutionPolicy Bypass -Command
+          "{{.WINGET_LOAD}}; {{.CARGO_LOAD}};
+          if (Get-Command cargo -ErrorAction SilentlyContinue) {
           exit 0 } else { exit 1 }"
         msg: Cargo is not installed or not available in PATH.
     cmds:
-      - cargo --version
+      - >-
+        powershell -NoProfile -ExecutionPolicy Bypass -Command
+        "{{.WINGET_LOAD}}; {{.CARGO_LOAD}}; cargo --version; exit \$LASTEXITCODE"

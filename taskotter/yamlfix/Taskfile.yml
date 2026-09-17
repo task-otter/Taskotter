@@ -96,8 +96,11 @@ tasks:
     preconditions:
       - sh: >-
           powershell -NoProfile -ExecutionPolicy Bypass -Command
-          "if (Get-Command yamlfix -ErrorAction SilentlyContinue) {
+          "{{.WINGET_LOAD}}; {{.UV_LOAD}};
+          if (Get-Command yamlfix -ErrorAction SilentlyContinue) {
           exit 0 } else { exit 1 }"
         msg: yamlfix is not installed or not available in PATH.
     cmds:
-      - yamlfix --version
+      - >-
+        powershell -NoProfile -ExecutionPolicy Bypass -Command
+        "{{.WINGET_LOAD}}; {{.UV_LOAD}}; yamlfix --version; exit \$LASTEXITCODE"

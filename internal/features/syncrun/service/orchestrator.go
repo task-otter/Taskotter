@@ -310,7 +310,6 @@ func buildPlanResult(deps *Deps, inp *buildPlanInput, ref *refInfo) (planResult,
 	return planResult{syncInput: syncInput, plan: plan, result: result}, nil
 }
 
-//nolint:gocritic // single-line sig for whitespace
 func buildSyncPlan(deps *Deps, inp *buildPlanInput) (*syncIn, *syncPlan, error) {
 	syncInput, err := deps.PrepareSyncInput(&syncsvc.PrepareSyncInputArgs{
 		Cfg:         inp.cfg,
@@ -543,7 +542,6 @@ func execPipeline(ctx context.Context, deps *Deps, cfg *config.Config) (*Result,
 	return result, nil
 }
 
-//nolint:gocritic // single-line sig for whitespace
 func getStore(ctx context.Context, deps *Deps, in *fetchIn) (*refInfo, *snapInfo, error) {
 	ref, err := storeRef(ctx, deps, in.cfg)
 	if err != nil {
@@ -824,7 +822,6 @@ func resolveTransitiveDeps(deps *Deps, res []resItem, snap *snapInfo) ([]string,
 	return resolved, nil
 }
 
-//nolint:gocritic // single-line sig for whitespace
 func modDeps(deps *Deps, cfg *config.Config, snap *snapInfo) ([]resItem, []string, error) {
 	resolutions, err := resolveReqMods(deps, cfg, snap)
 	if err != nil {
@@ -839,7 +836,6 @@ func modDeps(deps *Deps, cfg *config.Config, snap *snapInfo) ([]resItem, []strin
 	return resolutions, depSources, nil
 }
 
-//nolint:nestif // create vs update PR paths require branching on existing PR
 func resolveOrCreatePR(ctx context.Context, deps *Deps, input *prResolveInput) error {
 	if input.existing == nil {
 		err := createResolvedPR(ctx, deps, input)

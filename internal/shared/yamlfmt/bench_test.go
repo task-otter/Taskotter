@@ -13,7 +13,7 @@ const (
 	benchmarkMediumSize  = 100
 	benchmarkLargeSize   = 1000
 	benchmarkFirstIndex  = 0
-	benchmarkEmptyLength = 0 //nolint:goconst // benchmark sentinel is local to this benchmark
+	benchmarkEmptyLength = 0
 )
 
 // BenchmarkMarshal measures YAML marshaling.
@@ -28,7 +28,6 @@ func BenchmarkMarshal(b *testing.B) {
 	}
 }
 
-//nolint:funlen // benchmark setup and measurement are clearer together
 func runMarshalBenchmark(b *testing.B, size int) {
 	b.Helper()
 

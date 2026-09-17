@@ -272,7 +272,6 @@ func loadFirstCandidate(workspace string, candidates []string) (*domain.Metadata
 
 func previousMetadataCandidate(args *metadataCandidateArgs) (string, metadataScanResult, error) {
 	if args.entry.IsDir() {
-		//nolint:wrapcheck // must return filepath.SkipDir sentinel unwrapped
 		return handleDirEntry(args.entry)
 	}
 

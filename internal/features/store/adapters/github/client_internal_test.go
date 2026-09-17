@@ -130,7 +130,6 @@ func TestDoGetReportsInvalidURL(t *testing.T) {
 
 	client := NewClientWithHTTP(t.Context(), "token", &stubDoer{err: errStub}).WithBaseURL("://bad")
 
-	//nolint:bodyclose // the request is never sent, so there is no body
 	resp, err := doGet(t.Context(), client, "\n")
 	iox.Discard(resp)
 	assertFails(t, err)
@@ -192,16 +191,12 @@ func TestSnapshotCleanupReportsRemoveFailure(t *testing.T) {
 }
 
 // TestDrainResponseBodyReportsReadFailure verifies unreadable bodies are reported.
-//
-//nolint:bodyclose // the stub responses are drained by the function under test
 func TestDrainResponseBodyReportsReadFailure(t *testing.T) {
 	t.Parallel()
 	assertFails(t, drainResponseBody(failingResponse()))
 }
 
 // TestDrainArchiveBodyReportsFailures verifies read and close failures are reported.
-//
-//nolint:bodyclose // the stub responses are drained by the function under test
 func TestDrainArchiveBodyReportsFailures(t *testing.T) {
 	t.Parallel()
 
@@ -210,8 +205,6 @@ func TestDrainArchiveBodyReportsFailures(t *testing.T) {
 }
 
 // TestCloseOnArchiveStatusErrorReportsCleanupFailures verifies drain and close failures join.
-//
-//nolint:bodyclose // the stub responses are drained by the function under test
 func TestCloseOnArchiveStatusErrorReportsCleanupFailures(t *testing.T) {
 	t.Parallel()
 
@@ -241,7 +234,6 @@ func (body *stubBody) Read(data []byte) (int, error) {
 		return len(data) * consts.IndexZero, body.readErr
 	}
 
-	//nolint:wrapcheck // the io.Reader contract requires the unwrapped io.EOF sentinel
 	return body.reader.Read(data)
 }
 
@@ -327,7 +319,6 @@ func newRefInfoForTest() *RefInfo {
 }
 
 func newResponse(status int, body io.ReadCloser) *http.Response {
-	//nolint:exhaustruct // only the status and body are read
 	return &http.Response{StatusCode: status, Body: body}
 }
 

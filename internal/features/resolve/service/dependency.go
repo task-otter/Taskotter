@@ -56,7 +56,7 @@ var (
 
 // Resolve implements DepsResolver.
 func (transitiveResolver) Resolve(requested []string, deps map[string][]string) ([]string, error) {
-	return ResolveTransitive(requested, deps) //nolint:wrapcheck // package entrypoint
+	return ResolveTransitive(requested, deps)
 }
 
 // Error implements the error interface, returning the cyclic dependency chain.

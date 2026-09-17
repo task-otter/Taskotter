@@ -636,8 +636,6 @@ func spanForQuoteChoice(
 }
 
 // quoteForYAMLStyle returns the quote byte for quoted scalar styles.
-//
-//nolint:exhaustive // Tagged/Literal/Folded/Flow and plain (0) use unquoted spans
 func quoteForYAMLStyle(style yaml.Style) (quote byte, quoted bool) {
 	switch style {
 	case yaml.DoubleQuotedStyle:
@@ -782,8 +780,6 @@ func replaceByteSpan(params *replaceSpanParams) []byte {
 
 // parseTaskfileRoot unmarshals content into a YAML document node and returns its
 // root mapping node. parseErrMsg and emptyErrMsg format the respective failures.
-//
-//nolint:gocritic // single-line sig for whitespace
 func parseTaskfileRoot(
 	content []byte,
 	parseErr, emptyErr string,

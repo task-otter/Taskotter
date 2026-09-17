@@ -29,7 +29,6 @@ const (
 	errWireOrchFmt = "wire orchestrator: %w"
 )
 
-//nolint:gochecknoglobals // seams so tests can drive main without exiting the test process
 var (
 	exitFunc           = os.Exit
 	stdout   io.Writer = os.Stdout

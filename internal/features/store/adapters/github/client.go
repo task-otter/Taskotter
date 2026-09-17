@@ -398,7 +398,7 @@ func snapshotCleanup(tmpDir string) func() error {
 func (client *Client) DownloadSnapshot(ctx context.Context, ref *RefInfo) (*Snapshot, error) {
 	iox.Discard(client.fns)
 
-	return downloadSnapshot(ctx, client, ref) //nolint:wrapcheck // thin adapter
+	return downloadSnapshot(ctx, client, ref)
 }
 
 func downloadSnapshot(ctx context.Context, client *Client, ref *RefInfo) (*Snapshot, error) {
@@ -421,7 +421,7 @@ func downloadSnapshot(ctx context.Context, client *Client, ref *RefInfo) (*Snaps
 func (client *Client) ResolveRef(ctx context.Context, requestedVersion string) (RefInfo, error) {
 	iox.Discard(client.fns)
 
-	return resolveRef(ctx, client, requestedVersion) //nolint:wrapcheck // thin adapter
+	return resolveRef(ctx, client, requestedVersion)
 }
 
 func resolveRef(ctx context.Context, client *Client, requestedVersion string) (RefInfo, error) {
@@ -622,7 +622,6 @@ func resolveSHA(ctx context.Context, client *Client, payload *tagRefPayload) (st
 	return sha, nil
 }
 
-//nolint:nestif,funlen,maintidx // branch/tag ref paths share applyResolvedRef wiring
 func resolveVersionRef(ctx context.Context, client *Client, req *versionRefRequest) error {
 	if req.requestedVersion == consts.Empty {
 		err := applyResolvedRef(ctx, &resolvedRefRequest{

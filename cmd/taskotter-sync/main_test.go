@@ -37,8 +37,6 @@ const (
 var errStubRun = errors.New("stub run failure")
 
 // TestMainExitsWithErrorWhenConfigMissing verifies main reports a failure exit code.
-//
-//nolint:paralleltest // swaps package-level seams and environment variables
 func TestMainExitsWithErrorWhenConfigMissing(t *testing.T) {
 	code := exitError * consts.IndexZero
 
@@ -54,8 +52,6 @@ func TestMainExitsWithErrorWhenConfigMissing(t *testing.T) {
 }
 
 // TestRunReportsConfigFailure verifies a missing configuration exits with an error code.
-//
-//nolint:paralleltest // swaps package-level seams and environment variables
 func TestRunReportsConfigFailure(t *testing.T) {
 	captureStreams(t)
 	clearActionEnv(t)
@@ -80,8 +76,6 @@ func TestRunOrchestratorReportsWireFailure(t *testing.T) {
 }
 
 // TestRunOrchestratorReportsRunFailure verifies orchestrator run failures are wrapped.
-//
-//nolint:paralleltest // swaps the package-level wireOrchestrator seam
 func TestRunOrchestratorReportsRunFailure(t *testing.T) {
 	swapOrchestrator(t, &stubOrchestrator{result: nil, err: errStubRun})
 
@@ -94,8 +88,6 @@ func TestRunOrchestratorReportsRunFailure(t *testing.T) {
 }
 
 // TestLoadRunAndWriteReportsOutputFailure verifies an unwritable output path is reported.
-//
-//nolint:paralleltest // swaps package-level seams and environment variables
 func TestLoadRunAndWriteReportsOutputFailure(t *testing.T) {
 	captureStreams(t)
 	setValidActionEnv(t, filepath.Join(t.TempDir(), "missing", outputFileName))
@@ -110,8 +102,6 @@ func TestLoadRunAndWriteReportsOutputFailure(t *testing.T) {
 }
 
 // TestLoadRunAndWriteReportsRunFailure verifies orchestrator failures abort the run.
-//
-//nolint:paralleltest // swaps package-level seams and environment variables
 func TestLoadRunAndWriteReportsRunFailure(t *testing.T) {
 	captureStreams(t)
 	setValidActionEnv(t, filepath.Join(t.TempDir(), outputFileName))
@@ -140,8 +130,6 @@ func TestDefaultWireRunBuildsRunFunc(t *testing.T) {
 }
 
 // TestRunSucceedsWithStubbedOrchestrator verifies a clean run exits successfully.
-//
-//nolint:paralleltest // swaps package-level seams and environment variables
 func TestRunSucceedsWithStubbedOrchestrator(t *testing.T) {
 	captureStreams(t)
 	setValidActionEnv(t, filepath.Join(t.TempDir(), outputFileName))
@@ -155,8 +143,6 @@ func TestRunSucceedsWithStubbedOrchestrator(t *testing.T) {
 }
 
 // TestReportResultChangedWithoutFailOnChanges verifies a changed run succeeds by default.
-//
-//nolint:paralleltest // swaps the package-level stdout seam
 func TestReportResultChangedWithoutFailOnChanges(t *testing.T) {
 	captureStreams(t)
 
@@ -168,8 +154,6 @@ func TestReportResultChangedWithoutFailOnChanges(t *testing.T) {
 }
 
 // TestReportResultChangedWithFailOnChanges verifies fail-on-changes turns changes into failures.
-//
-//nolint:paralleltest // swaps the package-level stdout seam
 func TestReportResultChangedWithFailOnChanges(t *testing.T) {
 	captureStreams(t)
 
@@ -181,8 +165,6 @@ func TestReportResultChangedWithFailOnChanges(t *testing.T) {
 }
 
 // TestReportResultUnchangedWithFailOnChanges verifies an up-to-date run still succeeds.
-//
-//nolint:paralleltest // swaps the package-level stdout seam
 func TestReportResultUnchangedWithFailOnChanges(t *testing.T) {
 	captureStreams(t)
 
@@ -194,8 +176,6 @@ func TestReportResultUnchangedWithFailOnChanges(t *testing.T) {
 }
 
 // TestReportResultReportsWriteFailures verifies stdout failures become error exit codes.
-//
-//nolint:paralleltest // swaps the package-level stdout seam
 func TestReportResultReportsWriteFailures(t *testing.T) {
 	swapStdout(t, &faults.StubWriter{Count: consts.IndexZero, Err: faults.ErrFault})
 
@@ -209,8 +189,6 @@ func TestReportResultReportsWriteFailures(t *testing.T) {
 }
 
 // TestReportErrorWritesAnnotation verifies the error annotation reaches stderr.
-//
-//nolint:paralleltest // swaps the package-level stderr seam
 func TestReportErrorWritesAnnotation(t *testing.T) {
 	var buf bytes.Buffer
 
@@ -228,7 +206,6 @@ func (stub *stubOrchestrator) Run(
 ) (*syncrun.Result, error) {
 	iox.Discard2(ctx, cfg)
 
-	//nolint:nilnil // the stub mirrors whatever the test configured
 	return stub.result, stub.err
 }
 
@@ -321,7 +298,6 @@ func swapStdout(t *testing.T, writer io.Writer) {
 }
 
 func unchangedResult() *syncrun.Result {
-	//nolint:exhaustruct // only these fields are reported
 	return &syncrun.Result{
 		Changed:   false,
 		SourceSHA: sourceSHAHex,

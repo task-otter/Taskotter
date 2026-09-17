@@ -307,7 +307,6 @@ type (
 	}
 )
 
-//nolint:goconst // distinct typed enums intentionally reuse 0/1/2
 const (
 	fileUnchanged fileChangeKind = 0
 
@@ -342,7 +341,6 @@ const (
 	metadataIsCandidate = 1
 )
 
-//nolint:decorder,grouper // yamlStagedKind uses a dedicated iota block separate from typed enums above
 const (
 	yamlStagedSkip yamlStagedKind = iota
 

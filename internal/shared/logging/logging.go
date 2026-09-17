@@ -62,7 +62,6 @@ func (logger *Logger) Err() error {
 		return nil
 	}
 
-	//nolint:wrapcheck // write path already wraps; preserve stable error identity for callers
 	return logger.err()
 }
 

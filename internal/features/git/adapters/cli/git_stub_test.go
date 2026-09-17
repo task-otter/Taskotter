@@ -62,8 +62,6 @@ esac
 )
 
 // TestCommandsSucceedWithStubbedGit verifies the success paths of the mutating commands.
-//
-//nolint:paralleltest // swaps the package-level gitBinary seam
 func TestCommandsSucceedWithStubbedGit(t *testing.T) {
 	client := stubbedClient(t, stubOK)
 	ctx := t.Context()
@@ -74,22 +72,16 @@ func TestCommandsSucceedWithStubbedGit(t *testing.T) {
 }
 
 // TestDefaultBranchUsesAbbrevRef verifies the abbrev-ref fallback resolves the branch.
-//
-//nolint:paralleltest // swaps the package-level gitBinary seam
 func TestDefaultBranchUsesAbbrevRef(t *testing.T) {
 	assertDefaultBranch(t, stubAbbrev, mainBranch)
 }
 
 // TestDefaultBranchUsesRemoteShow verifies the remote show fallback resolves the branch.
-//
-//nolint:paralleltest // swaps the package-level gitBinary seam
 func TestDefaultBranchUsesRemoteShow(t *testing.T) {
 	assertDefaultBranch(t, stubShowOK, mainBranch)
 }
 
 // TestDefaultBranchReportsMissingHeadLine verifies remote show without a HEAD line fails.
-//
-//nolint:paralleltest // swaps the package-level gitBinary seam
 func TestDefaultBranchReportsMissingHeadLine(t *testing.T) {
 	client := stubbedClient(t, stubShowBad)
 
@@ -102,15 +94,11 @@ func TestDefaultBranchReportsMissingHeadLine(t *testing.T) {
 }
 
 // TestOriginHeadCommitReportsRefListFailure verifies a failing ref listing is reported.
-//
-//nolint:paralleltest // swaps the package-level gitBinary seam
 func TestOriginHeadCommitReportsRefListFailure(t *testing.T) {
 	assertOriginHeadCommitFails(t, stubBadRefs)
 }
 
 // TestOriginHeadCommitReportsMissingBranch verifies origin HEAD without a branch is reported.
-//
-//nolint:paralleltest // swaps the package-level gitBinary seam
 func TestOriginHeadCommitReportsMissingBranch(t *testing.T) {
 	assertOriginHeadCommitFails(t, stubNoRefs)
 }

@@ -19,8 +19,6 @@ func jsEnv(dir, jsValue string) map[string]string {
 }
 
 // TestParseJSNodeJSDefaults verifies nodejs runtime defaults to the npm package manager.
-//
-//nolint:paralleltest // LoadFromEnv uses t.Setenv; cannot run in parallel
 func TestParseJSNodeJSDefaults(t *testing.T) {
 	dir := t.TempDir()
 	cfg := loadEnvOK(t, jsEnv(dir, "runtime: nodejs\n"))
@@ -35,8 +33,6 @@ func TestParseJSNodeJSDefaults(t *testing.T) {
 }
 
 // TestParseJSBun verifies bun runtime sets the bun package manager.
-//
-//nolint:paralleltest // LoadFromEnv uses t.Setenv; cannot run in parallel
 func TestParseJSBun(t *testing.T) {
 	dir := t.TempDir()
 	cfg := loadEnvOK(t, jsEnv(dir, "runtime: bun\n"))
@@ -51,8 +47,6 @@ func TestParseJSBun(t *testing.T) {
 }
 
 // TestParseJSBunRejectsVersionManager verifies the removed version-manager key fails under bun.
-//
-//nolint:paralleltest // LoadFromEnv uses t.Setenv; cannot run in parallel
 func TestParseJSBunRejectsVersionManager(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
@@ -62,8 +56,6 @@ func TestParseJSBunRejectsVersionManager(t *testing.T) {
 }
 
 // TestParseJSBunRejectsPackageManager verifies bun runtime with an explicit package-manager fails.
-//
-//nolint:paralleltest // LoadFromEnv uses t.Setenv; cannot run in parallel
 func TestParseJSBunRejectsPackageManager(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
@@ -73,8 +65,6 @@ func TestParseJSBunRejectsPackageManager(t *testing.T) {
 }
 
 // TestParseJSNodeJSRejectsBunPackageManager verifies nodejs runtime rejects the bun package manager.
-//
-//nolint:paralleltest // LoadFromEnv uses t.Setenv; cannot run in parallel
 func TestParseJSNodeJSRejectsBunPackageManager(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
@@ -84,8 +74,6 @@ func TestParseJSNodeJSRejectsBunPackageManager(t *testing.T) {
 }
 
 // TestParseJSEmpty verifies an empty js input leaves runtime and package manager unset.
-//
-//nolint:paralleltest // LoadFromEnv uses t.Setenv; cannot run in parallel
 func TestParseJSEmpty(t *testing.T) {
 	dir := t.TempDir()
 	setEnv(t, baseEnv(dir))
@@ -105,8 +93,6 @@ func TestParseJSEmpty(t *testing.T) {
 }
 
 // TestParseJSDefaultsRuntimeToNodeJS verifies the runtime defaults to nodejs when unset.
-//
-//nolint:paralleltest // LoadFromEnv uses t.Setenv; cannot run in parallel
 func TestParseJSDefaultsRuntimeToNodeJS(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
@@ -125,8 +111,6 @@ func TestParseJSDefaultsRuntimeToNodeJS(t *testing.T) {
 }
 
 // TestParseJSRejectsInvalidYAML verifies malformed js YAML input is rejected.
-//
-//nolint:paralleltest // LoadFromEnv uses t.Setenv; cannot run in parallel
 func TestParseJSRejectsInvalidYAML(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
@@ -136,8 +120,6 @@ func TestParseJSRejectsInvalidYAML(t *testing.T) {
 }
 
 // TestParseJSRejectsInvalidRuntime verifies an unrecognized runtime value is rejected.
-//
-//nolint:paralleltest // LoadFromEnv uses t.Setenv; cannot run in parallel
 func TestParseJSRejectsInvalidRuntime(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
@@ -148,8 +130,6 @@ func TestParseJSRejectsInvalidRuntime(t *testing.T) {
 
 // TestParseJSRejectsVersionManager verifies the removed version-manager key is rejected outright,
 // including values that were valid before the store dropped its fnm and nvm variants.
-//
-//nolint:paralleltest // LoadFromEnv uses t.Setenv; cannot run in parallel
 func TestParseJSRejectsVersionManager(t *testing.T) {
 	removed := []string{"fnm", "nvm", "volta"}
 

@@ -99,7 +99,6 @@ func closeBenchmarkArchive(b *testing.B, tarWriter *tar.Writer, gzipWriter *gzip
 	}
 }
 
-//nolint:funlen,maintidx,revive // archive entry setup is one benchmark operation
 func writeBenchmarkArchiveEntry(b *testing.B, tarWriter *tar.Writer, index int) {
 	b.Helper()
 

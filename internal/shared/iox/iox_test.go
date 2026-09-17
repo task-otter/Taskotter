@@ -220,7 +220,7 @@ func assertFormatWrite(
 func assertOutputsFile(t *testing.T, path string) {
 	t.Helper()
 
-	data, err := os.ReadFile(path) //nolint:gosec // path is a file this test just created
+	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf(unexpectFmt, "read outputs", err)
 	}

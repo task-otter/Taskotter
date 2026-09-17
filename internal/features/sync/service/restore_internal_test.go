@@ -1,7 +1,6 @@
 // Taskotter 2026.
 // SPDX-License-Identifier: Apache-2.0.
 
-//nolint:exhaustruct // test fixtures only set fields exercised by the unit
 package service
 
 import (
@@ -15,8 +14,6 @@ import (
 )
 
 // TestLockContentChangedReportsNewMarshalFailure verifies new-lock marshal failures.
-//
-//nolint:paralleltest // swaps the package-level marshalYAML seam
 func TestLockContentChangedReportsNewMarshalFailure(t *testing.T) {
 	calls := consts.IndexZero
 
@@ -78,8 +75,6 @@ func TestDiffMetadataFileSectionReportsFailure(t *testing.T) {
 }
 
 // TestCommitTempFileReportsWriteFailure verifies writeAndFinalizeTemp failures.
-//
-//nolint:paralleltest // swaps the package-level writeFull seam
 func TestCommitTempFileReportsWriteFailure(t *testing.T) {
 	swapWriteFull(t, failingWriteFull)
 
@@ -123,8 +118,6 @@ func TestDiscoverPreviousMetadataReportsLoadFailure(t *testing.T) {
 }
 
 // TestProcessMetadataCandidateReportsUnexpectedFailure verifies non-SkipDir errors.
-//
-//nolint:paralleltest // swaps the package-level relPath seam
 func TestProcessMetadataCandidateReportsUnexpectedFailure(t *testing.T) {
 	swapRelPath(t, failingRelPath)
 
@@ -137,16 +130,12 @@ func TestProcessMetadataCandidateReportsUnexpectedFailure(t *testing.T) {
 }
 
 // TestMetadataCandidateReportsRelFailure verifies Rel failures for both candidates.
-//
-//nolint:paralleltest // swaps the package-level relPath seam
 func TestMetadataCandidateReportsRelFailure(t *testing.T) {
 	assertCandidateRelFails(t, previousMetadataCandidate)
 	assertCandidateRelFails(t, metadataFileCandidate)
 }
 
 // TestCollectModuleFileReportsRelFailure verifies Rel failures during collection.
-//
-//nolint:paralleltest // swaps the package-level relPath seam
 func TestCollectModuleFileReportsRelFailure(t *testing.T) {
 	swapRelPath(t, failingRelPath)
 
@@ -161,8 +150,6 @@ func TestCollectModuleFileReportsRelFailure(t *testing.T) {
 }
 
 // TestMergeParentDocFilesReportsReadyFailure verifies ready-check failures.
-//
-//nolint:paralleltest // swaps the package-level statPath seam
 func TestMergeParentDocFilesReportsReadyFailure(t *testing.T) {
 	swapStatPath(t, failingStat)
 
@@ -195,8 +182,6 @@ func TestIsDestinationManagedMissesOtherModule(t *testing.T) {
 }
 
 // TestLoadOneStoreMetadataFileReportsRelFailure verifies module-name Rel failures.
-//
-//nolint:paralleltest // swaps the package-level relPath seam
 func TestLoadOneStoreMetadataFileReportsRelFailure(t *testing.T) {
 	swapRelPath(t, failingRelPath)
 

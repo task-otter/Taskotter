@@ -1,7 +1,6 @@
 // Taskotter 2026.
 // SPDX-License-Identifier: Apache-2.0.
 
-//nolint:exhaustruct // test fixtures only set fields exercised by the unit
 package service
 
 import (
@@ -24,8 +23,6 @@ type (
 )
 
 // TestCollectMetadataCandidatesReportsWalkFailure verifies walk failures surface.
-//
-//nolint:paralleltest // swaps the package-level walkDir seam
 func TestCollectMetadataCandidatesReportsWalkFailure(t *testing.T) {
 	swapWalkDir(t, failingWalk)
 
@@ -136,8 +133,6 @@ func TestProcessMetadataCandidatePropagatesSkipDir(t *testing.T) {
 }
 
 // TestRelMetadataPathReportsFailure verifies Rel failures surface.
-//
-//nolint:paralleltest // swaps the package-level relPath seam
 func TestRelMetadataPathReportsFailure(t *testing.T) {
 	swapRelPath(t, failingRelPath)
 
@@ -158,7 +153,6 @@ func TestTryLegacyMetadataSkipsWhenAlreadyLegacy(t *testing.T) {
 	}
 }
 
-//nolint:ireturn // interface required by stdlib signature
 func (fakeDirEntry) Info() (os.FileInfo, error) { return nil, errStub }
 func (entry fakeDirEntry) IsDir() bool          { return entry.dir }
 func (entry fakeDirEntry) Name() string         { return entry.name }

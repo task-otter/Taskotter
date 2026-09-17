@@ -83,7 +83,6 @@ func applyPlanWithCleanup(plan *domain.Plan, syncInput *domain.SyncInput) (err e
 	return nil
 }
 
-//nolint:gocritic // named result requires error pointer for defer cleanup
 func cleanupStagingOnExit(stagingRoot string, err *error) {
 	cleanupErr := cleanupStagingDir(stagingRoot)
 
@@ -145,7 +144,7 @@ func applyStagedPlan(input *applyStagedInput) error {
 		return fmt.Errorf("validate and write staged files: %w", err)
 	}
 
-	return cleanupAfterApplyPlan(input) //nolint:wrapcheck // thin apply wrapper
+	return cleanupAfterApplyPlan(input)
 }
 
 func cleanupAfterApplyPlan(input *applyStagedInput) error {

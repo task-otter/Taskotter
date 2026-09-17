@@ -70,8 +70,6 @@ func targetFolderCases() []targetFolderCase {
 }
 
 // TestBunWithVersionManagerRejected verifies the removed version-manager key fails validation.
-//
-//nolint:paralleltest // LoadFromEnv uses t.Setenv; cannot run in parallel
 func TestBunWithVersionManagerRejected(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
@@ -82,8 +80,6 @@ func TestBunWithVersionManagerRejected(t *testing.T) {
 }
 
 // TestFailOnChangesDefaultsFalse verifies fail-on-changes defaults to false when unset.
-//
-//nolint:paralleltest // LoadFromEnv uses t.Setenv; cannot run in parallel
 func TestFailOnChangesDefaultsFalse(t *testing.T) {
 	dir := t.TempDir()
 	setEnv(t, baseEnv(dir))
@@ -99,8 +95,6 @@ func TestFailOnChangesDefaultsFalse(t *testing.T) {
 }
 
 // TestFailOnChangesTrue verifies fail-on-changes is set to true when the input is "true".
-//
-//nolint:paralleltest // LoadFromEnv uses t.Setenv; cannot run in parallel
 func TestFailOnChangesTrue(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
@@ -119,8 +113,6 @@ func TestFailOnChangesTrue(t *testing.T) {
 }
 
 // TestInvalidFailOnChanges verifies a non-boolean fail-on-changes input is rejected.
-//
-//nolint:paralleltest // LoadFromEnv uses t.Setenv; cannot run in parallel
 func TestInvalidFailOnChanges(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
@@ -130,8 +122,6 @@ func TestInvalidFailOnChanges(t *testing.T) {
 }
 
 // TestInvalidIncludesDoc verifies a non-boolean includes-doc input is rejected.
-//
-//nolint:paralleltest // LoadFromEnv uses t.Setenv; cannot run in parallel
 func TestInvalidIncludesDoc(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
@@ -141,8 +131,6 @@ func TestInvalidIncludesDoc(t *testing.T) {
 }
 
 // TestInvalidPackageManager verifies an unrecognized package manager is rejected.
-//
-//nolint:paralleltest // LoadFromEnv uses t.Setenv; cannot run in parallel
 func TestInvalidPackageManager(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
@@ -152,8 +140,6 @@ func TestInvalidPackageManager(t *testing.T) {
 }
 
 // TestInvalidSyncRoot verifies a non-boolean sync-root input is rejected.
-//
-//nolint:paralleltest // LoadFromEnv uses t.Setenv; cannot run in parallel
 func TestInvalidSyncRoot(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
@@ -163,8 +149,6 @@ func TestInvalidSyncRoot(t *testing.T) {
 }
 
 // TestInvalidTaskName verifies an unsafe task name is rejected.
-//
-//nolint:paralleltest // LoadFromEnv uses t.Setenv; cannot run in parallel
 func TestInvalidTaskName(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
@@ -174,8 +158,6 @@ func TestInvalidTaskName(t *testing.T) {
 }
 
 // TestLoadFromEnvDefaults verifies default paths, includes-doc, sync-root, and tasks are set.
-//
-//nolint:paralleltest // LoadFromEnv uses t.Setenv; cannot run in parallel
 func TestLoadFromEnvDefaults(t *testing.T) {
 	dir := t.TempDir()
 	cfg := loadEnvOK(t, baseEnv(dir))
@@ -196,8 +178,6 @@ func TestLoadFromEnvDefaults(t *testing.T) {
 }
 
 // TestIncludesDocFlipChangesConfigurationHash verifies flipping includes-doc changes hash and branch.
-//
-//nolint:paralleltest // LoadFromEnv uses t.Setenv; cannot run in parallel
 func TestIncludesDocFlipChangesConfigurationHash(t *testing.T) {
 	dir := t.TempDir()
 	cfgTrue := loadIncludesDocConfig(t, dir, testTrueValue)
@@ -235,8 +215,6 @@ func assertIncludesDocHashFlip(t *testing.T, cfgTrue, cfgFalse *config.Config) {
 }
 
 // TestLoadFromEnvDockerInputEnvNames verifies hyphenated Docker action input env names are read.
-//
-//nolint:paralleltest // LoadFromEnv uses t.Setenv; cannot run in parallel
 func TestLoadFromEnvDockerInputEnvNames(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
@@ -252,8 +230,6 @@ func TestLoadFromEnvDockerInputEnvNames(t *testing.T) {
 }
 
 // TestLoadFromEnvGitHubTokenFallback verifies GITHUB_TOKEN is used when the input token is empty.
-//
-//nolint:paralleltest // LoadFromEnv uses t.Setenv; cannot run in parallel
 func TestLoadFromEnvGitHubTokenFallback(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
@@ -273,8 +249,6 @@ func TestLoadFromEnvGitHubTokenFallback(t *testing.T) {
 }
 
 // TestLoadFromEnvUsesPullRequestTargetAsPRBase verifies a pull request ref uses GITHUB_BASE_REF as the PR base.
-//
-//nolint:paralleltest // LoadFromEnv uses t.Setenv; cannot run in parallel
 func TestLoadFromEnvUsesPullRequestTargetAsPRBase(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
@@ -294,8 +268,6 @@ func TestLoadFromEnvUsesPullRequestTargetAsPRBase(t *testing.T) {
 }
 
 // TestLoadFromEnvUsesTriggerBranchAsPRBase verifies a push ref sets the PR base to the trigger branch.
-//
-//nolint:paralleltest // LoadFromEnv uses t.Setenv; cannot run in parallel
 func TestLoadFromEnvUsesTriggerBranchAsPRBase(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
@@ -314,8 +286,6 @@ func TestLoadFromEnvUsesTriggerBranchAsPRBase(t *testing.T) {
 }
 
 // TestMissingRuntimeInputs verifies missing workspace or token inputs cause an error.
-//
-//nolint:paralleltest // LoadFromEnv uses t.Setenv; cannot run in parallel
 func TestMissingRuntimeInputs(t *testing.T) {
 	dir := t.TempDir()
 
@@ -330,8 +300,6 @@ func TestMissingRuntimeInputs(t *testing.T) {
 }
 
 // TestParseTasksMultilineAndDedupe verifies multiline, comma-separated task input is deduped.
-//
-//nolint:paralleltest // LoadFromEnv uses t.Setenv; cannot run in parallel
 func TestParseTasksMultilineAndDedupe(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
@@ -345,8 +313,6 @@ func TestParseTasksMultilineAndDedupe(t *testing.T) {
 }
 
 // TestRootTaskfileCustomPath verifies a custom root-taskfile input path is honored.
-//
-//nolint:paralleltest // LoadFromEnv uses t.Setenv; cannot run in parallel
 func TestRootTaskfileCustomPath(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
@@ -365,8 +331,6 @@ func TestRootTaskfileCustomPath(t *testing.T) {
 }
 
 // TestRootTaskfileFollowsTargetFolder verifies the default root taskfile path tracks target-folder.
-//
-//nolint:paralleltest // LoadFromEnv uses t.Setenv; cannot run in parallel
 func TestRootTaskfileFollowsTargetFolder(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
@@ -385,8 +349,6 @@ func TestRootTaskfileFollowsTargetFolder(t *testing.T) {
 }
 
 // TestEmptyTasksRejected verifies a blank tasks input fails validation.
-//
-//nolint:paralleltest // LoadFromEnv uses t.Setenv; cannot run in parallel
 func TestEmptyTasksRejected(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
@@ -396,8 +358,6 @@ func TestEmptyTasksRejected(t *testing.T) {
 }
 
 // TestRootTaskfileMustStayInsideWorkspace verifies an escaping root-taskfile path is rejected.
-//
-//nolint:paralleltest // LoadFromEnv uses t.Setenv; cannot run in parallel
 func TestRootTaskfileMustStayInsideWorkspace(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
@@ -407,8 +367,6 @@ func TestRootTaskfileMustStayInsideWorkspace(t *testing.T) {
 }
 
 // TestRootTaskfileMustBeYAML verifies a non-YAML root-taskfile path is rejected.
-//
-//nolint:paralleltest // LoadFromEnv uses t.Setenv; cannot run in parallel
 func TestRootTaskfileMustBeYAML(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
@@ -418,8 +376,6 @@ func TestRootTaskfileMustBeYAML(t *testing.T) {
 }
 
 // TestStoreVersionAllowsSafeTag verifies a safe tag store-version value is accepted.
-//
-//nolint:paralleltest // LoadFromEnv uses t.Setenv; cannot run in parallel
 func TestStoreVersionAllowsSafeTag(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
@@ -438,8 +394,6 @@ func TestStoreVersionAllowsSafeTag(t *testing.T) {
 }
 
 // TestTargetFolderSymlinkEscape verifies a target folder escaping via symlink is rejected.
-//
-//nolint:paralleltest // LoadFromEnv uses t.Setenv; cannot run in parallel
 func TestTargetFolderSymlinkEscape(t *testing.T) {
 	workspace := t.TempDir()
 	outside := t.TempDir()
@@ -459,8 +413,6 @@ func TestTargetFolderSymlinkEscape(t *testing.T) {
 }
 
 // TestTargetFolderValidation verifies target-folder values are accepted or rejected as expected.
-//
-//nolint:paralleltest // LoadFromEnv uses t.Setenv; cannot run in parallel
 func TestTargetFolderValidation(t *testing.T) {
 	dir := t.TempDir()
 
@@ -469,15 +421,12 @@ func TestTargetFolderValidation(t *testing.T) {
 	for i := range cases {
 		testCase := &cases[i]
 		t.Run(testCase.name, func(t *testing.T) {
-			//nolint:paralleltest // LoadFromEnv uses t.Setenv; cannot run in parallel
 			runTargetFolderCase(t, dir, testCase)
 		})
 	}
 }
 
 // TestUnsafeStoreVersion verifies an unsafe store-version value is rejected.
-//
-//nolint:paralleltest // LoadFromEnv uses t.Setenv; cannot run in parallel
 func TestUnsafeStoreVersion(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)

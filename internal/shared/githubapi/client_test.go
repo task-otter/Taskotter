@@ -198,7 +198,6 @@ func TestDoRequestReportsBuildError(t *testing.T) {
 
 	client := newStubClient(t, http.StatusOK, consts.Empty)
 
-	//nolint:bodyclose // the request never leaves the client, so no response body exists
 	resp, err := doRequest(t.Context(), client, newCall(badMethod, nil))
 	iox.Discard(resp)
 
@@ -217,7 +216,6 @@ func TestAppendBodyCloseReportsFailures(t *testing.T) {
 	}
 
 	for i := range cases {
-		//nolint:bodyclose // appendBodyClose closes the body under test
 		err := appendBodyClose(nil, newStubResponse(cases[i]))
 		if err == nil {
 			t.Fatalf(wantErrFmt, "appendBodyClose")
@@ -231,7 +229,6 @@ func TestAppendBodyCloseKeepsExistingError(t *testing.T) {
 
 	body := &stubBody{reader: strings.NewReader(consts.Empty), readErr: errStub, closeErr: errStub}
 
-	//nolint:bodyclose // appendBodyClose closes the body under test
 	err := appendBodyClose(errStub, newStubResponse(body))
 
 	if !errors.Is(err, errStub) {
@@ -248,7 +245,6 @@ func (body *stubBody) Read(data []byte) (int, error) {
 		return len(data) * consts.IndexZero, body.readErr
 	}
 
-	//nolint:wrapcheck // the io.Reader contract requires the unwrapped io.EOF sentinel
 	return body.reader.Read(data)
 }
 
@@ -325,5 +321,5 @@ func newStubClient(t *testing.T, status int, body string) *Client {
 }
 
 func newStubResponse(body io.ReadCloser) *http.Response {
-	return &http.Response{Body: body} //nolint:exhaustruct // appendBodyClose only reads the body
+	return &http.Response{Body: body}
 }

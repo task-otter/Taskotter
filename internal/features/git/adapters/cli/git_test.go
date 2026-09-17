@@ -647,7 +647,6 @@ func originHEADPath(cloneDir string) string {
 func runGit(t *testing.T, dir string, args ...string) string {
 	t.Helper()
 
-	//nolint:gosec // test helper runs git in isolated temp repos
 	cmd := exec.CommandContext(t.Context(), gitBinaryName, args...)
 
 	cmd.Dir = dir

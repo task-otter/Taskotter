@@ -86,7 +86,6 @@ func buildDepRecords(cfg *config.Config, deps []string, src map[string]string) [
 	return dependencyRecords
 }
 
-//nolint:gocritic // single-line sig for whitespace
 func buildReqRecords(args *buildReqArgs) (recMap, map[string]string) {
 	reqRecs := make(recMap)
 	dstByTask := make(map[string]string)

@@ -22,8 +22,6 @@ const (
 var errAbsFailed = errors.New("abs failed")
 
 // TestValidateTargetFolderReportsAbsFailure verifies an unresolvable workspace is reported.
-//
-//nolint:paralleltest // swaps the package-level absPath seam
 func TestValidateTargetFolderReportsAbsFailure(t *testing.T) {
 	failAbsPath(t)
 
@@ -34,8 +32,6 @@ func TestValidateTargetFolderReportsAbsFailure(t *testing.T) {
 }
 
 // TestValidateRelativePathReportsAbsFailure verifies an unresolvable root is reported.
-//
-//nolint:paralleltest // swaps the package-level absPath seam
 func TestValidateRelativePathReportsAbsFailure(t *testing.T) {
 	failAbsPath(t)
 
@@ -46,8 +42,6 @@ func TestValidateRelativePathReportsAbsFailure(t *testing.T) {
 }
 
 // TestResolveValidatedRootReportsAbsFailure verifies the second abs call failure is reported.
-//
-//nolint:paralleltest // swaps the package-level absPath seam
 func TestResolveValidatedRootReportsAbsFailure(t *testing.T) {
 	root := t.TempDir()
 	calls := consts.IndexZero

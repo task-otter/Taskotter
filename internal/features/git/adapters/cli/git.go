@@ -85,12 +85,10 @@ const (
 
 	gitConfigUnsetAll = "--unset-all"
 
-	//nolint:gosec // G101: GitHub x-access-token username scheme, not a secret
 	originAccessURLFmt = "https://x-access-token:%s@github.com/%s.git"
 )
 
 var (
-	//nolint:gochecknoglobals // seam so tests can stub the git command
 	gitBinary = "git"
 
 	errOriginHEADNotAvailable = errors.New("origin HEAD not available")
@@ -453,7 +451,7 @@ func branchRefVerified(ctx context.Context, client *Client, ref string) bool {
 func (client *Client) BranchExists(ctx context.Context, branch string) (bool, error) {
 	iox.Discard(client.fns)
 
-	return branchExists(ctx, client, branch) //nolint:wrapcheck // thin adapter
+	return branchExists(ctx, client, branch)
 }
 
 func branchExists(ctx context.Context, client *Client, branch string) (bool, error) {
@@ -473,7 +471,7 @@ func branchExists(ctx context.Context, client *Client, branch string) (bool, err
 func (client *Client) CheckoutBranch(ctx context.Context, branch string) error {
 	iox.Discard(client.fns)
 
-	return checkoutBranch(ctx, client, branch) //nolint:wrapcheck // thin adapter
+	return checkoutBranch(ctx, client, branch)
 }
 
 func checkoutBranch(ctx context.Context, client *Client, branch string) error {
@@ -498,7 +496,7 @@ func isNothingToCommit(err error) bool {
 func (client *Client) Commit(ctx context.Context, message string) error {
 	iox.Discard(client.fns)
 
-	return commit(ctx, client, message) //nolint:wrapcheck // thin adapter
+	return commit(ctx, client, message)
 }
 
 func commit(ctx context.Context, client *Client, message string) error {
@@ -536,7 +534,7 @@ func configureCredentials(ctx context.Context, client *Client, creds *credArgs) 
 		return nil
 	}
 
-	return applyOriginCredentials(ctx, client, creds) //nolint:wrapcheck // thin guard wrapper
+	return applyOriginCredentials(ctx, client, creds)
 }
 
 func applyOriginCredentials(ctx context.Context, client *Client, creds *credArgs) error {
@@ -563,7 +561,7 @@ func applyOriginCredentials(ctx context.Context, client *Client, creds *credArgs
 func (client *Client) CreateOrResetBranch(ctx context.Context, branch string) error {
 	iox.Discard(client.fns)
 
-	return createOrResetBranch(ctx, client, branch) //nolint:wrapcheck // thin adapter
+	return createOrResetBranch(ctx, client, branch)
 }
 
 func createOrResetBranch(ctx context.Context, client *Client, branch string) error {
@@ -584,7 +582,7 @@ func createOrResetBranch(ctx context.Context, client *Client, branch string) err
 func (client *Client) DefaultBranch(ctx context.Context) (string, error) {
 	iox.Discard(client.fns)
 
-	return defaultBranch(ctx, client) //nolint:wrapcheck // thin adapter
+	return defaultBranch(ctx, client)
 }
 
 func defaultBranch(ctx context.Context, client *Client) (string, error) {
@@ -614,7 +612,7 @@ func (*Client) EnsureSafeDirectory() {
 func (client *Client) HasUnrelatedChanges(ctx context.Context, set pathSet) (bool, error) {
 	iox.Discard(client.fns)
 
-	return hasUnrelatedChanges(ctx, client, set) //nolint:wrapcheck // thin adapter
+	return hasUnrelatedChanges(ctx, client, set)
 }
 
 func hasUnrelatedChanges(ctx context.Context, client *Client, set pathSet) (bool, error) {
@@ -630,7 +628,7 @@ func hasUnrelatedChanges(ctx context.Context, client *Client, set pathSet) (bool
 func (client *Client) LastCommitMessage(ctx context.Context, branch string) (string, error) {
 	iox.Discard(client.fns)
 
-	return lastCommitMessage(ctx, client, branch) //nolint:wrapcheck // thin adapter
+	return lastCommitMessage(ctx, client, branch)
 }
 
 func lastCommitMessage(ctx context.Context, client *Client, branch string) (string, error) {
@@ -651,7 +649,7 @@ func lastCommitMessage(ctx context.Context, client *Client, branch string) (stri
 func (client *Client) Push(ctx context.Context, branch string) error {
 	iox.Discard(client.fns)
 
-	return push(ctx, client, branch) //nolint:wrapcheck // thin adapter
+	return push(ctx, client, branch)
 }
 
 func push(ctx context.Context, client *Client, branch string) error {
@@ -672,7 +670,7 @@ func push(ctx context.Context, client *Client, branch string) error {
 func (client *Client) PushForceWithLease(ctx context.Context, branch string) error {
 	iox.Discard(client.fns)
 
-	return pushForceWithLease(ctx, client, branch) //nolint:wrapcheck // thin adapter
+	return pushForceWithLease(ctx, client, branch)
 }
 
 func pushForceWithLease(ctx context.Context, client *Client, branch string) error {
@@ -693,7 +691,7 @@ func pushForceWithLease(ctx context.Context, client *Client, branch string) erro
 func (client *Client) Stage(ctx context.Context, paths []string) error {
 	iox.Discard(client.fns)
 
-	return stage(ctx, client, paths) //nolint:wrapcheck // thin adapter
+	return stage(ctx, client, paths)
 }
 
 func stage(ctx context.Context, client *Client, paths []string) error {
@@ -853,7 +851,7 @@ func originHEADSHA(ctx context.Context, client *Client) (string, error) {
 func (client *Client) output(ctx context.Context, args ...string) (string, error) {
 	iox.Discard(client.fns)
 
-	return client.fns.output(ctx, args...) //nolint:wrapcheck // fns closure
+	return client.fns.output(ctx, args...)
 }
 
 func outputGitCommand(ctx context.Context, workspace string, args ...string) (string, error) {
@@ -945,9 +943,9 @@ func setOriginRemoteURL(ctx context.Context, client *Client, remoteURL string) e
 }
 
 func run(ctx context.Context, client *Client, args ...string) error {
-	return client.fns.run(ctx, args...) //nolint:wrapcheck // fns closure
+	return client.fns.run(ctx, args...)
 }
 
 func output(ctx context.Context, client *Client, args ...string) (string, error) {
-	return client.fns.output(ctx, args...) //nolint:wrapcheck // fns closure
+	return client.fns.output(ctx, args...)
 }

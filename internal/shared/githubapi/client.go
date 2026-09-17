@@ -158,7 +158,7 @@ func defaultAPIBaseURL() *url.URL {
 func (client *Client) CreatePR(ctx context.Context, opts *CreatePROptions) (PullRequest, error) {
 	iox.Discard(client.fns)
 
-	return invokeCreatePR(ctx, client, opts) //nolint:wrapcheck // thin adapter
+	return invokeCreatePR(ctx, client, opts)
 }
 
 func invokeCreatePR(
@@ -185,7 +185,7 @@ func invokeCreatePR(
 func (client *Client) EditPRBody(ctx context.Context, opts *EditPRBodyOptions) error {
 	iox.Discard(client.fns)
 
-	return invokeEditPRBody(ctx, client, opts) //nolint:wrapcheck // thin adapter
+	return invokeEditPRBody(ctx, client, opts)
 }
 
 func invokeEditPRBody(ctx context.Context, client *Client, opts *EditPRBodyOptions) error {
@@ -206,7 +206,7 @@ func invokeEditPRBody(ctx context.Context, client *Client, opts *EditPRBodyOptio
 func (client *Client) ListOpenPRs(ctx context.Context, opt *listPROpts) ([]PullRequest, error) {
 	iox.Discard(client.fns)
 
-	return invokeListOpenPRs(ctx, client, opt) //nolint:wrapcheck // thin adapter
+	return invokeListOpenPRs(ctx, client, opt)
 }
 
 func invokeListOpenPRs(

@@ -131,7 +131,6 @@ func buildResolvedDependenciesJSON(deps []lockmodel.ModuleRecord) string {
 		})
 	}
 
-	//nolint:dogsled,errcheck,gosec // errchkjson: ResolvedTask values are safe to marshal
 	data, _ := json.MarshalIndent(out, consts.Empty, jsonIndent)
 
 	return string(data)
@@ -150,7 +149,6 @@ func buildResolvedTasksJSON(requested map[string]lockmodel.ModuleRecord) string 
 		}
 	}
 
-	//nolint:dogsled,errcheck,gosec // errchkjson: ResolvedTask values are safe to marshal
 	data, _ := json.MarshalIndent(out, consts.Empty, jsonIndent)
 
 	return string(data)
@@ -286,10 +284,7 @@ func writeSyncRequiredAnnotations(writer io.Writer, summary string) {
 }
 
 // MarshalJSON encodes a resolved task using the GitHub Actions output keys.
-//
-//nolint:unparam // json.Marshaler requires error; map[string]string cannot fail
 func (task *ResolvedTask) MarshalJSON() ([]byte, error) {
-	//nolint:dogsled,errcheck,gosec // map[string]string cannot fail to marshal
 	data, _ := json.Marshal(map[string]string{
 		"source_module":      task.SourceModule,
 		"destination_module": task.DestinationModule,

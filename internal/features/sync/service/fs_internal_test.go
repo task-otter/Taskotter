@@ -59,8 +59,6 @@ func TestCopyFileReportsMissingSource(t *testing.T) {
 }
 
 // TestCopyFileReportsWriteFailure verifies destination write failures surface.
-//
-//nolint:paralleltest // swaps the package-level mkdirAll seam
 func TestCopyFileReportsWriteFailure(t *testing.T) {
 	root := t.TempDir()
 	writeTempFile(t, filepath.Join(root, fileNameTxt), []byte(byteX))
@@ -75,8 +73,6 @@ func TestCopyFileReportsWriteFailure(t *testing.T) {
 }
 
 // TestCopyFileToReportsWriteFailure verifies copyFileTo wraps write failures.
-//
-//nolint:paralleltest // swaps the package-level mkdirAll seam
 func TestCopyFileToReportsWriteFailure(t *testing.T) {
 	swapMkdirAll(t, failingMkdirAll)
 
@@ -88,8 +84,6 @@ func TestCopyFileToReportsWriteFailure(t *testing.T) {
 }
 
 // TestCreateTempFileReportsCreateFailure verifies CreateTemp failures surface.
-//
-//nolint:paralleltest // swaps the package-level createTemp seam
 func TestCreateTempFileReportsCreateFailure(t *testing.T) {
 	swapCreateTemp(t, failingCreateTemp)
 
@@ -99,8 +93,6 @@ func TestCreateTempFileReportsCreateFailure(t *testing.T) {
 }
 
 // TestCreateTempFileReportsMkdirFailure verifies parent mkdir failures surface.
-//
-//nolint:paralleltest // swaps the package-level mkdirAll seam
 func TestCreateTempFileReportsMkdirFailure(t *testing.T) {
 	swapMkdirAll(t, failingMkdirAll)
 
@@ -110,8 +102,6 @@ func TestCreateTempFileReportsMkdirFailure(t *testing.T) {
 }
 
 // TestReadRelativeFileReportsOpenFailure verifies open failures surface.
-//
-//nolint:paralleltest // swaps the package-level openRelativeFile seam
 func TestReadRelativeFileReportsOpenFailure(t *testing.T) {
 	swapOpenRelative(t, failingOpenRelative)
 
@@ -121,8 +111,6 @@ func TestReadRelativeFileReportsOpenFailure(t *testing.T) {
 }
 
 // TestReadRelativeFileReportsReadFailure verifies read failures surface.
-//
-//nolint:paralleltest // swaps the package-level readAll seam
 func TestReadRelativeFileReportsReadFailure(t *testing.T) {
 	root := t.TempDir()
 	writeTempFile(t, filepath.Join(root, fileNameTxt), []byte(byteX))
@@ -134,8 +122,6 @@ func TestReadRelativeFileReportsReadFailure(t *testing.T) {
 }
 
 // TestRenameTempFileReportsFailure verifies rename failures surface.
-//
-//nolint:paralleltest // swaps the package-level renamePath seam
 func TestRenameTempFileReportsFailure(t *testing.T) {
 	swapRenamePath(t, failingRename)
 
@@ -143,8 +129,6 @@ func TestRenameTempFileReportsFailure(t *testing.T) {
 }
 
 // TestWriteAndFinalizeTempReportsChmodFailure verifies chmod failures surface.
-//
-//nolint:paralleltest // swaps the package-level chmodFile seam
 func TestWriteAndFinalizeTempReportsChmodFailure(t *testing.T) {
 	swapChmodFile(t, failingChmod)
 
@@ -153,8 +137,6 @@ func TestWriteAndFinalizeTempReportsChmodFailure(t *testing.T) {
 }
 
 // TestWriteAndFinalizeTempReportsCloseFailure verifies close failures surface.
-//
-//nolint:paralleltest // swaps the package-level closeFile seam
 func TestWriteAndFinalizeTempReportsCloseFailure(t *testing.T) {
 	swapCloseFile(t, failingClose)
 
@@ -163,8 +145,6 @@ func TestWriteAndFinalizeTempReportsCloseFailure(t *testing.T) {
 }
 
 // TestWriteAndFinalizeTempReportsWriteFailure verifies writeFull failures surface.
-//
-//nolint:paralleltest // swaps the package-level writeFull seam
 func TestWriteAndFinalizeTempReportsWriteFailure(t *testing.T) {
 	swapWriteFull(t, failingWriteFull)
 
@@ -173,8 +153,6 @@ func TestWriteAndFinalizeTempReportsWriteFailure(t *testing.T) {
 }
 
 // TestWriteFileAtomicReportsFinalizeFailure verifies rename failures abort atomic writes.
-//
-//nolint:paralleltest // swaps the package-level renamePath seam
 func TestWriteFileAtomicReportsFinalizeFailure(t *testing.T) {
 	swapRenamePath(t, failingRename)
 
@@ -193,7 +171,7 @@ func TestWriteFullStubWriterUsedDocumentsFaults(t *testing.T) {
 func assertFilePayload(t *testing.T, path, want string) {
 	t.Helper()
 
-	data, err := os.ReadFile(path) //nolint:gosec // test-owned path
+	data, err := os.ReadFile(path)
 	assertNoErr(t, err)
 
 	if string(data) != want {

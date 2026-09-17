@@ -1,7 +1,6 @@
 // Taskotter 2026.
 // SPDX-License-Identifier: Apache-2.0.
 
-//nolint:exhaustruct // test fixtures only set fields exercised by the unit
 package service
 
 import (
@@ -67,8 +66,6 @@ func TestGeneratedTaskMetadataResolvesRecord(t *testing.T) {
 }
 
 // TestLoadStoreTaskMetadataReportsWalkFailure verifies load wraps walk failures.
-//
-//nolint:paralleltest // swaps the package-level walkDir seam
 func TestLoadStoreTaskMetadataReportsWalkFailure(t *testing.T) {
 	swapWalkDir(t, failingWalk)
 
@@ -78,8 +75,6 @@ func TestLoadStoreTaskMetadataReportsWalkFailure(t *testing.T) {
 }
 
 // TestModuleNameForReportsRelFailure verifies Rel failures surface.
-//
-//nolint:paralleltest // swaps the package-level relPath seam
 func TestModuleNameForReportsRelFailure(t *testing.T) {
 	swapRelPath(t, failingRelPath)
 

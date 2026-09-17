@@ -351,7 +351,6 @@ func failingRemove(string) error { return errStub }
 
 func failingRename(string, string) error { return errStub }
 
-//nolint:ireturn // interface required by stdlib signature
 func failingStat(string) (os.FileInfo, error) { return nil, errStub }
 
 func failingWalk(string, fs.WalkDirFunc) error { return errStub }

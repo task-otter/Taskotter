@@ -78,7 +78,6 @@ const (
 	errFmtEnsureValidTarPath = "ensure valid tar path: %w"
 )
 
-//nolint:gochecknoglobals // seam so tests can reach the filepath.Abs failure branches
 var absPath = filepath.Abs
 
 // ExtractTarGz extracts a gzip-compressed tar archive into destDir.
@@ -443,7 +442,6 @@ func executeTarExtractor(extractor *tarExtractor) error {
 	}
 }
 
-//nolint:nestif // metadata vs regular entries require distinct skip paths
 func shouldSkipEntry(extractor *tarExtractor, header *tar.Header) (bool, error) {
 	if isTarMetadataEntry(header.Typeflag) {
 		skip, err := skipMetadataWithWrap(extractor, header)
@@ -550,7 +548,6 @@ func writeEntry(extractor *tarExtractor, header *tar.Header, target string) erro
 	return nil
 }
 
-//nolint:wrapcheck // writeEntry wraps errors from this dispatcher
 func dispatchWriteEntry(extractor *tarExtractor, header *tar.Header, target string) error {
 	if header.Typeflag == tar.TypeDir {
 		return writeDirTarget(target)

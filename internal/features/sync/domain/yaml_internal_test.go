@@ -205,7 +205,6 @@ func unmarshalMetaOK(t *testing.T, payload string, meta *Metadata) {
 }
 
 func yamlScalarNode(value string) *yaml.Node {
-	//nolint:exhaustruct // only kind and value matter for this fixture
 	return &yaml.Node{Kind: yaml.ScalarNode, Value: value}
 }
 

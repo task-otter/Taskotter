@@ -1,7 +1,6 @@
 // Taskotter 2026.
 // SPDX-License-Identifier: Apache-2.0.
 
-//nolint:exhaustruct // test fixtures only set fields exercised by the unit
 package service
 
 import (

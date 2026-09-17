@@ -1,7 +1,6 @@
 // Taskotter 2026.
 // SPDX-License-Identifier: Apache-2.0.
 
-//nolint:exhaustruct // test fixtures only set fields exercised by the unit
 package service
 
 import (
@@ -41,8 +40,6 @@ func TestApplyFileChangeAddedAndUpdated(t *testing.T) {
 }
 
 // TestApplyPlanWithCleanupReportsSessionFailure verifies session start failures surface.
-//
-//nolint:paralleltest // swaps the package-level mkdirAll seam
 func TestApplyPlanWithCleanupReportsSessionFailure(t *testing.T) {
 	swapMkdirAll(t, failingMkdirAll)
 
@@ -50,8 +47,6 @@ func TestApplyPlanWithCleanupReportsSessionFailure(t *testing.T) {
 }
 
 // TestApplyStagedPlanReportsCleanupFailure verifies post-write cleanup failures surface.
-//
-//nolint:paralleltest // swaps the package-level removePath seam
 func TestApplyStagedPlanReportsCleanupFailure(t *testing.T) {
 	swapRemovePath(t, failingRemove)
 
@@ -80,8 +75,6 @@ func TestBuildFileEntryReportsReadFailure(t *testing.T) {
 }
 
 // TestCleanupAfterApplyReportsLegacyFailure verifies legacy cleanup failures surface.
-//
-//nolint:paralleltest // swaps the package-level removePath seam
 func TestCleanupAfterApplyReportsLegacyFailure(t *testing.T) {
 	swapRemovePath(t, failingRemove)
 
@@ -89,8 +82,6 @@ func TestCleanupAfterApplyReportsLegacyFailure(t *testing.T) {
 }
 
 // TestCleanupAfterApplyReportsObsoleteFailure verifies obsolete cleanup failures surface.
-//
-//nolint:paralleltest // swaps the package-level removePath seam
 func TestCleanupAfterApplyReportsObsoleteFailure(t *testing.T) {
 	swapRemovePath(t, failingRemove)
 
@@ -102,8 +93,6 @@ func TestCleanupAfterApplyReportsObsoleteFailure(t *testing.T) {
 }
 
 // TestCleanupLegacyMetadataReportsDirFailure verifies dir cleanup failures surface.
-//
-//nolint:paralleltest // swaps the package-level removePath seam
 func TestCleanupLegacyMetadataReportsDirFailure(t *testing.T) {
 	calls := consts.IndexZero
 
@@ -121,8 +110,6 @@ func TestCleanupLegacyMetadataReportsDirFailure(t *testing.T) {
 }
 
 // TestCleanupLegacyMetadataReportsFileFailure verifies legacy file remove failures.
-//
-//nolint:paralleltest // swaps the package-level removePath seam
 func TestCleanupLegacyMetadataReportsFileFailure(t *testing.T) {
 	swapRemovePath(t, failingRemove)
 
@@ -130,8 +117,6 @@ func TestCleanupLegacyMetadataReportsFileFailure(t *testing.T) {
 }
 
 // TestCleanupOldTargetReportsStepFailure verifies old-target cleanup failures surface.
-//
-//nolint:paralleltest // swaps the package-level removePath seam
 func TestCleanupOldTargetReportsStepFailure(t *testing.T) {
 	swapRemovePath(t, failingRemove)
 
@@ -143,8 +128,6 @@ func TestCleanupOldTargetReportsStepFailure(t *testing.T) {
 }
 
 // TestRemoveOldTargetLockReportsFailure verifies old lock remove failures surface.
-//
-//nolint:paralleltest // swaps the package-level removePath seam
 func TestRemoveOldTargetLockReportsFailure(t *testing.T) {
 	swapRemovePath(t, failingRemove)
 
@@ -155,8 +138,6 @@ func TestRemoveOldTargetLockReportsFailure(t *testing.T) {
 }
 
 // TestRemoveOldTargetMetadataReportsDirFailure verifies old metadata dir prune failures.
-//
-//nolint:paralleltest // swaps the package-level removePath seam
 func TestRemoveOldTargetMetadataReportsDirFailure(t *testing.T) {
 	calls := consts.IndexZero
 
@@ -177,8 +158,6 @@ func TestRemoveOldTargetMetadataReportsDirFailure(t *testing.T) {
 }
 
 // TestRemoveOldTargetMetadataReportsFailure verifies old metadata remove failures.
-//
-//nolint:paralleltest // swaps the package-level removePath seam
 func TestRemoveOldTargetMetadataReportsFailure(t *testing.T) {
 	swapRemovePath(t, failingRemove)
 
@@ -189,8 +168,6 @@ func TestRemoveOldTargetMetadataReportsFailure(t *testing.T) {
 }
 
 // TestRemoveStaleManagedFileReportsPruneFailure verifies prune failures after remove surface.
-//
-//nolint:paralleltest // swaps a package-level FS seam
 func TestRemoveStaleManagedFileReportsPruneFailure(t *testing.T) {
 	workspace := prepGoSubDir(t)
 	swapRemovePath(t, succeedThenFail())
@@ -208,8 +185,6 @@ func TestRemoveStaleManagedFileReportsPruneFailure(t *testing.T) {
 }
 
 // TestRemoveStaleManagedFilesReportsFailure verifies first stale remove failure surfaces.
-//
-//nolint:paralleltest // swaps the package-level removePath seam
 func TestRemoveStaleManagedFilesReportsFailure(t *testing.T) {
 	swapRemovePath(t, failingRemove)
 
@@ -221,8 +196,6 @@ func TestRemoveStaleManagedFilesReportsFailure(t *testing.T) {
 }
 
 // TestScanLogicalRootDocsReportsWalkFailure verifies logical-root scan failures.
-//
-//nolint:paralleltest // swaps the package-level walkDir seam
 func TestScanLogicalRootDocsReportsWalkFailure(t *testing.T) {
 	swapWalkDir(t, failingWalk)
 
@@ -240,8 +213,6 @@ func TestScanLogicalRootDocsReportsWalkFailure(t *testing.T) {
 }
 
 // TestStagePreparedFilesReportsFailure verifies staging failures surface.
-//
-//nolint:paralleltest // swaps the package-level mkdirAll seam
 func TestStagePreparedFilesReportsFailure(t *testing.T) {
 	swapMkdirAll(t, failingMkdirAll)
 
@@ -257,8 +228,6 @@ func TestStagePreparedFilesReportsFailure(t *testing.T) {
 }
 
 // TestStartApplySessionReportsStagingFailure verifies prepareStaging failures surface.
-//
-//nolint:paralleltest // swaps the package-level mkdirAll seam
 func TestStartApplySessionReportsStagingFailure(t *testing.T) {
 	swapMkdirAll(t, failingMkdirAll)
 

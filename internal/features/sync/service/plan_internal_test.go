@@ -1,7 +1,6 @@
 // Taskotter 2026.
 // SPDX-License-Identifier: Apache-2.0.
 
-//nolint:exhaustruct // test fixtures only set fields exercised by the unit
 package service
 
 import (
@@ -33,8 +32,6 @@ func TestBuildFileEntryReportsInfoFailure(t *testing.T) {
 }
 
 // TestCollectModuleFilesReportsWalkFailure verifies CollectModuleFiles wraps walk errors.
-//
-//nolint:paralleltest // swaps the package-level walkDir seam
 func TestCollectModuleFilesReportsWalkFailure(t *testing.T) {
 	swapWalkDir(t, failingWalk)
 
@@ -100,8 +97,6 @@ func TestLogicalRootReadyMissingReturnsFalse(t *testing.T) {
 }
 
 // TestLogicalRootReadyReportsStatFailure verifies non-missing stat errors surface.
-//
-//nolint:paralleltest // swaps the package-level statPath seam
 func TestLogicalRootReadyReportsStatFailure(t *testing.T) {
 	swapStatPath(t, failingStat)
 
@@ -144,8 +139,6 @@ func TestReadRootTaskfileReportsTemplateFailure(t *testing.T) {
 }
 
 // TestRelSlashPathReportsFailure verifies Rel failures surface.
-//
-//nolint:paralleltest // swaps the package-level relPath seam
 func TestRelSlashPathReportsFailure(t *testing.T) {
 	swapRelPath(t, failingRelPath)
 
@@ -167,8 +160,6 @@ func TestRootTemplateOrErrorRequiresOps(t *testing.T) {
 }
 
 // TestScanModuleFilesReportsWalkFailure verifies walkDir failures surface.
-//
-//nolint:paralleltest // swaps a package-level FS seam
 func TestScanModuleFilesReportsWalkFailure(t *testing.T) {
 	swapWalkDir(t, failingWalk)
 
@@ -216,8 +207,6 @@ func TestUpdateRootTaskfileRequiresOps(t *testing.T) {
 }
 
 // TestValidateDestinationReportsStatFailure verifies destination stat failures surface.
-//
-//nolint:paralleltest // swaps a package-level FS seam
 func TestValidateDestinationReportsStatFailure(t *testing.T) {
 	swapStatPath(t, failingStat)
 

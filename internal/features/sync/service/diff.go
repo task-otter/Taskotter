@@ -198,7 +198,7 @@ func diffManagedFilePaths(current map[string]managedFile, workspace string) (dif
 }
 
 func applyFileChange(lists *diffLists, path string, change fileChangeKind) *diffLists {
-	switch change { //nolint:revive // exhaustive cases include intentional no-op branches
+	switch change {
 	case fileAdded:
 		lists.added = append(lists.added, path)
 	case fileUpdated:

@@ -88,8 +88,6 @@ func TestDiscardTarEntryConsumesPayload(t *testing.T) {
 }
 
 // TestAbsPathsReportFailures verifies both abs resolutions are reported when they fail.
-//
-//nolint:paralleltest // swaps the package-level absPath seam
 func TestAbsPathsReportFailures(t *testing.T) {
 	assertAbsPathsFail(t, consts.IndexZero)
 	assertAbsPathsFail(t, consts.IndexOne)
@@ -108,8 +106,6 @@ func TestEnsureInsideRejectsEscape(t *testing.T) {
 }
 
 // TestEnsureInsideReportsAbsFailure verifies an unresolvable path is rejected.
-//
-//nolint:paralleltest // swaps the package-level absPath seam
 func TestEnsureInsideReportsAbsFailure(t *testing.T) {
 	failAbsPath(t)
 
@@ -540,7 +536,6 @@ func singleEntryArchive(t *testing.T) []byte {
 	return buf.Bytes()
 }
 
-//nolint:exhaustruct // the extractor only reads the type, name, size, and mode
 func testHeader(typeflag byte, name string, size int64) *tar.Header {
 	return &tar.Header{
 		Typeflag: typeflag,

@@ -1,7 +1,6 @@
 // Taskotter 2026.
 // SPDX-License-Identifier: Apache-2.0.
 
-//nolint:exhaustruct // test fixtures only set fields exercised by the unit
 package service
 
 import (
@@ -90,8 +89,6 @@ func TestBuildRootTaskfileReportsUpdateFailure(t *testing.T) {
 }
 
 // TestCollectAndTrackModuleFilesReportsFailure verifies collectModuleContents failures.
-//
-//nolint:paralleltest // swaps the package-level walkDir seam
 func TestCollectAndTrackModuleFilesReportsFailure(t *testing.T) {
 	swapWalkDir(t, failingWalk)
 
@@ -102,8 +99,6 @@ func TestCollectAndTrackModuleFilesReportsFailure(t *testing.T) {
 }
 
 // TestCollectModuleContentsReportsMergeFailure verifies mergeLogicalRootDocs failures.
-//
-//nolint:paralleltest // swaps the package-level walkDir seam
 func TestCollectModuleContentsReportsMergeFailure(t *testing.T) {
 	args := distinctDocCollectArgs(t)
 	swapWalkThenFail(t)
@@ -115,8 +110,6 @@ func TestCollectModuleContentsReportsMergeFailure(t *testing.T) {
 }
 
 // TestCollectModuleContentsReportsScanFailure verifies scanModuleFiles failures surface.
-//
-//nolint:paralleltest // swaps a package-level FS seam
 func TestCollectModuleContentsReportsScanFailure(t *testing.T) {
 	swapWalkDir(t, failingWalk)
 
@@ -164,8 +157,6 @@ func TestDiffFilesReportsLockMetadataFailure(t *testing.T) {
 }
 
 // TestDiffLockFileReportsContentFailure verifies lockContentChanged failures surface.
-//
-//nolint:paralleltest // swaps the package-level marshalYAML seam
 func TestDiffLockFileReportsContentFailure(t *testing.T) {
 	swapMarshalYAML(t, failingMarshalYAML)
 
@@ -185,8 +176,6 @@ func TestDiffLockFileReportsContentFailure(t *testing.T) {
 }
 
 // TestDiscoverPreviousMetadataReportsWalkFailure verifies candidate collection failures.
-//
-//nolint:paralleltest // swaps the package-level walkDir seam
 func TestDiscoverPreviousMetadataReportsWalkFailure(t *testing.T) {
 	swapWalkDir(t, failingWalk)
 
@@ -227,8 +216,6 @@ func TestLoadPreviousLockUsesLockTarget(t *testing.T) {
 }
 
 // TestMergeLogicalRootDocsReportsMergeFailure verifies parent-doc merge failures.
-//
-//nolint:paralleltest // swaps the package-level walkDir seam
 func TestMergeLogicalRootDocsReportsMergeFailure(t *testing.T) {
 	args := distinctDocCollectArgs(t)
 	assertNoErr(t, mkdirAll(args.syncInput.Snapshot.ModuleDir(consts.Go), dirModePerm))
@@ -241,8 +228,6 @@ func TestMergeLogicalRootDocsReportsMergeFailure(t *testing.T) {
 }
 
 // TestMergeParentDocsIfDistinctReportsFailure verifies mergeParentDocFiles failures.
-//
-//nolint:paralleltest // swaps the package-level walkDir seam
 func TestMergeParentDocsIfDistinctReportsFailure(t *testing.T) {
 	args := distinctDocCollectArgs(t)
 	assertNoErr(t, mkdirAll(args.syncInput.Snapshot.ModuleDir(consts.Go), dirModePerm))
@@ -255,8 +240,6 @@ func TestMergeParentDocsIfDistinctReportsFailure(t *testing.T) {
 }
 
 // TestPlanModuleFilesReportsCollectFailure verifies collectAndTrackModuleFiles failures.
-//
-//nolint:paralleltest // swaps the package-level walkDir seam
 func TestPlanModuleFilesReportsCollectFailure(t *testing.T) {
 	workspace := t.TempDir()
 	assertNoErr(t, mkdirAll(filepath.Join(workspace, consts.Go), dirModePerm))
@@ -321,8 +304,6 @@ func TestReadRootPlanFinishInputReportsFailure(t *testing.T) {
 }
 
 // TestRemoveObsoleteReportsOldTargetFailure verifies cleanupOldTarget failures surface.
-//
-//nolint:paralleltest // swaps the package-level removePath seam
 func TestRemoveObsoleteReportsOldTargetFailure(t *testing.T) {
 	swapRemovePath(t, failingRemove)
 

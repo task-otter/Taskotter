@@ -11,18 +11,16 @@ import (
 )
 
 const (
-	benchmarkSmallSize     = 2 //nolint:goconst // benchmark sizing is intentionally independent
+	benchmarkSmallSize     = 2
 	benchmarkMediumSize    = 10
 	benchmarkLargeSize     = 50
 	benchmarkFirstIndex    = 0
-	benchmarkEmptyLength   = 0 //nolint:goconst // benchmark sentinel is local to this benchmark
+	benchmarkEmptyLength   = 0
 	benchmarkTaskfilesDir  = "taskfiles"
 	benchmarkModuleNameFmt = "module-%d"
 )
 
 // BenchmarkRewriteIncludes measures include rewriting.
-//
-//nolint:dupl // benchmarks intentionally share the same size matrix
 func BenchmarkRewriteIncludes(b *testing.B) {
 	sizes := []int{benchmarkSmallSize, benchmarkMediumSize, benchmarkLargeSize}
 
@@ -67,8 +65,6 @@ func runRewriteIncludesIterations(b *testing.B, content []byte, mapping map[stri
 }
 
 // BenchmarkUpdateRootTaskfile measures root taskfile updates.
-//
-//nolint:dupl // benchmarks intentionally share the same size matrix
 func BenchmarkUpdateRootTaskfile(b *testing.B) {
 	sizes := []int{benchmarkSmallSize, benchmarkMediumSize, benchmarkLargeSize}
 

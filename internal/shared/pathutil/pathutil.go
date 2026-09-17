@@ -74,7 +74,6 @@ var (
 
 	// absPath resolves a path against the working directory. It is a variable so
 	// tests can exercise the failure branches of the callers below.
-	//nolint:gochecknoglobals // seam so tests can reach the filepath.Abs failure branches
 	absPath = filepath.Abs
 )
 
@@ -567,7 +566,6 @@ func OpenRelativeFile(root, rel string) (*os.File, error) {
 // openDirFSFile opens safeRel under absRoot. safeRel has already been validated
 // to stay inside absRoot by resolveValidatedRoot.
 func openDirFSFile(absRoot, safeRel, rel string) (*os.File, error) {
-	//nolint:gosec // safeRel is validated to resolve inside absRoot before opening
 	file, err := os.Open(filepath.Join(absRoot, filepath.FromSlash(safeRel)))
 	if err != nil {
 		return nil, fmt.Errorf(errFmtOpenFile, rel, err)

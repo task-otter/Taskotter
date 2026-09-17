@@ -47,7 +47,6 @@ func runValidateTargetFolderBenchmark(b *testing.B, depth int) {
 	}
 }
 
-//nolint:funlen,revive // benchmark input construction is clearer as one operation
 func benchmarkFolder(depth int) string {
 	var folderBuilder strings.Builder
 

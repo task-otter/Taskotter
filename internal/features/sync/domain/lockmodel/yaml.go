@@ -107,7 +107,7 @@ func UnmarshalLockFile(value *yaml.Node, lock *LockFile) error {
 
 // DecodeLockFileYAML unmarshals YAML bytes into a lock file.
 func DecodeLockFileYAML(data []byte, lock *LockFile) error {
-	return decodeYAMLDocument( //nolint:wrapcheck // thin decode wrapper
+	return decodeYAMLDocument(
 		data,
 		"lock file",
 		func(node *yaml.Node) error {
@@ -133,7 +133,7 @@ func UnmarshalModuleRecord(value *yaml.Node, record *ModuleRecord) error {
 
 // DecodeModuleRecordYAML unmarshals YAML bytes into a module record.
 func DecodeModuleRecordYAML(data []byte, record *ModuleRecord) error {
-	return decodeYAMLDocument( //nolint:wrapcheck // thin decode wrapper
+	return decodeYAMLDocument(
 		data,
 		yamlLabelModuleRecord,
 		func(node *yaml.Node) error {
@@ -158,7 +158,7 @@ func UnmarshalOrderedRequested(value *yaml.Node, requested *OrderedRequested) er
 
 // DecodeOrderedRequestedYAML unmarshals YAML bytes into ordered requested modules.
 func DecodeOrderedRequestedYAML(data []byte, requested *OrderedRequested) error {
-	return decodeYAMLDocument( //nolint:wrapcheck // thin decode wrapper
+	return decodeYAMLDocument(
 		data,
 		"ordered requested",
 		func(node *yaml.Node) error {

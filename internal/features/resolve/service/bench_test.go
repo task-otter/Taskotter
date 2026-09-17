@@ -10,8 +10,8 @@ import (
 
 const (
 	benchmarkSmallSize  = 10
-	benchmarkMediumSize = 100  //nolint:goconst // benchmark sizing is intentionally independent
-	benchmarkLargeSize  = 1000 //nolint:goconst // benchmark sizing is intentionally independent
+	benchmarkMediumSize = 100
+	benchmarkLargeSize  = 1000
 	benchmarkModuleFmt  = "module-%d"
 	benchmarkOffset     = 1
 	benchmarkZero       = 0

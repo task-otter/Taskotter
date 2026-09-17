@@ -6,9 +6,8 @@ A Taskfile for running Go unit tests, benchmarks, and fuzz targets. The Go
 toolchain is installed through `nix:install:profile`.
 
 Linting and formatting live in the [`golangci-lint`](../golangci-lint/README.md)
-Taskfile, vulnerability scanning lives in the
-[`govulncheck`](../govulncheck/README.md) Taskfile, and JUnit XML conversion
-lives in the [`go-junit-report`](../go-junit-report/README.md) Taskfile.
+Taskfile, and JUnit XML conversion lives in the
+[`go-junit-report`](../go-junit-report/README.md) Taskfile.
 
 ## Usage
 
@@ -59,18 +58,6 @@ task go:test -- -race -run TestName ./internal/...
 task go:bench -- -bench BenchmarkName ./internal/parser
 ```
 
-For CodSpeed, run the same Go benchmarks through its walltime runner:
-
-```sh
-codspeed run -m walltime -- go test -run '^$' -bench . -benchmem ./...
-```
-
-To focus on resolution benchmarks:
-
-```sh
-go test -run '^$' -bench 'Benchmark(Resolve|Normalize)' -benchmem ./internal/features/resolve/service
-```
-
 `test` runs plain `go test -v`. For converting a go test log to JUnit XML, use
 `go-junit-report:report`.
 `fuzz` runs a single target for `GO_FUZZTIME` (default `30s`); Go fuzzes one
@@ -105,6 +92,7 @@ Pin a revision by overriding the installable, for example
 | `GO_WINGET_INSTALLABLE` | `GoLang.Go` | WinGet package ID for `winget:install:package` |
 | `GO_FUZZTIME`        | empty (`30s`) | Duration a single `fuzz` target runs before stopping |
 | `GO_PKG`             | empty        | Module path for `install:pkg`; required when running that task |
+| `GO_LOAD`            | reloads User Path; prepends GOPATH\bin | PowerShell snippet so `go`-installed tools from earlier in the same Task process are on PATH |
 
 ## Notes
 

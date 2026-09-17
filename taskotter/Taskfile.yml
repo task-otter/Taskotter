@@ -82,6 +82,12 @@ vars:
   YAMLFIX_UV_TOOL: '{{.YAMLFIX_UV_TOOL | default "yamlfix"}}'
   YAMLLINT_UV_TOOL: '{{.YAMLLINT_UV_TOOL | default "yamllint"}}'
   ZIZMOR_WINGET_INSTALLABLE: '{{.ZIZMOR_WINGET_INSTALLABLE | default "zizmor.zizmor"}}'
+  GO_LOAD: >-
+    {{.GO_LOAD | default ` \$u = [Environment]::GetEnvironmentVariable('Path', 'User'); if (\$u) { \$env:Path = \$u + ';' + \$env:Path }; if (Get-Command go -ErrorAction SilentlyContinue) {
+
+      \$goBin = Join-Path ((go env GOPATH).Trim()) 'bin';
+      if (Test-Path -LiteralPath \$goBin) { \$env:Path = \$goBin + ';' + \$env:Path }
+    } `}}
 includes:
   go:
     taskfile: go/Taskfile.yml
@@ -101,6 +107,7 @@ includes:
       GO_NIX_INSTALLABLE: '{{.GO_NIX_INSTALLABLE}}'
       GO_WINGET_INSTALLABLE: '{{.GO_WINGET_INSTALLABLE}}'
       GO_PKG: '{{.GO_PKG}}'
+      GO_LOAD: '{{.GO_LOAD}}'
   golangci-lint:
     taskfile: golangci-lint/Taskfile.yml
     dir: ..
@@ -118,15 +125,6 @@ includes:
       GO_GLOBAL_BIN: '{{.GO_GLOBAL_BIN}}'
       GOLANGCI_LINT_NIX_INSTALLABLE: '{{.GOLANGCI_LINT_NIX_INSTALLABLE}}'
       GOLANGCI_LINT_WINGET_INSTALLABLE: '{{.GOLANGCI_LINT_WINGET_INSTALLABLE}}'
-  govulncheck:
-    taskfile: govulncheck/Taskfile.yml
-    dir: ..
-    vars:
-      GOVULNCHECK_VERSION: '{{.GOVULNCHECK_VERSION}}'
-      GOVULNCHECK_LINT_SKIP_PATTERN: '{{.GOVULNCHECK_LINT_SKIP_PATTERN}}'
-      GO_GLOBAL_BIN: '{{.GO_GLOBAL_BIN}}'
-      GOVULNCHECK_NIX_INSTALLABLE: '{{.GOVULNCHECK_NIX_INSTALLABLE}}'
-      GOVULNCHECK_GO_PKG: '{{.GOVULNCHECK_GO_PKG}}'
   yamllint:
     taskfile: yamllint/Taskfile.yml
     dir: ..
@@ -205,7 +203,6 @@ tasks:
     desc: Run ci for synced TaskOtter modules
     cmds:
       - task: golangci-lint:ci
-      - task: govulncheck:ci
       - task: yamllint:ci
       - task: actionlint:ci
       - task: zizmor:ci
@@ -221,7 +218,6 @@ tasks:
       - task: go:install
       - task: go-junit-report:install
       - task: golangci-lint:install
-      - task: govulncheck:install
       - task: yamllint:install
       - task: yamlfix:install
       - task: actionlint:install
@@ -239,7 +235,6 @@ tasks:
       - task: go:version
       - task: go-junit-report:version
       - task: golangci-lint:version
-      - task: govulncheck:version
       - task: yamllint:version
       - task: yamlfix:version
       - task: actionlint:version

@@ -97,11 +97,13 @@ tasks:
         platforms: [linux, darwin]
       - cmd: >-
           powershell -NoProfile -ExecutionPolicy Bypass -Command
-          "Remove-Item Env:GH_TOKEN -ErrorAction SilentlyContinue;
-          zizmor {{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}
-            {{.ZIZMOR_EXTRA_ARGS}}
-            {{.ZIZMOR_TARGETS}}{{end}};
-          exit $LASTEXITCODE"
+          "{{.WINGET_LOAD}};
+          Remove-Item Env:GH_TOKEN -ErrorAction SilentlyContinue;
+          \$zArgs = '{{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}
+          {{.ZIZMOR_EXTRA_ARGS}} {{.ZIZMOR_TARGETS}}{{end}}'.Trim().Split(' ',
+          [System.StringSplitOptions]::RemoveEmptyEntries);
+          & zizmor @zArgs;
+          exit \$LASTEXITCODE"
         platforms: [windows]
 
   _version:unix:
@@ -122,8 +124,11 @@ tasks:
     preconditions:
       - sh: >-
           powershell -NoProfile -ExecutionPolicy Bypass -Command
-          "if (Get-Command zizmor -ErrorAction SilentlyContinue) {
+          "{{.WINGET_LOAD}};
+          if (Get-Command zizmor -ErrorAction SilentlyContinue) {
           exit 0 } else { exit 1 }"
         msg: zizmor is not installed or not available in PATH.
     cmds:
-      - zizmor --version
+      - cmd: >-
+          powershell -NoProfile -ExecutionPolicy Bypass -Command
+          "{{.WINGET_LOAD}}; zizmor --version; exit \$LASTEXITCODE"

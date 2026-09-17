@@ -11,6 +11,8 @@ includes:
     taskfile: ../nix/Taskfile.yml
   uv:
     taskfile: ../uv/Taskfile.yml
+  winget:
+    taskfile: ../winget/Taskfile.yml
 vars:
   YAMLLINT_NIX_INSTALLABLE: '{{.YAMLLINT_NIX_INSTALLABLE | default "nixpkgs#yamllint"}}'
   YAMLLINT_UV_TOOL: '{{.YAMLLINT_UV_TOOL | default "yamllint"}}'
@@ -32,14 +34,14 @@ tasks:
       is not already on PATH. On Windows, installs via uv tool install
       (YAMLLINT_UV_TOOL). Override YAMLLINT_NIX_INSTALLABLE or
       YAMLLINT_UV_TOOL to pin a different package or version.
-    status:
-      - command -v yamllint >/dev/null 2>&1
     cmds:
       - task: _install:unix
       - task: _install:windows
   _install:unix:
     internal: true
     platforms: [linux, darwin]
+    status:
+      - command -v yamllint >/dev/null 2>&1
     cmds:
       - task: nix:install:profile
         vars:
@@ -48,6 +50,10 @@ tasks:
   _install:windows:
     internal: true
     platforms: [windows]
+    status:
+      - >-
+        powershell -NoProfile -ExecutionPolicy Bypass -Command
+        "{{.WINGET_LOAD}}; {{.UV_LOAD}}; yamllint --version; exit \$LASTEXITCODE"
     cmds:
       - task: uv:tool:install
         vars:
@@ -75,11 +81,21 @@ tasks:
     deps:
       - task: install
     cmds:
-      - >-
-        bash -lc '{{.NIX_LOAD}}; yamllint --strict {{if .YAMLLINT_CONFIG}}-c
-        "{{.YAMLLINT_CONFIG}}" {{end}} {{if .YAMLLINT_TARGETS}}{{.YAMLLINT_TARGETS}}
-        {{else}}.{{end}} {{.YAMLLINT_EXTRA_ARGS}}
-        && echo "✅ yamllint passed" || { echo "❌ yamllint failed"; exit 1; }'
+      - cmd: >-
+          bash -lc '{{.NIX_LOAD}}; yamllint --strict {{if .YAMLLINT_CONFIG}}-c
+          "{{.YAMLLINT_CONFIG}}" {{end}} {{if .YAMLLINT_TARGETS}}{{.YAMLLINT_TARGETS}}
+          {{else}}.{{end}} {{.YAMLLINT_EXTRA_ARGS}}
+          && echo "✅ yamllint passed" || { echo "❌ yamllint failed"; exit 1; }'
+        platforms: [linux, darwin]
+      - cmd: >-
+          powershell -NoProfile -ExecutionPolicy Bypass -Command
+          "{{.WINGET_LOAD}}; {{.UV_LOAD}};
+          yamllint --strict
+          {{if .YAMLLINT_CONFIG}}-c '{{.YAMLLINT_CONFIG}}' {{end}}
+          {{if .YAMLLINT_TARGETS}}{{.YAMLLINT_TARGETS}}{{else}}.{{end}}
+          {{.YAMLLINT_EXTRA_ARGS}};
+          exit \$LASTEXITCODE"
+        platforms: [windows]
   config:init:
     run: once
     dir: "{{.USER_WORKING_DIR}}"
@@ -91,7 +107,8 @@ tasks:
     status:
       - test -f .yamllint
     cmds:
-      - "printf 'extends: default\\n' > .yamllint"
+      - "printf '---\\n' > .yamllint"
+      - "printf 'extends: default\\n' >> .yamllint"
       - "printf 'rules:\\n' >> .yamllint"
       - "printf '  line-length:\\n' >> .yamllint"
       - "printf '    max: 120\\n' >> .yamllint"
@@ -115,8 +132,10 @@ tasks:
     preconditions:
       - sh: >-
           powershell -NoProfile -ExecutionPolicy Bypass -Command
-          "if (Get-Command yamllint -ErrorAction SilentlyContinue) {
-          exit 0 } else { exit 1 }"
+          "{{.WINGET_LOAD}}; {{.UV_LOAD}};
+          yamllint --version; exit \$LASTEXITCODE"
         msg: yamllint is not installed or not available in PATH.
     cmds:
-      - yamllint --version
+      - >-
+        powershell -NoProfile -ExecutionPolicy Bypass -Command
+        "{{.WINGET_LOAD}}; {{.UV_LOAD}}; yamllint --version; exit \$LASTEXITCODE"

@@ -85,6 +85,7 @@ vars:
   GO_LOAD: >-
     {{.GO_LOAD | default ` \$u = [Environment]::GetEnvironmentVariable('Path', 'User'); if (\$u) { \$env:Path = \$u + ';' + \$env:Path }; if (Get-Command go -ErrorAction SilentlyContinue) {
 
+
       \$goBin = Join-Path ((go env GOPATH).Trim()) 'bin';
       if (Test-Path -LiteralPath \$goBin) { \$env:Path = \$goBin + ';' + \$env:Path }
     } `}}

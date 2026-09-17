@@ -583,6 +583,152 @@ func TestUpdateRootTaskfilePromotesSingleModuleVars(t *testing.T) {
 	assertGoModulePromotedVars(t, string(out))
 }
 
+// TestUpdateRootTaskfilePreservesFoldedModuleVar verifies folded template vars
+// retain their source spelling when promoted to a fresh root Taskfile.
+func TestUpdateRootTaskfilePreservesFoldedModuleVar(t *testing.T) {
+	t.Parallel()
+
+	modulePath := "../../../../../taskotter/go/Taskfile.yml"
+
+	module, err := os.ReadFile(modulePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	input := goOnlyRootInput()
+
+	input.ModuleTaskfiles[consts.Go] = module
+
+	out, err := taskfile.UpdateRootTaskfile(taskfile.NewRootTemplate(), input)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := sourceVarEntry(t, string(module), "GO_LOAD", "\n\ntasks:")
+
+	if !strings.Contains(string(out), want) {
+		t.Fatalf("promoted GO_LOAD changed source text; missing exact source entry:\n%s", out)
+	}
+}
+
+// TestUpdateRootTaskfilePreservesVariableStyles verifies raw source copying for
+// each supported variable shape, not only the GO_LOAD regression case.
+func TestUpdateRootTaskfilePreservesVariableStyles(t *testing.T) {
+	t.Parallel()
+
+	module := []byte(`version: "3"
+vars:
+  PLAIN: '{{.PLAIN | default "plain"}}'
+  SINGLE: '{{.SINGLE | default "single"}}'
+  LITERAL: |-
+    {{.LITERAL | default ` + "`" + `
+    line one
+    line two
+    ` + "`" + `}}
+  FOLDED: >-
+    {{.FOLDED | default ` + "`" + `
+    folded one
+    folded two
+    ` + "`" + `}}
+  LIST:
+    - one
+    - two
+  MAP:
+    nested: value
+`)
+
+	input := goOnlyRootInput()
+
+	input.ModuleTaskfiles[consts.Go] = module
+
+	out, err := taskfile.UpdateRootTaskfile(taskfile.NewRootTemplate(), input)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, want := range []string{
+		"  PLAIN: '{{.PLAIN | default \"plain\"}}'",
+		"  SINGLE: '{{.SINGLE | default \"single\"}}'",
+		"  LITERAL: |-\n    {{.LITERAL | default `\n    line one\n    line two\n    `}}",
+		"  FOLDED: >-\n    {{.FOLDED | default `\n    folded one\n    folded two\n    `}}",
+		"  LIST:\n    - one\n    - two",
+		"  MAP:\n    nested: value",
+	} {
+		if !strings.Contains(string(out), want) {
+			t.Fatalf("variable source changed; missing exact text %q:\n%s", want, out)
+		}
+	}
+}
+
+// TestUpdateRootTaskfilePreservesUnmanagedRootText verifies only managed root
+// content changes when an existing Taskfile has custom formatting and content.
+func TestUpdateRootTaskfilePreservesUnmanagedRootText(t *testing.T) {
+	t.Parallel()
+
+	root := []byte(
+		"---\nversion: '3'\n# keep this comment\nvars:\n  CUSTOM: >-\n    keep   spacing\n    keep line two\n\nincludes:\n  custom:\n    taskfile: custom/Taskfile.yml # keep this comment\n\n\ntasks:\n  custom:\n    cmds:\n      - echo   preserve\n",
+	)
+
+	out, err := taskfile.UpdateRootTaskfile(root, goOnlyRootInput())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, preserved := range []string{
+		"# keep this comment\nvars:\n  CUSTOM: >-\n    keep   spacing\n    keep line two\n",
+		"custom:\n    taskfile: custom/Taskfile.yml # keep this comment\n",
+		"custom:\n    cmds:\n      - echo   preserve\n",
+	} {
+		if !strings.Contains(string(out), preserved) {
+			t.Fatalf("unmanaged root text changed; missing %q:\n%s", preserved, out)
+		}
+	}
+
+	second, err := taskfile.UpdateRootTaskfile(out, goOnlyRootInput())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !bytes.Equal(second, out) {
+		t.Fatalf("root update is not idempotent:\nfirst:\n%s\nsecond:\n%s", out, second)
+	}
+}
+
+// TestUpdateRootTaskfilePreservesCRLF verifies generated edits follow the
+// existing root file's line-ending convention.
+func TestUpdateRootTaskfilePreservesCRLF(t *testing.T) {
+	t.Parallel()
+
+	root := []byte("---\r\nversion: \"3\"\r\nvars:\r\n  CUSTOM: value\r\n")
+
+	out, err := taskfile.UpdateRootTaskfile(root, goOnlyRootInput())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if bytes.Contains(bytes.ReplaceAll(out, []byte("\r\n"), nil), []byte("\n")) {
+		t.Fatalf("root update introduced bare LF line endings: %q", out)
+	}
+}
+
+func sourceVarEntry(t *testing.T, content, key, endMarker string) string {
+	t.Helper()
+
+	start := strings.Index(content, "  "+key+":")
+
+	if start < 0 {
+		t.Fatalf("variable %s missing from content:\n%s", key, content)
+	}
+
+	relEnd := strings.Index(content[start:], endMarker)
+
+	if relEnd < 0 {
+		t.Fatalf("end marker %q missing after %s:\n%s", endMarker, key, content)
+	}
+
+	return content[start : start+relEnd]
+}
+
 // TestManagedIncludeDifferentPathConflict verifies a managed alias with a mismatched path errors.
 func TestManagedIncludeDifferentPathConflict(t *testing.T) {
 	t.Parallel()

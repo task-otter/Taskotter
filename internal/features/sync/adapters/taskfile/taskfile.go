@@ -974,10 +974,26 @@ func UpdateRootTaskfile(content []byte, input *rootUpdateInput) ([]byte, error) 
 		return nil, fmt.Errorf(errParseTaskfileRoot, err)
 	}
 
-	out, err := marshalUpdatedRootTaskfile(node, root, input)
+	originalRoot := cloneYAMLNode(root)
+
+	rawModuleVars, err := rawModuleVarsByTask(input)
 	if err != nil {
-		return nil, fmt.Errorf("marshal updated root taskfile: %w", err)
+		return nil, fmt.Errorf("read raw module vars: %w", err)
 	}
+
+	setRootTaskfileVersion(root)
+
+	err = applyRootUpdates(root, input)
+	if err != nil {
+		return nil, fmt.Errorf("apply root updates: %w", err)
+	}
+
+	out, err := patchRootTaskfile(content, originalRoot, root, input, rawModuleVars)
+	if err != nil {
+		return nil, fmt.Errorf("patch root taskfile: %w", err)
+	}
+
+	iox.Discard(node)
 
 	return out, nil
 }

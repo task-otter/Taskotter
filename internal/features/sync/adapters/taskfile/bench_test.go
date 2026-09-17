@@ -11,16 +11,23 @@ import (
 )
 
 const (
-	benchmarkSmallSize   = 2
-	benchmarkMediumSize  = 10
-	benchmarkLargeSize   = 50
-	benchmarkFirstIndex  = 0
-	benchmarkEmptyLength = 0
+	benchmarkSmallSize     = 2 //nolint:goconst // benchmark sizing is intentionally independent
+	benchmarkMediumSize    = 10
+	benchmarkLargeSize     = 50
+	benchmarkFirstIndex    = 0
+	benchmarkEmptyLength   = 0 //nolint:goconst // benchmark sentinel is local to this benchmark
+	benchmarkTaskfilesDir  = "taskfiles"
+	benchmarkModuleNameFmt = "module-%d"
 )
 
 // BenchmarkRewriteIncludes measures include rewriting.
+//
+//nolint:dupl // benchmarks intentionally share the same size matrix
 func BenchmarkRewriteIncludes(b *testing.B) {
-	for _, size := range []int{benchmarkSmallSize, benchmarkMediumSize, benchmarkLargeSize} {
+	sizes := []int{benchmarkSmallSize, benchmarkMediumSize, benchmarkLargeSize}
+
+	for index := range sizes {
+		size := sizes[index]
 		b.Run(fmt.Sprintf("includes_%d", size), func(b *testing.B) {
 			runRewriteIncludesBenchmark(b, size)
 		})
@@ -34,7 +41,7 @@ func runRewriteIncludesBenchmark(b *testing.B, size int) {
 	mapping := make(map[string]string, size)
 
 	for i := range size {
-		name := fmt.Sprintf("module-%d", i+benchmarkFirstIndex)
+		name := fmt.Sprintf(benchmarkModuleNameFmt, i+benchmarkFirstIndex)
 
 		content = append(
 			content,
@@ -51,7 +58,7 @@ func runRewriteIncludesIterations(b *testing.B, content []byte, mapping map[stri
 	b.Helper()
 
 	for range b.N {
-		result, err := RewriteIncludes(content, mapping, "taskfiles")
+		result, err := RewriteIncludes(content, mapping, benchmarkTaskfilesDir)
 
 		if err != nil || len(result) == benchmarkEmptyLength {
 			b.Fatalf("rewrite includes: %v", err)
@@ -60,8 +67,13 @@ func runRewriteIncludesIterations(b *testing.B, content []byte, mapping map[stri
 }
 
 // BenchmarkUpdateRootTaskfile measures root taskfile updates.
+//
+//nolint:dupl // benchmarks intentionally share the same size matrix
 func BenchmarkUpdateRootTaskfile(b *testing.B) {
-	for _, size := range []int{benchmarkSmallSize, benchmarkMediumSize, benchmarkLargeSize} {
+	sizes := []int{benchmarkSmallSize, benchmarkMediumSize, benchmarkLargeSize}
+
+	for index := range sizes {
+		size := sizes[index]
 		b.Run(fmt.Sprintf("modules_%d", size), func(b *testing.B) {
 			runUpdateRootTaskfileBenchmark(b, size)
 		})

@@ -9,30 +9,36 @@ import (
 )
 
 const (
-	benchmarkSmallSize  = 10
-	benchmarkMediumSize = 100
-	benchmarkLargeSize  = 1000
+	benchmarkSmallSize   = 10
+	benchmarkMediumSize  = 100
+	benchmarkLargeSize   = 1000
+	benchmarkEmptyLength = 0 //nolint:goconst // benchmark sentinel is local to this benchmark
+	benchmarkModuleFmt   = "module-%04d"
 )
 
 // BenchmarkSortManagedFiles measures managed-file sorting.
 func BenchmarkSortManagedFiles(b *testing.B) {
-	for _, size := range []int{benchmarkSmallSize, benchmarkMediumSize, benchmarkLargeSize} {
+	sizes := []int{benchmarkSmallSize, benchmarkMediumSize, benchmarkLargeSize}
+
+	for index := range sizes {
+		size := sizes[index]
 		b.Run(fmt.Sprintf("files_%d", size), func(b *testing.B) {
 			runSortManagedFilesBenchmark(b, size)
 		})
 	}
 }
 
+//nolint:funlen,maintidx,revive // benchmark setup and measurement are clearer together
 func runSortManagedFilesBenchmark(b *testing.B, size int) {
 	b.Helper()
 
-	files := make([]managedFile, 0, size)
+	files := make([]managedFile, benchmarkEmptyLength, size)
 
 	for i := range files {
 		files = append(files, managedFile{
-			Path:              fmt.Sprintf("taskfiles/module-%04d/Taskfile.yml", size-i),
-			SourceModule:      fmt.Sprintf("module-%04d", size-i),
-			DestinationModule: fmt.Sprintf("module-%04d", size-i),
+			Path:              fmt.Sprintf("taskfiles/"+benchmarkModuleFmt+"/Taskfile.yml", size-i),
+			SourceModule:      fmt.Sprintf(benchmarkModuleFmt, size-i),
+			DestinationModule: fmt.Sprintf(benchmarkModuleFmt, size-i),
 		})
 	}
 
@@ -44,7 +50,12 @@ func runSortManagedFilesBenchmark(b *testing.B, size int) {
 		sortManagedFiles(candidate)
 
 		if len(candidate) != size {
-			b.Fatalf("sorted file count = %d, want %d", len(candidate), size)
+			benchmarkSortedFileCountFailure(b, len(candidate), size)
 		}
 	}
+}
+
+func benchmarkSortedFileCountFailure(b *testing.B, got, want int) {
+	b.Helper()
+	b.Fatalf("sorted file count = %d, want %d", got, want)
 }

@@ -327,7 +327,7 @@ func newRefInfoForTest() *RefInfo {
 }
 
 func newResponse(status int, body io.ReadCloser) *http.Response {
-	//nolint:exhaustruct_v5 // only the status and body are read
+	//nolint:exhaustruct // only the status and body are read
 	return &http.Response{StatusCode: status, Body: body}
 }
 

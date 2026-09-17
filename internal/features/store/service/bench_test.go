@@ -34,6 +34,8 @@ func BenchmarkLoadCatalogAndDeps(b *testing.B) {
 }
 
 func runStoreBenchmark(b *testing.B, size int) {
+	b.Helper()
+
 	root := benchmarkStore(b, size)
 	b.ResetTimer()
 

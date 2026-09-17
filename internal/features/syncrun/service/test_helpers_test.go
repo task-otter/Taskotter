@@ -298,7 +298,7 @@ func newTestOrchestrator(
 func newTestOrchestratorParts(input *testOrchInput) (*service.Deps, *service.Orchestrator) {
 	input.t.Helper()
 
-	//nolint:exhaustruct_v5 // optional sync/resolve hooks default in wireDefaults
+	//nolint:exhaustruct // optional sync/resolve hooks default in wireDefaults
 	deps := &service.Deps{
 		Logger:       nil,
 		StoreClient:  input.store,

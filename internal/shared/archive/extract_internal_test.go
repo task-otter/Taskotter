@@ -540,7 +540,7 @@ func singleEntryArchive(t *testing.T) []byte {
 	return buf.Bytes()
 }
 
-//nolint:exhaustruct_v5 // the extractor only reads the type, name, size, and mode
+//nolint:exhaustruct // the extractor only reads the type, name, size, and mode
 func testHeader(typeflag byte, name string, size int64) *tar.Header {
 	return &tar.Header{
 		Typeflag: typeflag,

@@ -18,11 +18,15 @@ const (
 	benchmarkMediumSize  = 20
 	benchmarkLargeSize   = 100
 	benchmarkArchiveMode = 0o644
+	benchmarkEmptyLength = 0
 )
 
 // BenchmarkExtractTarGz measures archive extraction.
 func BenchmarkExtractTarGz(b *testing.B) {
-	for _, size := range []int{benchmarkSmallSize, benchmarkMediumSize, benchmarkLargeSize} {
+	sizes := []int{benchmarkSmallSize, benchmarkMediumSize, benchmarkLargeSize}
+
+	for index := range sizes {
+		size := sizes[index]
 		b.Run(fmt.Sprintf("files_%d", size), func(b *testing.B) {
 			runExtractTarGzBenchmark(b, size)
 		})
@@ -81,7 +85,7 @@ func benchmarkArchive(b *testing.B, size int) []byte {
 	return buf.Bytes()
 }
 
-func closeBenchmarkArchive(b *testing.B, tarWriter *tar.Writer, gz *gzip.Writer) {
+func closeBenchmarkArchive(b *testing.B, tarWriter *tar.Writer, gzipWriter *gzip.Writer) {
 	b.Helper()
 
 	err := tarWriter.Close()
@@ -89,12 +93,13 @@ func closeBenchmarkArchive(b *testing.B, tarWriter *tar.Writer, gz *gzip.Writer)
 		b.Fatal(err)
 	}
 
-	err = gz.Close()
+	err = gzipWriter.Close()
 	if err != nil {
 		b.Fatal(err)
 	}
 }
 
+//nolint:funlen,maintidx,revive // archive entry setup is one benchmark operation
 func writeBenchmarkArchiveEntry(b *testing.B, tarWriter *tar.Writer, index int) {
 	b.Helper()
 
@@ -117,7 +122,7 @@ func writeBenchmarkArchiveEntry(b *testing.B, tarWriter *tar.Writer, index int) 
 		b.Fatal(err)
 	}
 
-	if written == 0 {
+	if written == benchmarkEmptyLength {
 		b.Fatal("empty archive entry")
 	}
 }

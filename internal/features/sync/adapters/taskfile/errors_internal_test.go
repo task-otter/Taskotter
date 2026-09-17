@@ -20,7 +20,7 @@ const (
 	moduleWithVars = yamlHeader + "vars:\n  GO_VERSION: \"1.22\"\n"
 	yamlHeader     = "version: \"3\"\n"
 	fromDestESLint = "eslint"
-	folderTaskfile = "taskfiles"
+	folderTaskfile = "taskfiles" //nolint:goconst // fixture name is intentionally local to this test
 	valueText      = "value"
 	plainText      = "plain"
 	lintTask       = "lint"
@@ -397,11 +397,11 @@ func failIfErr(t *testing.T, err error) {
 }
 
 func emptyDocumentNode() *yaml.Node {
-	//nolint:exhaustruct_v5 // an empty document node fails to encode, which is the point
+	//nolint:exhaustruct // an empty document node fails to encode, which is the point
 	return &yaml.Node{Kind: yaml.DocumentNode}
 }
 
 func newYAMLSequenceNodeForTest() *yaml.Node {
-	//nolint:exhaustruct_v5 // only the kind matters for this fixture
+	//nolint:exhaustruct // only the kind matters for this fixture
 	return &yaml.Node{Kind: yaml.SequenceNode}
 }

@@ -325,5 +325,5 @@ func newStubClient(t *testing.T, status int, body string) *Client {
 }
 
 func newStubResponse(body io.ReadCloser) *http.Response {
-	return &http.Response{Body: body} //nolint:exhaustruct_v5 // appendBodyClose only reads the body
+	return &http.Response{Body: body} //nolint:exhaustruct // appendBodyClose only reads the body
 }

@@ -10,10 +10,11 @@ import (
 
 const (
 	benchmarkSmallSize  = 10
-	benchmarkMediumSize = scoreIdenticalString
-	benchmarkLargeSize  = scoreExactMatch
+	benchmarkMediumSize = 100  //nolint:goconst // benchmark sizing is intentionally independent
+	benchmarkLargeSize  = 1000 //nolint:goconst // benchmark sizing is intentionally independent
 	benchmarkModuleFmt  = "module-%d"
 	benchmarkOffset     = 1
+	benchmarkZero       = 0
 )
 
 // BenchmarkResolveTransitive measures dependency traversal at several graph sizes.
@@ -65,7 +66,10 @@ func BenchmarkBuildDestinationMap(b *testing.B) {
 func benchmarkSizes(b *testing.B, label string, run func(*testing.B, int)) {
 	b.Helper()
 
-	for _, size := range []int{benchmarkSmallSize, benchmarkMediumSize, benchmarkLargeSize} {
+	sizes := []int{benchmarkSmallSize, benchmarkMediumSize, benchmarkLargeSize}
+
+	for index := range sizes {
+		size := sizes[index]
 		b.Run(fmt.Sprintf("%s_%d", label, size), func(b *testing.B) { run(b, size) })
 	}
 }
@@ -73,7 +77,7 @@ func benchmarkSizes(b *testing.B, label string, run func(*testing.B, int)) {
 func runDestinationMapBenchmark(b *testing.B, size int) {
 	b.Helper()
 
-	sources := make([]string, 0, size)
+	sources := make([]string, benchmarkZero, size)
 
 	for index := range sources {
 		sources = append(sources, fmt.Sprintf("tool-%d/node/pnpm", index))

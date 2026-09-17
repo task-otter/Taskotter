@@ -9,21 +9,26 @@ import (
 )
 
 const (
-	benchmarkSmallSize  = 10
-	benchmarkMediumSize = 100
-	benchmarkLargeSize  = 1000
-	benchmarkFirstIndex = 0
+	benchmarkSmallSize   = 10
+	benchmarkMediumSize  = 100
+	benchmarkLargeSize   = 1000
+	benchmarkFirstIndex  = 0
+	benchmarkEmptyLength = 0 //nolint:goconst // benchmark sentinel is local to this benchmark
 )
 
 // BenchmarkMarshal measures YAML marshaling.
 func BenchmarkMarshal(b *testing.B) {
-	for _, size := range []int{benchmarkSmallSize, benchmarkMediumSize, benchmarkLargeSize} {
+	sizes := []int{benchmarkSmallSize, benchmarkMediumSize, benchmarkLargeSize}
+
+	for index := range sizes {
+		size := sizes[index]
 		b.Run(fmt.Sprintf("entries_%d", size), func(b *testing.B) {
 			runMarshalBenchmark(b, size)
 		})
 	}
 }
 
+//nolint:funlen // benchmark setup and measurement are clearer together
 func runMarshalBenchmark(b *testing.B, size int) {
 	b.Helper()
 
@@ -42,7 +47,7 @@ func runMarshalBenchmark(b *testing.B, size int) {
 	for range b.N {
 		data, err := Marshal(value)
 
-		if err != nil || len(data) == 0 {
+		if err != nil || len(data) == benchmarkEmptyLength {
 			b.Fatalf("marshal yaml: %v", err)
 		}
 	}

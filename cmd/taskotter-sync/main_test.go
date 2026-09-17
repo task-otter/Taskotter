@@ -321,7 +321,8 @@ func swapStdout(t *testing.T, writer io.Writer) {
 }
 
 func unchangedResult() *syncrun.Result {
-	return &syncrun.Result{ //nolint:exhaustruct_v5 // only these fields are reported
+	//nolint:exhaustruct // only these fields are reported
+	return &syncrun.Result{
 		Changed:   false,
 		SourceSHA: sourceSHAHex,
 	}

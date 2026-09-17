@@ -59,6 +59,18 @@ task go:test -- -race -run TestName ./internal/...
 task go:bench -- -bench BenchmarkName ./internal/parser
 ```
 
+For CodSpeed, run the same Go benchmarks through its walltime runner:
+
+```sh
+codspeed run -m walltime -- go test -run '^$' -bench . -benchmem ./...
+```
+
+To focus on resolution benchmarks:
+
+```sh
+go test -run '^$' -bench 'Benchmark(Resolve|Normalize)' -benchmem ./internal/features/resolve/service
+```
+
 `test` runs plain `go test -v`. For converting a go test log to JUnit XML, use
 `go-junit-report:report`.
 `fuzz` runs a single target for `GO_FUZZTIME` (default `30s`); Go fuzzes one

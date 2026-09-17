@@ -83,14 +83,11 @@ vars:
   YAMLLINT_UV_TOOL: '{{.YAMLLINT_UV_TOOL | default "yamllint"}}'
   ZIZMOR_WINGET_INSTALLABLE: '{{.ZIZMOR_WINGET_INSTALLABLE | default "zizmor.zizmor"}}'
   GO_LOAD: >-
-    {{.GO_LOAD | default `
-    \$u = [Environment]::GetEnvironmentVariable('Path', 'User');
-    if (\$u) { \$env:Path = \$u + ';' + \$env:Path };
-    if (Get-Command go -ErrorAction SilentlyContinue) {
+    {{.GO_LOAD | default ` \$u = [Environment]::GetEnvironmentVariable('Path', 'User'); if (\$u) { \$env:Path = \$u + ';' + \$env:Path }; if (Get-Command go -ErrorAction SilentlyContinue) {
+
       \$goBin = Join-Path ((go env GOPATH).Trim()) 'bin';
       if (Test-Path -LiteralPath \$goBin) { \$env:Path = \$goBin + ';' + \$env:Path }
-    }
-    `}}
+    } `}}
 includes:
   go:
     taskfile: go/Taskfile.yml

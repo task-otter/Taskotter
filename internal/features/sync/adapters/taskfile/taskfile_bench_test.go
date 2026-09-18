@@ -19,16 +19,21 @@ const (
 	benchmarkModuleNameFmt = "module-%d"
 )
 
-// BenchmarkRewriteIncludes measures include rewriting.
-func BenchmarkRewriteIncludes(b *testing.B) {
+func runBenchmarkSizes(b *testing.B, prefix string, fn func(*testing.B, int)) {
+	b.Helper()
+
 	sizes := []int{benchmarkSmallSize, benchmarkMediumSize, benchmarkLargeSize}
 
-	for index := range sizes {
-		size := sizes[index]
-		b.Run(fmt.Sprintf("includes_%d", size), func(b *testing.B) {
-			runRewriteIncludesBenchmark(b, size)
+	for _, size := range sizes {
+		b.Run(fmt.Sprintf("%s_%d", prefix, size), func(b *testing.B) {
+			fn(b, size)
 		})
 	}
+}
+
+// BenchmarkRewriteIncludes measures include rewriting.
+func BenchmarkRewriteIncludes(b *testing.B) {
+	runBenchmarkSizes(b, "includes", runRewriteIncludesBenchmark)
 }
 
 func runRewriteIncludesBenchmark(b *testing.B, size int) {
@@ -65,14 +70,7 @@ func runRewriteIncludesIterations(b *testing.B, content []byte, mapping map[stri
 
 // BenchmarkUpdateRootTaskfile measures root taskfile updates.
 func BenchmarkUpdateRootTaskfile(b *testing.B) {
-	sizes := []int{benchmarkSmallSize, benchmarkMediumSize, benchmarkLargeSize}
-
-	for index := range sizes {
-		size := sizes[index]
-		b.Run(fmt.Sprintf("modules_%d", size), func(b *testing.B) {
-			runUpdateRootTaskfileBenchmark(b, size)
-		})
-	}
+	runBenchmarkSizes(b, "modules", runUpdateRootTaskfileBenchmark)
 }
 
 func runUpdateRootTaskfileBenchmark(b *testing.B, size int) {

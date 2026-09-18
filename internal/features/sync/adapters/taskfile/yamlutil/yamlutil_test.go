@@ -15,7 +15,6 @@ const (
 	testUpdatedValue = "updated"
 	testNewKey       = "new"
 	testCloneValue   = "changed"
-	secondPairIndex  = firstIndex
 )
 
 // TestNodeHelpersPreserveMappingSemantics verifies mapping mutations preserve keys.
@@ -47,10 +46,10 @@ func TestCloneDeepCopiesContent(t *testing.T) {
 
 	clone := Clone(original)
 
-	clone.Content[secondPairIndex].Value = testCloneValue
+	clone.Content[firstIndex].Value = testCloneValue
 
-	if original.Content[secondPairIndex].Value != testValue {
-		t.Fatalf("clone mutated original: %q", original.Content[secondPairIndex].Value)
+	if original.Content[firstIndex].Value != testValue {
+		t.Fatalf("clone mutated original: %q", original.Content[firstIndex].Value)
 	}
 }
 

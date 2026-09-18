@@ -525,36 +525,51 @@ func resolveVersionRef(ctx context.Context, client *Client, req *versionRefReque
 	return resolveRequestedTagRef(ctx, client, req)
 }
 
-func resolveDefaultBranchRef(ctx context.Context, client *Client, req *versionRefRequest) error {
+func resolveRefWithKind(
+	ctx context.Context,
+	req *versionRefRequest,
+	sourceRef string,
+	wrapMsg string,
+	errKind string,
+	resolveFn func(context.Context) (string, error),
+) error {
 	err := applyResolvedRef(ctx, &resolvedRefRequest{
 		info:      req.info,
-		sourceRef: "refs/heads/" + req.defaultBranch,
-		wrapMsg:   "resolve branch head",
-		resolve: func(callCtx context.Context) (string, error) {
-			return resolveBranchHead(callCtx, client, req.defaultBranch)
-		},
+		sourceRef: sourceRef,
+		wrapMsg:   wrapMsg,
+		resolve:   resolveFn,
 	})
 	if err != nil {
-		return fmt.Errorf(fmtApplyResolvedRefErr, "resolve branch ref", err)
+		return fmt.Errorf(fmtApplyResolvedRefErr, errKind, err)
 	}
 
 	return nil
 }
 
+func resolveDefaultBranchRef(ctx context.Context, client *Client, req *versionRefRequest) error {
+	return resolveRefWithKind(
+		ctx,
+		req,
+		"refs/heads/"+req.defaultBranch,
+		"resolve branch head",
+		"resolve branch ref",
+		func(callCtx context.Context) (string, error) {
+			return resolveBranchHead(callCtx, client, req.defaultBranch)
+		},
+	)
+}
+
 func resolveRequestedTagRef(ctx context.Context, client *Client, req *versionRefRequest) error {
-	err := applyResolvedRef(ctx, &resolvedRefRequest{
-		info:      req.info,
-		sourceRef: "refs/tags/" + req.requestedVersion,
-		wrapMsg:   "resolve tag",
-		resolve: func(callCtx context.Context) (string, error) {
+	return resolveRefWithKind(
+		ctx,
+		req,
+		"refs/tags/"+req.requestedVersion,
+		"resolve tag",
+		"resolve tag ref",
+		func(callCtx context.Context) (string, error) {
 			return resolveTag(callCtx, client, req.requestedVersion)
 		},
-	})
-	if err != nil {
-		return fmt.Errorf(fmtApplyResolvedRefErr, "resolve tag ref", err)
-	}
-
-	return nil
+	)
 }
 
 func resolveTag(ctx context.Context, client *Client, tag string) (string, error) {

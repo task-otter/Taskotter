@@ -602,7 +602,7 @@ func TestUpdateRootTaskfilePreservesFoldedModuleVar(t *testing.T) {
 	want := sourceVarEntry(
 		t,
 		string(module),
-		sourceVarQuery{key: "GO_LOAD", endMarker: "\n\ntasks:"},
+		&sourceVarQuery{key: "GO_LOAD", endMarker: "\n\ntasks:"},
 	)
 
 	if !strings.Contains(string(out), want) {
@@ -753,7 +753,7 @@ func TestUpdateRootTaskfilePreservesCRLF(t *testing.T) {
 	}
 }
 
-func sourceVarEntry(t *testing.T, content string, query sourceVarQuery) string {
+func sourceVarEntry(t *testing.T, content string, query *sourceVarQuery) string {
 	t.Helper()
 
 	start := strings.Index(content, "  "+query.key+":")

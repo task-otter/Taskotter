@@ -735,6 +735,7 @@ func renderRootVarPair(pair mappingPair, rawVars rawModuleVars, tasks []string) 
 
 	if len(raw) != consts.IndexZero &&
 		(pair.value.Kind != yaml.ScalarNode || strings.Contains(string(raw), defaultMarker)) {
+
 		return renderRawRootVarPair(pair, raw), nil
 	}
 

@@ -138,16 +138,20 @@ func TestFileChangeFromDataDetectsUpdate(t *testing.T) {
 	}
 }
 
+func assertPrepareStagingRootFailsWithOps(t *testing.T, ops *fileOps) {
+	t.Helper()
+
+	root, err := prepareStagingRootWithOps(ops, t.TempDir(), config.DefaultTargetFolder)
+	iox.Discard(root)
+	assertFails(t, err)
+}
+
 // TestPrepareStagingRootReportsMkdirFailure verifies parent mkdir failures surface.
 func TestPrepareStagingRootReportsMkdirFailure(t *testing.T) {
 	t.Parallel()
 	lockSeams(t)
 
-	ops := swapMkdirAll(t, failingMkdirAll)
-
-	root, err := prepareStagingRootWithOps(ops, t.TempDir(), config.DefaultTargetFolder)
-	iox.Discard(root)
-	assertFails(t, err)
+	assertPrepareStagingRootFailsWithOps(t, swapMkdirAll(t, failingMkdirAll))
 }
 
 // TestPrepareStagingRootReportsTempFailure verifies MkdirTemp failures surface.
@@ -155,11 +159,7 @@ func TestPrepareStagingRootReportsTempFailure(t *testing.T) {
 	t.Parallel()
 	lockSeams(t)
 
-	ops := swapMkdirTemp(t, failingMkdirTemp)
-
-	root, err := prepareStagingRootWithOps(ops, t.TempDir(), config.DefaultTargetFolder)
-	iox.Discard(root)
-	assertFails(t, err)
+	assertPrepareStagingRootFailsWithOps(t, swapMkdirTemp(t, failingMkdirTemp))
 }
 
 // TestPruneDirsUntilStopReportsFailure verifies prune stops on remove errors.
@@ -1242,16 +1242,23 @@ func TestBuildRootTaskfileReportsUpdateFailure(t *testing.T) {
 	assertFails(t, err)
 }
 
+func sampleFailingWalkCollectArgs(t *testing.T) *collectModuleArgs {
+	t.Helper()
+
+	ops := swapWalkDir(t, failingWalk)
+	args := sampleCollectArgs(t.TempDir())
+
+	args.fsOps = ops
+
+	return args
+}
+
 // TestCollectAndTrackModuleFilesReportsFailure verifies collectModuleContents failures.
 func TestCollectAndTrackModuleFilesReportsFailure(t *testing.T) {
 	t.Parallel()
 	lockSeams(t)
 
-	ops := swapWalkDir(t, failingWalk)
-
-	args := sampleCollectArgs(t.TempDir())
-
-	args.fsOps = ops
+	args := sampleFailingWalkCollectArgs(t)
 
 	contents, managed, err := collectAndTrackModuleFiles(args)
 	iox.Discard(contents)
@@ -1279,11 +1286,7 @@ func TestCollectModuleContentsReportsScanFailure(t *testing.T) {
 	t.Parallel()
 	lockSeams(t)
 
-	ops := swapWalkDir(t, failingWalk)
-
-	args := sampleCollectArgs(t.TempDir())
-
-	args.fsOps = ops
+	args := sampleFailingWalkCollectArgs(t)
 
 	contents, docs, err := collectModuleContents(args)
 	iox.Discard(contents)
@@ -1658,7 +1661,7 @@ func sampleCollectArgs(sourceDir string) *collectModuleArgs {
 	}
 }
 
-func swapWalkThenFail(t *testing.T) fileOps {
+func swapWalkThenFail(t *testing.T) *fileOps {
 	t.Helper()
 
 	calls := consts.IndexZero
@@ -1816,7 +1819,7 @@ func lockWithManaged(path string) *syncLock {
 
 func newStagingSession(
 	copyFile func(string, *domain.FileEntry) error,
-	ops ...fileOps,
+	ops ...*fileOps,
 ) stagingSession {
 	var session stagingSession
 
@@ -2032,7 +2035,7 @@ func lockSeams(t *testing.T) {
 	t.Cleanup(testsupport.Lock())
 }
 
-func swapChmodFile(t *testing.T, stub func(*os.File, os.FileMode) error) fileOps {
+func swapChmodFile(t *testing.T, stub func(*os.File, os.FileMode) error) *fileOps {
 	t.Helper()
 
 	ops := defaultFileOps()
@@ -2042,7 +2045,7 @@ func swapChmodFile(t *testing.T, stub func(*os.File, os.FileMode) error) fileOps
 	return ops
 }
 
-func swapCloseFile(t *testing.T, stub func(*os.File) error) fileOps {
+func swapCloseFile(t *testing.T, stub func(*os.File) error) *fileOps {
 	t.Helper()
 
 	ops := defaultFileOps()
@@ -2052,7 +2055,7 @@ func swapCloseFile(t *testing.T, stub func(*os.File) error) fileOps {
 	return ops
 }
 
-func swapCreateTemp(t *testing.T, stub func(string, string) (*os.File, error)) fileOps {
+func swapCreateTemp(t *testing.T, stub func(string, string) (*os.File, error)) *fileOps {
 	t.Helper()
 
 	ops := defaultFileOps()
@@ -2062,7 +2065,7 @@ func swapCreateTemp(t *testing.T, stub func(string, string) (*os.File, error)) f
 	return ops
 }
 
-func swapMarshalYAML(t *testing.T, stub func(any) ([]byte, error)) fileOps {
+func swapMarshalYAML(t *testing.T, stub func(any) ([]byte, error)) *fileOps {
 	t.Helper()
 
 	ops := defaultFileOps()
@@ -2072,7 +2075,7 @@ func swapMarshalYAML(t *testing.T, stub func(any) ([]byte, error)) fileOps {
 	return ops
 }
 
-func swapMkdirAll(t *testing.T, stub func(string, os.FileMode) error) fileOps {
+func swapMkdirAll(t *testing.T, stub func(string, os.FileMode) error) *fileOps {
 	t.Helper()
 
 	ops := defaultFileOps()
@@ -2082,7 +2085,7 @@ func swapMkdirAll(t *testing.T, stub func(string, os.FileMode) error) fileOps {
 	return ops
 }
 
-func swapMkdirTemp(t *testing.T, stub func(string, string) (string, error)) fileOps {
+func swapMkdirTemp(t *testing.T, stub func(string, string) (string, error)) *fileOps {
 	t.Helper()
 
 	ops := defaultFileOps()
@@ -2092,7 +2095,7 @@ func swapMkdirTemp(t *testing.T, stub func(string, string) (string, error)) file
 	return ops
 }
 
-func swapOpenRelative(t *testing.T, stub func(string, string) (*os.File, error)) fileOps {
+func swapOpenRelative(t *testing.T, stub func(string, string) (*os.File, error)) *fileOps {
 	t.Helper()
 
 	ops := defaultFileOps()
@@ -2102,7 +2105,7 @@ func swapOpenRelative(t *testing.T, stub func(string, string) (*os.File, error))
 	return ops
 }
 
-func swapReadAll(t *testing.T, stub func(io.Reader) ([]byte, error)) fileOps {
+func swapReadAll(t *testing.T, stub func(io.Reader) ([]byte, error)) *fileOps {
 	t.Helper()
 
 	ops := defaultFileOps()
@@ -2112,7 +2115,7 @@ func swapReadAll(t *testing.T, stub func(io.Reader) ([]byte, error)) fileOps {
 	return ops
 }
 
-func swapRelPath(t *testing.T, stub func(string, string) (string, error)) fileOps {
+func swapRelPath(t *testing.T, stub func(string, string) (string, error)) *fileOps {
 	t.Helper()
 
 	ops := defaultFileOps()
@@ -2122,7 +2125,7 @@ func swapRelPath(t *testing.T, stub func(string, string) (string, error)) fileOp
 	return ops
 }
 
-func swapRemoveAll(t *testing.T, stub func(string) error) fileOps {
+func swapRemoveAll(t *testing.T, stub func(string) error) *fileOps {
 	t.Helper()
 
 	ops := defaultFileOps()
@@ -2132,7 +2135,7 @@ func swapRemoveAll(t *testing.T, stub func(string) error) fileOps {
 	return ops
 }
 
-func swapRemovePath(t *testing.T, stub func(string) error) fileOps {
+func swapRemovePath(t *testing.T, stub func(string) error) *fileOps {
 	t.Helper()
 
 	ops := defaultFileOps()
@@ -2142,7 +2145,7 @@ func swapRemovePath(t *testing.T, stub func(string) error) fileOps {
 	return ops
 }
 
-func swapRenamePath(t *testing.T, stub func(string, string) error) fileOps {
+func swapRenamePath(t *testing.T, stub func(string, string) error) *fileOps {
 	t.Helper()
 
 	ops := defaultFileOps()
@@ -2152,7 +2155,7 @@ func swapRenamePath(t *testing.T, stub func(string, string) error) fileOps {
 	return ops
 }
 
-func swapStatPath(t *testing.T, stub func(string) (os.FileInfo, error)) fileOps {
+func swapStatPath(t *testing.T, stub func(string) (os.FileInfo, error)) *fileOps {
 	t.Helper()
 
 	ops := defaultFileOps()
@@ -2162,7 +2165,7 @@ func swapStatPath(t *testing.T, stub func(string) (os.FileInfo, error)) fileOps 
 	return ops
 }
 
-func swapWalkDir(t *testing.T, stub func(string, fs.WalkDirFunc) error) fileOps {
+func swapWalkDir(t *testing.T, stub func(string, fs.WalkDirFunc) error) *fileOps {
 	t.Helper()
 
 	ops := defaultFileOps()
@@ -2172,7 +2175,7 @@ func swapWalkDir(t *testing.T, stub func(string, fs.WalkDirFunc) error) fileOps 
 	return ops
 }
 
-func swapWriteFull(t *testing.T, stub func(io.Writer, []byte) error) fileOps {
+func swapWriteFull(t *testing.T, stub func(io.Writer, []byte) error) *fileOps {
 	t.Helper()
 
 	ops := defaultFileOps()
@@ -2676,7 +2679,7 @@ func TestLockContentChangedReportsNewMarshalFailure(t *testing.T) {
 	assertFails(t, err)
 }
 
-func marshalFailsOnSecond(t *testing.T) fileOps {
+func marshalFailsOnSecond(t *testing.T) *fileOps {
 	t.Helper()
 
 	calls := consts.IndexZero

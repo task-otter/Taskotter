@@ -34,5 +34,5 @@ const (
 	lineStartOffsetError   = "line start offset: %w"
 	versionKey             = "version"
 	rootVarIndent          = 4
-	mappingPairIndent      = 2
+	mappingPairIndent      = yamlMappingPairKeyValue
 )

@@ -33,7 +33,7 @@ func PullPath(owner, repository string, number int) string {
 }
 
 // ListOpenPRPath returns the endpoint for open pull requests matching head/base.
-func ListOpenPRPath(owner, repository string, filters OpenPRQuery) string {
+func ListOpenPRPath(owner, repository string, filters *OpenPRQuery) string {
 	query := url.Values{}
 	query.Set("state", "open")
 	query.Set("head", filters.Head)

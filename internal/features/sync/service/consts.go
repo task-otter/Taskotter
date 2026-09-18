@@ -59,35 +59,35 @@ const (
 
 const (
 	// DocPolicySkip excludes README and docs/ paths from collected module files.
-	DocPolicySkip DocPolicy = iota
+	DocPolicySkip DocPolicy = DocPolicy(docPolicySkip)
 
 	// DocPolicyInclude copies documentation paths alongside taskfiles.
-	DocPolicyInclude
+	DocPolicyInclude DocPolicy = DocPolicy(docPolicyInclude)
 )
 
 const (
-	syncRootDisabled syncRootPolicy = iota
-	syncRootEnabled
+	syncRootDisabled syncRootPolicy = syncRootPolicy(docPolicySkip)
+	syncRootEnabled  syncRootPolicy = syncRootPolicy(docPolicyInclude)
 )
 
 const (
-	rootAbsent rootState = iota
-	rootPresent
+	rootAbsent  rootState = rootState(docPolicySkip)
+	rootPresent rootState = rootState(docPolicyInclude)
 )
 
 const (
-	priorContentEmpty priorContent = iota
-	priorContentExists
+	priorContentEmpty  priorContent = priorContent(docPolicySkip)
+	priorContentExists priorContent = priorContent(docPolicyInclude)
 )
 
 const (
-	metadataNotCandidate metadataScanResult = iota
-	metadataIsCandidate
+	metadataNotCandidate metadataScanResult = metadataScanResult(docPolicySkip)
+	metadataIsCandidate  metadataScanResult = metadataScanResult(docPolicyInclude)
 )
 
 const (
-	yamlStagedSkip yamlStagedKind = iota
-	yamlStagedRoot
+	yamlStagedSkip yamlStagedKind = yamlStagedKind(docPolicySkip)
+	yamlStagedRoot yamlStagedKind = iota + 1
 	yamlStagedLock
 	yamlStagedMetadata
 )

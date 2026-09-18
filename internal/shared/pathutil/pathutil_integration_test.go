@@ -487,26 +487,42 @@ func assertMetadataPathCases(t *testing.T, cases []struct {
 	}
 }
 
-func assertRelativePathsRejected(t *testing.T, root string, cases []string) {
+func assertPathValidationRejected(
+	t *testing.T,
+	name string,
+	cases []string,
+	validate func(string) (string, error),
+) {
 	t.Helper()
 
 	for _, item := range cases {
-		path, err := pathutil.ValidateRelativePath(root, item)
+		res, err := validate(item)
 		if err == nil {
-			t.Fatalf("ValidateRelativePath(%q) = %q, expected error", item, path)
+			t.Fatalf("%s(%q) = %q, expected error", name, item, res)
 		}
 	}
 }
 
-func assertTargetFoldersRejected(t *testing.T, workspace string, cases []string) {
-	t.Helper()
+func assertRelativePathsRejected(t *testing.T, root string, cases []string) {
+	assertPathValidationRejected(
+		t,
+		"ValidateRelativePath",
+		cases,
+		func(item string) (string, error) {
+			return pathutil.ValidateRelativePath(root, item)
+		},
+	)
+}
 
-	for _, item := range cases {
-		folder, err := pathutil.ValidateTargetFolder(item, workspace)
-		if err == nil {
-			t.Fatalf("ValidateTargetFolder(%q) = %q, expected error", item, folder)
-		}
-	}
+func assertTargetFoldersRejected(t *testing.T, workspace string, cases []string) {
+	assertPathValidationRejected(
+		t,
+		"ValidateTargetFolder",
+		cases,
+		func(item string) (string, error) {
+			return pathutil.ValidateTargetFolder(item, workspace)
+		},
+	)
 }
 
 // TestValidateTargetFolderRejectsEscapingSymlink verifies a symlink escaping the workspace is rejected.

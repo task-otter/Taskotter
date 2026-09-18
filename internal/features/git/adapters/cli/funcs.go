@@ -369,16 +369,19 @@ func branchExists(ctx context.Context, client *Client, branch string) (bool, err
 	return false, nil
 }
 
-// CheckoutBranch checks out an existing branch.
-func (client *Client) CheckoutBranch(ctx context.Context, branch string) error {
+func (client *Client) runOp(op string, err error) error {
 	iox.Discard(client.fns)
 
-	err := checkoutBranch(ctx, client, branch)
 	if err != nil {
-		return fmt.Errorf("checkout branch: %w", err)
+		return fmt.Errorf("%s: %w", op, err)
 	}
 
 	return nil
+}
+
+// CheckoutBranch checks out an existing branch.
+func (client *Client) CheckoutBranch(ctx context.Context, branch string) error {
+	return client.runOp("checkout branch", checkoutBranch(ctx, client, branch))
 }
 
 func checkoutBranch(ctx context.Context, client *Client, branch string) error {
@@ -401,14 +404,7 @@ func isNothingToCommit(err error) bool {
 
 // Commit creates a commit with the given message.
 func (client *Client) Commit(ctx context.Context, message string) error {
-	iox.Discard(client.fns)
-
-	err := commit(ctx, client, message)
-	if err != nil {
-		return fmt.Errorf("commit changes: %w", err)
-	}
-
-	return nil
+	return client.runOp("commit changes", commit(ctx, client, message))
 }
 
 func commit(ctx context.Context, client *Client, message string) error {
@@ -476,14 +472,7 @@ func applyOriginCredentials(ctx context.Context, client *Client, creds *credArgs
 
 // CreateOrResetBranch creates or resets a branch and checks it out.
 func (client *Client) CreateOrResetBranch(ctx context.Context, branch string) error {
-	iox.Discard(client.fns)
-
-	err := createOrResetBranch(ctx, client, branch)
-	if err != nil {
-		return fmt.Errorf("create or reset branch: %w", err)
-	}
-
-	return nil
+	return client.runOp("create or reset branch", createOrResetBranch(ctx, client, branch))
 }
 
 func createOrResetBranch(ctx context.Context, client *Client, branch string) error {
@@ -582,14 +571,7 @@ func lastCommitMessage(ctx context.Context, client *Client, branch string) (stri
 
 // Push pushes a branch to origin.
 func (client *Client) Push(ctx context.Context, branch string) error {
-	iox.Discard(client.fns)
-
-	err := push(ctx, client, branch)
-	if err != nil {
-		return fmt.Errorf("push branch: %w", err)
-	}
-
-	return nil
+	return client.runOp("push branch", push(ctx, client, branch))
 }
 
 func push(ctx context.Context, client *Client, branch string) error {
@@ -608,14 +590,10 @@ func push(ctx context.Context, client *Client, branch string) error {
 
 // PushForceWithLease pushes a branch to origin with force-with-lease.
 func (client *Client) PushForceWithLease(ctx context.Context, branch string) error {
-	iox.Discard(client.fns)
-
-	err := pushForceWithLease(ctx, client, branch)
-	if err != nil {
-		return fmt.Errorf("push branch with force-with-lease: %w", err)
-	}
-
-	return nil
+	return client.runOp(
+		"push branch with force-with-lease",
+		pushForceWithLease(ctx, client, branch),
+	)
 }
 
 func pushForceWithLease(ctx context.Context, client *Client, branch string) error {

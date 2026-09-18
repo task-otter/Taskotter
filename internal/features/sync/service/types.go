@@ -28,7 +28,7 @@ type (
 	}
 
 	removeStaleFileArgs = struct {
-		fsOps        fileOps
+		fsOps        *fileOps
 		old          *managedFile
 		current      map[string]struct{}
 		workspace    string
@@ -55,7 +55,7 @@ type (
 	}
 
 	mergeParentDocsArgs = struct {
-		fsOps      fileOps
+		fsOps      *fileOps
 		collect    *collectModuleArgs
 		contents   fMap
 		parentDocs map[string]struct{}
@@ -159,7 +159,7 @@ type (
 	}
 
 	diffInput = struct {
-		fsOps        fileOps
+		fsOps        *fileOps
 		plan         *domain.Plan
 		workspace    string
 		metadataPath string
@@ -187,7 +187,7 @@ type (
 	}
 
 	stagingSession = struct {
-		fsOps       fileOps
+		fsOps       *fileOps
 		copyFile    func(string, *domain.FileEntry) error
 		stagingRoot string
 		staged      []stagedFile
@@ -195,7 +195,7 @@ type (
 
 	collectOptions = struct {
 		ops          ports.TaskfileOps
-		fsOps        fileOps
+		fsOps        *fileOps
 		sourceToDest map[string]string
 		sourceDir    string
 		fromDest     string
@@ -204,7 +204,7 @@ type (
 
 	// CollectOptions bundles inputs for CollectModuleFiles.
 	CollectOptions = struct {
-		fsOps        fileOps
+		fsOps        *fileOps
 		TaskfileOps  ports.TaskfileOps
 		SourceToDest map[string]string
 		SourceDir    string
@@ -214,7 +214,7 @@ type (
 
 	moduleCollectArgs = struct {
 		ops          ports.TaskfileOps
-		fsOps        fileOps
+		fsOps        *fileOps
 		entry        os.DirEntry
 		sourceToDest map[string]string
 		contents     map[string]domain.FileEntry
@@ -230,7 +230,7 @@ type (
 	}
 
 	finalizePlanArgs = struct {
-		fsOps        fileOps
+		fsOps        *fileOps
 		plan         *domain.Plan
 		meta         *domain.Metadata
 		workspace    string
@@ -241,7 +241,7 @@ type (
 	}
 
 	diffLockArgs = struct {
-		fsOps     fileOps
+		fsOps     *fileOps
 		plan      *domain.Plan
 		workspace string
 		lockPath  string
@@ -256,7 +256,7 @@ type (
 	}
 
 	stagePathsInput = struct {
-		fsOps        fileOps
+		fsOps        *fileOps
 		plan         *domain.Plan
 		workspace    string
 		metadataPath string
@@ -271,7 +271,7 @@ type (
 	}
 
 	copyFileArgs = struct {
-		fsOps fileOps
+		fsOps *fileOps
 		root  string
 		rel   string
 		dst   string
@@ -279,7 +279,7 @@ type (
 	}
 
 	finalizeTempArgs = struct {
-		fsOps fileOps
+		fsOps *fileOps
 		tmp   *os.File
 		path  string
 		data  []byte
@@ -287,7 +287,7 @@ type (
 	}
 
 	modulePlanArgs = struct {
-		fsOps          fileOps
+		fsOps          *fileOps
 		syncInput      *domain.SyncInput
 		mod            *moduleRecord
 		oldLock        *syncLock
@@ -296,7 +296,7 @@ type (
 	}
 
 	collectModuleArgs = struct {
-		fsOps      fileOps
+		fsOps      *fileOps
 		syncInput  *domain.SyncInput
 		mod        *moduleRecord
 		sourceDir  string
@@ -309,14 +309,14 @@ type (
 	}
 
 	writeStagedArgs = struct {
-		fsOps     fileOps
+		fsOps     *fileOps
 		copyFile  func(string, *domain.FileEntry) error
 		workspace string
 		staged    []stagedFile
 	}
 
 	stagePlanArgs = struct {
-		fsOps        fileOps
+		fsOps        *fileOps
 		copyFile     func(string, *domain.FileEntry) error
 		workspace    string
 		targetFolder string
@@ -336,14 +336,14 @@ type (
 	}
 
 	metadataWalkerArgs = struct {
-		fsOps               fileOps
+		fsOps               *fileOps
 		candidates          *[]string
 		workspace           string
 		currentMetadataPath string
 	}
 
 	metadataCandidateArgs = struct {
-		fsOps               fileOps
+		fsOps               *fileOps
 		entry               os.DirEntry
 		workspace           string
 		currentMetadataPath string
@@ -358,14 +358,14 @@ type (
 	}
 
 	prepareStagingInput = struct {
-		fsOps     fileOps
+		fsOps     *fileOps
 		plan      *domain.Plan
 		syncInput *domain.SyncInput
 		workspace string
 	}
 
 	stagePreparedInput = struct {
-		fsOps     fileOps
+		fsOps     *fileOps
 		plan      *domain.Plan
 		syncInput *domain.SyncInput
 		workspace string
@@ -373,7 +373,7 @@ type (
 	}
 
 	validateWriteStagedInput = struct {
-		fsOps     fileOps
+		fsOps     *fileOps
 		copyFile  func(string, *domain.FileEntry) error
 		workspace string
 		args      validateStagedArgs
@@ -395,7 +395,7 @@ type (
 	}
 
 	modulePlanDirsInput = struct {
-		fsOps     fileOps
+		fsOps     *fileOps
 		syncInput *domain.SyncInput
 		mod       *moduleRecord
 		oldLock   *syncLock

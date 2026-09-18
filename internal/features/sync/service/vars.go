@@ -33,8 +33,8 @@ type fileOps struct {
 	marshalYAML      func(any) ([]byte, error)
 }
 
-func defaultFileOps() fileOps {
-	return fileOps{
+func defaultFileOps() *fileOps {
+	return &fileOps{
 		removeAll:        os.RemoveAll,
 		removePath:       os.Remove,
 		mkdirAll:         os.MkdirAll,
@@ -53,19 +53,23 @@ func defaultFileOps() fileOps {
 	}
 }
 
-func withFileOps(ops fileOps) fileOps {
+func withFileOps(ops *fileOps) *fileOps {
 	defaults := defaultFileOps()
 
-	ops = fillFileOpsOne(ops, defaults)
-	ops = fillFileOpsTwo(ops, defaults)
-	ops = fillFileOpsThree(ops, defaults)
-	ops = fillFileOpsFour(ops, defaults)
-	ops = fillFileOpsFive(ops, defaults)
+	if ops == nil {
+		ops = &fileOps{}
+	} else {
+		copied := *ops
+
+		ops = &copied
+	}
+
+	fillFileOpsDefaults(ops, defaults)
 
 	return ops
 }
 
-func fillFileOpsOne(ops, defaults fileOps) fileOps {
+func fillFileOpsDefaults(ops, defaults *fileOps) {
 	if ops.removeAll == nil {
 		ops.removeAll = defaults.removeAll
 	}
@@ -78,10 +82,6 @@ func fillFileOpsOne(ops, defaults fileOps) fileOps {
 		ops.mkdirAll = defaults.mkdirAll
 	}
 
-	return ops
-}
-
-func fillFileOpsTwo(ops, defaults fileOps) fileOps {
 	if ops.mkdirTemp == nil {
 		ops.mkdirTemp = defaults.mkdirTemp
 	}
@@ -94,10 +94,6 @@ func fillFileOpsTwo(ops, defaults fileOps) fileOps {
 		ops.renamePath = defaults.renamePath
 	}
 
-	return ops
-}
-
-func fillFileOpsThree(ops, defaults fileOps) fileOps {
 	if ops.statPath == nil {
 		ops.statPath = defaults.statPath
 	}
@@ -110,10 +106,6 @@ func fillFileOpsThree(ops, defaults fileOps) fileOps {
 		ops.writeFull = defaults.writeFull
 	}
 
-	return ops
-}
-
-func fillFileOpsFour(ops, defaults fileOps) fileOps {
 	if ops.readAll == nil {
 		ops.readAll = defaults.readAll
 	}
@@ -126,10 +118,6 @@ func fillFileOpsFour(ops, defaults fileOps) fileOps {
 		ops.relPath = defaults.relPath
 	}
 
-	return ops
-}
-
-func fillFileOpsFive(ops, defaults fileOps) fileOps {
 	if ops.closeFile == nil {
 		ops.closeFile = defaults.closeFile
 	}
@@ -141,8 +129,6 @@ func fillFileOpsFive(ops, defaults fileOps) fileOps {
 	if ops.marshalYAML == nil {
 		ops.marshalYAML = defaults.marshalYAML
 	}
-
-	return ops
 }
 
 var (

@@ -40,7 +40,7 @@ func TestSplitPathQuery(t *testing.T) {
 func TestListOpenPRAndRelativeURL(t *testing.T) {
 	t.Parallel()
 
-	path := ListOpenPRPath(testOwner, testRepo, OpenPRQuery{Head: "feature", Base: "main"})
+	path := ListOpenPRPath(testOwner, testRepo, &OpenPRQuery{Head: "feature", Base: "main"})
 
 	if path != "/repos/owner/repo/pulls?base=main&head=feature&state=open" {
 		t.Fatalf("ListOpenPRPath() = %q", path)

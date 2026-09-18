@@ -4,7 +4,8 @@
 package githubapi
 
 const (
-	defaultAPIHost = "api.github.com"
+	errCreatePullRequest = "create pull request: %w"
+	defaultAPIHost       = "api.github.com"
 
 	fmtListPullRequestsErr = "list pull requests: %w"
 

@@ -802,13 +802,7 @@ func assertCorruptMetadata(t *testing.T) {
 	t.Helper()
 	lockSeams(t)
 
-	root := t.TempDir()
-	rel := testMetadataFileName
-
-	err := os.WriteFile(filepath.Join(root, rel), []byte(testBadYAML), consts.FilePerm644)
-	if err != nil {
-		t.Fatal(err)
-	}
+	root, rel := writeCorruptFixture(t, testMetadataFileName)
 
 	meta, err := syncsvc.LoadMetadata(root, rel)
 	iox.Discard(meta)
@@ -828,13 +822,7 @@ func assertCorruptLock(t *testing.T) {
 	t.Helper()
 	lockSeams(t)
 
-	root := t.TempDir()
-	rel := "lock.yml"
-
-	err := os.WriteFile(filepath.Join(root, rel), []byte(testBadYAML), consts.FilePerm644)
-	if err != nil {
-		t.Fatal(err)
-	}
+	root, rel := writeCorruptFixture(t, "lock.yml")
 
 	lock, err := syncsvc.LoadLock(root, rel)
 	iox.Discard(lock)
@@ -842,6 +830,23 @@ func assertCorruptLock(t *testing.T) {
 	if err == nil {
 		t.Fatal(errExpectedCorruptLock)
 	}
+}
+
+func writeCorruptFixture(t *testing.T, rel string) (string, string) {
+	t.Helper()
+
+	root := t.TempDir()
+
+	err := os.WriteFile(
+		filepath.Join(root, rel),
+		[]byte(testBadYAML),
+		consts.FilePerm644,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return root, rel
 }
 
 // TestPackageManagerSwitchSameDestination verifies different package manager variants normalize to eslint.

@@ -9,11 +9,10 @@ import (
 )
 
 const (
-	benchmarkSmallSize   = 10
-	benchmarkMediumSize  = 100
-	benchmarkLargeSize   = 1000
-	benchmarkFirstIndex  = 0
-	benchmarkEmptyLength = 0
+	benchmarkSmallSize  = 10
+	benchmarkMediumSize = 100
+	benchmarkLargeSize  = 1000
+	benchmarkFirstIndex = 0
 )
 
 // BenchmarkMarshal measures YAML marshaling.
@@ -44,10 +43,16 @@ func runMarshalBenchmark(b *testing.B, size int) {
 	b.ResetTimer()
 
 	for range b.N {
-		data, err := Marshal(value)
+		benchmarkMarshalValue(b, value)
+	}
+}
 
-		if err != nil || len(data) == benchmarkEmptyLength {
-			b.Fatalf("marshal yaml: %v", err)
-		}
+func benchmarkMarshalValue(b *testing.B, value map[string]string) {
+	b.Helper()
+
+	data, err := Marshal(value)
+
+	if err != nil || len(data) == benchmarkFirstIndex {
+		b.Fatalf("marshal yaml: %v", err)
 	}
 }

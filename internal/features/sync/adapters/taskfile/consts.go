@@ -20,6 +20,11 @@ const (
 
 	errParseTaskfileRoot  = "parse taskfile root: %w"
 	errMarshalAndValidate = "marshal and validate: %w"
+	errRenderSection      = "render %s section: %w"
+	errRenderMappingPair  = "render mapping pair: %w"
+	errScalarSourceEnd    = "scalar source end: %w"
+	errFindClosingQuote   = "find closing quote: %w"
+	defaultMarker         = "| default"
 
 	lineFeed               = "\n"
 	carriageReturnLineFeed = "\r\n"

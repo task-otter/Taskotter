@@ -7,11 +7,15 @@ import (
 	"testing"
 )
 
+const outsidePath = "../outside"
+
 // TestIsSafeTarPath verifies archive paths stay within the extraction root.
 func TestIsSafeTarPath(t *testing.T) {
+	t.Parallel()
+
 	tests := map[string]bool{
 		"taskfiles/go/Taskfile.yml": true,
-		"../outside":                false,
+		outsidePath:                 false,
 		"/absolute":                 false,
 		"windows\\escape":           false,
 	}
@@ -25,7 +29,9 @@ func TestIsSafeTarPath(t *testing.T) {
 
 // TestEscapes verifies traversal paths are detected.
 func TestEscapes(t *testing.T) {
-	if !Escapes("../outside") || Escapes("inside/file") {
+	t.Parallel()
+
+	if !Escapes(outsidePath) || Escapes("inside/file") {
 		t.Fatal("unexpected extraction escape result")
 	}
 }

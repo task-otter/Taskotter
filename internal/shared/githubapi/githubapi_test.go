@@ -200,7 +200,12 @@ func TestDoRequestReportsBuildError(t *testing.T) {
 	client := newStubClient(t, http.StatusOK, consts.Empty)
 
 	resp, err := doRequest(t.Context(), client, newCall(badMethod, nil))
-	iox.Discard(resp)
+
+	if resp != nil {
+		_, copyErr := io.Copy(io.Discard, resp.Body)
+		closeErr := resp.Body.Close()
+		iox.Discard2(copyErr, closeErr)
+	}
 
 	if err == nil {
 		t.Fatalf(wantErrFmt, "doRequest")
@@ -217,7 +222,7 @@ func TestAppendBodyCloseReportsFailures(t *testing.T) {
 	}
 
 	for i := range cases {
-		err := appendBodyClose(nil, newStubResponse(cases[i]))
+		err := appendBodyClose(nil, cases[i])
 		if err == nil {
 			t.Fatalf(wantErrFmt, "appendBodyClose")
 		}
@@ -230,7 +235,7 @@ func TestAppendBodyCloseKeepsExistingError(t *testing.T) {
 
 	body := &stubBody{reader: strings.NewReader(consts.Empty), readErr: errStub, closeErr: errStub}
 
-	err := appendBodyClose(errStub, newStubResponse(body))
+	err := appendBodyClose(errStub, body)
 
 	if !errors.Is(err, errStub) {
 		t.Fatalf("err = %v, want %v", err, errStub)
@@ -324,8 +329,4 @@ func newStubClient(t *testing.T, status int, body string) *Client {
 	t.Cleanup(server.Close)
 
 	return clientFor(t, server.URL)
-}
-
-func newStubResponse(body io.ReadCloser) *http.Response {
-	return &http.Response{Body: body}
 }

@@ -8,7 +8,9 @@ import (
 	"strings"
 )
 
-const emptyValue = ""
+const (
+	emptyValue = ""
+)
 
 // Input reads INPUT_<NAME>, accepting both hyphen-preserving and underscore
 // spellings used by different GitHub Actions runners.

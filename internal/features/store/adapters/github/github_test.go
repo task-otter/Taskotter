@@ -132,7 +132,13 @@ func TestDoGetReportsInvalidURL(t *testing.T) {
 	client := NewClientWithHTTP(t.Context(), "token", &stubDoer{err: errStub}).WithBaseURL("://bad")
 
 	resp, err := doGet(t.Context(), client, "\n")
-	iox.Discard(resp)
+
+	if resp != nil {
+		_, copyErr := io.Copy(io.Discard, resp.Body)
+		closeErr := resp.Body.Close()
+		iox.Discard2(copyErr, closeErr)
+	}
+
 	assertFails(t, err)
 }
 
@@ -194,24 +200,24 @@ func TestSnapshotCleanupReportsRemoveFailure(t *testing.T) {
 // TestDrainResponseBodyReportsReadFailure verifies unreadable bodies are reported.
 func TestDrainResponseBodyReportsReadFailure(t *testing.T) {
 	t.Parallel()
-	assertFails(t, drainResponseBody(failingResponse()))
+	assertFails(t, drainResponseBody(failingBody()))
 }
 
 // TestDrainArchiveBodyReportsFailures verifies read and close failures are reported.
 func TestDrainArchiveBodyReportsFailures(t *testing.T) {
 	t.Parallel()
 
-	assertFails(t, secondOf(drainArchiveBody(failingResponse())))
-	assertFails(t, secondOf(drainArchiveBody(closeFailingResponse())))
+	assertFails(t, secondOf(drainArchiveBody(failingBody())))
+	assertFails(t, secondOf(drainArchiveBody(closeFailingBody())))
 }
 
 // TestCloseOnArchiveStatusErrorReportsCleanupFailures verifies drain and close failures join.
 func TestCloseOnArchiveStatusErrorReportsCleanupFailures(t *testing.T) {
 	t.Parallel()
 
-	assertFails(t, closeOnArchiveStatusError(notFoundResponse(failingBody())))
-	assertFails(t, closeOnArchiveStatusError(notFoundResponse(closeFailingBody())))
-	assertFails(t, closeOnArchiveStatusError(notFoundResponse(okBody())))
+	assertFails(t, closeOnArchiveStatusError(http.StatusNotFound, failingBody()))
+	assertFails(t, closeOnArchiveStatusError(http.StatusNotFound, closeFailingBody()))
+	assertFails(t, closeOnArchiveStatusError(http.StatusNotFound, okBody()))
 }
 
 // TestResolveSHAReportsPeelFailure verifies annotated tag peeling failures are reported.
@@ -278,10 +284,6 @@ func closeFailingBody() *stubBody {
 	return &stubBody{reader: strings.NewReader(consts.Empty), readErr: nil, closeErr: errStub}
 }
 
-func closeFailingResponse() *http.Response {
-	return newResponse(http.StatusOK, closeFailingBody())
-}
-
 // emptyArchive returns a valid gzip stream holding an empty tar, which extracts
 // to a store root without a taskfiles tree.
 func emptyArchive(t *testing.T) *bytes.Reader {
@@ -308,14 +310,6 @@ func failOnErr(t *testing.T, err error) {
 
 func failingBody() *stubBody {
 	return &stubBody{reader: strings.NewReader(consts.Empty), readErr: errStub, closeErr: nil}
-}
-
-func failingResponse() *http.Response {
-	return newResponse(http.StatusOK, failingBody())
-}
-
-func notFoundResponse(body io.ReadCloser) *http.Response {
-	return newResponse(http.StatusNotFound, body)
 }
 
 func newRefInfoForTest() *RefInfo {

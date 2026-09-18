@@ -15,31 +15,33 @@ const (
 	testUpdatedValue = "updated"
 	testNewKey       = "new"
 	testCloneValue   = "changed"
-	testPairCount    = 2
-	testSingleCount  = 1
-	secondPairIndex  = 1
+	secondPairIndex  = firstIndex
 )
 
 // TestNodeHelpersPreserveMappingSemantics verifies mapping mutations preserve keys.
 func TestNodeHelpersPreserveMappingSemantics(t *testing.T) {
+	t.Parallel()
+
 	mapping := Mapping()
 	AppendMappingPair(mapping, Scalar(testOldKey), Scalar(testValue))
 	SetValue(mapping, testOldKey, Scalar(testUpdatedValue))
 	SetValue(mapping, testNewKey, Scalar(testValue))
 
-	if got := len(Keys(mapping)); got != testPairCount {
-		t.Fatalf("mapping key count = %d, want %d", got, testPairCount)
+	if got := len(Keys(mapping)); got != mappingPairWidth {
+		t.Fatalf("mapping key count = %d, want %d", got, mappingPairWidth)
 	}
 
 	DeleteKey(mapping, testOldKey)
 
-	if got := len(Keys(mapping)); got != testSingleCount {
-		t.Fatalf("mapping key count after delete = %d, want %d", got, testSingleCount)
+	if got := len(Keys(mapping)); got != firstIndex {
+		t.Fatalf("mapping key count after delete = %d, want %d", got, firstIndex)
 	}
 }
 
 // TestCloneDeepCopiesContent verifies cloned nodes do not alias their source.
 func TestCloneDeepCopiesContent(t *testing.T) {
+	t.Parallel()
+
 	original := Mapping()
 	AppendMappingPair(original, Scalar("key"), Scalar(testValue))
 
@@ -54,11 +56,23 @@ func TestCloneDeepCopiesContent(t *testing.T) {
 
 // TestScalarAndSequenceKinds verifies YAML helper node kinds.
 func TestScalarAndSequenceKinds(t *testing.T) {
+	t.Parallel()
+
 	if Scalar(testValue).Kind != yaml.ScalarNode {
 		t.Fatal("scalar has wrong kind")
 	}
 
 	if Sequence().Kind != yaml.SequenceNode {
 		t.Fatal("sequence has wrong kind")
+	}
+}
+
+func TestSortedKeys(t *testing.T) {
+	t.Parallel()
+
+	got := SortedKeys(map[string]struct{}{"z": {}, "a": {}})
+
+	if len(got) != 2 || got[0] != "a" || got[1] != "z" {
+		t.Fatalf("SortedKeys() = %#v", got)
 	}
 }

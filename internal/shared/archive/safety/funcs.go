@@ -8,9 +8,11 @@ import (
 	"strings"
 )
 
+const parentPath = ".."
+
 // Escapes reports whether a relative path leaves its extraction root.
 func Escapes(rel string) bool {
-	return rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator))
+	return rel == parentPath || strings.HasPrefix(rel, parentPath+string(filepath.Separator))
 }
 
 // IsSafeTarPath rejects absolute, parent-traversing, and platform-specific

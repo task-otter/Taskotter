@@ -40,12 +40,12 @@ func ApplyPlan(plan *domain.Plan, syncInput *domain.SyncInput) error {
 }
 
 func applyPlanWithCleanup(plan *domain.Plan, syncInput *domain.SyncInput) (err error) {
-	session, err := startApplySession(plan, syncInput)
+	session, err := startApplySessionWithOps(defaultFileOps(), plan, syncInput)
 	if err != nil {
 		return fmt.Errorf("start apply session: %w", err)
 	}
 
-	defer cleanupStagingOnExit(session.stagingRoot, &err)
+	defer cleanupStagingOnExitWithOps(session.fsOps, session.stagingRoot, &err)
 
 	err = executeAppliedPlan(&session, plan, syncInput)
 	if err != nil {
@@ -56,7 +56,11 @@ func applyPlanWithCleanup(plan *domain.Plan, syncInput *domain.SyncInput) (err e
 }
 
 func cleanupStagingOnExit(stagingRoot string, err *error) {
-	cleanupErr := cleanupStagingDir(stagingRoot)
+	cleanupStagingOnExitWithOps(defaultFileOps(), stagingRoot, err)
+}
+
+func cleanupStagingOnExitWithOps(ops fileOps, stagingRoot string, err *error) {
+	cleanupErr := cleanupStagingDirWithOps(ops, stagingRoot)
 
 	if cleanupErr != nil && *err == nil {
 		*err = cleanupErr
@@ -82,10 +86,19 @@ func executeAppliedPlan(
 }
 
 func startApplySession(plan *domain.Plan, syncInput *domain.SyncInput) (stagingSession, error) {
+	return startApplySessionWithOps(defaultFileOps(), plan, syncInput)
+}
+
+func startApplySessionWithOps(
+	ops fileOps,
+	plan *domain.Plan,
+	syncInput *domain.SyncInput,
+) (stagingSession, error) {
 	session, err := prepareStaging(&prepareStagingInput{
 		plan:      plan,
 		syncInput: syncInput,
 		workspace: syncInput.Config.Workspace,
+		fsOps:     ops,
 	})
 	if err != nil {
 		return stagingSession{}, fmt.Errorf("prepare staging: %w", err)
@@ -111,12 +124,13 @@ func applyStagedPlan(input *applyStagedInput) error {
 		},
 		workspace: input.workspace,
 		copyFile:  input.session.copyFile,
+		fsOps:     input.session.fsOps,
 	})
 	if err != nil {
 		return fmt.Errorf("validate and write staged files: %w", err)
 	}
 
-	err = cleanupAfterApplyPlan(input)
+	err = cleanupAfterApplyPlanWithOps(input, input.session.fsOps)
 	if err != nil {
 		return fmt.Errorf("cleanup after apply plan: %w", err)
 	}
@@ -125,7 +139,12 @@ func applyStagedPlan(input *applyStagedInput) error {
 }
 
 func cleanupAfterApplyPlan(input *applyStagedInput) error {
-	err := cleanupAfterApply(
+	return cleanupAfterApplyPlanWithOps(input, defaultFileOps())
+}
+
+func cleanupAfterApplyPlanWithOps(input *applyStagedInput, ops fileOps) error {
+	err := cleanupAfterApplyWithOps(
+		ops,
 		input.plan,
 		input.workspace,
 		config.MetadataPath(input.syncInput.Config),
@@ -163,12 +182,20 @@ func buildStagedFiles(plan *domain.Plan, syncInput *domain.SyncInput) []stagedFi
 }
 
 func cleanupAfterApply(plan *domain.Plan, workspace, metadataPath string) error {
-	err := removeObsolete(plan, workspace)
+	return cleanupAfterApplyWithOps(defaultFileOps(), plan, workspace, metadataPath)
+}
+
+func cleanupAfterApplyWithOps(
+	ops fileOps,
+	plan *domain.Plan,
+	workspace, metadataPath string,
+) error {
+	err := removeObsoleteWithOps(ops, plan, workspace)
 	if err != nil {
 		return fmt.Errorf("remove obsolete files: %w", err)
 	}
 
-	err = cleanupLegacyMetadata(workspace, metadataPath)
+	err = cleanupLegacyMetadataWithOps(ops, workspace, metadataPath)
 	if err != nil {
 		return fmt.Errorf("clean up legacy metadata: %w", err)
 	}
@@ -177,7 +204,11 @@ func cleanupAfterApply(plan *domain.Plan, workspace, metadataPath string) error 
 }
 
 func cleanupFailedStaging(stagingRoot string, copyErr error) error {
-	removeErr := removeAll(stagingRoot)
+	return cleanupFailedStagingWithOps(defaultFileOps(), stagingRoot, copyErr)
+}
+
+func cleanupFailedStagingWithOps(ops fileOps, stagingRoot string, copyErr error) error {
+	removeErr := withFileOps(ops).removeAll(stagingRoot)
 	if removeErr != nil {
 		return errors.Join(
 			copyErr,
@@ -189,16 +220,20 @@ func cleanupFailedStaging(stagingRoot string, copyErr error) error {
 }
 
 func cleanupLegacyMetadata(workspace, metadataPath string) error {
+	return cleanupLegacyMetadataWithOps(defaultFileOps(), workspace, metadataPath)
+}
+
+func cleanupLegacyMetadataWithOps(ops fileOps, workspace, metadataPath string) error {
 	if metadataPath == config.LegacyMetadataPath {
 		return nil
 	}
 
-	err := removeLegacyMetadataFile(workspace)
+	err := removeLegacyMetadataFileWithOps(ops, workspace)
 	if err != nil {
 		return fmt.Errorf("remove legacy metadata file: %w", err)
 	}
 
-	err = removeLegacyMetadataDir(workspace)
+	err = removeLegacyMetadataDirWithOps(ops, workspace)
 	if err != nil {
 		return fmt.Errorf("remove legacy metadata directory: %w", err)
 	}
@@ -207,11 +242,15 @@ func cleanupLegacyMetadata(workspace, metadataPath string) error {
 }
 
 func cleanupOldTarget(plan *domain.Plan, workspace string) error {
+	return cleanupOldTargetWithOps(defaultFileOps(), plan, workspace)
+}
+
+func cleanupOldTargetWithOps(ops fileOps, plan *domain.Plan, workspace string) error {
 	if oldTargetUnchanged(plan) {
 		return nil
 	}
 
-	err := runOldTargetCleanupSteps(plan, workspace)
+	err := runOldTargetCleanupStepsWithOps(ops, plan, workspace)
 	if err != nil {
 		return fmt.Errorf("run old target cleanup steps: %w", err)
 	}
@@ -220,10 +259,20 @@ func cleanupOldTarget(plan *domain.Plan, workspace string) error {
 }
 
 func runOldTargetCleanupSteps(plan *domain.Plan, workspace string) error {
+	return runOldTargetCleanupStepsWithOps(defaultFileOps(), plan, workspace)
+}
+
+func runOldTargetCleanupStepsWithOps(ops fileOps, plan *domain.Plan, workspace string) error {
 	steps := []func(*domain.Plan, string) error{
-		removeOldTargetFiles,
-		removeOldTargetLock,
-		removeOldTargetMetadata,
+		func(plan *domain.Plan, workspace string) error {
+			return removeOldTargetFilesWithOps(ops, plan, workspace)
+		},
+		func(plan *domain.Plan, workspace string) error {
+			return removeOldTargetLockWithOps(ops, plan, workspace)
+		},
+		func(plan *domain.Plan, workspace string) error {
+			return removeOldTargetMetadataWithOps(ops, plan, workspace)
+		},
 	}
 
 	for i := range steps {
@@ -237,7 +286,11 @@ func runOldTargetCleanupSteps(plan *domain.Plan, workspace string) error {
 }
 
 func cleanupStagingDir(stagingRoot string) error {
-	removeErr := removeAll(stagingRoot)
+	return cleanupStagingDirWithOps(defaultFileOps(), stagingRoot)
+}
+
+func cleanupStagingDirWithOps(ops fileOps, stagingRoot string) error {
+	removeErr := withFileOps(ops).removeAll(stagingRoot)
 	if removeErr != nil {
 		return fmt.Errorf(errFmtCleanupStagingDir, stagingRoot, removeErr)
 	}
@@ -278,6 +331,7 @@ func prepareStaging(input *prepareStagingInput) (stagingSession, error) {
 		plan:      input.plan,
 		syncInput: input.syncInput,
 		workspace: input.workspace,
+		fsOps:     input.fsOps,
 	})
 	if err != nil {
 		return stagingSession{}, fmt.Errorf("stage prepared files: %w", err)
@@ -287,17 +341,23 @@ func prepareStaging(input *prepareStagingInput) (stagingSession, error) {
 }
 
 func prepareStagingRoot(workspace, targetFolder string) (string, error) {
+	return prepareStagingRootWithOps(defaultFileOps(), workspace, targetFolder)
+}
+
+func prepareStagingRootWithOps(ops fileOps, workspace, targetFolder string) (string, error) {
+	ops = withFileOps(ops)
+
 	stagingParent := pathutil.WorkspacePath(
 		workspace,
 		pathutil.JoinRelative(targetFolder, ".taskotter/staging"),
 	)
 
-	err := mkdirAll(stagingParent, dirModePerm)
+	err := ops.mkdirAll(stagingParent, dirModePerm)
 	if err != nil {
 		return consts.Empty, fmt.Errorf(errCreateStagingDir, err)
 	}
 
-	stagingRoot, err := mkdirTemp(stagingParent, "apply-*")
+	stagingRoot, err := ops.mkdirTemp(stagingParent, "apply-*")
 	if err != nil {
 		return consts.Empty, fmt.Errorf(errCreateStagingDir, err)
 	}
@@ -306,7 +366,11 @@ func prepareStagingRoot(workspace, targetFolder string) (string, error) {
 }
 
 func removeDirIfEmpty(dir, context string) error {
-	err := removePath(dir)
+	return removeDirIfEmptyWithOps(defaultFileOps(), dir, context)
+}
+
+func removeDirIfEmptyWithOps(ops fileOps, dir, context string) error {
+	err := withFileOps(ops).removePath(dir)
 
 	if err != nil && !os.IsNotExist(err) && !errorsIsDirectoryNotEmpty(err) {
 		return fmt.Errorf("%s: %w", context, err)
@@ -316,7 +380,11 @@ func removeDirIfEmpty(dir, context string) error {
 }
 
 func removeIfExists(workspace, rel string) error {
-	err := removePath(pathutil.WorkspacePath(workspace, rel))
+	return removeIfExistsWithOps(defaultFileOps(), workspace, rel)
+}
+
+func removeIfExistsWithOps(ops fileOps, workspace, rel string) error {
+	err := withFileOps(ops).removePath(pathutil.WorkspacePath(workspace, rel))
 
 	if err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("remove %q: %w", rel, err)
@@ -326,9 +394,13 @@ func removeIfExists(workspace, rel string) error {
 }
 
 func removeLegacyMetadataDir(workspace string) error {
+	return removeLegacyMetadataDirWithOps(defaultFileOps(), workspace)
+}
+
+func removeLegacyMetadataDirWithOps(ops fileOps, workspace string) error {
 	legacyDir := pathutil.WorkspacePath(workspace, legacyMetadataDirName)
 
-	err := removeDirIfEmpty(legacyDir, "remove legacy metadata directory")
+	err := removeDirIfEmptyWithOps(ops, legacyDir, "remove legacy metadata directory")
 	if err != nil {
 		return fmt.Errorf("clean up legacy metadata directory: %w", err)
 	}
@@ -337,9 +409,13 @@ func removeLegacyMetadataDir(workspace string) error {
 }
 
 func removeLegacyMetadataFile(workspace string) error {
+	return removeLegacyMetadataFileWithOps(defaultFileOps(), workspace)
+}
+
+func removeLegacyMetadataFileWithOps(ops fileOps, workspace string) error {
 	legacy := pathutil.WorkspacePath(workspace, config.LegacyMetadataPath)
 
-	err := removePath(legacy)
+	err := withFileOps(ops).removePath(legacy)
 
 	if err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("remove legacy metadata: %w", err)
@@ -349,18 +425,22 @@ func removeLegacyMetadataFile(workspace string) error {
 }
 
 func removeObsolete(plan *domain.Plan, workspace string) error {
+	return removeObsoleteWithOps(defaultFileOps(), plan, workspace)
+}
+
+func removeObsoleteWithOps(ops fileOps, plan *domain.Plan, workspace string) error {
 	currentPaths := buildCurrentPathSet(plan)
 
 	if plan.OldLock == nil {
 		return nil
 	}
 
-	err := removeStaleManagedFiles(plan.OldLock, currentPaths, workspace)
+	err := removeStaleManagedFilesWithOps(ops, plan.OldLock, currentPaths, workspace)
 	if err != nil {
 		return fmt.Errorf("remove stale managed files: %w", err)
 	}
 
-	err = cleanupOldTarget(plan, workspace)
+	err = cleanupOldTargetWithOps(ops, plan, workspace)
 	if err != nil {
 		return fmt.Errorf("clean up old target: %w", err)
 	}
@@ -369,9 +449,13 @@ func removeObsolete(plan *domain.Plan, workspace string) error {
 }
 
 func removeObsoleteFile(workspace, relPath string) error {
+	return removeObsoleteFileWithOps(defaultFileOps(), workspace, relPath)
+}
+
+func removeObsoleteFileWithOps(ops fileOps, workspace, relPath string) error {
 	abs := pathutil.WorkspacePath(workspace, relPath)
 
-	err := removePath(abs)
+	err := withFileOps(ops).removePath(abs)
 
 	if err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf(errFmtRemoveObsoleteFile, relPath, err)
@@ -381,6 +465,10 @@ func removeObsoleteFile(workspace, relPath string) error {
 }
 
 func removeOldTargetFiles(plan *domain.Plan, workspace string) error {
+	return removeOldTargetFilesWithOps(defaultFileOps(), plan, workspace)
+}
+
+func removeOldTargetFilesWithOps(ops fileOps, plan *domain.Plan, workspace string) error {
 	for i := range plan.OldLock.ManagedFiles {
 		old := &plan.OldLock.ManagedFiles[i]
 
@@ -388,7 +476,7 @@ func removeOldTargetFiles(plan *domain.Plan, workspace string) error {
 			continue
 		}
 
-		err := removeIfExists(workspace, old.Path)
+		err := removeIfExistsWithOps(ops, workspace, old.Path)
 		if err != nil {
 			return fmt.Errorf("remove old target file %q: %w", old.Path, err)
 		}
@@ -398,7 +486,12 @@ func removeOldTargetFiles(plan *domain.Plan, workspace string) error {
 }
 
 func removeOldTargetLock(plan *domain.Plan, workspace string) error {
-	err := removeIfExists(
+	return removeOldTargetLockWithOps(defaultFileOps(), plan, workspace)
+}
+
+func removeOldTargetLockWithOps(ops fileOps, plan *domain.Plan, workspace string) error {
+	err := removeIfExistsWithOps(
+		ops,
 		workspace,
 		pathutil.JoinRelative(plan.OldTargetFolder, lockFileName),
 	)
@@ -410,16 +503,20 @@ func removeOldTargetLock(plan *domain.Plan, workspace string) error {
 }
 
 func removeOldTargetMetadata(plan *domain.Plan, workspace string) error {
+	return removeOldTargetMetadataWithOps(defaultFileOps(), plan, workspace)
+}
+
+func removeOldTargetMetadataWithOps(ops fileOps, plan *domain.Plan, workspace string) error {
 	oldMetadataRel := pathutil.JoinRelative(plan.OldTargetFolder, legacyMetadataRelPath)
 
-	err := removeIfExists(workspace, oldMetadataRel)
+	err := removeIfExistsWithOps(ops, workspace, oldMetadataRel)
 	if err != nil {
 		return fmt.Errorf("remove old metadata file: %w", err)
 	}
 
 	oldMetadata := pathutil.WorkspacePath(workspace, oldMetadataRel)
 
-	err = removeDirIfEmpty(filepath.Dir(oldMetadata), "remove old metadata directory")
+	err = removeDirIfEmptyWithOps(ops, filepath.Dir(oldMetadata), "remove old metadata directory")
 	if err != nil {
 		return fmt.Errorf("clean up old metadata directory: %w", err)
 	}
@@ -428,11 +525,15 @@ func removeOldTargetMetadata(plan *domain.Plan, workspace string) error {
 }
 
 func pruneEmptyParentDirs(workspace, fileRel, stopRel string) error {
+	return pruneEmptyParentDirsWithOps(defaultFileOps(), workspace, fileRel, stopRel)
+}
+
+func pruneEmptyParentDirsWithOps(ops fileOps, workspace, fileRel, stopRel string) error {
 	if stopRel == consts.Empty {
 		return nil
 	}
 
-	err := pruneDirsUntilStop(
+	err := pruneDirsUntilStopWithOps(ops,
 		filepath.Dir(pathutil.WorkspacePath(workspace, fileRel)),
 		pathutil.WorkspacePath(workspace, stopRel),
 	)
@@ -444,8 +545,12 @@ func pruneEmptyParentDirs(workspace, fileRel, stopRel string) error {
 }
 
 func pruneDirsUntilStop(dir, stop string) error {
+	return pruneDirsUntilStopWithOps(defaultFileOps(), dir, stop)
+}
+
+func pruneDirsUntilStopWithOps(ops fileOps, dir, stop string) error {
 	for shouldPruneParent(dir, stop) {
-		stillExists, err := removeEmptyParentDir(dir)
+		stillExists, err := removeEmptyParentDirWithOps(ops, dir)
 		if err != nil {
 			return fmt.Errorf("prune dirs until stop: %w", err)
 		}
@@ -471,16 +576,24 @@ func shouldPruneParent(dir, stop string) bool {
 }
 
 func removeEmptyParentDir(dir string) (bool, error) {
-	err := removeDirIfEmpty(dir, "remove empty parent directory")
+	return removeEmptyParentDirWithOps(defaultFileOps(), dir)
+}
+
+func removeEmptyParentDirWithOps(ops fileOps, dir string) (bool, error) {
+	err := removeDirIfEmptyWithOps(ops, dir, "remove empty parent directory")
 	if err != nil {
 		return false, fmt.Errorf("prune empty parents: %w", err)
 	}
 
-	return pathPresent(dir), nil
+	return pathPresentWithOps(ops, dir), nil
 }
 
 func pathPresent(filePath string) bool {
-	info, err := statPath(filePath)
+	return pathPresentWithOps(defaultFileOps(), filePath)
+}
+
+func pathPresentWithOps(ops fileOps, filePath string) bool {
+	info, err := withFileOps(ops).statPath(filePath)
 	iox.Discard(info)
 
 	return err == nil
@@ -491,7 +604,7 @@ func removeStaleManagedFile(args *removeStaleFileArgs) error {
 		return nil
 	}
 
-	err := removeObsoleteFile(args.workspace, args.old.Path)
+	err := removeObsoleteFileWithOps(args.fsOps, args.workspace, args.old.Path)
 	if err != nil {
 		return fmt.Errorf(errFmtRemoveStaleManaged, err)
 	}
@@ -507,7 +620,7 @@ func removeStaleManagedFile(args *removeStaleFileArgs) error {
 func pruneModuleParents(args *removeStaleFileArgs) error {
 	moduleRoot := pathutil.JoinRelative(args.targetFolder, args.old.DestinationModule)
 
-	err := pruneEmptyParentDirs(args.workspace, args.old.Path, moduleRoot)
+	err := pruneEmptyParentDirsWithOps(args.fsOps, args.workspace, args.old.Path, moduleRoot)
 	if err != nil {
 		return fmt.Errorf("prune empty parents after removing %q: %w", args.old.Path, err)
 	}
@@ -520,12 +633,22 @@ func removeStaleManagedFiles(
 	current map[string]struct{},
 	workspace string,
 ) error {
+	return removeStaleManagedFilesWithOps(defaultFileOps(), lock, current, workspace)
+}
+
+func removeStaleManagedFilesWithOps(
+	ops fileOps,
+	lock *syncLock,
+	current map[string]struct{},
+	workspace string,
+) error {
 	for i := range lock.ManagedFiles {
 		err := removeStaleManagedFile(&removeStaleFileArgs{
 			old:          &lock.ManagedFiles[i],
 			current:      current,
 			workspace:    workspace,
 			targetFolder: lock.Configuration.TargetFolder,
+			fsOps:        ops,
 		})
 		if err != nil {
 			return fmt.Errorf(errFmtRemoveObsoleteFile, lock.ManagedFiles[i].Path, err)
@@ -616,14 +739,14 @@ func stageOneModule(
 }
 
 func stagePlanFiles(args *stagePlanArgs) (string, error) {
-	stagingRoot, err := prepareStagingRoot(args.workspace, args.targetFolder)
+	stagingRoot, err := prepareStagingRootWithOps(args.fsOps, args.workspace, args.targetFolder)
 	if err != nil {
 		return consts.Empty, fmt.Errorf("prepare staging root: %w", err)
 	}
 
 	err = copyStagedFiles(stagingRoot, args.staged, args.copyFile)
 	if err != nil {
-		stagingErr := cleanupFailedStaging(stagingRoot, err)
+		stagingErr := cleanupFailedStagingWithOps(args.fsOps, stagingRoot, err)
 
 		return consts.Empty, fmt.Errorf("copy staged files: %w", stagingErr)
 	}
@@ -639,6 +762,7 @@ func stagePreparedFiles(input *stagePreparedInput) (stagingSession, error) {
 		workspace:    input.workspace,
 		targetFolder: input.syncInput.Config.TargetFolder,
 		copyFile:     copyFile,
+		fsOps:        input.fsOps,
 	})
 	if err != nil {
 		return stagingSession{}, fmt.Errorf("stage plan files: %w", err)
@@ -648,6 +772,7 @@ func stagePreparedFiles(input *stagePreparedInput) (stagingSession, error) {
 		staged:      input.staged,
 		copyFile:    copyFile,
 		stagingRoot: stagingRoot,
+		fsOps:       input.fsOps,
 	}, nil
 }
 
@@ -661,6 +786,7 @@ func validateAndWriteStaged(input *validateWriteStagedInput) error {
 		staged:    input.args.staged,
 		workspace: input.workspace,
 		copyFile:  input.copyFile,
+		fsOps:     input.fsOps,
 	})
 	if err != nil {
 		return fmt.Errorf("write staged files: %w", err)
@@ -774,31 +900,51 @@ func validateStagedYAML(stagedEntry *stagedFile, rootPath string) error {
 }
 
 func writeStagedFiles(args *writeStagedArgs) error {
+	ops := withFileOps(args.fsOps)
+
 	for i := range args.staged {
 		stagedEntry := &args.staged[i]
 		finalPath := pathutil.WorkspacePath(args.workspace, stagedEntry.finalRel)
 
-		err := mkdirAll(filepath.Dir(finalPath), dirModePerm)
+		err := writeOneStagedFile(ops, args.copyFile, finalPath, stagedEntry)
 		if err != nil {
-			return fmt.Errorf("prepare %q: %w", stagedEntry.finalRel, err)
-		}
-
-		err = args.copyFile(finalPath, &stagedEntry.entry)
-		if err != nil {
-			return fmt.Errorf(errFmtWriteQuoted, stagedEntry.finalRel, err)
+			return fmt.Errorf("stage %q: %w", stagedEntry.finalRel, err)
 		}
 	}
 
 	return nil
 }
 
+func writeOneStagedFile(
+	ops fileOps,
+	copyFile func(string, *domain.FileEntry) error,
+	finalPath string,
+	entry *stagedFile,
+) error {
+	err := withFileOps(ops).mkdirAll(filepath.Dir(finalPath), dirModePerm)
+	if err != nil {
+		return fmt.Errorf("prepare %q: %w", entry.finalRel, err)
+	}
+
+	err = copyFile(finalPath, &entry.entry)
+	if err != nil {
+		return fmt.Errorf(errFmtWriteQuoted, entry.finalRel, err)
+	}
+
+	return nil
+}
+
 func lockContentChanged(old, newLock *syncLock) (changed bool, err error) {
-	oldNorm, err := marshalLockForCompare(old)
+	return lockContentChangedWithOps(defaultFileOps(), old, newLock)
+}
+
+func lockContentChangedWithOps(ops fileOps, old, newLock *syncLock) (changed bool, err error) {
+	oldNorm, err := marshalLockForCompareWithOps(ops, old)
 	if err != nil {
 		return false, fmt.Errorf("normalize old lock file: %w", err)
 	}
 
-	newNorm, err := marshalLockForCompare(newLock)
+	newNorm, err := marshalLockForCompareWithOps(ops, newLock)
 	if err != nil {
 		return false, fmt.Errorf("normalize new lock file: %w", err)
 	}
@@ -807,6 +953,10 @@ func lockContentChanged(old, newLock *syncLock) (changed bool, err error) {
 }
 
 func marshalLockForCompare(lock *syncLock) ([]byte, error) {
+	return marshalLockForCompareWithOps(defaultFileOps(), lock)
+}
+
+func marshalLockForCompareWithOps(ops fileOps, lock *syncLock) ([]byte, error) {
 	if lock == nil {
 		return nil, nil
 	}
@@ -815,7 +965,7 @@ func marshalLockForCompare(lock *syncLock) ([]byte, error) {
 
 	cloned.Source.ResolvedCommit = consts.Empty
 
-	data, err := marshalYAML(lockmodel.EncodeLockFile(&cloned))
+	data, err := withFileOps(ops).marshalYAML(lockmodel.EncodeLockFile(&cloned))
 	if err != nil {
 		return nil, fmt.Errorf("marshal lock file for compare: %w", err)
 	}
@@ -915,6 +1065,7 @@ func diffLockFileSection(input *diffInput, lists *diffLists) (diffLists, error) 
 		workspace: input.workspace,
 		lockPath:  input.plan.Metadata.LockFile,
 		lists:     *lists,
+		fsOps:     input.fsOps,
 	})
 	if err != nil {
 		return diffLists{}, fmt.Errorf("diff lock file: %w", err)
@@ -964,11 +1115,12 @@ func diffManagedFilePaths(current map[string]managedFile, workspace string) (dif
 
 func applyFileChange(lists *diffLists, relPath string, change fileChangeKind) *diffLists {
 	switch change {
+	case fileUnchanged:
+		return lists
 	case fileAdded:
 		lists.added = append(lists.added, relPath)
 	case fileUpdated:
 		lists.updated = append(lists.updated, relPath)
-	default:
 	}
 
 	return lists
@@ -1040,7 +1192,7 @@ func diffLockFile(args *diffLockArgs) (diffLists, error) {
 		return diffLists{}, fmt.Errorf(errReadLockFile, args.lockPath, readErr)
 	}
 
-	changed, err := lockContentChanged(args.plan.OldLock, &args.plan.Lock)
+	changed, err := lockContentChangedWithOps(args.fsOps, args.plan.OldLock, &args.plan.Lock)
 	if err != nil {
 		return diffLists{}, fmt.Errorf("lock content changed: %w", err)
 	}
@@ -1157,7 +1309,11 @@ func sortedStagePaths(paths map[string]struct{}) []string {
 }
 
 func relativePathExists(workspace, rel string) bool {
-	info, err := statPath(pathutil.WorkspacePath(workspace, rel))
+	return relativePathExistsWithOps(defaultFileOps(), workspace, rel)
+}
+
+func relativePathExistsWithOps(ops fileOps, workspace, rel string) bool {
+	info, err := withFileOps(ops).statPath(pathutil.WorkspacePath(workspace, rel))
 	iox.Discard(info)
 
 	return err == nil
@@ -1169,14 +1325,20 @@ func SetCopyFileToHookForTest(plan *domain.Plan, hook func(string, *domain.FileE
 }
 
 func writeFileAtomic(filePath string, data []byte, mode os.FileMode) error {
+	return writeFileAtomicWithOps(defaultFileOps(), filePath, data, mode)
+}
+
+func writeFileAtomicWithOps(ops fileOps, filePath string, data []byte, mode os.FileMode) error {
 	dir := filepath.Dir(filePath)
 
-	tmp, err := createTempFile(dir)
+	tmp, err := createTempFileWithOps(ops, dir)
 	if err != nil {
 		return fmt.Errorf("create temp file: %w", err)
 	}
 
-	err = finalizeTempFile(&finalizeTempArgs{tmp: tmp, data: data, mode: mode, path: filePath})
+	err = finalizeTempFile(
+		&finalizeTempArgs{tmp: tmp, data: data, mode: mode, path: filePath, fsOps: ops},
+	)
 	if err != nil {
 		return fmt.Errorf("finalize temp file: %w", err)
 	}
@@ -1185,12 +1347,18 @@ func writeFileAtomic(filePath string, data []byte, mode os.FileMode) error {
 }
 
 func createTempFile(dir string) (*os.File, error) {
-	err := mkdirAll(dir, dirModePerm)
+	return createTempFileWithOps(defaultFileOps(), dir)
+}
+
+func createTempFileWithOps(ops fileOps, dir string) (*os.File, error) {
+	ops = withFileOps(ops)
+
+	err := ops.mkdirAll(dir, dirModePerm)
 	if err != nil {
 		return nil, fmt.Errorf("create directory %q: %w", dir, err)
 	}
 
-	tmp, err := createTemp(dir, stagingTempPattern)
+	tmp, err := ops.createTemp(dir, stagingTempPattern)
 	if err != nil {
 		return nil, fmt.Errorf("create temp file in %q: %w", dir, err)
 	}
@@ -1199,10 +1367,12 @@ func createTempFile(dir string) (*os.File, error) {
 }
 
 func finalizeTempFile(args *finalizeTempArgs) error {
+	args.fsOps = withFileOps(args.fsOps)
+
 	tmpPath := args.tmp.Name()
 	cleanup := true
 
-	defer cleanupTempFile(args.tmp, tmpPath, &cleanup)
+	defer cleanupTempFileWithOps(args.fsOps, args.tmp, tmpPath, &cleanup)
 
 	err := commitTempFile(args, tmpPath, &cleanup)
 	if err != nil {
@@ -1213,14 +1383,14 @@ func finalizeTempFile(args *finalizeTempArgs) error {
 }
 
 func commitTempFile(args *finalizeTempArgs, tmpPath string, cleanup *bool) error {
-	err := writeAndFinalizeTemp(args.tmp, args.data, args.mode)
+	err := writeAndFinalizeTempWithOps(args.fsOps, args.tmp, args.data, args.mode)
 	if err != nil {
 		return fmt.Errorf("write temp file: %w", err)
 	}
 
 	*cleanup = false
 
-	err = renameTempFile(tmpPath, args.path)
+	err = renameTempFileWithOps(args.fsOps, tmpPath, args.path)
 	if err != nil {
 		return fmt.Errorf("rename temp file: %w", err)
 	}
@@ -1229,27 +1399,37 @@ func commitTempFile(args *finalizeTempArgs, tmpPath string, cleanup *bool) error
 }
 
 func cleanupTempFile(tmp *os.File, tmpPath string, cleanup *bool) {
+	cleanupTempFileWithOps(defaultFileOps(), tmp, tmpPath, cleanup)
+}
+
+func cleanupTempFileWithOps(ops fileOps, tmp *os.File, tmpPath string, cleanup *bool) {
 	if *cleanup {
-		closeErr := closeFile(tmp)
+		ops = withFileOps(ops)
+
+		closeErr := ops.closeFile(tmp)
 		iox.Discard(closeErr)
 
-		removeErr := removePath(tmpPath)
+		removeErr := ops.removePath(tmpPath)
 		iox.Discard(removeErr)
 	}
 }
 
 func writeAndFinalizeTemp(tmp *os.File, data []byte, mode os.FileMode) error {
-	err := writeFull(tmp, data)
+	return writeAndFinalizeTempWithOps(defaultFileOps(), tmp, data, mode)
+}
+
+func writeAndFinalizeTempWithOps(ops fileOps, tmp *os.File, data []byte, mode os.FileMode) error {
+	err := writeTempData(withFileOps(ops), tmp, data)
 	if err != nil {
-		return fmt.Errorf("write temp file %q: %w", tmp.Name(), err)
+		return err
 	}
 
-	err = chmodFile(tmp, mode)
+	err = chmodTempFile(withFileOps(ops), tmp, mode)
 	if err != nil {
-		return fmt.Errorf("chmod temp file %q: %w", tmp.Name(), err)
+		return err
 	}
 
-	err = closeFile(tmp)
+	err = withFileOps(ops).closeFile(tmp)
 	if err != nil {
 		return fmt.Errorf("close temp file %q: %w", tmp.Name(), err)
 	}
@@ -1257,8 +1437,30 @@ func writeAndFinalizeTemp(tmp *os.File, data []byte, mode os.FileMode) error {
 	return nil
 }
 
+func writeTempData(ops fileOps, tmp *os.File, data []byte) error {
+	err := ops.writeFull(tmp, data)
+	if err != nil {
+		return fmt.Errorf("write temp file %q: %w", tmp.Name(), err)
+	}
+
+	return nil
+}
+
+func chmodTempFile(ops fileOps, tmp *os.File, mode os.FileMode) error {
+	err := ops.chmodFile(tmp, mode)
+	if err != nil {
+		return fmt.Errorf("chmod temp file %q: %w", tmp.Name(), err)
+	}
+
+	return nil
+}
+
 func renameTempFile(tmpPath, filePath string) error {
-	err := renamePath(tmpPath, filePath)
+	return renameTempFileWithOps(defaultFileOps(), tmpPath, filePath)
+}
+
+func renameTempFileWithOps(ops fileOps, tmpPath, filePath string) error {
+	err := withFileOps(ops).renamePath(tmpPath, filePath)
 	if err != nil {
 		return fmt.Errorf("rename temp file to %q: %w", filePath, err)
 	}
@@ -1267,7 +1469,11 @@ func renameTempFile(tmpPath, filePath string) error {
 }
 
 func copyFileTo(filePath string, entry *domain.FileEntry) error {
-	err := writeFileAtomic(filePath, entry.Data, entry.Mode)
+	return copyFileToWithOps(defaultFileOps(), filePath, entry)
+}
+
+func copyFileToWithOps(ops fileOps, filePath string, entry *domain.FileEntry) error {
+	err := writeFileAtomicWithOps(ops, filePath, entry.Data, entry.Mode)
 	if err != nil {
 		return fmt.Errorf("write file %q: %w", filePath, err)
 	}
@@ -1277,12 +1483,12 @@ func copyFileTo(filePath string, entry *domain.FileEntry) error {
 
 // CopyFile copies rel under root to dst with the given mode.
 func CopyFile(args *copyFileArgs) error {
-	data, err := readRelativeFile(args.root, args.rel)
+	data, err := readRelativeFileWithOps(args.fsOps, args.root, args.rel)
 	if err != nil {
 		return fmt.Errorf("read source file: %w", err)
 	}
 
-	err = writeCopiedFile(args.dst, data, args.mode)
+	err = writeCopiedFileWithOps(args.fsOps, args.dst, data, args.mode)
 	if err != nil {
 		return fmt.Errorf("write copied file: %w", err)
 	}
@@ -1291,17 +1497,34 @@ func CopyFile(args *copyFileArgs) error {
 }
 
 func readRelativeFile(root, rel string) ([]byte, error) {
-	source, err := openRelativeFile(root, rel)
+	return readRelativeFileWithOps(defaultFileOps(), root, rel)
+}
+
+func readRelativeFileWithOps(ops fileOps, root, rel string) ([]byte, error) {
+	source, err := openRelativeSource(ops, root, rel)
 	if err != nil {
 		return nil, fmt.Errorf("open %q: %w", rel, err)
 	}
 
 	defer func() {
-		closeErr := closeFile(source)
+		closeErr := ops.closeFile(source)
 		iox.Discard(closeErr)
 	}()
 
-	data, err := readAll(source)
+	data, err := readSourceData(ops, source, rel)
+	if err != nil {
+		return nil, err
+	}
+
+	return data, nil
+}
+
+func openRelativeSource(ops fileOps, root, rel string) (*os.File, error) {
+	return withFileOps(ops).openRelativeFile(root, rel)
+}
+
+func readSourceData(ops fileOps, source *os.File, rel string) ([]byte, error) {
+	data, err := ops.readAll(source)
 	if err != nil {
 		return nil, fmt.Errorf(errFmtReadQuoted, rel, err)
 	}
@@ -1310,7 +1533,11 @@ func readRelativeFile(root, rel string) ([]byte, error) {
 }
 
 func writeCopiedFile(dst string, data []byte, mode os.FileMode) error {
-	err := writeFileAtomic(dst, data, mode)
+	return writeCopiedFileWithOps(defaultFileOps(), dst, data, mode)
+}
+
+func writeCopiedFileWithOps(ops fileOps, dst string, data []byte, mode os.FileMode) error {
+	err := writeFileAtomicWithOps(ops, dst, data, mode)
 	if err != nil {
 		return fmt.Errorf(errFmtWriteQuoted, dst, err)
 	}
@@ -1506,7 +1733,14 @@ func resolveOldLockPathAndTarget(args resolveLockArgs) lockPathResult {
 }
 
 func discoverPreviousMetadata(workspace, currentMetadataPath string) (*domain.Metadata, error) {
-	candidates, err := collectMetadataCandidates(workspace, currentMetadataPath)
+	return discoverPreviousMetadataWithOps(defaultFileOps(), workspace, currentMetadataPath)
+}
+
+func discoverPreviousMetadataWithOps(
+	ops fileOps,
+	workspace, currentMetadataPath string,
+) (*domain.Metadata, error) {
+	candidates, err := collectMetadataCandidatesWithOps(ops, workspace, currentMetadataPath)
 	if err != nil {
 		return nil, fmt.Errorf(errDiscoverPreviousMetadata, err)
 	}
@@ -1524,15 +1758,23 @@ func discoverPreviousMetadata(workspace, currentMetadataPath string) (*domain.Me
 }
 
 func collectMetadataCandidates(workspace, currentMetadataPath string) ([]string, error) {
+	return collectMetadataCandidatesWithOps(defaultFileOps(), workspace, currentMetadataPath)
+}
+
+func collectMetadataCandidatesWithOps(
+	ops fileOps,
+	workspace, currentMetadataPath string,
+) ([]string, error) {
 	var candidates []string
 
 	walker := metadataCandidateWalker(&metadataWalkerArgs{
 		workspace:           workspace,
 		currentMetadataPath: currentMetadataPath,
 		candidates:          &candidates,
+		fsOps:               ops,
 	})
 
-	err := walkDir(workspace, walker)
+	err := withFileOps(ops).walkDir(workspace, walker)
 	if err != nil {
 		return nil, fmt.Errorf(errDiscoverPreviousMetadata, err)
 	}
@@ -1558,6 +1800,7 @@ func processMetadataCandidate(args *metadataWalkerArgs, abs string, entry os.Dir
 		currentMetadataPath: args.currentMetadataPath,
 		abs:                 abs,
 		entry:               entry,
+		fsOps:               args.fsOps,
 	})
 	if err == nil {
 		recordMetadataCandidate(args.candidates, rel, scan)
@@ -1589,7 +1832,7 @@ func loadFirstCandidate(workspace string, candidates []string) (*domain.Metadata
 
 func previousMetadataCandidate(args *metadataCandidateArgs) (string, metadataScanResult, error) {
 	if args.entry.IsDir() {
-		rel, scan, err := handleDirEntry(args.entry)
+		err := handleDirEntry(args.entry)
 		if err != nil {
 			return consts.Empty, metadataNotCandidate, fmt.Errorf(
 				"handle metadata directory entry: %w",
@@ -1597,7 +1840,7 @@ func previousMetadataCandidate(args *metadataCandidateArgs) (string, metadataSca
 			)
 		}
 
-		return rel, scan, nil
+		return consts.Empty, metadataNotCandidate, nil
 	}
 
 	rel, scan, err := metadataFileCandidate(args)
@@ -1609,7 +1852,7 @@ func previousMetadataCandidate(args *metadataCandidateArgs) (string, metadataSca
 }
 
 func metadataFileCandidate(args *metadataCandidateArgs) (string, metadataScanResult, error) {
-	rel, err := relMetadataPath(args.workspace, args.abs)
+	rel, err := relMetadataPathWithOps(args.fsOps, args.workspace, args.abs)
 	if err != nil {
 		return consts.Empty, metadataNotCandidate, fmt.Errorf("relative metadata path: %w", err)
 	}
@@ -1626,7 +1869,11 @@ func metadataFileCandidate(args *metadataCandidateArgs) (string, metadataScanRes
 }
 
 func relMetadataPath(workspace, abs string) (string, error) {
-	rel, err := relPath(workspace, abs)
+	return relMetadataPathWithOps(defaultFileOps(), workspace, abs)
+}
+
+func relMetadataPathWithOps(ops fileOps, workspace, abs string) (string, error) {
+	rel, err := withFileOps(ops).relPath(workspace, abs)
 	if err != nil {
 		return consts.Empty, fmt.Errorf("relative metadata path for %q: %w", abs, err)
 	}
@@ -1634,12 +1881,12 @@ func relMetadataPath(workspace, abs string) (string, error) {
 	return filepath.ToSlash(rel), nil
 }
 
-func handleDirEntry(entry os.DirEntry) (string, metadataScanResult, error) {
+func handleDirEntry(entry os.DirEntry) error {
 	if entry.Name() == ".git" {
-		return consts.Empty, metadataNotCandidate, filepath.SkipDir
+		return filepath.SkipDir
 	}
 
-	return consts.Empty, metadataNotCandidate, nil
+	return nil
 }
 
 func isCurrentOrLegacyMetadataPath(rel, currentMetadataPath string) bool {
@@ -1940,7 +2187,7 @@ func collectModuleContents(args *collectModuleArgs) (fMap, map[string]struct{}, 
 }
 
 func collectModuleFile(args *moduleCollectArgs) error {
-	rel, err := relSlashPath(args.sourceDir, args.absPath)
+	rel, err := relSlashPathWithOps(args.fsOps, args.sourceDir, args.absPath)
 	if err != nil {
 		return fmt.Errorf("rel slash path: %w", err)
 	}
@@ -2040,7 +2287,11 @@ func copyDocPathsInto(rootContents, contents fMap, parentDocs map[string]struct{
 }
 
 func logicalRootReady(dir string) (bool, error) {
-	info, err := statPath(dir)
+	return logicalRootReadyWithOps(defaultFileOps(), dir)
+}
+
+func logicalRootReadyWithOps(ops fileOps, dir string) (bool, error) {
+	info, err := withFileOps(ops).statPath(dir)
 	iox.Discard(info)
 
 	if err == nil {
@@ -2108,6 +2359,7 @@ func parentDocsMergeArgs(
 		destRoot:   destRoot,
 		contents:   contents,
 		parentDocs: parentDocs,
+		fsOps:      args.fsOps,
 	}
 }
 
@@ -2116,7 +2368,7 @@ func sameModuleRoot(destRoot, sourceDir string) bool {
 }
 
 func mergeParentDocFiles(args *mergeParentDocsArgs) error {
-	ready, err := logicalRootReady(args.destRoot)
+	ready, err := logicalRootReadyWithOps(args.collect.fsOps, args.destRoot)
 	if err != nil {
 		return fmt.Errorf("logical root ready: %w", err)
 	}
@@ -2138,6 +2390,7 @@ func mergeParentDocFiles(args *mergeParentDocsArgs) error {
 func moduleCollectOptions(args *collectModuleArgs, policy docPolicy) *collectOptions {
 	return &collectOptions{
 		ops:          args.syncInput.TaskfileOps,
+		fsOps:        args.fsOps,
 		sourceDir:    args.sourceDir,
 		fromDest:     args.mod.DestinationModule,
 		docPolicy:    policy,
@@ -2148,6 +2401,7 @@ func moduleCollectOptions(args *collectModuleArgs, policy docPolicy) *collectOpt
 func scanLogicalRootDocs(args *mergeParentDocsArgs) (fMap, error) {
 	rootContents, err := scanModuleFiles(&collectOptions{
 		ops:          args.collect.syncInput.TaskfileOps,
+		fsOps:        args.collect.fsOps,
 		sourceDir:    args.destRoot,
 		fromDest:     args.collect.mod.DestinationModule,
 		docPolicy:    docPolicyInclude,
@@ -2161,7 +2415,11 @@ func scanLogicalRootDocs(args *mergeParentDocsArgs) (fMap, error) {
 }
 
 func ensureSourceDirExists(sourceDir string, mod *moduleRecord) error {
-	info, err := statPath(sourceDir)
+	return ensureSourceDirExistsWithOps(defaultFileOps(), sourceDir, mod)
+}
+
+func ensureSourceDirExistsWithOps(ops fileOps, sourceDir string, mod *moduleRecord) error {
+	info, err := withFileOps(ops).statPath(sourceDir)
 	iox.Discard(info)
 
 	if err != nil {
@@ -2174,14 +2432,7 @@ func ensureSourceDirExists(sourceDir string, mod *moduleRecord) error {
 }
 
 func finalizePlanDiff(args *finalizePlanArgs) (*domain.Plan, error) {
-	lists, err := diffFiles(&diffInput{
-		plan:         args.plan,
-		workspace:    args.workspace,
-		oldRoot:      oldRootForDiffing(args.rootBytes, args.rootState),
-		syncRoot:     args.syncRoot,
-		metadataPath: args.metadataPath,
-		plannedMeta:  mustMarshalMetadata(args.meta),
-	})
+	lists, err := diffPlan(args)
 	if err != nil {
 		return nil, fmt.Errorf("diff files: %w", err)
 	}
@@ -2194,6 +2445,18 @@ func finalizePlanDiff(args *finalizePlanArgs) (*domain.Plan, error) {
 	})
 
 	return args.plan, nil
+}
+
+func diffPlan(args *finalizePlanArgs) (diffLists, error) {
+	return diffFiles(&diffInput{
+		plan:         args.plan,
+		workspace:    args.workspace,
+		oldRoot:      oldRootForDiffing(args.rootBytes, args.rootState),
+		syncRoot:     args.syncRoot,
+		metadataPath: args.metadataPath,
+		plannedMeta:  mustMarshalMetadata(args.meta),
+		fsOps:        args.fsOps,
+	})
 }
 
 func finishRootPlanResult(input *finishRootPlanInput) (rootPlanResult, error) {
@@ -2375,6 +2638,7 @@ func moduleCollectArgsForPlan(args *modulePlanArgs) (*collectModuleArgs, error) 
 		mod:       args.mod,
 		oldLock:   args.oldLock,
 		sourceDir: sourceDir,
+		fsOps:     args.fsOps,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("prepare module plan dirs: %w", err)
@@ -2382,11 +2646,12 @@ func moduleCollectArgsForPlan(args *modulePlanArgs) (*collectModuleArgs, error) 
 
 	return &collectModuleArgs{
 		syncInput: args.syncInput, mod: args.mod, sourceDir: sourceDir, destDirRel: destDirRel,
+		fsOps: args.fsOps,
 	}, nil
 }
 
 func prepareModulePlanDirs(input *modulePlanDirsInput) (string, error) {
-	err := ensureSourceDirExists(input.sourceDir, input.mod)
+	err := ensureSourceDirExistsWithOps(input.fsOps, input.sourceDir, input.mod)
 	if err != nil {
 		return consts.Empty, fmt.Errorf("ensure source dir exists: %w", err)
 	}
@@ -2394,6 +2659,7 @@ func prepareModulePlanDirs(input *modulePlanDirsInput) (string, error) {
 	destDirRel, err := validateModuleDestination(&modulePlanArgs{
 		syncInput: input.syncInput, mod: input.mod, oldLock: input.oldLock,
 		moduleContents: nil, planned: nil,
+		fsOps: input.fsOps,
 	})
 	if err != nil {
 		return consts.Empty, fmt.Errorf("validate module destination: %w", err)
@@ -2472,7 +2738,11 @@ func rootTemplateOrError(ops ports.TaskfileOps) ([]byte, error) {
 }
 
 func relSlashPath(sourceDir, absPath string) (string, error) {
-	rel, err := relPath(sourceDir, absPath)
+	return relSlashPathWithOps(defaultFileOps(), sourceDir, absPath)
+}
+
+func relSlashPathWithOps(ops fileOps, sourceDir, absPath string) (string, error) {
+	rel, err := withFileOps(ops).relPath(sourceDir, absPath)
 	if err != nil {
 		return consts.Empty, fmt.Errorf("rel path for %q: %w", absPath, err)
 	}
@@ -2489,9 +2759,11 @@ func resolveManagedTasks(args *planManagedInput) (managedTasks, managedRootTasks
 }
 
 func scanModuleFiles(opts *collectOptions) (map[string]domain.FileEntry, error) {
+	opts.fsOps = withFileOps(opts.fsOps)
+
 	contents := make(map[string]domain.FileEntry)
 
-	err := walkDir(
+	err := opts.fsOps.walkDir(
 		opts.sourceDir,
 		collectModuleWalkFunc(opts, contents),
 	)
@@ -2620,7 +2892,16 @@ func rootUpdateInputFrom(input *updateRootArgs) *rootUpdateInput {
 }
 
 func validateDestination(destDirAbs string, mod *moduleRecord, oldLock *syncLock) error {
-	info, err := statPath(destDirAbs)
+	return validateDestinationWithOps(defaultFileOps(), destDirAbs, mod, oldLock)
+}
+
+func validateDestinationWithOps(
+	ops fileOps,
+	destDirAbs string,
+	mod *moduleRecord,
+	oldLock *syncLock,
+) error {
+	info, err := withFileOps(ops).statPath(destDirAbs)
 
 	if os.IsNotExist(err) {
 		return nil
@@ -2659,7 +2940,7 @@ func validateModuleDestination(args *modulePlanArgs) (string, error) {
 	)
 	destDirAbs := pathutil.WorkspacePath(args.syncInput.Config.Workspace, destDirRel)
 
-	err := validateDestination(destDirAbs, args.mod, args.oldLock)
+	err := validateDestinationWithOps(args.fsOps, destDirAbs, args.mod, args.oldLock)
 	if err != nil {
 		return consts.Empty, fmt.Errorf("validate destination: %w", err)
 	}
@@ -2852,7 +3133,15 @@ func emptyStoreTaskMetadata() storeTaskMetadata {
 }
 
 func loadOneStoreMetadataFile(root, abs string, out map[string]storeTaskMetadata) error {
-	module, err := moduleNameFor(root, abs)
+	return loadOneStoreMetadataFileWithOps(defaultFileOps(), root, abs, out)
+}
+
+func loadOneStoreMetadataFileWithOps(
+	ops fileOps,
+	root, abs string,
+	out map[string]storeTaskMetadata,
+) error {
+	module, err := moduleNameForWithOps(ops, root, abs)
 	if err != nil {
 		return fmt.Errorf("module name for %q: %w", abs, err)
 	}
@@ -2868,10 +3157,17 @@ func loadOneStoreMetadataFile(root, abs string, out map[string]storeTaskMetadata
 }
 
 func loadStoreTaskMetadata(snapshot ports.Snapshot) (map[string]storeTaskMetadata, error) {
+	return loadStoreTaskMetadataWithOps(defaultFileOps(), snapshot)
+}
+
+func loadStoreTaskMetadataWithOps(
+	ops fileOps,
+	snapshot ports.Snapshot,
+) (map[string]storeTaskMetadata, error) {
 	out := make(map[string]storeTaskMetadata)
 	root := filepath.Join(snapshot.WorkspaceRoot(), taskfilesDirName)
 
-	err := walkDir(root, storeMetadataWalker(root, out))
+	err := withFileOps(ops).walkDir(root, storeMetadataWalker(root, out))
 	if err != nil {
 		return nil, fmt.Errorf("load store metadata: %w", err)
 	}
@@ -2880,7 +3176,11 @@ func loadStoreTaskMetadata(snapshot ports.Snapshot) (map[string]storeTaskMetadat
 }
 
 func moduleNameFor(root, abs string) (string, error) {
-	relDir, err := relPath(root, filepath.Dir(abs))
+	return moduleNameForWithOps(defaultFileOps(), root, abs)
+}
+
+func moduleNameForWithOps(ops fileOps, root, abs string) (string, error) {
+	relDir, err := withFileOps(ops).relPath(root, filepath.Dir(abs))
 	if err != nil {
 		return consts.Empty, fmt.Errorf("metadata module path for %q: %w", abs, err)
 	}
@@ -3054,6 +3354,7 @@ func recordGeneratedTaskModules(byTask map[string][]string, input *groupModulesI
 func collectOptionsFrom(opts *CollectOptions) *collectOptions {
 	return &collectOptions{
 		ops:          opts.TaskfileOps,
+		fsOps:        opts.fsOps,
 		sourceDir:    opts.SourceDir,
 		fromDest:     opts.FromDest,
 		docPolicy:    docPolicyFromExported(opts.DocPolicy),

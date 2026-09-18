@@ -18,6 +18,7 @@ type (
 	clientFns = struct {
 		run       func(ctx context.Context, args ...string) error
 		output    func(ctx context.Context, args ...string) (string, error)
+		binary    string
 		workspace string
 	}
 

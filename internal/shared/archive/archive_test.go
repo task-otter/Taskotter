@@ -121,9 +121,8 @@ func TestEnsureInsideRejectsEscape(t *testing.T) {
 func TestEnsureInsideReportsAbsFailure(t *testing.T) {
 	t.Parallel()
 	lockArchiveTestState(t)
-	failAbsPath(t)
 
-	err := ensureInside(baseName, baseName+"/target")
+	err := ensureInsideWith(failingAbsPath, baseName, baseName+"/target")
 	if err == nil {
 		t.Fatal(wantErrText)
 	}
@@ -236,16 +235,9 @@ func TestCopyAndCloseReportsCloseFailure(t *testing.T) {
 	lockArchiveTestState(t)
 
 	extractor := extractorWithReader(t, tar.NewReader(strings.NewReader(consts.Empty)))
-	path := filepath.Join(t.TempDir(), fileName)
+	path, file := closedTarget(t)
 
-	file, err := openTarget(path, consts.FilePerm644)
-	if err != nil {
-		t.Fatalf(unexpectText, err)
-	}
-
-	iox.Discard(file.Close())
-
-	err = copyAndClose(extractor, &copyCloseArgs{file: file, size: consts.IndexZero, path: path})
+	err := copyAndClose(extractor, &copyCloseArgs{file: file, size: consts.IndexZero, path: path})
 	if err == nil {
 		t.Fatal(wantErrText)
 	}
@@ -469,9 +461,18 @@ func (closer *stubCloser) Close() error {
 func assertAbsPathsFail(t *testing.T, failAfter int) {
 	t.Helper()
 
+	base, target, err := absPathsWith(absPathFailureStub(failAfter), "base", "target")
+	iox.Discard2(base, target)
+
+	if !errors.Is(err, errStub) {
+		t.Fatalf(errWantFmt, err, errStub)
+	}
+}
+
+func absPathFailureStub(failAfter int) func(string) (string, error) {
 	calls := consts.IndexZero
 
-	swapAbsPath(t, func(path string) (string, error) {
+	return func(path string) (string, error) {
 		defer func() { calls++ }()
 
 		if calls >= failAfter {
@@ -479,14 +480,22 @@ func assertAbsPathsFail(t *testing.T, failAfter int) {
 		}
 
 		return filepath.Abs(path)
-	})
-
-	base, target, err := absPaths("base", "target")
-	iox.Discard2(base, target)
-
-	if !errors.Is(err, errStub) {
-		t.Fatalf(errWantFmt, err, errStub)
 	}
+}
+
+func closedTarget(t *testing.T) (string, *os.File) {
+	t.Helper()
+
+	path := filepath.Join(t.TempDir(), fileName)
+
+	file, err := openTarget(path, consts.FilePerm644)
+	if err != nil {
+		t.Fatalf(unexpectText, err)
+	}
+
+	iox.Discard(file.Close())
+
+	return path, file
 }
 
 func assertSkipMetadataFails(t *testing.T, extractor *tarExtractor, header *tar.Header) {
@@ -520,22 +529,8 @@ func extractorWithReader(t *testing.T, reader *tar.Reader) *tarExtractor {
 	}
 }
 
-func failAbsPath(t *testing.T) {
-	t.Helper()
-
-	swapAbsPath(t, func(string) (string, error) {
-		return consts.Empty, errStub
-	})
-}
-
-func swapAbsPath(t *testing.T, stub func(string) (string, error)) {
-	t.Helper()
-
-	original := absPath
-
-	absPath = stub
-
-	t.Cleanup(func() { absPath = original })
+func failingAbsPath(string) (string, error) {
+	return consts.Empty, errStub
 }
 
 // truncatedEntryExtractor returns an extractor whose current entry promises more

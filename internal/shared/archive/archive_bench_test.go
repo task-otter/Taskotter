@@ -103,20 +103,27 @@ func writeBenchmarkArchiveEntry(b *testing.B, tarWriter *tar.Writer, index int) 
 	b.Helper()
 
 	body := []byte("version: \"3\"\n")
-	header := &tar.Header{
+	writeBenchmarkHeader(b, tarWriter, &tar.Header{
 		Name: fmt.Sprintf("store/taskfiles/module-%d/Taskfile.yml", index),
 		Mode: benchmarkArchiveMode,
 		Size: int64(len(body)),
-	}
+	})
+	writeBenchmarkBody(b, tarWriter, body)
+}
+
+func writeBenchmarkHeader(b *testing.B, tarWriter *tar.Writer, header *tar.Header) {
+	b.Helper()
 
 	err := tarWriter.WriteHeader(header)
 	if err != nil {
 		b.Fatal(err)
 	}
+}
 
-	var written int64
+func writeBenchmarkBody(b *testing.B, tarWriter *tar.Writer, body []byte) {
+	b.Helper()
 
-	written, err = io.Copy(tarWriter, bytes.NewReader(body))
+	written, err := io.Copy(tarWriter, bytes.NewReader(body))
 	if err != nil {
 		b.Fatal(err)
 	}

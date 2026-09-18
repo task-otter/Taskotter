@@ -9,13 +9,18 @@ import (
 	"strings"
 )
 
-const pathSeparator = "/"
+type (
+	// OpenPRQuery contains head and base filters for open pull requests.
+	OpenPRQuery struct {
+		Head string
+		Base string
+	}
+)
 
-// OpenPRQuery contains head and base filters for open pull requests.
-type OpenPRQuery struct {
-	Head string
-	Base string
-}
+const (
+	pathSeparator = "/"
+	emptyQuery    = ""
+)
 
 // PullsPath returns the pull-request collection endpoint.
 func PullsPath(owner, repository string) string {
@@ -54,5 +59,3 @@ func SplitPathQuery(requestPath string) (pathPart, queryPart string) {
 
 	return cutPath, query
 }
-
-const emptyQuery = ""

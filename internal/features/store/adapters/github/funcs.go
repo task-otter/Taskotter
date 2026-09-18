@@ -113,17 +113,17 @@ func checkTagResponseStatus(statusCode int, tag string) error {
 	return nil
 }
 
-func closeOnArchiveStatusError(resp *http.Response) error {
-	err := archiveDownloadStatusError(resp.StatusCode)
+func closeOnArchiveStatusError(statusCode int, body io.ReadCloser) error {
+	err := archiveDownloadStatusError(statusCode)
 	if err == nil {
 		return nil
 	}
 
-	return fmt.Errorf("finalize archive status error: %w", finalizeArchiveStatusError(resp, err))
+	return fmt.Errorf("finalize archive status error: %w", finalizeArchiveStatusError(body, err))
 }
 
-func finalizeArchiveStatusError(resp *http.Response, statusErr error) error {
-	drainErr := drainResponseBody(resp)
+func finalizeArchiveStatusError(body io.ReadCloser, statusErr error) error {
+	drainErr := drainResponseBody(body)
 	if drainErr != nil {
 		return errors.Join(
 			fmt.Errorf(fmtArchiveDownloadStatusErr, statusErr),
@@ -131,22 +131,14 @@ func finalizeArchiveStatusError(resp *http.Response, statusErr error) error {
 		)
 	}
 
-	closeErr := resp.Body.Close()
-	if closeErr != nil {
-		return errors.Join(
-			fmt.Errorf(fmtArchiveDownloadStatusErr, statusErr),
-			fmt.Errorf(fmtCloseResponseBodyErr, closeErr),
-		)
-	}
-
 	return fmt.Errorf(fmtArchiveDownloadStatusErr, statusErr)
 }
 
-func drainArchiveBody(resp *http.Response) (int64, error) {
-	written, err := io.Copy(io.Discard, resp.Body)
+func drainArchiveBody(body io.ReadCloser) (int64, error) {
+	written, err := io.Copy(io.Discard, body)
 	iox.Discard(written)
 
-	closeErr := resp.Body.Close()
+	closeErr := body.Close()
 
 	if err != nil {
 		return written, fmt.Errorf(fmtDrainResponseBodyErr, err)
@@ -159,12 +151,25 @@ func drainArchiveBody(resp *http.Response) (int64, error) {
 	return written, nil
 }
 
-func drainResponseBody(resp *http.Response) error {
-	written, err := io.Copy(io.Discard, resp.Body)
+func drainResponseBody(body io.ReadCloser) error {
+	written, err := io.Copy(io.Discard, body)
 	iox.Discard(written)
 
+	closeErr := body.Close()
+
 	if err != nil {
+		if closeErr != nil {
+			return errors.Join(
+				fmt.Errorf(fmtDrainResponseBodyErr, err),
+				fmt.Errorf(fmtCloseResponseBodyErr, closeErr),
+			)
+		}
+
 		return fmt.Errorf(fmtDrainResponseBodyErr, err)
+	}
+
+	if closeErr != nil {
+		return fmt.Errorf(fmtCloseResponseBodyErr, closeErr)
 	}
 
 	return nil
@@ -292,7 +297,7 @@ func downloadSnapshot(ctx context.Context, client *Client, ref *RefInfo) (*Snaps
 		return nil, fmt.Errorf("fetch archive: %w", err)
 	}
 
-	defer func() { iox.Discard2(drainArchiveBody(resp)) }()
+	defer func() { iox.Discard2(drainArchiveBody(resp.Body)) }()
 
 	snapshot, err := buildSnapshot(resp.Body, ref)
 	if err != nil {
@@ -404,7 +409,7 @@ func fetchArchive(ctx context.Context, client *Client, ref *RefInfo) (*http.Resp
 		return nil, fmt.Errorf("get archive: %w", err)
 	}
 
-	err = closeOnArchiveStatusError(resp)
+	err = closeOnArchiveStatusError(resp.StatusCode, resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("check archive download status: %w", err)
 	}
@@ -451,7 +456,7 @@ func getJSON(ctx context.Context, client *Client, args *getJSONArgs) error {
 		return fmt.Errorf("get %q: %w", args.reqPath, err)
 	}
 
-	defer func() { iox.Discard2(drainArchiveBody(resp)) }()
+	defer func() { iox.Discard2(drainArchiveBody(resp.Body)) }()
 
 	err = readJSONResponse(resp, args.reqPath, args.payload)
 	if err != nil {
@@ -514,21 +519,29 @@ func resolveSHA(ctx context.Context, client *Client, payload *tagRefPayload) (st
 
 func resolveVersionRef(ctx context.Context, client *Client, req *versionRefRequest) error {
 	if req.requestedVersion == consts.Empty {
-		err := applyResolvedRef(ctx, &resolvedRefRequest{
-			info:      req.info,
-			sourceRef: "refs/heads/" + req.defaultBranch,
-			wrapMsg:   "resolve branch head",
-			resolve: func(callCtx context.Context) (string, error) {
-				return resolveBranchHead(callCtx, client, req.defaultBranch)
-			},
-		})
-		if err != nil {
-			return fmt.Errorf(fmtApplyResolvedRefErr, "resolve branch ref", err)
-		}
-
-		return nil
+		return resolveDefaultBranchRef(ctx, client, req)
 	}
 
+	return resolveRequestedTagRef(ctx, client, req)
+}
+
+func resolveDefaultBranchRef(ctx context.Context, client *Client, req *versionRefRequest) error {
+	err := applyResolvedRef(ctx, &resolvedRefRequest{
+		info:      req.info,
+		sourceRef: "refs/heads/" + req.defaultBranch,
+		wrapMsg:   "resolve branch head",
+		resolve: func(callCtx context.Context) (string, error) {
+			return resolveBranchHead(callCtx, client, req.defaultBranch)
+		},
+	})
+	if err != nil {
+		return fmt.Errorf(fmtApplyResolvedRefErr, "resolve branch ref", err)
+	}
+
+	return nil
+}
+
+func resolveRequestedTagRef(ctx context.Context, client *Client, req *versionRefRequest) error {
 	err := applyResolvedRef(ctx, &resolvedRefRequest{
 		info:      req.info,
 		sourceRef: "refs/tags/" + req.requestedVersion,
@@ -550,7 +563,7 @@ func resolveTag(ctx context.Context, client *Client, tag string) (string, error)
 		return consts.Empty, fmt.Errorf("fetch tag ref: %w", err)
 	}
 
-	defer func() { iox.Discard2(drainArchiveBody(resp)) }()
+	defer func() { iox.Discard2(drainArchiveBody(resp.Body)) }()
 
 	sha, err := decodeTag(ctx, client, decodeTagArgs{rsp: resp, val: tag})
 	if err != nil {

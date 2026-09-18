@@ -17,30 +17,42 @@ import (
 	"github.com/task-otter/Taskotter/internal/shared/logging"
 )
 
-func main() { exitFunc(run()) }
+func main() { newApp().main() }
 
 func run() int {
+	return newApp().run()
+}
+
+func (application *app) main() { application.exit(application.run()) }
+
+func (application *app) run() int {
 	ctx, cancel := context.WithTimeout(context.Background(), runTimeout)
 
 	defer cancel()
 
-	cfg, result, err := loadRunAndWrite(ctx)
+	cfg, result, err := application.loadRunAndWrite(ctx)
 	if err != nil {
-		reportError(err, "")
+		application.reportError(err, "")
 
 		return exitError
 	}
 
-	return reportResult(cfg, result)
+	return application.reportResult(cfg, result)
 }
 
 func loadRunAndWrite(ctx context.Context) (cfg *config.Config, result *syncrun.Result, err error) {
+	return newApp().loadRunAndWrite(ctx)
+}
+
+func (application *app) loadRunAndWrite(
+	ctx context.Context,
+) (cfg *config.Config, result *syncrun.Result, err error) {
 	cfg, err = config.LoadFromEnv()
 	if err != nil {
 		return nil, nil, fmt.Errorf("load config: %w", err)
 	}
 
-	result, err = runOrchestrator(ctx, cfg)
+	result, err = application.runOrchestrator(ctx, cfg)
 	if err != nil {
 		return nil, nil, fmt.Errorf("run sync: %w", err)
 	}
@@ -63,7 +75,14 @@ func defaultWireRun(ctx context.Context, cfg *config.Config) (runSyncFn, error) 
 }
 
 func runOrchestrator(ctx context.Context, cfg *config.Config) (*syncrun.Result, error) {
-	runSync, err := wireRun(ctx, cfg)
+	return newApp().runOrchestrator(ctx, cfg)
+}
+
+func (application *app) runOrchestrator(
+	ctx context.Context,
+	cfg *config.Config,
+) (*syncrun.Result, error) {
+	runSync, err := application.wireRun(ctx, cfg)
 	if err != nil {
 		return nil, fmt.Errorf(errWireOrchFmt, err)
 	}
@@ -86,19 +105,27 @@ func writeOutputs(cfg *config.Config, result *syncrun.Result) error {
 }
 
 func reportResult(cfg *config.Config, result *syncrun.Result) int {
+	return newApp().reportResult(cfg, result)
+}
+
+func (application *app) reportResult(cfg *config.Config, result *syncrun.Result) int {
 	if result.Changed {
-		return handleChanged(cfg, result)
+		return application.handleChanged(cfg, result)
 	}
 
-	return handleUnchanged(cfg, result)
+	return application.handleUnchanged(cfg, result)
 }
 
 func reportError(err error, prefix string) {
-	iox.FprintfBestEffortf(stderr, "::error::%s%v\n", prefix, err)
+	newApp().reportError(err, prefix)
 }
 
-func handleChanged(cfg *config.Config, result *syncrun.Result) int {
-	err := iox.Fprintln(stdout, "TaskOtter produced changes.")
+func (application *app) reportError(err error, prefix string) {
+	iox.FprintfBestEffortf(application.stderr, "::error::%s%v\n", prefix, err)
+}
+
+func (application *app) handleChanged(cfg *config.Config, result *syncrun.Result) int {
+	err := iox.Fprintln(application.stdout, "TaskOtter produced changes.")
 	if err != nil {
 		return exitError
 	}
@@ -112,8 +139,8 @@ func handleChanged(cfg *config.Config, result *syncrun.Result) int {
 	return exitSuccess
 }
 
-func handleUnchanged(cfg *config.Config, result *syncrun.Result) int {
-	err := iox.Fprintln(stdout, "TaskOtter completed with no changes.")
+func (application *app) handleUnchanged(cfg *config.Config, result *syncrun.Result) int {
+	err := iox.Fprintln(application.stdout, "TaskOtter completed with no changes.")
 	if err != nil {
 		return exitError
 	}

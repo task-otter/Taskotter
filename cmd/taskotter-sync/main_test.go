@@ -9,13 +9,13 @@ import (
 	"errors"
 	"io"
 	"path/filepath"
-	"sync"
 	"testing"
 
 	syncrun "github.com/task-otter/Taskotter/internal/features/syncrun/service"
 	"github.com/task-otter/Taskotter/internal/shared/config"
 	"github.com/task-otter/Taskotter/internal/shared/consts"
 	"github.com/task-otter/Taskotter/internal/shared/iox"
+	"github.com/task-otter/Taskotter/internal/testsupport"
 	"github.com/task-otter/Taskotter/internal/testsupport/faults"
 )
 
@@ -35,23 +35,20 @@ const (
 	errExpectedOrchestrator = "expected orchestrator"
 )
 
-var (
-	errStubRun      = errors.New("stub run failure")
-	mainTestStateMu sync.Mutex
-)
+var errStubRun = errors.New("stub run failure")
 
 // TestMainExitsWithErrorWhenConfigMissing verifies main reports a failure exit code.
 func TestMainExitsWithErrorWhenConfigMissing(t *testing.T) {
-	t.Parallel()
 	lockMainTestState(t)
 
+	application := newTestApp(t)
 	code := exitError * consts.IndexZero
 
-	swapExitFunc(t, func(got int) { code = got })
-	captureStreams(t)
+	application.exit = func(got int) { code = got }
+
 	clearActionEnv(t)
 
-	main()
+	application.main()
 
 	if code != exitError {
 		t.Fatalf(exitFmt, code, exitError)
@@ -60,12 +57,10 @@ func TestMainExitsWithErrorWhenConfigMissing(t *testing.T) {
 
 // TestRunReportsConfigFailure verifies a missing configuration exits with an error code.
 func TestRunReportsConfigFailure(t *testing.T) {
-	t.Parallel()
 	lockMainTestState(t)
-	captureStreams(t)
 	clearActionEnv(t)
 
-	code := run()
+	code := newTestApp(t).run()
 
 	if code != exitError {
 		t.Fatalf(exitFmt, code, exitError)
@@ -77,7 +72,7 @@ func TestRunOrchestratorReportsWireFailure(t *testing.T) {
 	t.Parallel()
 	lockMainTestState(t)
 
-	result, err := runOrchestrator(t.Context(), invalidRepoOrchestratorConfig())
+	result, err := newTestApp(t).runOrchestrator(t.Context(), invalidRepoOrchestratorConfig())
 	iox.Discard(result)
 
 	if err == nil {
@@ -89,9 +84,11 @@ func TestRunOrchestratorReportsWireFailure(t *testing.T) {
 func TestRunOrchestratorReportsRunFailure(t *testing.T) {
 	t.Parallel()
 	lockMainTestState(t)
-	swapOrchestrator(t, &stubOrchestrator{result: nil, err: errStubRun})
 
-	result, err := runOrchestrator(t.Context(), emptyConfig())
+	application := newTestApp(t)
+	swapOrchestrator(t, application, &stubOrchestrator{result: nil, err: errStubRun})
+
+	result, err := application.runOrchestrator(t.Context(), emptyConfig())
 	iox.Discard(result)
 
 	if !errors.Is(err, errStubRun) {
@@ -101,13 +98,13 @@ func TestRunOrchestratorReportsRunFailure(t *testing.T) {
 
 // TestLoadRunAndWriteReportsOutputFailure verifies an unwritable output path is reported.
 func TestLoadRunAndWriteReportsOutputFailure(t *testing.T) {
-	t.Parallel()
 	lockMainTestState(t)
-	captureStreams(t)
 	setValidActionEnv(t, filepath.Join(t.TempDir(), "missing", outputFileName))
-	swapOrchestrator(t, &stubOrchestrator{result: unchangedResult(), err: nil})
 
-	cfg, result, err := loadRunAndWrite(t.Context())
+	application := newTestApp(t)
+	swapOrchestrator(t, application, &stubOrchestrator{result: unchangedResult(), err: nil})
+
+	cfg, result, err := application.loadRunAndWrite(t.Context())
 	iox.Discard2(cfg, result)
 
 	if err == nil {
@@ -117,13 +114,13 @@ func TestLoadRunAndWriteReportsOutputFailure(t *testing.T) {
 
 // TestLoadRunAndWriteReportsRunFailure verifies orchestrator failures abort the run.
 func TestLoadRunAndWriteReportsRunFailure(t *testing.T) {
-	t.Parallel()
 	lockMainTestState(t)
-	captureStreams(t)
 	setValidActionEnv(t, filepath.Join(t.TempDir(), outputFileName))
-	swapOrchestrator(t, &stubOrchestrator{result: nil, err: errStubRun})
 
-	cfg, result, err := loadRunAndWrite(t.Context())
+	application := newTestApp(t)
+	swapOrchestrator(t, application, &stubOrchestrator{result: nil, err: errStubRun})
+
+	cfg, result, err := application.loadRunAndWrite(t.Context())
 	iox.Discard2(cfg, result)
 
 	if !errors.Is(err, errStubRun) {
@@ -148,13 +145,13 @@ func TestDefaultWireRunBuildsRunFunc(t *testing.T) {
 
 // TestRunSucceedsWithStubbedOrchestrator verifies a clean run exits successfully.
 func TestRunSucceedsWithStubbedOrchestrator(t *testing.T) {
-	t.Parallel()
 	lockMainTestState(t)
-	captureStreams(t)
 	setValidActionEnv(t, filepath.Join(t.TempDir(), outputFileName))
-	swapOrchestrator(t, &stubOrchestrator{result: unchangedResult(), err: nil})
 
-	code := run()
+	application := newTestApp(t)
+	swapOrchestrator(t, application, &stubOrchestrator{result: unchangedResult(), err: nil})
+
+	code := application.run()
 
 	if code != exitSuccess {
 		t.Fatalf(exitFmt, code, exitSuccess)
@@ -165,9 +162,10 @@ func TestRunSucceedsWithStubbedOrchestrator(t *testing.T) {
 func TestReportResultChangedWithoutFailOnChanges(t *testing.T) {
 	t.Parallel()
 	lockMainTestState(t)
-	captureStreams(t)
 
-	code := reportResult(emptyConfig(), changedResult())
+	application := newTestApp(t)
+
+	code := application.reportResult(emptyConfig(), changedResult())
 
 	if code != exitSuccess {
 		t.Fatalf(exitFmt, code, exitSuccess)
@@ -178,9 +176,10 @@ func TestReportResultChangedWithoutFailOnChanges(t *testing.T) {
 func TestReportResultChangedWithFailOnChanges(t *testing.T) {
 	t.Parallel()
 	lockMainTestState(t)
-	captureStreams(t)
 
-	code := reportResult(failOnChangesConfig(), changedResult())
+	application := newTestApp(t)
+
+	code := application.reportResult(failOnChangesConfig(), changedResult())
 
 	if code != exitError {
 		t.Fatalf(exitFmt, code, exitError)
@@ -191,9 +190,10 @@ func TestReportResultChangedWithFailOnChanges(t *testing.T) {
 func TestReportResultUnchangedWithFailOnChanges(t *testing.T) {
 	t.Parallel()
 	lockMainTestState(t)
-	captureStreams(t)
 
-	code := reportResult(failOnChangesConfig(), unchangedResult())
+	application := newTestApp(t)
+
+	code := application.reportResult(failOnChangesConfig(), unchangedResult())
 
 	if code != exitSuccess {
 		t.Fatalf(exitFmt, code, exitSuccess)
@@ -204,13 +204,16 @@ func TestReportResultUnchangedWithFailOnChanges(t *testing.T) {
 func TestReportResultReportsWriteFailures(t *testing.T) {
 	t.Parallel()
 	lockMainTestState(t)
-	swapStdout(t, &faults.StubWriter{Count: consts.IndexZero, Err: faults.ErrFault})
 
-	if reportResult(emptyConfig(), changedResult()) != exitError {
+	application := newTestApp(t)
+
+	application.stdout = &faults.StubWriter{Count: consts.IndexZero, Err: faults.ErrFault}
+
+	if application.reportResult(emptyConfig(), changedResult()) != exitError {
 		t.Fatal("changed result should fail when stdout fails")
 	}
 
-	if reportResult(emptyConfig(), unchangedResult()) != exitError {
+	if application.reportResult(emptyConfig(), unchangedResult()) != exitError {
 		t.Fatal("unchanged result should fail when stdout fails")
 	}
 }
@@ -222,8 +225,10 @@ func TestReportErrorWritesAnnotation(t *testing.T) {
 
 	var buf bytes.Buffer
 
-	swapStderr(t, &buf)
-	reportError(errStubRun, "prefix: ")
+	application := newTestApp(t)
+
+	application.stderr = &buf
+	application.reportError(errStubRun, "prefix: ")
 
 	if !bytes.Contains(buf.Bytes(), []byte("::error::prefix: ")) {
 		t.Fatalf("stderr = %q", buf.String())
@@ -241,21 +246,30 @@ func (stub *stubOrchestrator) Run(
 
 func lockMainTestState(t *testing.T) {
 	t.Helper()
-
-	mainTestStateMu.Lock()
-	t.Cleanup(mainTestStateMu.Unlock)
+	t.Cleanup(testsupport.Lock())
 }
 
-func swapOrchestrator(t *testing.T, stub *stubOrchestrator) {
+func newTestApp(t *testing.T) *app {
 	t.Helper()
 
-	original := wireRun
+	application := newApp()
 
-	wireRun = func(context.Context, *config.Config) (runSyncFn, error) {
+	application.stdout = io.Discard
+	application.stderr = io.Discard
+
+	return application
+}
+
+func swapOrchestrator(t *testing.T, application *app, stub *stubOrchestrator) {
+	t.Helper()
+
+	original := application.wireRun
+
+	application.wireRun = func(context.Context, *config.Config) (runSyncFn, error) {
 		return stub.Run, nil
 	}
 
-	t.Cleanup(func() { wireRun = original })
+	t.Cleanup(func() { application.wireRun = original })
 }
 
 func changedResult() *syncrun.Result {
@@ -301,42 +315,6 @@ func setValidActionEnv(t *testing.T, outputPath string) {
 func setActionEnv(t *testing.T, key, value string) {
 	t.Helper()
 	t.Setenv(key, value)
-}
-
-func swapExitFunc(t *testing.T, stub func(int)) {
-	t.Helper()
-
-	original := exitFunc
-
-	exitFunc = stub
-
-	t.Cleanup(func() { exitFunc = original })
-}
-
-func captureStreams(t *testing.T) {
-	t.Helper()
-	swapStdout(t, io.Discard)
-	swapStderr(t, io.Discard)
-}
-
-func swapStderr(t *testing.T, writer io.Writer) {
-	t.Helper()
-
-	original := stderr
-
-	stderr = writer
-
-	t.Cleanup(func() { stderr = original })
-}
-
-func swapStdout(t *testing.T, writer io.Writer) {
-	t.Helper()
-
-	original := stdout
-
-	stdout = writer
-
-	t.Cleanup(func() { stdout = original })
 }
 
 func unchangedResult() *syncrun.Result {

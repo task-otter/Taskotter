@@ -34,12 +34,19 @@ func ExtractTarGz(reader Reader, destDir string) (string, error) {
 }
 
 func absPaths(base, target string) (absBase, absTarget string, err error) {
-	absBase, err = absPath(base)
+	return absPathsWith(filepath.Abs, base, target)
+}
+
+func absPathsWith(
+	resolve func(string) (string, error),
+	base, target string,
+) (absBase, absTarget string, err error) {
+	absBase, err = resolve(base)
 	if err != nil {
 		return consts.Empty, consts.Empty, fmt.Errorf("resolve base path: %w", err)
 	}
 
-	absTarget, err = absPath(target)
+	absTarget, err = resolve(target)
 	if err != nil {
 		return consts.Empty, consts.Empty, fmt.Errorf("resolve target path: %w", err)
 	}
@@ -73,7 +80,11 @@ func discardTarEntry(reader io.Reader, size int64) error {
 }
 
 func ensureInside(base, target string) error {
-	absBase, absTarget, err := absPaths(base, target)
+	return ensureInsideWith(filepath.Abs, base, target)
+}
+
+func ensureInsideWith(resolve func(string) (string, error), base, target string) error {
+	absBase, absTarget, err := absPathsWith(resolve, base, target)
 	if err != nil {
 		return fmt.Errorf("abs paths: %w", err)
 	}

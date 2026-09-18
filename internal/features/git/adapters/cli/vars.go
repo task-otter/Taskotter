@@ -8,9 +8,16 @@ import (
 	"regexp"
 )
 
-var (
-	gitBinary = "git"
+const gitBinary = "git"
 
+const (
+	errCheckBranchExists     = "check branch exists: %w"
+	errReadLastCommitMessage = "read last commit message: %w"
+	errStagePaths            = "stage paths: %w"
+	errRunGitOutput          = "run git output: %w"
+)
+
+var (
 	errOriginHEADNotAvailable = errors.New("origin HEAD not available")
 
 	errNoRemoteBranchAtOriginHEAD = errors.New("no remote branch at origin HEAD commit")

@@ -5,6 +5,7 @@ package iox_test
 
 import (
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -220,7 +221,7 @@ func assertFormatWrite(
 func assertOutputsFile(t *testing.T, path string) {
 	t.Helper()
 
-	data, err := os.ReadFile(path)
+	data, err := fs.ReadFile(os.DirFS(filepath.Dir(path)), filepath.Base(path))
 	if err != nil {
 		t.Fatalf(unexpectFmt, "read outputs", err)
 	}

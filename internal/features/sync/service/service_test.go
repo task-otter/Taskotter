@@ -43,9 +43,10 @@ func TestApplyFileChangeDefaultIsNoOp(t *testing.T) {
 func TestCleanupFailedStagingJoinsRemoveError(t *testing.T) {
 	t.Parallel()
 	lockSeams(t)
-	swapRemoveAll(t, failingRemove)
 
-	err := cleanupFailedStaging(stagingName, errStub)
+	ops := swapRemoveAll(t, failingRemove)
+
+	err := cleanupFailedStagingWithOps(ops, stagingName, errStub)
 
 	if !errors.Is(err, errStub) {
 		t.Fatalf(errWantFmt, err, errStub)
@@ -76,19 +77,21 @@ func TestCleanupLegacyMetadataSkipsLegacyPath(t *testing.T) {
 func TestCleanupStagingDirReportsRemoveFailure(t *testing.T) {
 	t.Parallel()
 	lockSeams(t)
-	swapRemoveAll(t, failingRemove)
 
-	assertFails(t, cleanupStagingDir(stagingName))
+	ops := swapRemoveAll(t, failingRemove)
+
+	assertFails(t, cleanupStagingDirWithOps(ops, stagingName))
 }
 
 // TestCleanupStagingOnExitKeepsPrimaryError verifies cleanup errors do not clobber primary.
 func TestCleanupStagingOnExitKeepsPrimaryError(t *testing.T) {
 	t.Parallel()
 	lockSeams(t)
-	swapRemoveAll(t, failingRemove)
+
+	ops := swapRemoveAll(t, failingRemove)
 
 	primary := errStub
-	cleanupStagingOnExit(stagingName, &primary)
+	cleanupStagingOnExitWithOps(ops, stagingName, &primary)
 
 	if !errors.Is(primary, errStub) {
 		t.Fatalf("err = %v, want primary", primary)
@@ -99,11 +102,12 @@ func TestCleanupStagingOnExitKeepsPrimaryError(t *testing.T) {
 func TestCleanupStagingOnExitSurfacesCleanupError(t *testing.T) {
 	t.Parallel()
 	lockSeams(t)
-	swapRemoveAll(t, failingRemove)
+
+	ops := swapRemoveAll(t, failingRemove)
 
 	var err error
 
-	cleanupStagingOnExit(stagingName, &err)
+	cleanupStagingOnExitWithOps(ops, stagingName, &err)
 	assertFails(t, err)
 }
 
@@ -138,9 +142,10 @@ func TestFileChangeFromDataDetectsUpdate(t *testing.T) {
 func TestPrepareStagingRootReportsMkdirFailure(t *testing.T) {
 	t.Parallel()
 	lockSeams(t)
-	swapMkdirAll(t, failingMkdirAll)
 
-	root, err := prepareStagingRoot(t.TempDir(), config.DefaultTargetFolder)
+	ops := swapMkdirAll(t, failingMkdirAll)
+
+	root, err := prepareStagingRootWithOps(ops, t.TempDir(), config.DefaultTargetFolder)
 	iox.Discard(root)
 	assertFails(t, err)
 }
@@ -149,9 +154,10 @@ func TestPrepareStagingRootReportsMkdirFailure(t *testing.T) {
 func TestPrepareStagingRootReportsTempFailure(t *testing.T) {
 	t.Parallel()
 	lockSeams(t)
-	swapMkdirTemp(t, failingMkdirTemp)
 
-	root, err := prepareStagingRoot(t.TempDir(), config.DefaultTargetFolder)
+	ops := swapMkdirTemp(t, failingMkdirTemp)
+
+	root, err := prepareStagingRootWithOps(ops, t.TempDir(), config.DefaultTargetFolder)
 	iox.Discard(root)
 	assertFails(t, err)
 }
@@ -160,13 +166,14 @@ func TestPrepareStagingRootReportsTempFailure(t *testing.T) {
 func TestPruneDirsUntilStopReportsFailure(t *testing.T) {
 	t.Parallel()
 	lockSeams(t)
-	swapRemovePath(t, failingRemove)
+
+	ops := swapRemovePath(t, failingRemove)
 
 	workspace := t.TempDir()
 	nested := filepath.Join(workspace, pathA, pathB)
 	assertNoErr(t, os.MkdirAll(nested, dirModePerm))
 
-	assertFails(t, pruneDirsUntilStop(nested, workspace))
+	assertFails(t, pruneDirsUntilStopWithOps(ops, nested, workspace))
 }
 
 // TestPruneEmptyParentDirsSkipsEmptyStop verifies empty stopRel is a no-op.
@@ -181,27 +188,30 @@ func TestPruneEmptyParentDirsSkipsEmptyStop(t *testing.T) {
 func TestRemoveDirIfEmptyIgnoresNotEmpty(t *testing.T) {
 	t.Parallel()
 	lockSeams(t)
-	swapRemovePath(t, func(string) error { return syscall.ENOTEMPTY })
 
-	assertNoErr(t, removeDirIfEmpty(stagingName, removeEmptyCtx))
+	ops := swapRemovePath(t, func(string) error { return syscall.ENOTEMPTY })
+
+	assertNoErr(t, removeDirIfEmptyWithOps(ops, stagingName, removeEmptyCtx))
 }
 
 // TestRemoveDirIfEmptyReportsFailure verifies unexpected remove errors surface.
 func TestRemoveDirIfEmptyReportsFailure(t *testing.T) {
 	t.Parallel()
 	lockSeams(t)
-	swapRemovePath(t, failingRemove)
 
-	assertFails(t, removeDirIfEmpty(stagingName, removeEmptyCtx))
+	ops := swapRemovePath(t, failingRemove)
+
+	assertFails(t, removeDirIfEmptyWithOps(ops, stagingName, removeEmptyCtx))
 }
 
 // TestRemoveEmptyParentDirReportsFailure verifies prune propagates remove failures.
 func TestRemoveEmptyParentDirReportsFailure(t *testing.T) {
 	t.Parallel()
 	lockSeams(t)
-	swapRemovePath(t, failingRemove)
 
-	exists, err := removeEmptyParentDir(stagingName)
+	ops := swapRemovePath(t, failingRemove)
+
+	exists, err := removeEmptyParentDirWithOps(ops, stagingName)
 	iox.Discard(exists)
 	assertFails(t, err)
 }
@@ -210,43 +220,48 @@ func TestRemoveEmptyParentDirReportsFailure(t *testing.T) {
 func TestRemoveIfExistsReportsFailure(t *testing.T) {
 	t.Parallel()
 	lockSeams(t)
-	swapRemovePath(t, failingRemove)
 
-	assertFails(t, removeIfExists(t.TempDir(), fileNameTxt))
+	ops := swapRemovePath(t, failingRemove)
+
+	assertFails(t, removeIfExistsWithOps(ops, t.TempDir(), fileNameTxt))
 }
 
 // TestRemoveLegacyMetadataDirReportsFailure verifies legacy dir remove failures.
 func TestRemoveLegacyMetadataDirReportsFailure(t *testing.T) {
 	t.Parallel()
 	lockSeams(t)
-	swapRemovePath(t, failingRemove)
 
-	assertFails(t, removeLegacyMetadataDir(t.TempDir()))
+	ops := swapRemovePath(t, failingRemove)
+
+	assertFails(t, removeLegacyMetadataDirWithOps(ops, t.TempDir()))
 }
 
 // TestRemoveLegacyMetadataFileReportsFailure verifies legacy metadata remove failures.
 func TestRemoveLegacyMetadataFileReportsFailure(t *testing.T) {
 	t.Parallel()
 	lockSeams(t)
-	swapRemovePath(t, failingRemove)
 
-	assertFails(t, removeLegacyMetadataFile(t.TempDir()))
+	ops := swapRemovePath(t, failingRemove)
+
+	assertFails(t, removeLegacyMetadataFileWithOps(ops, t.TempDir()))
 }
 
 // TestRemoveObsoleteFileReportsFailure verifies unexpected remove errors surface.
 func TestRemoveObsoleteFileReportsFailure(t *testing.T) {
 	t.Parallel()
 	lockSeams(t)
-	swapRemovePath(t, failingRemove)
 
-	assertFails(t, removeObsoleteFile(t.TempDir(), fileNameTxt))
+	ops := swapRemovePath(t, failingRemove)
+
+	assertFails(t, removeObsoleteFileWithOps(ops, t.TempDir(), fileNameTxt))
 }
 
 // TestRemoveStaleManagedFileReportsRemoveFailure verifies stale remove failures surface.
 func TestRemoveStaleManagedFileReportsRemoveFailure(t *testing.T) {
 	t.Parallel()
 	lockSeams(t)
-	swapRemovePath(t, failingRemove)
+
+	ops := swapRemovePath(t, failingRemove)
 
 	err := removeStaleManagedFile(&removeStaleFileArgs{
 		old: &managedFile{
@@ -256,6 +271,7 @@ func TestRemoveStaleManagedFileReportsRemoveFailure(t *testing.T) {
 		current:      map[string]struct{}{},
 		workspace:    t.TempDir(),
 		targetFolder: config.DefaultTargetFolder,
+		fsOps:        ops,
 	})
 
 	assertFails(t, err)
@@ -287,7 +303,8 @@ func TestRemoveStaleManagedFileSkipsCurrent(t *testing.T) {
 func TestStagePlanFilesCleansFailedStaging(t *testing.T) {
 	t.Parallel()
 	lockSeams(t)
-	swapRemoveAll(t, failingRemove)
+
+	ops := swapRemoveAll(t, failingRemove)
 
 	root, err := stagePlanFiles(&stagePlanArgs{
 		staged: []stagedFile{{
@@ -297,6 +314,7 @@ func TestStagePlanFilesCleansFailedStaging(t *testing.T) {
 		workspace:    t.TempDir(),
 		targetFolder: config.DefaultTargetFolder,
 		copyFile:     func(string, *domain.FileEntry) error { return errStub },
+		fsOps:        ops,
 	})
 
 	iox.Discard(root)
@@ -307,13 +325,15 @@ func TestStagePlanFilesCleansFailedStaging(t *testing.T) {
 func TestStagePlanFilesPrepareRootFailure(t *testing.T) {
 	t.Parallel()
 	lockSeams(t)
-	swapMkdirAll(t, failingMkdirAll)
+
+	ops := swapMkdirAll(t, failingMkdirAll)
 
 	root, err := stagePlanFiles(&stagePlanArgs{
 		staged:       nil,
 		workspace:    t.TempDir(),
 		targetFolder: config.DefaultTargetFolder,
 		copyFile:     copyFileTo,
+		fsOps:        ops,
 	})
 
 	iox.Discard(root)
@@ -398,7 +418,8 @@ func TestWriteStagedFilesReportsCopyFailure(t *testing.T) {
 func TestWriteStagedFilesReportsMkdirFailure(t *testing.T) {
 	t.Parallel()
 	lockSeams(t)
-	swapMkdirAll(t, failingMkdirAll)
+
+	ops := swapMkdirAll(t, failingMkdirAll)
 
 	err := writeStagedFiles(&writeStagedArgs{
 		staged: []stagedFile{{
@@ -407,6 +428,7 @@ func TestWriteStagedFilesReportsMkdirFailure(t *testing.T) {
 		}},
 		workspace: t.TempDir(),
 		copyFile:  copyFileTo,
+		fsOps:     ops,
 	})
 
 	assertFails(t, err)
@@ -437,16 +459,21 @@ func TestApplyFileChangeAddedAndUpdated(t *testing.T) {
 func TestApplyPlanWithCleanupReportsSessionFailure(t *testing.T) {
 	t.Parallel()
 	lockSeams(t)
-	swapMkdirAll(t, failingMkdirAll)
 
-	assertFails(t, applyPlanWithCleanup(minimalPlan(), minimalSyncInput(t.TempDir())))
+	ops := swapMkdirAll(t, failingMkdirAll)
+
+	plan := minimalPlan()
+	syncInput := minimalSyncInput(t.TempDir())
+	_, err := startApplySessionWithOps(ops, plan, syncInput)
+	assertFails(t, err)
 }
 
 // TestApplyStagedPlanReportsCleanupFailure verifies post-write cleanup failures surface.
 func TestApplyStagedPlanReportsCleanupFailure(t *testing.T) {
 	t.Parallel()
 	lockSeams(t)
-	swapRemovePath(t, failingRemove)
+
+	ops := swapRemovePath(t, failingRemove)
 
 	plan := minimalPlan()
 
@@ -457,7 +484,7 @@ func TestApplyStagedPlanReportsCleanupFailure(t *testing.T) {
 		plan:      plan,
 		syncInput: minimalSyncInput(t.TempDir()),
 		workspace: t.TempDir(),
-		session:   newStagingSession(copyFileTo),
+		session:   newStagingSession(copyFileTo, ops),
 	})
 
 	assertFails(t, err)
@@ -477,22 +504,24 @@ func TestBuildFileEntryReportsReadFailure(t *testing.T) {
 func TestCleanupAfterApplyReportsLegacyFailure(t *testing.T) {
 	t.Parallel()
 	lockSeams(t)
-	swapRemovePath(t, failingRemove)
 
-	assertFails(t, cleanupAfterApply(minimalPlan(), t.TempDir(), metaRelPath))
+	ops := swapRemovePath(t, failingRemove)
+
+	assertFails(t, cleanupAfterApplyWithOps(ops, minimalPlan(), t.TempDir(), metaRelPath))
 }
 
 // TestCleanupAfterApplyReportsObsoleteFailure verifies obsolete cleanup failures surface.
 func TestCleanupAfterApplyReportsObsoleteFailure(t *testing.T) {
 	t.Parallel()
 	lockSeams(t)
-	swapRemovePath(t, failingRemove)
+
+	ops := swapRemovePath(t, failingRemove)
 
 	plan := minimalPlan()
 
 	plan.OldLock = lockWithManaged(goOldTxtRel)
 	plan.OldLock.Configuration.TargetFolder = config.DefaultTargetFolder
-	assertFails(t, cleanupAfterApply(plan, t.TempDir(), metaRelPath))
+	assertFails(t, cleanupAfterApplyWithOps(ops, plan, t.TempDir(), metaRelPath))
 }
 
 // TestCleanupLegacyMetadataReportsDirFailure verifies dir cleanup failures surface.
@@ -502,7 +531,7 @@ func TestCleanupLegacyMetadataReportsDirFailure(t *testing.T) {
 
 	calls := consts.IndexZero
 
-	swapRemovePath(t, func(string) error {
+	ops := swapRemovePath(t, func(string) error {
 		calls++
 
 		if calls == consts.IndexOne {
@@ -512,41 +541,44 @@ func TestCleanupLegacyMetadataReportsDirFailure(t *testing.T) {
 		return errStub
 	})
 
-	assertFails(t, cleanupLegacyMetadata(t.TempDir(), metaRelPath))
+	assertFails(t, cleanupLegacyMetadataWithOps(ops, t.TempDir(), metaRelPath))
 }
 
 // TestCleanupLegacyMetadataReportsFileFailure verifies legacy file remove failures.
 func TestCleanupLegacyMetadataReportsFileFailure(t *testing.T) {
 	t.Parallel()
 	lockSeams(t)
-	swapRemovePath(t, failingRemove)
 
-	assertFails(t, cleanupLegacyMetadata(t.TempDir(), metaRelPath))
+	ops := swapRemovePath(t, failingRemove)
+
+	assertFails(t, cleanupLegacyMetadataWithOps(ops, t.TempDir(), metaRelPath))
 }
 
 // TestCleanupOldTargetReportsStepFailure verifies old-target cleanup failures surface.
 func TestCleanupOldTargetReportsStepFailure(t *testing.T) {
 	t.Parallel()
 	lockSeams(t)
-	swapRemovePath(t, failingRemove)
+
+	ops := swapRemovePath(t, failingRemove)
 
 	plan := minimalPlan()
 
 	plan.OldTargetFolder = oldTargetFolder
 	plan.OldLock = lockWithManaged(oldTargetFileRel)
-	assertFails(t, removeOldTargetFiles(plan, t.TempDir()))
+	assertFails(t, removeOldTargetFilesWithOps(ops, plan, t.TempDir()))
 }
 
 // TestRemoveOldTargetLockReportsFailure verifies old lock remove failures surface.
 func TestRemoveOldTargetLockReportsFailure(t *testing.T) {
 	t.Parallel()
 	lockSeams(t)
-	swapRemovePath(t, failingRemove)
+
+	ops := swapRemovePath(t, failingRemove)
 
 	plan := minimalPlan()
 
 	plan.OldTargetFolder = oldTargetFolder
-	assertFails(t, removeOldTargetLock(plan, t.TempDir()))
+	assertFails(t, removeOldTargetLockWithOps(ops, plan, t.TempDir()))
 }
 
 // TestRemoveOldTargetMetadataReportsDirFailure verifies old metadata dir prune failures.
@@ -556,7 +588,7 @@ func TestRemoveOldTargetMetadataReportsDirFailure(t *testing.T) {
 
 	calls := consts.IndexZero
 
-	swapRemovePath(t, func(string) error {
+	ops := swapRemovePath(t, func(string) error {
 		calls++
 
 		if calls == consts.IndexOne {
@@ -569,19 +601,20 @@ func TestRemoveOldTargetMetadataReportsDirFailure(t *testing.T) {
 	plan := minimalPlan()
 
 	plan.OldTargetFolder = oldTargetFolder
-	assertFails(t, removeOldTargetMetadata(plan, t.TempDir()))
+	assertFails(t, removeOldTargetMetadataWithOps(ops, plan, t.TempDir()))
 }
 
 // TestRemoveOldTargetMetadataReportsFailure verifies old metadata remove failures.
 func TestRemoveOldTargetMetadataReportsFailure(t *testing.T) {
 	t.Parallel()
 	lockSeams(t)
-	swapRemovePath(t, failingRemove)
+
+	ops := swapRemovePath(t, failingRemove)
 
 	plan := minimalPlan()
 
 	plan.OldTargetFolder = oldTargetFolder
-	assertFails(t, removeOldTargetMetadata(plan, t.TempDir()))
+	assertFails(t, removeOldTargetMetadataWithOps(ops, plan, t.TempDir()))
 }
 
 // TestRemoveStaleManagedFileReportsPruneFailure verifies prune failures after remove surface.
@@ -590,7 +623,7 @@ func TestRemoveStaleManagedFileReportsPruneFailure(t *testing.T) {
 	lockSeams(t)
 
 	workspace := prepGoSubDir(t)
-	swapRemovePath(t, succeedThenFail())
+	ops := swapRemovePath(t, succeedThenFail())
 
 	assertFails(t, removeStaleManagedFile(&removeStaleFileArgs{
 		old: &managedFile{
@@ -601,6 +634,7 @@ func TestRemoveStaleManagedFileReportsPruneFailure(t *testing.T) {
 		current:      map[string]struct{}{},
 		workspace:    workspace,
 		targetFolder: config.DefaultTargetFolder,
+		fsOps:        ops,
 	}))
 }
 
@@ -608,27 +642,31 @@ func TestRemoveStaleManagedFileReportsPruneFailure(t *testing.T) {
 func TestRemoveStaleManagedFilesReportsFailure(t *testing.T) {
 	t.Parallel()
 	lockSeams(t)
-	swapRemovePath(t, failingRemove)
+
+	ops := swapRemovePath(t, failingRemove)
 
 	lock := emptyLock()
 
 	lock.ManagedFiles = []managedFile{managedAt(goOldTxtRel, consts.Go, consts.Empty)}
 	lock.Configuration.TargetFolder = config.DefaultTargetFolder
-	assertFails(t, removeStaleManagedFiles(&lock, map[string]struct{}{}, t.TempDir()))
+	assertFails(t, removeStaleManagedFilesWithOps(ops, &lock, map[string]struct{}{}, t.TempDir()))
 }
 
 // TestScanLogicalRootDocsReportsWalkFailure verifies logical-root scan failures.
 func TestScanLogicalRootDocsReportsWalkFailure(t *testing.T) {
 	t.Parallel()
 	lockSeams(t)
-	swapWalkDir(t, failingWalk)
+
+	ops := swapWalkDir(t, failingWalk)
 
 	var args mergeParentDocsArgs
 
 	args.destRoot = t.TempDir()
+	args.fsOps = ops
 	args.collect = &collectModuleArgs{
 		syncInput: syncInputWithConfig(),
 		mod:       emptyModulePtr(consts.Empty, consts.Go),
+		fsOps:     ops,
 	}
 
 	contents, err := scanLogicalRootDocs(&args)
@@ -640,13 +678,15 @@ func TestScanLogicalRootDocsReportsWalkFailure(t *testing.T) {
 func TestStagePreparedFilesReportsFailure(t *testing.T) {
 	t.Parallel()
 	lockSeams(t)
-	swapMkdirAll(t, failingMkdirAll)
+
+	ops := swapMkdirAll(t, failingMkdirAll)
 
 	session, err := stagePreparedFiles(&stagePreparedInput{
 		staged:    nil,
 		plan:      minimalPlan(),
 		syncInput: minimalSyncInput(t.TempDir()),
 		workspace: t.TempDir(),
+		fsOps:     ops,
 	})
 
 	iox.Discard(session)
@@ -657,9 +697,10 @@ func TestStagePreparedFilesReportsFailure(t *testing.T) {
 func TestStartApplySessionReportsStagingFailure(t *testing.T) {
 	t.Parallel()
 	lockSeams(t)
-	swapMkdirAll(t, failingMkdirAll)
 
-	session, err := startApplySession(minimalPlan(), minimalSyncInput(t.TempDir()))
+	ops := swapMkdirAll(t, failingMkdirAll)
+
+	session, err := startApplySessionWithOps(ops, minimalPlan(), minimalSyncInput(t.TempDir()))
 	iox.Discard(session)
 	assertFails(t, err)
 }
@@ -689,7 +730,7 @@ func TestTryLegacyMetadataReportsCorrupt(t *testing.T) {
 
 	workspace := t.TempDir()
 	path := filepath.Join(workspace, filepath.FromSlash(config.LegacyMetadataPath))
-	assertNoErr(t, mkdirAll(filepath.Dir(path), dirModePerm))
+	assertNoErr(t, defaultFileOps().mkdirAll(filepath.Dir(path), dirModePerm))
 
 	writeTempFile(t, path, []byte(badYAMLText))
 
@@ -932,7 +973,7 @@ func TestCopyFileCopiesRelativeSource(t *testing.T) {
 
 	dst := filepath.Join(t.TempDir(), "out.txt")
 	assertNoErr(t, CopyFile(&copyFileArgs{
-		root: root, rel: fileNameTxt, dst: dst, mode: fileModeRegular,
+		root: root, rel: fileNameTxt, dst: dst, mode: fileModeRegular, fsOps: defaultFileOps(),
 	}))
 	assertFilePayload(t, dst, payloadText)
 }
@@ -957,11 +998,13 @@ func TestCopyFileReportsWriteFailure(t *testing.T) {
 
 	root := t.TempDir()
 	writeTempFile(t, filepath.Join(root, fileNameTxt), []byte(byteX))
-	swapMkdirAll(t, failingMkdirAll)
+
+	ops := swapMkdirAll(t, failingMkdirAll)
 
 	err := CopyFile(&copyFileArgs{
 		root: root, rel: fileNameTxt, dst: filepath.Join(t.TempDir(), outName),
-		mode: fileModeRegular,
+		mode:  fileModeRegular,
+		fsOps: ops,
 	})
 
 	assertFails(t, err)
@@ -971,9 +1014,10 @@ func TestCopyFileReportsWriteFailure(t *testing.T) {
 func TestCopyFileToReportsWriteFailure(t *testing.T) {
 	t.Parallel()
 	lockSeams(t)
-	swapMkdirAll(t, failingMkdirAll)
 
-	err := copyFileTo(filepath.Join(t.TempDir(), pathA, fileNameTxt), &domain.FileEntry{
+	ops := swapMkdirAll(t, failingMkdirAll)
+
+	err := copyFileToWithOps(ops, filepath.Join(t.TempDir(), pathA, fileNameTxt), &domain.FileEntry{
 		Data: []byte(byteX), Mode: fileModeRegular,
 	})
 
@@ -984,9 +1028,10 @@ func TestCopyFileToReportsWriteFailure(t *testing.T) {
 func TestCreateTempFileReportsCreateFailure(t *testing.T) {
 	t.Parallel()
 	lockSeams(t)
-	swapCreateTemp(t, failingCreateTemp)
 
-	file, err := createTempFile(t.TempDir())
+	ops := swapCreateTemp(t, failingCreateTemp)
+
+	file, err := createTempFileWithOps(ops, t.TempDir())
 	discardTemp(file)
 	assertFails(t, err)
 }
@@ -995,9 +1040,10 @@ func TestCreateTempFileReportsCreateFailure(t *testing.T) {
 func TestCreateTempFileReportsMkdirFailure(t *testing.T) {
 	t.Parallel()
 	lockSeams(t)
-	swapMkdirAll(t, failingMkdirAll)
 
-	file, err := createTempFile(filepath.Join(t.TempDir(), "nested"))
+	ops := swapMkdirAll(t, failingMkdirAll)
+
+	file, err := createTempFileWithOps(ops, filepath.Join(t.TempDir(), "nested"))
 	discardTemp(file)
 	assertFails(t, err)
 }
@@ -1006,9 +1052,10 @@ func TestCreateTempFileReportsMkdirFailure(t *testing.T) {
 func TestReadRelativeFileReportsOpenFailure(t *testing.T) {
 	t.Parallel()
 	lockSeams(t)
-	swapOpenRelative(t, failingOpenRelative)
 
-	data, err := readRelativeFile(t.TempDir(), fileNameTxt)
+	ops := swapOpenRelative(t, failingOpenRelative)
+
+	data, err := readRelativeFileWithOps(ops, t.TempDir(), fileNameTxt)
 	iox.Discard(data)
 	assertFails(t, err)
 }
@@ -1020,9 +1067,10 @@ func TestReadRelativeFileReportsReadFailure(t *testing.T) {
 
 	root := t.TempDir()
 	writeTempFile(t, filepath.Join(root, fileNameTxt), []byte(byteX))
-	swapReadAll(t, failingReadAll)
 
-	data, err := readRelativeFile(root, fileNameTxt)
+	ops := swapReadAll(t, failingReadAll)
+
+	data, err := readRelativeFileWithOps(ops, root, fileNameTxt)
 	iox.Discard(data)
 	assertFails(t, err)
 }
@@ -1031,49 +1079,54 @@ func TestReadRelativeFileReportsReadFailure(t *testing.T) {
 func TestRenameTempFileReportsFailure(t *testing.T) {
 	t.Parallel()
 	lockSeams(t)
-	swapRenamePath(t, failingRename)
 
-	assertFails(t, renameTempFile(pathA, pathB))
+	ops := swapRenamePath(t, failingRename)
+
+	assertFails(t, renameTempFileWithOps(ops, pathA, pathB))
 }
 
 // TestWriteAndFinalizeTempReportsChmodFailure verifies chmod failures surface.
 func TestWriteAndFinalizeTempReportsChmodFailure(t *testing.T) {
 	t.Parallel()
 	lockSeams(t)
-	swapChmodFile(t, failingChmod)
+
+	ops := swapChmodFile(t, failingChmod)
 
 	tmp := createRealTemp(t)
-	assertFails(t, writeAndFinalizeTemp(tmp, []byte(byteX), fileModeRegular))
+	assertFails(t, writeAndFinalizeTempWithOps(ops, tmp, []byte(byteX), fileModeRegular))
 }
 
 // TestWriteAndFinalizeTempReportsCloseFailure verifies close failures surface.
 func TestWriteAndFinalizeTempReportsCloseFailure(t *testing.T) {
 	t.Parallel()
 	lockSeams(t)
-	swapCloseFile(t, failingClose)
+
+	ops := swapCloseFile(t, failingClose)
 
 	tmp := createRealTemp(t)
-	assertFails(t, writeAndFinalizeTemp(tmp, []byte(byteX), fileModeRegular))
+	assertFails(t, writeAndFinalizeTempWithOps(ops, tmp, []byte(byteX), fileModeRegular))
 }
 
 // TestWriteAndFinalizeTempReportsWriteFailure verifies writeFull failures surface.
 func TestWriteAndFinalizeTempReportsWriteFailure(t *testing.T) {
 	t.Parallel()
 	lockSeams(t)
-	swapWriteFull(t, failingWriteFull)
+
+	ops := swapWriteFull(t, failingWriteFull)
 
 	tmp := createRealTemp(t)
-	assertFails(t, writeAndFinalizeTemp(tmp, []byte(byteX), fileModeRegular))
+	assertFails(t, writeAndFinalizeTempWithOps(ops, tmp, []byte(byteX), fileModeRegular))
 }
 
 // TestWriteFileAtomicReportsFinalizeFailure verifies rename failures abort atomic writes.
 func TestWriteFileAtomicReportsFinalizeFailure(t *testing.T) {
 	t.Parallel()
 	lockSeams(t)
-	swapRenamePath(t, failingRename)
+
+	ops := swapRenamePath(t, failingRename)
 
 	path := filepath.Join(t.TempDir(), fileNameTxt)
-	assertFails(t, writeFileAtomic(path, []byte(byteX), fileModeRegular))
+	assertFails(t, writeFileAtomicWithOps(ops, path, []byte(byteX), fileModeRegular))
 }
 
 // TestWriteFullStubWriterUsedDocumentsFaults verifies StubWriter stays referenced.
@@ -1082,13 +1135,13 @@ func TestWriteFullStubWriterUsedDocumentsFaults(t *testing.T) {
 	lockSeams(t)
 
 	writer := &faults.StubWriter{Count: consts.IndexZero, Err: faults.ErrFault}
-	assertFails(t, writeFull(writer, []byte(byteX)))
+	assertFails(t, defaultFileOps().writeFull(writer, []byte(byteX)))
 }
 
 func assertFilePayload(t *testing.T, path, want string) {
 	t.Helper()
 
-	data, err := os.ReadFile(path)
+	data, err := fs.ReadFile(os.DirFS(filepath.Dir(path)), filepath.Base(path))
 	assertNoErr(t, err)
 
 	if string(data) != want {
@@ -1159,7 +1212,10 @@ func TestBuildRootPlanResultReportsReadFailure(t *testing.T) {
 	lockSeams(t)
 
 	workspace := t.TempDir()
-	assertNoErr(t, mkdirAll(filepath.Join(workspace, rootTaskfileName), dirModePerm))
+	assertNoErr(
+		t,
+		defaultFileOps().mkdirAll(filepath.Join(workspace, rootTaskfileName), dirModePerm),
+	)
 
 	result, err := buildRootPlanResult(&buildRootPlanInput{
 		oldLock:   nil,
@@ -1190,9 +1246,14 @@ func TestBuildRootTaskfileReportsUpdateFailure(t *testing.T) {
 func TestCollectAndTrackModuleFilesReportsFailure(t *testing.T) {
 	t.Parallel()
 	lockSeams(t)
-	swapWalkDir(t, failingWalk)
 
-	contents, managed, err := collectAndTrackModuleFiles(sampleCollectArgs(t.TempDir()))
+	ops := swapWalkDir(t, failingWalk)
+
+	args := sampleCollectArgs(t.TempDir())
+
+	args.fsOps = ops
+
+	contents, managed, err := collectAndTrackModuleFiles(args)
 	iox.Discard(contents)
 	iox.Discard(managed)
 	assertFails(t, err)
@@ -1204,7 +1265,8 @@ func TestCollectModuleContentsReportsMergeFailure(t *testing.T) {
 	lockSeams(t)
 
 	args := distinctDocCollectArgs(t)
-	swapWalkThenFail(t)
+
+	args.fsOps = swapWalkThenFail(t)
 
 	contents, docs, err := collectModuleContents(args)
 	iox.Discard(contents)
@@ -1216,9 +1278,14 @@ func TestCollectModuleContentsReportsMergeFailure(t *testing.T) {
 func TestCollectModuleContentsReportsScanFailure(t *testing.T) {
 	t.Parallel()
 	lockSeams(t)
-	swapWalkDir(t, failingWalk)
 
-	contents, docs, err := collectModuleContents(sampleCollectArgs(t.TempDir()))
+	ops := swapWalkDir(t, failingWalk)
+
+	args := sampleCollectArgs(t.TempDir())
+
+	args.fsOps = ops
+
+	contents, docs, err := collectModuleContents(args)
 	iox.Discard(contents)
 	iox.Discard(docs)
 	assertFails(t, err)
@@ -1249,7 +1316,10 @@ func TestDiffFilesReportsLockMetadataFailure(t *testing.T) {
 	lockSeams(t)
 
 	workspace := t.TempDir()
-	assertNoErr(t, mkdirAll(filepath.Join(workspace, filepath.FromSlash(lockRelPath)), dirModePerm))
+	assertNoErr(
+		t,
+		defaultFileOps().mkdirAll(filepath.Join(workspace, filepath.FromSlash(lockRelPath)), dirModePerm),
+	)
 
 	lists, err := diffFiles(&diffInput{
 		plan:         planWithLockMeta(lockRelPath),
@@ -1257,6 +1327,7 @@ func TestDiffFilesReportsLockMetadataFailure(t *testing.T) {
 		metadataPath: metaRelPath,
 		plannedMeta:  []byte(byteX),
 		syncRoot:     syncRootDisabled,
+		fsOps:        defaultFileOps(),
 	})
 
 	iox.Discard(lists)
@@ -1267,7 +1338,8 @@ func TestDiffFilesReportsLockMetadataFailure(t *testing.T) {
 func TestDiffLockFileReportsContentFailure(t *testing.T) {
 	t.Parallel()
 	lockSeams(t)
-	swapMarshalYAML(t, failingMarshalYAML)
+
+	ops := swapMarshalYAML(t, failingMarshalYAML)
 
 	plan := emptyPlan()
 
@@ -1279,6 +1351,7 @@ func TestDiffLockFileReportsContentFailure(t *testing.T) {
 		plan:      &plan,
 		workspace: t.TempDir(),
 		lockPath:  lockRelPath,
+		fsOps:     ops,
 	})
 	iox.Discard(lists)
 	assertFails(t, err)
@@ -1288,9 +1361,10 @@ func TestDiffLockFileReportsContentFailure(t *testing.T) {
 func TestDiscoverPreviousMetadataReportsWalkFailure(t *testing.T) {
 	t.Parallel()
 	lockSeams(t)
-	swapWalkDir(t, failingWalk)
 
-	meta, err := discoverPreviousMetadata(t.TempDir(), metaRelPath)
+	ops := swapWalkDir(t, failingWalk)
+
+	meta, err := discoverPreviousMetadataWithOps(ops, t.TempDir(), metaRelPath)
 	iox.Discard(meta)
 	assertFails(t, err)
 }
@@ -1334,9 +1408,14 @@ func TestMergeLogicalRootDocsReportsMergeFailure(t *testing.T) {
 	lockSeams(t)
 
 	args := distinctDocCollectArgs(t)
-	assertNoErr(t, mkdirAll(args.syncInput.Snapshot.ModuleDir(consts.Go), dirModePerm))
+	assertNoErr(
+		t,
+		defaultFileOps().mkdirAll(args.syncInput.Snapshot.ModuleDir(consts.Go), dirModePerm),
+	)
 
-	swapWalkDir(t, failingWalk)
+	ops := swapWalkDir(t, failingWalk)
+
+	args.fsOps = ops
 
 	docs, err := mergeLogicalRootDocs(args, fMap{}, docPolicyInclude)
 	iox.Discard(docs)
@@ -1349,9 +1428,14 @@ func TestMergeParentDocsIfDistinctReportsFailure(t *testing.T) {
 	lockSeams(t)
 
 	args := distinctDocCollectArgs(t)
-	assertNoErr(t, mkdirAll(args.syncInput.Snapshot.ModuleDir(consts.Go), dirModePerm))
+	assertNoErr(
+		t,
+		defaultFileOps().mkdirAll(args.syncInput.Snapshot.ModuleDir(consts.Go), dirModePerm),
+	)
 
-	swapWalkDir(t, failingWalk)
+	ops := swapWalkDir(t, failingWalk)
+
+	args.fsOps = ops
 
 	docs, err := mergeParentDocsIfDistinct(args, fMap{}, map[string]struct{}{})
 	iox.Discard(docs)
@@ -1363,14 +1447,26 @@ func TestPlanModuleFilesReportsCollectFailure(t *testing.T) {
 	t.Parallel()
 	lockSeams(t)
 
-	workspace := t.TempDir()
-	assertNoErr(t, mkdirAll(filepath.Join(workspace, consts.Go), dirModePerm))
-	swapWalkDir(t, failingWalk)
+	workspace := modulePlanWorkspace(t)
+	ops := swapWalkDir(t, failingWalk)
 
-	contents, managed, err := planModuleFiles(goModulePlanArgs(workspace))
+	planArgs := goModulePlanArgs(workspace)
+
+	planArgs.fsOps = ops
+
+	contents, managed, err := planModuleFiles(planArgs)
 	iox.Discard(contents)
 	iox.Discard(managed)
 	assertFails(t, err)
+}
+
+func modulePlanWorkspace(t *testing.T) string {
+	t.Helper()
+
+	workspace := t.TempDir()
+	assertNoErr(t, defaultFileOps().mkdirAll(filepath.Join(workspace, consts.Go), dirModePerm))
+
+	return workspace
 }
 
 // TestPrepareModulePlanDirsReportsMissingSource verifies missing source dirs fail.
@@ -1382,6 +1478,7 @@ func TestPrepareModulePlanDirsReportsMissingSource(t *testing.T) {
 		syncInput: minimalSyncInput(t.TempDir()),
 		mod:       emptyModulePtr(consts.Go, consts.Go),
 		sourceDir: filepath.Join(t.TempDir(), pathMissing),
+		fsOps:     defaultFileOps(),
 	})
 
 	iox.Discard(rel)
@@ -1432,13 +1529,14 @@ func TestReadRootPlanFinishInputReportsFailure(t *testing.T) {
 func TestRemoveObsoleteReportsOldTargetFailure(t *testing.T) {
 	t.Parallel()
 	lockSeams(t)
-	swapRemovePath(t, failingRemove)
+
+	ops := swapRemovePath(t, failingRemove)
 
 	plan := minimalPlan()
 
 	plan.OldTargetFolder = oldTargetFolder
 	plan.OldLock = emptyLockPtr()
-	assertFails(t, removeObsolete(plan, t.TempDir()))
+	assertFails(t, removeObsoleteWithOps(ops, plan, t.TempDir()))
 }
 
 // TestRemoveOldTargetFilesSkipsOutsidePrefix verifies unrelated paths are skipped.
@@ -1479,7 +1577,7 @@ func distinctDocCollectArgs(t *testing.T) *collectModuleArgs {
 
 	workspace := t.TempDir()
 	source := filepath.Join(workspace, srcModuleName)
-	assertNoErr(t, mkdirAll(source, dirModePerm))
+	assertNoErr(t, defaultFileOps().mkdirAll(source, dirModePerm))
 
 	args := sampleCollectArgs(source)
 
@@ -1494,7 +1592,7 @@ func failingRootSyncInput(t *testing.T) *domain.SyncInput {
 	t.Helper()
 
 	root := t.TempDir()
-	assertNoErr(t, mkdirAll(filepath.Join(root, taskfilesDirName), dirModePerm))
+	assertNoErr(t, defaultFileOps().mkdirAll(filepath.Join(root, taskfilesDirName), dirModePerm))
 
 	return &domain.SyncInput{
 		Config:      emptyConfigPtr(),
@@ -1540,12 +1638,12 @@ func prepFinalizeFailDirs(t *testing.T) (workspace, storeRoot string) {
 	storeRoot = t.TempDir()
 
 	srcTask := filepath.Join(storeRoot, consts.Go, rootTaskfileName)
-	assertNoErr(t, mkdirAll(filepath.Dir(srcTask), dirModePerm))
+	assertNoErr(t, defaultFileOps().mkdirAll(filepath.Dir(srcTask), dirModePerm))
 
 	writeTempFile(t, srcTask, []byte(emptyTaskYAML))
 	assertNoErr(
 		t,
-		mkdirAll(filepath.Join(workspace, filepath.FromSlash(goTaskfileRel)), dirModePerm),
+		defaultFileOps().mkdirAll(filepath.Join(workspace, filepath.FromSlash(goTaskfileRel)), dirModePerm),
 	)
 
 	return workspace, storeRoot
@@ -1560,23 +1658,23 @@ func sampleCollectArgs(sourceDir string) *collectModuleArgs {
 	}
 }
 
-func swapWalkThenFail(t *testing.T) {
+func swapWalkThenFail(t *testing.T) fileOps {
 	t.Helper()
 
-	original := walkDir
 	calls := consts.IndexZero
+	ops := defaultFileOps()
 
-	walkDir = func(root string, walker fs.WalkDirFunc) error {
+	ops.walkDir = func(root string, walker fs.WalkDirFunc) error {
 		calls++
 
 		if calls == consts.IndexOne {
-			return original(root, walker)
+			return defaultFileOps().walkDir(root, walker)
 		}
 
 		return errStub
 	}
 
-	t.Cleanup(func() { walkDir = original })
+	return ops
 }
 
 func writeValidLock(t *testing.T, workspace, targetFolder string) {
@@ -1587,7 +1685,7 @@ func writeValidLock(t *testing.T, workspace, targetFolder string) {
 	lock.Configuration.TargetFolder = targetFolder
 
 	path := filepath.Join(workspace, filepath.FromSlash(lockRelPath))
-	assertNoErr(t, mkdirAll(filepath.Dir(path), dirModePerm))
+	assertNoErr(t, defaultFileOps().mkdirAll(filepath.Dir(path), dirModePerm))
 
 	writeTempFile(t, path, MarshalLock(&lock))
 }
@@ -1716,10 +1814,17 @@ func lockWithManaged(path string) *syncLock {
 	return &lock
 }
 
-func newStagingSession(copyFile func(string, *domain.FileEntry) error) stagingSession {
+func newStagingSession(
+	copyFile func(string, *domain.FileEntry) error,
+	ops ...fileOps,
+) stagingSession {
 	var session stagingSession
 
 	session.copyFile = copyFile
+
+	if len(ops) > consts.IndexZero {
+		session.fsOps = ops[consts.IndexZero]
+	}
 
 	return session
 }
@@ -1803,7 +1908,7 @@ func prepFinalizeDiffWorkspace(t *testing.T) string {
 	workspace := t.TempDir()
 	assertNoErr(
 		t,
-		mkdirAll(filepath.Join(workspace, filepath.FromSlash(goTaskfileRel)), dirModePerm),
+		defaultFileOps().mkdirAll(filepath.Join(workspace, filepath.FromSlash(goTaskfileRel)), dirModePerm),
 	)
 
 	return workspace
@@ -1831,13 +1936,14 @@ func assertCandidateRelFails(
 ) {
 	t.Helper()
 
-	swapRelPath(t, failingRelPath)
+	ops := swapRelPath(t, failingRelPath)
 
 	rel, scan, err := call(&metadataCandidateArgs{
 		workspace:           wsRoot,
 		currentMetadataPath: metaRelPath,
 		abs:                 wsFileX,
 		entry:               fakeDirEntry{name: fileNameTxt, dir: false},
+		fsOps:               ops,
 	})
 
 	iox.Discard(rel)
@@ -1902,7 +2008,7 @@ func prepGoSubDir(t *testing.T) string {
 
 	workspace := t.TempDir()
 	nested := filepath.Join(workspace, taskfilesDirName, consts.Go, subDirName)
-	assertNoErr(t, mkdirAll(nested, dirModePerm))
+	assertNoErr(t, defaultFileOps().mkdirAll(nested, dirModePerm))
 
 	return workspace
 }
@@ -1921,118 +2027,169 @@ func succeedThenFail() func(string) error {
 	}
 }
 
-func swapSeam[T any](t *testing.T, target *T, stub T) {
-	t.Helper()
-
-	original := *target
-
-	*target = stub
-
-	t.Cleanup(func() { *target = original })
-}
-
 func lockSeams(t *testing.T) {
 	t.Helper()
 	t.Cleanup(testsupport.Lock())
 }
 
-func swapChmodFile(t *testing.T, stub func(*os.File, os.FileMode) error) {
+func swapChmodFile(t *testing.T, stub func(*os.File, os.FileMode) error) fileOps {
 	t.Helper()
 
-	swapSeam(t, &chmodFile, stub)
+	ops := defaultFileOps()
+
+	ops.chmodFile = stub
+
+	return ops
 }
 
-func swapCloseFile(t *testing.T, stub func(*os.File) error) {
+func swapCloseFile(t *testing.T, stub func(*os.File) error) fileOps {
 	t.Helper()
 
-	swapSeam(t, &closeFile, stub)
+	ops := defaultFileOps()
+
+	ops.closeFile = stub
+
+	return ops
 }
 
-func swapCreateTemp(t *testing.T, stub func(string, string) (*os.File, error)) {
+func swapCreateTemp(t *testing.T, stub func(string, string) (*os.File, error)) fileOps {
 	t.Helper()
 
-	swapSeam(t, &createTemp, stub)
+	ops := defaultFileOps()
+
+	ops.createTemp = stub
+
+	return ops
 }
 
-func swapMarshalYAML(t *testing.T, stub func(any) ([]byte, error)) {
+func swapMarshalYAML(t *testing.T, stub func(any) ([]byte, error)) fileOps {
 	t.Helper()
 
-	swapSeam(t, &marshalYAML, stub)
+	ops := defaultFileOps()
+
+	ops.marshalYAML = stub
+
+	return ops
 }
 
-func swapMkdirAll(t *testing.T, stub func(string, os.FileMode) error) {
+func swapMkdirAll(t *testing.T, stub func(string, os.FileMode) error) fileOps {
 	t.Helper()
 
-	swapSeam(t, &mkdirAll, stub)
+	ops := defaultFileOps()
+
+	ops.mkdirAll = stub
+
+	return ops
 }
 
-func swapMkdirTemp(t *testing.T, stub func(string, string) (string, error)) {
+func swapMkdirTemp(t *testing.T, stub func(string, string) (string, error)) fileOps {
 	t.Helper()
 
-	swapSeam(t, &mkdirTemp, stub)
+	ops := defaultFileOps()
+
+	ops.mkdirTemp = stub
+
+	return ops
 }
 
-func swapOpenRelative(t *testing.T, stub func(string, string) (*os.File, error)) {
+func swapOpenRelative(t *testing.T, stub func(string, string) (*os.File, error)) fileOps {
 	t.Helper()
 
-	swapSeam(t, &openRelativeFile, stub)
+	ops := defaultFileOps()
+
+	ops.openRelativeFile = stub
+
+	return ops
 }
 
-func swapReadAll(t *testing.T, stub func(io.Reader) ([]byte, error)) {
+func swapReadAll(t *testing.T, stub func(io.Reader) ([]byte, error)) fileOps {
 	t.Helper()
 
-	swapSeam(t, &readAll, stub)
+	ops := defaultFileOps()
+
+	ops.readAll = stub
+
+	return ops
 }
 
-func swapRelPath(t *testing.T, stub func(string, string) (string, error)) {
+func swapRelPath(t *testing.T, stub func(string, string) (string, error)) fileOps {
 	t.Helper()
 
-	swapSeam(t, &relPath, stub)
+	ops := defaultFileOps()
+
+	ops.relPath = stub
+
+	return ops
 }
 
-func swapRemoveAll(t *testing.T, stub func(string) error) {
+func swapRemoveAll(t *testing.T, stub func(string) error) fileOps {
 	t.Helper()
 
-	swapSeam(t, &removeAll, stub)
+	ops := defaultFileOps()
+
+	ops.removeAll = stub
+
+	return ops
 }
 
-func swapRemovePath(t *testing.T, stub func(string) error) {
+func swapRemovePath(t *testing.T, stub func(string) error) fileOps {
 	t.Helper()
 
-	swapSeam(t, &removePath, stub)
+	ops := defaultFileOps()
+
+	ops.removePath = stub
+
+	return ops
 }
 
-func swapRenamePath(t *testing.T, stub func(string, string) error) {
+func swapRenamePath(t *testing.T, stub func(string, string) error) fileOps {
 	t.Helper()
 
-	swapSeam(t, &renamePath, stub)
+	ops := defaultFileOps()
+
+	ops.renamePath = stub
+
+	return ops
 }
 
-func swapStatPath(t *testing.T, stub func(string) (os.FileInfo, error)) {
+func swapStatPath(t *testing.T, stub func(string) (os.FileInfo, error)) fileOps {
 	t.Helper()
 
-	swapSeam(t, &statPath, stub)
+	ops := defaultFileOps()
+
+	ops.statPath = stub
+
+	return ops
 }
 
-func swapWalkDir(t *testing.T, stub func(string, fs.WalkDirFunc) error) {
+func swapWalkDir(t *testing.T, stub func(string, fs.WalkDirFunc) error) fileOps {
 	t.Helper()
 
-	swapSeam(t, &walkDir, stub)
+	ops := defaultFileOps()
+
+	ops.walkDir = stub
+
+	return ops
 }
 
-func swapWriteFull(t *testing.T, stub func(io.Writer, []byte) error) {
+func swapWriteFull(t *testing.T, stub func(io.Writer, []byte) error) fileOps {
 	t.Helper()
 
-	swapSeam(t, &writeFull, stub)
+	ops := defaultFileOps()
+
+	ops.writeFull = stub
+
+	return ops
 }
 
 // TestCollectMetadataCandidatesReportsWalkFailure verifies walk failures surface.
 func TestCollectMetadataCandidatesReportsWalkFailure(t *testing.T) {
 	t.Parallel()
 	lockSeams(t)
-	swapWalkDir(t, failingWalk)
 
-	cands, err := collectMetadataCandidates(t.TempDir(), metaRelPath)
+	ops := swapWalkDir(t, failingWalk)
+
+	cands, err := collectMetadataCandidatesWithOps(ops, t.TempDir(), metaRelPath)
 	iox.Discard(cands)
 	assertFails(t, err)
 }
@@ -2055,12 +2212,8 @@ func TestHandleDirEntryAllowsNormalDir(t *testing.T) {
 	t.Parallel()
 	lockSeams(t)
 
-	rel, scan, err := handleDirEntry(fakeDirEntry{name: taskfilesDirName, dir: true})
+	err := handleDirEntry(fakeDirEntry{name: taskfilesDirName, dir: true})
 	assertNoErr(t, err)
-
-	if rel != consts.Empty || scan != metadataNotCandidate {
-		t.Fatalf(relScanFmt, rel, scan)
-	}
 }
 
 // TestHandleDirEntrySkipsGit verifies .git directories return SkipDir.
@@ -2068,9 +2221,7 @@ func TestHandleDirEntrySkipsGit(t *testing.T) {
 	t.Parallel()
 	lockSeams(t)
 
-	rel, scan, err := handleDirEntry(fakeDirEntry{name: gitDirName, dir: true})
-	iox.Discard(rel)
-	iox.Discard(scan)
+	err := handleDirEntry(fakeDirEntry{name: gitDirName, dir: true})
 
 	if !errors.Is(err, filepath.SkipDir) {
 		t.Fatalf(errSkipDirFmt, err)
@@ -2113,7 +2264,7 @@ func TestMetadataFileCandidateSkipsCurrentAndLegacy(t *testing.T) {
 	t.Parallel()
 	lockSeams(t)
 
-	rel, scan, err := metadataFileCandidate(&metadataCandidateArgs{
+	_, scan, err := metadataFileCandidate(&metadataCandidateArgs{
 		workspace:           wsRoot,
 		currentMetadataPath: metaRelPath,
 		abs:                 "/ws/" + metaRelPath,
@@ -2124,8 +2275,8 @@ func TestMetadataFileCandidateSkipsCurrentAndLegacy(t *testing.T) {
 
 	assertNoErr(t, err)
 
-	if rel != consts.Empty || scan != metadataNotCandidate {
-		t.Fatalf(relScanFmt, rel, scan)
+	if scan != metadataNotCandidate {
+		t.Fatalf(relScanFmt, consts.Empty, scan)
 	}
 }
 
@@ -2149,9 +2300,10 @@ func TestProcessMetadataCandidatePropagatesSkipDir(t *testing.T) {
 func TestRelMetadataPathReportsFailure(t *testing.T) {
 	t.Parallel()
 	lockSeams(t)
-	swapRelPath(t, failingRelPath)
 
-	rel, err := relMetadataPath(wsRoot, "/ws/meta.yml")
+	ops := swapRelPath(t, failingRelPath)
+
+	rel, err := relMetadataPathWithOps(ops, wsRoot, "/ws/meta.yml")
 	iox.Discard(rel)
 	assertFails(t, err)
 }
@@ -2200,13 +2352,15 @@ func TestBuildFileEntryReportsInfoFailure(t *testing.T) {
 func TestCollectModuleFilesReportsWalkFailure(t *testing.T) {
 	t.Parallel()
 	lockSeams(t)
-	swapWalkDir(t, failingWalk)
+
+	ops := swapWalkDir(t, failingWalk)
 
 	contents, err := CollectModuleFiles(&CollectOptions{
 		TaskfileOps:  nil,
 		SourceToDest: nil,
 		SourceDir:    t.TempDir(),
 		FromDest:     consts.Go,
+		fsOps:        ops,
 		DocPolicy:    DocPolicySkip,
 	})
 
@@ -2271,9 +2425,10 @@ func TestLogicalRootReadyMissingReturnsFalse(t *testing.T) {
 func TestLogicalRootReadyReportsStatFailure(t *testing.T) {
 	t.Parallel()
 	lockSeams(t)
-	swapStatPath(t, failingStat)
 
-	ready, err := logicalRootReady(stagingName)
+	ops := swapStatPath(t, failingStat)
+
+	ready, err := logicalRootReadyWithOps(ops, stagingName)
 	iox.Discard(ready)
 	assertFails(t, err)
 }
@@ -2317,9 +2472,10 @@ func TestReadRootTaskfileReportsTemplateFailure(t *testing.T) {
 func TestRelSlashPathReportsFailure(t *testing.T) {
 	t.Parallel()
 	lockSeams(t)
-	swapRelPath(t, failingRelPath)
 
-	rel, err := relSlashPath(srcDir, srcFileA)
+	ops := swapRelPath(t, failingRelPath)
+
+	rel, err := relSlashPathWithOps(ops, srcDir, srcFileA)
 	iox.Discard(rel)
 	assertFails(t, err)
 }
@@ -2341,7 +2497,8 @@ func TestRootTemplateOrErrorRequiresOps(t *testing.T) {
 func TestScanModuleFilesReportsWalkFailure(t *testing.T) {
 	t.Parallel()
 	lockSeams(t)
-	swapWalkDir(t, failingWalk)
+
+	ops := swapWalkDir(t, failingWalk)
 
 	contents, err := scanModuleFiles(
 		&collectOptions{
@@ -2350,6 +2507,7 @@ func TestScanModuleFilesReportsWalkFailure(t *testing.T) {
 			sourceToDest: nil,
 			fromDest:     consts.Empty,
 			docPolicy:    0,
+			fsOps:        ops,
 		},
 	)
 	iox.Discard(contents)
@@ -2392,9 +2550,10 @@ func TestUpdateRootTaskfileRequiresOps(t *testing.T) {
 func TestValidateDestinationReportsStatFailure(t *testing.T) {
 	t.Parallel()
 	lockSeams(t)
-	swapStatPath(t, failingStat)
 
-	err := validateDestination(
+	ops := swapStatPath(t, failingStat)
+
+	err := validateDestinationWithOps(ops,
 		stagingName,
 		&moduleRecord{
 			Path:              "taskfiles/go",
@@ -2507,9 +2666,22 @@ func TestLockContentChangedReportsNewMarshalFailure(t *testing.T) {
 	t.Parallel()
 	lockSeams(t)
 
+	ops := marshalFailsOnSecond(t)
+
+	oldLock := emptyLock()
+	newLock := emptyLock()
+
+	changed, err := lockContentChangedWithOps(ops, &oldLock, &newLock)
+	iox.Discard(changed)
+	assertFails(t, err)
+}
+
+func marshalFailsOnSecond(t *testing.T) fileOps {
+	t.Helper()
+
 	calls := consts.IndexZero
 
-	swapMarshalYAML(t, func(any) ([]byte, error) {
+	return swapMarshalYAML(t, func(any) ([]byte, error) {
 		calls++
 
 		if calls == consts.IndexOne {
@@ -2518,13 +2690,6 @@ func TestLockContentChangedReportsNewMarshalFailure(t *testing.T) {
 
 		return nil, errStub
 	})
-
-	oldLock := emptyLock()
-	newLock := emptyLock()
-
-	changed, err := lockContentChanged(&oldLock, &newLock)
-	iox.Discard(changed)
-	assertFails(t, err)
 }
 
 // TestDiffLockAndMetadataReportsMetadataFailure verifies metadata section failures.
@@ -2533,7 +2698,10 @@ func TestDiffLockAndMetadataReportsMetadataFailure(t *testing.T) {
 	lockSeams(t)
 
 	workspace := t.TempDir()
-	assertNoErr(t, mkdirAll(filepath.Join(workspace, filepath.FromSlash(metaRelPath)), dirModePerm))
+	assertNoErr(
+		t,
+		defaultFileOps().mkdirAll(filepath.Join(workspace, filepath.FromSlash(metaRelPath)), dirModePerm),
+	)
 
 	plan := emptyPlan()
 
@@ -2557,7 +2725,10 @@ func TestDiffMetadataFileSectionReportsFailure(t *testing.T) {
 	lockSeams(t)
 
 	workspace := t.TempDir()
-	assertNoErr(t, mkdirAll(filepath.Join(workspace, filepath.FromSlash(metaRelPath)), dirModePerm))
+	assertNoErr(
+		t,
+		defaultFileOps().mkdirAll(filepath.Join(workspace, filepath.FromSlash(metaRelPath)), dirModePerm),
+	)
 
 	lists, err := diffMetadataFileSection(&diffInput{
 		workspace:    workspace,
@@ -2572,16 +2743,18 @@ func TestDiffMetadataFileSectionReportsFailure(t *testing.T) {
 func TestCommitTempFileReportsWriteFailure(t *testing.T) {
 	t.Parallel()
 	lockSeams(t)
-	swapWriteFull(t, failingWriteFull)
+
+	ops := swapWriteFull(t, failingWriteFull)
 
 	tmp := createRealTemp(t)
 	cleanup := true
 
 	assertFails(t, commitTempFile(&finalizeTempArgs{
-		tmp:  tmp,
-		data: []byte(byteX),
-		mode: fileModeRegular,
-		path: filepath.Join(t.TempDir(), outName),
+		tmp:   tmp,
+		data:  []byte(byteX),
+		mode:  fileModeRegular,
+		path:  filepath.Join(t.TempDir(), outName),
+		fsOps: ops,
 	}, tmp.Name(), &cleanup))
 }
 
@@ -2592,7 +2765,7 @@ func TestLoadMetadataFallbacksReportsLegacyFailure(t *testing.T) {
 
 	workspace := t.TempDir()
 	path := filepath.Join(workspace, filepath.FromSlash(config.LegacyMetadataPath))
-	assertNoErr(t, mkdirAll(filepath.Dir(path), dirModePerm))
+	assertNoErr(t, defaultFileOps().mkdirAll(filepath.Dir(path), dirModePerm))
 	writeTempFile(t, path, []byte(badYAMLText))
 
 	meta, err := loadMetadataFallbacks(workspace, metaRelPath)
@@ -2607,7 +2780,7 @@ func TestDiscoverPreviousMetadataReportsLoadFailure(t *testing.T) {
 
 	workspace := t.TempDir()
 	cand := filepath.Join(workspace, filepath.FromSlash(otherMetaRel))
-	assertNoErr(t, mkdirAll(filepath.Dir(cand), dirModePerm))
+	assertNoErr(t, defaultFileOps().mkdirAll(filepath.Dir(cand), dirModePerm))
 	writeTempFile(t, cand, []byte(badYAMLText))
 
 	meta, err := discoverPreviousMetadata(workspace, metaRelPath)
@@ -2619,12 +2792,14 @@ func TestDiscoverPreviousMetadataReportsLoadFailure(t *testing.T) {
 func TestProcessMetadataCandidateReportsUnexpectedFailure(t *testing.T) {
 	t.Parallel()
 	lockSeams(t)
-	swapRelPath(t, failingRelPath)
+
+	ops := swapRelPath(t, failingRelPath)
 
 	err := processMetadataCandidate(&metadataWalkerArgs{
 		workspace:           wsRoot,
 		currentMetadataPath: metaRelPath,
 		candidates:          &[]string{},
+		fsOps:               ops,
 	}, wsFileX, fakeDirEntry{name: fileNameTxt, dir: false})
 	assertFails(t, err)
 }
@@ -2641,13 +2816,15 @@ func TestMetadataCandidateReportsRelFailure(t *testing.T) {
 func TestCollectModuleFileReportsRelFailure(t *testing.T) {
 	t.Parallel()
 	lockSeams(t)
-	swapRelPath(t, failingRelPath)
+
+	ops := swapRelPath(t, failingRelPath)
 
 	err := collectModuleFile(&moduleCollectArgs{
 		sourceDir: srcDir,
 		absPath:   srcFileA,
 		entry:     fakeDirEntry{name: pathA, dir: false},
 		contents:  fMap{},
+		fsOps:     ops,
 	})
 
 	assertFails(t, err)
@@ -2657,15 +2834,18 @@ func TestCollectModuleFileReportsRelFailure(t *testing.T) {
 func TestMergeParentDocFilesReportsReadyFailure(t *testing.T) {
 	t.Parallel()
 	lockSeams(t)
-	swapStatPath(t, failingStat)
+
+	ops := swapStatPath(t, failingStat)
 
 	err := mergeParentDocFiles(&mergeParentDocsArgs{
 		destRoot:   t.TempDir(),
 		contents:   fMap{},
 		parentDocs: map[string]struct{}{},
+		fsOps:      ops,
 		collect: &collectModuleArgs{
 			syncInput: &domain.SyncInput{Config: &config.Config{}},
 			mod:       emptyModulePtr(consts.Empty, consts.Go),
+			fsOps:     ops,
 		},
 	})
 
@@ -2692,9 +2872,15 @@ func TestIsDestinationManagedMissesOtherModule(t *testing.T) {
 func TestLoadOneStoreMetadataFileReportsRelFailure(t *testing.T) {
 	t.Parallel()
 	lockSeams(t)
-	swapRelPath(t, failingRelPath)
 
-	err := loadOneStoreMetadataFile(rootDir, rootMetaPath, map[string]storeTaskMetadata{})
+	ops := swapRelPath(t, failingRelPath)
+
+	err := loadOneStoreMetadataFileWithOps(
+		ops,
+		rootDir,
+		rootMetaPath,
+		map[string]storeTaskMetadata{},
+	)
 	assertFails(t, err)
 }
 
@@ -2777,9 +2963,10 @@ func TestGeneratedTaskMetadataResolvesRecord(t *testing.T) {
 func TestLoadStoreTaskMetadataReportsWalkFailure(t *testing.T) {
 	t.Parallel()
 	lockSeams(t)
-	swapWalkDir(t, failingWalk)
 
-	meta, err := loadStoreTaskMetadata(stubSnapshot{root: t.TempDir()})
+	ops := swapWalkDir(t, failingWalk)
+
+	meta, err := loadStoreTaskMetadataWithOps(ops, stubSnapshot{root: t.TempDir()})
 	iox.Discard(meta)
 	assertFails(t, err)
 }
@@ -2788,9 +2975,10 @@ func TestLoadStoreTaskMetadataReportsWalkFailure(t *testing.T) {
 func TestModuleNameForReportsRelFailure(t *testing.T) {
 	t.Parallel()
 	lockSeams(t)
-	swapRelPath(t, failingRelPath)
 
-	name, err := moduleNameFor(rootDir, rootMetaPath)
+	ops := swapRelPath(t, failingRelPath)
+
+	name, err := moduleNameForWithOps(ops, rootDir, rootMetaPath)
 	iox.Discard(name)
 	assertFails(t, err)
 }

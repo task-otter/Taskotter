@@ -69,7 +69,7 @@ func (client *Client) CreatePR(ctx context.Context, opts *CreatePROptions) (Pull
 
 	pull, err := invokeCreatePR(ctx, client, opts)
 	if err != nil {
-		return PullRequest{}, fmt.Errorf("create pull request: %w", err)
+		return PullRequest{}, fmt.Errorf(errCreatePullRequest, err)
 	}
 
 	return pull, nil
@@ -168,7 +168,7 @@ func doJSON(ctx context.Context, client *Client, call *jsonCall) (err error) {
 	}
 
 	defer func() {
-		err = appendBodyClose(err, resp)
+		err = appendBodyClose(err, resp.Body)
 	}()
 
 	readErr := readJSONBody(resp, call.dest)
@@ -179,11 +179,11 @@ func doJSON(ctx context.Context, client *Client, call *jsonCall) (err error) {
 	return nil
 }
 
-func appendBodyClose(err error, resp *http.Response) error {
-	copied, copyErr := io.Copy(io.Discard, resp.Body)
+func appendBodyClose(err error, body io.ReadCloser) error {
+	copied, copyErr := io.Copy(io.Discard, body)
 	iox.Discard(copied)
 
-	closeErr := resp.Body.Close()
+	closeErr := body.Close()
 
 	if err != nil {
 		return err

@@ -22,6 +22,11 @@ type (
 		input    []byte
 		want     []byte
 	}
+
+	sourceVarQuery struct {
+		key       string
+		endMarker string
+	}
 )
 
 const (
@@ -41,6 +46,7 @@ const (
 	pathUnknownTaskfile     = "../unknown/Taskfile.yml"
 	fmtExpectedInRewritten  = "expected %q in rewritten Taskfile: %s"
 	pathTaskfileYML         = "Taskfile.yml"
+	testNotFoundIndex       = -1
 	wantGoVersionEmpty      = `GO_VERSION: '{{.GO_VERSION | default ""}}'`
 	wantGoCmdUnixDefault    = `GO_CMD_UNIX: '{{.GO_CMD_UNIX | default "/usr/local/go/bin/go"}}'`
 	wantGoVersionRef        = `GO_VERSION: '{{.GO_VERSION}}'`
@@ -589,9 +595,7 @@ func TestUpdateRootTaskfilePreservesFoldedModuleVar(t *testing.T) {
 	t.Parallel()
 
 	module := readGoModuleTaskfile(t)
-	input := goOnlyRootInput()
-
-	input.ModuleTaskfiles[consts.Go] = module
+	input := rootInputWithModule(module)
 
 	out := updateRootTaskfile(t, taskfile.NewRootTemplate(), input)
 
@@ -611,7 +615,25 @@ func TestUpdateRootTaskfilePreservesFoldedModuleVar(t *testing.T) {
 func TestUpdateRootTaskfilePreservesVariableStyles(t *testing.T) {
 	t.Parallel()
 
-	module := []byte(`version: "3"
+	input := rootInputWithModule(variableStylesModule())
+
+	out, err := taskfile.UpdateRootTaskfile(taskfile.NewRootTemplate(), input)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assertVariableStyles(t, string(out), []string{
+		"  PLAIN: '{{.PLAIN | default \"plain\"}}'",
+		"  SINGLE: '{{.SINGLE | default \"single\"}}'",
+		"  LITERAL: |-\n    {{.LITERAL | default `\n    line one\n    line two\n    `}}",
+		"  FOLDED: >-\n    {{.FOLDED | default `\n    folded one\n    folded two\n    `}}",
+		"  LIST:\n    - one\n    - two",
+		"  MAP:\n    nested: value",
+	})
+}
+
+func variableStylesModule() []byte {
+	return []byte(`version: "3"
 vars:
   PLAIN: '{{.PLAIN | default "plain"}}'
   SINGLE: '{{.SINGLE | default "single"}}'
@@ -631,26 +653,22 @@ vars:
   MAP:
     nested: value
 `)
+}
 
+func rootInputWithModule(module []byte) *rootupd.RootUpdateInput {
 	input := goOnlyRootInput()
 
 	input.ModuleTaskfiles[consts.Go] = module
 
-	out, err := taskfile.UpdateRootTaskfile(taskfile.NewRootTemplate(), input)
-	if err != nil {
-		t.Fatal(err)
-	}
+	return input
+}
 
-	for _, want := range []string{
-		"  PLAIN: '{{.PLAIN | default \"plain\"}}'",
-		"  SINGLE: '{{.SINGLE | default \"single\"}}'",
-		"  LITERAL: |-\n    {{.LITERAL | default `\n    line one\n    line two\n    `}}",
-		"  FOLDED: >-\n    {{.FOLDED | default `\n    folded one\n    folded two\n    `}}",
-		"  LIST:\n    - one\n    - two",
-		"  MAP:\n    nested: value",
-	} {
-		if !strings.Contains(string(out), want) {
-			t.Fatalf("variable source changed; missing exact text %q:\n%s", want, out)
+func assertVariableStyles(t *testing.T, content string, want []string) {
+	t.Helper()
+
+	for _, item := range want {
+		if !strings.Contains(content, item) {
+			t.Fatalf("variable source changed; missing exact text %q:\n%s", item, content)
 		}
 	}
 }
@@ -734,13 +752,6 @@ func TestUpdateRootTaskfilePreservesCRLF(t *testing.T) {
 		t.Fatalf("root update introduced bare LF line endings: %q", out)
 	}
 }
-
-type sourceVarQuery struct {
-	key       string
-	endMarker string
-}
-
-const testNotFoundIndex = -1
 
 func sourceVarEntry(t *testing.T, content string, query sourceVarQuery) string {
 	t.Helper()

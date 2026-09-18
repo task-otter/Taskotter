@@ -9,6 +9,8 @@ import (
 
 // TestClassifiers verifies path classification helpers.
 func TestClassifiers(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name string
 		got  bool
@@ -24,6 +26,17 @@ func TestClassifiers(t *testing.T) {
 			want: true,
 		},
 	}
+
+	assertClassifiers(t, tests)
+}
+
+func assertClassifiers(t *testing.T, tests []struct {
+	name string
+	got  bool
+	want bool
+},
+) {
+	t.Helper()
 
 	for _, test := range tests {
 		if test.got != test.want {

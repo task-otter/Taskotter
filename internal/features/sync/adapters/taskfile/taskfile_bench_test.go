@@ -11,11 +11,10 @@ import (
 )
 
 const (
-	benchmarkSmallSize     = 2
+	benchmarkSmallSize     = 3
 	benchmarkMediumSize    = 10
 	benchmarkLargeSize     = 50
 	benchmarkFirstIndex    = 0
-	benchmarkEmptyLength   = 0
 	benchmarkTaskfilesDir  = "taskfiles"
 	benchmarkModuleNameFmt = "module-%d"
 )
@@ -58,7 +57,7 @@ func runRewriteIncludesIterations(b *testing.B, content []byte, mapping map[stri
 	for range b.N {
 		result, err := RewriteIncludes(content, mapping, benchmarkTaskfilesDir)
 
-		if err != nil || len(result) == benchmarkEmptyLength {
+		if err != nil || len(result) == benchmarkFirstIndex {
 			b.Fatalf("rewrite includes: %v", err)
 		}
 	}
@@ -94,7 +93,7 @@ func runUpdateRootTaskfileIterations(b *testing.B, content []byte, input *ports.
 	for range b.N {
 		result, err := UpdateRootTaskfile(content, input)
 
-		if err != nil || len(result) == benchmarkEmptyLength {
+		if err != nil || len(result) == benchmarkFirstIndex {
 			b.Fatalf("update root taskfile: %v", err)
 		}
 	}

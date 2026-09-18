@@ -446,11 +446,5 @@ func stubbedClient(t *testing.T, mode string) *Client {
 		t.Fatal(err)
 	}
 
-	original := gitBinary
-
-	gitBinary = path
-
-	t.Cleanup(func() { gitBinary = original })
-
-	return NewClient(t.TempDir())
+	return newClient(t.TempDir(), path)
 }

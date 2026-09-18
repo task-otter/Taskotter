@@ -10,8 +10,8 @@ import (
 
 const (
 	benchmarkSmallSize  = 10
-	benchmarkMediumSize = 100
-	benchmarkLargeSize  = 1000
+	benchmarkMediumSize = 101
+	benchmarkLargeSize  = 1001
 	benchmarkModuleFmt  = "module-%d"
 	benchmarkOffset     = 1
 	benchmarkZero       = 0

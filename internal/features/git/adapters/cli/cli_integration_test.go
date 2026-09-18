@@ -92,7 +92,7 @@ const (
 
 	gitBinaryName = "git"
 
-	testAccessCred = "ghs_fixture_access"
+	testAccessCred = "fixture-access"
 
 	testOwnerRepo = "owner/repo"
 )
@@ -681,7 +681,9 @@ func originHEADPath(cloneDir string) string {
 func runGit(t *testing.T, dir string, args ...string) string {
 	t.Helper()
 
-	cmd := exec.CommandContext(t.Context(), "git", args...)
+	cmd := exec.CommandContext(t.Context(), gitBinaryName)
+
+	cmd.Args = append(cmd.Args, args...)
 
 	cmd.Dir = dir
 

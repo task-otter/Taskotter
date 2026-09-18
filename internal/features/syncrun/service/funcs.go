@@ -4,6 +4,7 @@
 package service
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -954,10 +955,7 @@ func buildResolvedDependenciesJSON(deps []lockmodel.ModuleRecord) string {
 		})
 	}
 
-	data, err := json.MarshalIndent(out, consts.Empty, jsonIndent)
-	iox.Discard(err)
-
-	return string(data)
+	return string(marshalJSON(out, jsonIndent))
 }
 
 func buildResolvedTasksJSON(requested map[string]lockmodel.ModuleRecord) string {
@@ -973,10 +971,7 @@ func buildResolvedTasksJSON(requested map[string]lockmodel.ModuleRecord) string 
 		}
 	}
 
-	data, err := json.MarshalIndent(out, consts.Empty, jsonIndent)
-	iox.Discard(err)
-
-	return string(data)
+	return string(marshalJSON(out, jsonIndent))
 }
 
 func buildResult(cfg *config.Config, plan *syncdomain.Plan, ref *storedomain.RefInfo) *Result {
@@ -1110,13 +1105,23 @@ func writeSyncRequiredAnnotations(writer io.Writer, summary string) {
 
 // MarshalJSON encodes a resolved task using the GitHub Actions output keys.
 func (task *ResolvedTask) MarshalJSON() ([]byte, error) {
-	data, err := json.Marshal(map[string]string{
+	return marshalJSON(map[string]string{
 		"source_module":      task.SourceModule,
 		"destination_module": task.DestinationModule,
 		"path":               task.Path,
-	})
+	}, consts.Empty), nil
+}
 
-	iox.Discard(err)
+func marshalJSON(value any, indent string) []byte {
+	var buffer bytes.Buffer
 
-	return data, nil
+	encoder := json.NewEncoder(&buffer)
+	encoder.SetIndent(consts.Empty, indent)
+
+	err := encoder.Encode(value)
+	if err != nil {
+		return nil
+	}
+
+	return bytes.TrimSuffix(buffer.Bytes(), []byte{'\n'})
 }

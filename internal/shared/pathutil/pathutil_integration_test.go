@@ -233,14 +233,7 @@ func TestIsModuleMetadataPath(t *testing.T) {
 		{pathTaskfileYML, false},
 	}
 
-	for i := range cases {
-		testCase := &cases[i]
-		got := pathutil.IsModuleMetadataPath(testCase.path)
-
-		if got != testCase.want {
-			t.Fatalf("IsModuleMetadataPath(%q) = %t, want %t", testCase.path, got, testCase.want)
-		}
-	}
+	assertMetadataPathCases(t, cases)
 }
 
 // TestHasFolderPrefix verifies exact and child-path folder prefix matching.
@@ -310,12 +303,7 @@ func TestValidateRelativePathRejectsTraversal(t *testing.T) {
 		testWindowsAbsPath,
 	}
 
-	for i := range cases {
-		path, err := pathutil.ValidateRelativePath(root, cases[i])
-		if err == nil {
-			t.Fatalf("ValidateRelativePath(%q) = %q, expected error", cases[i], path)
-		}
-	}
+	assertRelativePathsRejected(t, root, cases)
 }
 
 // TestReadRelativeFileMissingReturnsNotExist verifies a missing file returns an [os.ErrNotExist] error.
@@ -480,10 +468,43 @@ func TestValidateTargetFolderRejectsUnsafePaths(t *testing.T) {
 		".github/actions/taskotter",
 	}
 
+	assertTargetFoldersRejected(t, workspace, cases)
+}
+
+func assertMetadataPathCases(t *testing.T, cases []struct {
+	path string
+	want bool
+},
+) {
+	t.Helper()
+
 	for i := range cases {
-		folder, err := pathutil.ValidateTargetFolder(cases[i], workspace)
+		item := &cases[i]
+
+		if got := pathutil.IsModuleMetadataPath(item.path); got != item.want {
+			t.Fatalf("IsModuleMetadataPath(%q) = %t, want %t", item.path, got, item.want)
+		}
+	}
+}
+
+func assertRelativePathsRejected(t *testing.T, root string, cases []string) {
+	t.Helper()
+
+	for _, item := range cases {
+		path, err := pathutil.ValidateRelativePath(root, item)
 		if err == nil {
-			t.Fatalf("ValidateTargetFolder(%q) = %q, expected error", cases[i], folder)
+			t.Fatalf("ValidateRelativePath(%q) = %q, expected error", item, path)
+		}
+	}
+}
+
+func assertTargetFoldersRejected(t *testing.T, workspace string, cases []string) {
+	t.Helper()
+
+	for _, item := range cases {
+		folder, err := pathutil.ValidateTargetFolder(item, workspace)
+		if err == nil {
+			t.Fatalf("ValidateTargetFolder(%q) = %q, expected error", item, folder)
 		}
 	}
 }

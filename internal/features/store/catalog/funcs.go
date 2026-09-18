@@ -10,12 +10,14 @@ import (
 	"path/filepath"
 )
 
-type collectChildrenParams struct {
-	modules map[string]struct{}
-	dir     string
-	prefix  string
-	entries []os.DirEntry
-}
+type (
+	collectChildrenParams struct {
+		modules map[string]struct{}
+		dir     string
+		prefix  string
+		entries []os.DirEntry
+	}
+)
 
 // Discover returns modules whose directories contain their own Taskfile.yml.
 // Directories without a Taskfile are intentionally not traversed.

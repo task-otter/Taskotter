@@ -16,6 +16,15 @@ import (
 	"github.com/task-otter/Taskotter/internal/shared/pathutil/classify"
 )
 
+func absPath(path string) (string, error) {
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		return consts.Empty, fmt.Errorf("resolve absolute path: %w", err)
+	}
+
+	return abs, nil
+}
+
 // Detail returns field, value, and message for diagnostics.
 func (pathErr *PathError) Detail() string {
 	return fmt.Sprintf("%s=%q: %s", pathErr.Field, pathErr.Value, pathErr.Message)
@@ -505,12 +514,26 @@ func OpenRelativeFile(root, rel string) (*os.File, error) {
 // openDirFSFile opens safeRel under absRoot. safeRel has already been validated
 // to stay inside absRoot by resolveValidatedRoot.
 func openDirFSFile(absRoot, safeRel, rel string) (*os.File, error) {
-	file, err := os.Open(filepath.Join(absRoot, filepath.FromSlash(safeRel)))
+	file, err := os.DirFS(absRoot).Open(safeRel)
 	if err != nil {
 		return nil, fmt.Errorf(errFmtOpenFile, rel, err)
 	}
 
-	return file, nil
+	osFile, ok := file.(*os.File)
+
+	if !ok {
+		closeErr := file.Close()
+		if closeErr != nil {
+			return nil, errors.Join(
+				fmt.Errorf("open validated file %q: unexpected file type", rel),
+				fmt.Errorf("close unexpected file: %w", closeErr),
+			)
+		}
+
+		return nil, fmt.Errorf("open validated file %q: unexpected file type", rel)
+	}
+
+	return osFile, nil
 }
 
 // IsDocPath reports whether rel is documentation copied when includes-doc is enabled.

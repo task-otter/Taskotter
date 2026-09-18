@@ -23,13 +23,18 @@ import (
 
 // NewClient returns a git client bound to the given workspace path.
 func NewClient(workspace string) *Client {
+	return newClient(workspace, gitBinary)
+}
+
+func newClient(workspace, binary string) *Client {
 	return &Client{fns: clientFns{
 		workspace: workspace,
+		binary:    binary,
 		run: func(ctx context.Context, args ...string) error {
-			return runGitCommand(ctx, workspace, args...)
+			return runGitCommand(ctx, workspace, binary, args...)
 		},
 		output: func(ctx context.Context, args ...string) (string, error) {
-			return outputGitCommand(ctx, workspace, args...)
+			return outputGitCommand(ctx, workspace, binary, args...)
 		},
 	}}
 }
@@ -49,7 +54,7 @@ func AllowedPathSet(paths []string) map[string]struct{} {
 func EnsureBranchOwned(ctx context.Context, ops gitports.BranchChecker, branch string) error {
 	exists, err := ops.BranchExists(ctx, branch)
 	if err != nil {
-		return fmt.Errorf("check branch exists: %w", err)
+		return fmt.Errorf(errCheckBranchExists, err)
 	}
 
 	if !exists {
@@ -321,7 +326,7 @@ func verifyExistingBranchOwned(
 ) error {
 	msg, err := ops.LastCommitMessage(ctx, branch)
 	if err != nil {
-		return fmt.Errorf("read last commit message: %w", err)
+		return fmt.Errorf(errReadLastCommitMessage, err)
 	}
 
 	err = checkBranchOwnership(msg, branch)
@@ -345,7 +350,7 @@ func (client *Client) BranchExists(ctx context.Context, branch string) (bool, er
 
 	exists, err := branchExists(ctx, client, branch)
 	if err != nil {
-		return false, fmt.Errorf("check branch exists: %w", err)
+		return false, fmt.Errorf(errCheckBranchExists, err)
 	}
 
 	return exists, nil
@@ -555,7 +560,7 @@ func (client *Client) LastCommitMessage(ctx context.Context, branch string) (str
 
 	message, err := lastCommitMessage(ctx, client, branch)
 	if err != nil {
-		return consts.Empty, fmt.Errorf("read last commit message: %w", err)
+		return consts.Empty, fmt.Errorf(errReadLastCommitMessage, err)
 	}
 
 	return message, nil
@@ -633,7 +638,7 @@ func (client *Client) Stage(ctx context.Context, paths []string) error {
 
 	err := stage(ctx, client, paths)
 	if err != nil {
-		return fmt.Errorf("stage paths: %w", err)
+		return fmt.Errorf(errStagePaths, err)
 	}
 
 	return nil
@@ -752,11 +757,11 @@ func gitArgs(workspace string, args ...string) []string {
 	}, args...)
 }
 
-func newGitCommand(ctx context.Context, workspace string, args ...string) *exec.Cmd {
+func newGitCommand(ctx context.Context, workspace, binary string, args ...string) *exec.Cmd {
 	cmdArgs := gitArgs(workspace, args...)
-	cmd := exec.CommandContext(ctx, gitBinary)
+	cmd := exec.CommandContext(ctx, binary)
 
-	cmd.Args = append([]string{gitBinary}, cmdArgs...)
+	cmd.Args = append([]string{binary}, cmdArgs...)
 	cmd.Dir = workspace
 
 	return cmd
@@ -797,14 +802,18 @@ func (client *Client) output(ctx context.Context, args ...string) (string, error
 
 	out, err := client.fns.output(ctx, args...)
 	if err != nil {
-		return consts.Empty, fmt.Errorf("run git output: %w", err)
+		return consts.Empty, fmt.Errorf(errRunGitOutput, err)
 	}
 
 	return out, nil
 }
 
-func outputGitCommand(ctx context.Context, workspace string, args ...string) (string, error) {
-	cmd := newGitCommand(ctx, workspace, args...)
+func outputGitCommand(
+	ctx context.Context,
+	workspace, binary string,
+	args ...string,
+) (string, error) {
+	cmd := newGitCommand(ctx, workspace, binary, args...)
 
 	var stdout, stderr bytes.Buffer
 
@@ -841,8 +850,8 @@ func refsAtOriginHEAD(ctx context.Context, client *Client, sha string) (string, 
 	return refs, nil
 }
 
-func runGitCommand(ctx context.Context, workspace string, args ...string) error {
-	cmd := newGitCommand(ctx, workspace, args...)
+func runGitCommand(ctx context.Context, workspace, binary string, args ...string) error {
+	cmd := newGitCommand(ctx, workspace, binary, args...)
 
 	var stderr bytes.Buffer
 
@@ -866,7 +875,7 @@ func runStageAdd(ctx context.Context, client *Client, paths []string) error {
 
 	err := run(ctx, client, args...)
 	if err != nil {
-		return fmt.Errorf("stage paths: %w", err)
+		return fmt.Errorf(errStagePaths, err)
 	}
 
 	return nil
@@ -876,6 +885,7 @@ func setOriginRemoteURL(ctx context.Context, client *Client, remoteURL string) e
 	cmd := newGitCommand(
 		ctx,
 		client.fns.workspace,
+		client.fns.binary,
 		gitRemote,
 		"set-url",
 		consts.GitOrigin,
@@ -902,7 +912,7 @@ func run(ctx context.Context, client *Client, args ...string) error {
 func output(ctx context.Context, client *Client, args ...string) (string, error) {
 	out, err := client.fns.output(ctx, args...)
 	if err != nil {
-		return consts.Empty, fmt.Errorf("run git output: %w", err)
+		return consts.Empty, fmt.Errorf(errRunGitOutput, err)
 	}
 
 	return out, nil

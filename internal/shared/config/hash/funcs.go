@@ -4,20 +4,28 @@
 package hash
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-
-	"github.com/task-otter/Taskotter/internal/shared/iox"
 )
 
-const zeroPrefixLength = 0
+const (
+	zeroPrefixLength = 0
+)
 
 // Compute returns the full SHA-256 hex digest and its TaskOtter sync branch.
 func Compute(input *Input, prefixLength int) (fullDigest, branch string, err error) {
-	data, err := json.Marshal(input)
-	iox.Discard(err)
+	var buffer bytes.Buffer
+
+	encoder := json.NewEncoder(&buffer)
+
+	if err := encoder.Encode(input); err != nil {
+		return "", "", fmt.Errorf("encode configuration input: %w", err)
+	}
+
+	data := bytes.TrimSuffix(buffer.Bytes(), []byte{'\n'})
 
 	digest := sha256.Sum256(data)
 	full := hex.EncodeToString(digest[:])

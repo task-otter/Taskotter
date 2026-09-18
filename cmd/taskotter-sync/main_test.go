@@ -38,6 +38,8 @@ const (
 var errStubRun = errors.New("stub run failure")
 
 // TestMainExitsWithErrorWhenConfigMissing verifies main reports a failure exit code.
+//
+//nolint:paralleltest // mutates process-wide environment variables and shared main test state.
 func TestMainExitsWithErrorWhenConfigMissing(t *testing.T) {
 	lockMainTestState(t)
 
@@ -56,6 +58,8 @@ func TestMainExitsWithErrorWhenConfigMissing(t *testing.T) {
 }
 
 // TestRunReportsConfigFailure verifies a missing configuration exits with an error code.
+//
+//nolint:paralleltest // mutates process-wide environment variables and shared main test state.
 func TestRunReportsConfigFailure(t *testing.T) {
 	lockMainTestState(t)
 	clearActionEnv(t)
@@ -97,6 +101,8 @@ func TestRunOrchestratorReportsRunFailure(t *testing.T) {
 }
 
 // TestLoadRunAndWriteReportsOutputFailure verifies an unwritable output path is reported.
+//
+//nolint:paralleltest // mutates process-wide environment variables and shared main test state.
 func TestLoadRunAndWriteReportsOutputFailure(t *testing.T) {
 	lockMainTestState(t)
 	setValidActionEnv(t, filepath.Join(t.TempDir(), "missing", outputFileName))
@@ -113,6 +119,8 @@ func TestLoadRunAndWriteReportsOutputFailure(t *testing.T) {
 }
 
 // TestLoadRunAndWriteReportsRunFailure verifies orchestrator failures abort the run.
+//
+//nolint:paralleltest // mutates process-wide environment variables and shared main test state.
 func TestLoadRunAndWriteReportsRunFailure(t *testing.T) {
 	lockMainTestState(t)
 	setValidActionEnv(t, filepath.Join(t.TempDir(), outputFileName))
@@ -144,6 +152,8 @@ func TestDefaultWireRunBuildsRunFunc(t *testing.T) {
 }
 
 // TestRunSucceedsWithStubbedOrchestrator verifies a clean run exits successfully.
+//
+//nolint:paralleltest // mutates process-wide environment variables and shared main test state.
 func TestRunSucceedsWithStubbedOrchestrator(t *testing.T) {
 	lockMainTestState(t)
 	setValidActionEnv(t, filepath.Join(t.TempDir(), outputFileName))

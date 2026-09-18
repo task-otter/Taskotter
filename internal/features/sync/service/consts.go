@@ -43,49 +43,32 @@ const (
 	storeMetadataFileName = "metadata.yml"
 
 	// storeMetadataSchema is the only metadata.yml schema this version understands.
-	storeMetadataSchema = "taskotter.dev/taskfile-metadata/v1"
-)
-
-const (
-	fileUnchanged fileChangeKind = iota
+	storeMetadataSchema                = "taskotter.dev/taskfile-metadata/v1"
+	fileUnchanged       fileChangeKind = iota
 	fileAdded
 	fileUpdated
-)
 
-const (
 	docPolicySkip docPolicy = iota
 	docPolicyInclude
-)
 
-const (
 	// DocPolicySkip excludes README and docs/ paths from collected module files.
 	DocPolicySkip DocPolicy = DocPolicy(docPolicySkip)
 
 	// DocPolicyInclude copies documentation paths alongside taskfiles.
 	DocPolicyInclude DocPolicy = DocPolicy(docPolicyInclude)
-)
 
-const (
 	syncRootDisabled syncRootPolicy = syncRootPolicy(docPolicySkip)
 	syncRootEnabled  syncRootPolicy = syncRootPolicy(docPolicyInclude)
-)
 
-const (
 	rootAbsent  rootState = rootState(docPolicySkip)
 	rootPresent rootState = rootState(docPolicyInclude)
-)
 
-const (
 	priorContentEmpty  priorContent = priorContent(docPolicySkip)
 	priorContentExists priorContent = priorContent(docPolicyInclude)
-)
 
-const (
 	metadataNotCandidate metadataScanResult = metadataScanResult(docPolicySkip)
 	metadataIsCandidate  metadataScanResult = metadataScanResult(docPolicyInclude)
-)
 
-const (
 	yamlStagedSkip yamlStagedKind = yamlStagedKind(docPolicySkip)
 	yamlStagedRoot yamlStagedKind = iota + 1
 	yamlStagedLock

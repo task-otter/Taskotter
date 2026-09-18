@@ -7,7 +7,9 @@ import (
 	"testing"
 )
 
-const outsidePath = "../outside"
+const (
+	outsidePath = "../outside"
+)
 
 // TestIsSafeTarPath verifies archive paths stay within the extraction root.
 func TestIsSafeTarPath(t *testing.T) {

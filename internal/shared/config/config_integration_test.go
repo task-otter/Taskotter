@@ -70,6 +70,8 @@ func targetFolderCases() []targetFolderCase {
 }
 
 // TestBunWithVersionManagerRejected verifies the removed version-manager key fails validation.
+//
+//nolint:paralleltest // mutates process-wide environment variables.
 func TestBunWithVersionManagerRejected(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
@@ -80,6 +82,8 @@ func TestBunWithVersionManagerRejected(t *testing.T) {
 }
 
 // TestFailOnChangesDefaultsFalse verifies fail-on-changes defaults to false when unset.
+//
+//nolint:paralleltest // mutates process-wide environment variables.
 func TestFailOnChangesDefaultsFalse(t *testing.T) {
 	dir := t.TempDir()
 	setEnv(t, baseEnv(dir))
@@ -92,6 +96,8 @@ func TestFailOnChangesDefaultsFalse(t *testing.T) {
 }
 
 // TestFailOnChangesTrue verifies fail-on-changes is set to true when the input is "true".
+//
+//nolint:paralleltest // mutates process-wide environment variables.
 func TestFailOnChangesTrue(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
@@ -107,6 +113,8 @@ func TestFailOnChangesTrue(t *testing.T) {
 }
 
 // TestInvalidFailOnChanges verifies a non-boolean fail-on-changes input is rejected.
+//
+//nolint:paralleltest // mutates process-wide environment variables.
 func TestInvalidFailOnChanges(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
@@ -116,6 +124,8 @@ func TestInvalidFailOnChanges(t *testing.T) {
 }
 
 // TestInvalidIncludesDoc verifies a non-boolean includes-doc input is rejected.
+//
+//nolint:paralleltest // mutates process-wide environment variables.
 func TestInvalidIncludesDoc(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
@@ -125,6 +135,8 @@ func TestInvalidIncludesDoc(t *testing.T) {
 }
 
 // TestInvalidPackageManager verifies an unrecognized package manager is rejected.
+//
+//nolint:paralleltest // mutates process-wide environment variables.
 func TestInvalidPackageManager(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
@@ -134,6 +146,8 @@ func TestInvalidPackageManager(t *testing.T) {
 }
 
 // TestInvalidSyncRoot verifies a non-boolean sync-root input is rejected.
+//
+//nolint:paralleltest // mutates process-wide environment variables.
 func TestInvalidSyncRoot(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
@@ -143,6 +157,8 @@ func TestInvalidSyncRoot(t *testing.T) {
 }
 
 // TestInvalidTaskName verifies an unsafe task name is rejected.
+//
+//nolint:paralleltest // mutates process-wide environment variables.
 func TestInvalidTaskName(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
@@ -152,6 +168,8 @@ func TestInvalidTaskName(t *testing.T) {
 }
 
 // TestLoadFromEnvDefaults verifies default paths, includes-doc, sync-root, and tasks are set.
+//
+//nolint:paralleltest // mutates process-wide environment variables.
 func TestLoadFromEnvDefaults(t *testing.T) {
 	dir := t.TempDir()
 	cfg := loadEnvOK(t, baseEnv(dir))
@@ -172,6 +190,8 @@ func TestLoadFromEnvDefaults(t *testing.T) {
 }
 
 // TestIncludesDocFlipChangesConfigurationHash verifies flipping includes-doc changes hash and branch.
+//
+//nolint:paralleltest // mutates process-wide environment variables.
 func TestIncludesDocFlipChangesConfigurationHash(t *testing.T) {
 	dir := t.TempDir()
 	cfgTrue := loadIncludesDocConfig(t, dir, testTrueValue)
@@ -209,6 +229,8 @@ func assertIncludesDocHashFlip(t *testing.T, cfgTrue, cfgFalse *config.Config) {
 }
 
 // TestLoadFromEnvDockerInputEnvNames verifies hyphenated Docker action input env names are read.
+//
+//nolint:paralleltest // mutates process-wide environment variables.
 func TestLoadFromEnvDockerInputEnvNames(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
@@ -224,6 +246,8 @@ func TestLoadFromEnvDockerInputEnvNames(t *testing.T) {
 }
 
 // TestLoadFromEnvGitHubTokenFallback verifies GITHUB_TOKEN is used when the input token is empty.
+//
+//nolint:paralleltest // mutates process-wide environment variables.
 func TestLoadFromEnvGitHubTokenFallback(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
@@ -243,6 +267,8 @@ func TestLoadFromEnvGitHubTokenFallback(t *testing.T) {
 }
 
 // TestLoadFromEnvUsesPullRequestTargetAsPRBase verifies a pull request ref uses GITHUB_BASE_REF as the PR base.
+//
+//nolint:paralleltest // mutates process-wide environment variables.
 func TestLoadFromEnvUsesPullRequestTargetAsPRBase(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
@@ -262,6 +288,8 @@ func TestLoadFromEnvUsesPullRequestTargetAsPRBase(t *testing.T) {
 }
 
 // TestLoadFromEnvUsesTriggerBranchAsPRBase verifies a push ref sets the PR base to the trigger branch.
+//
+//nolint:paralleltest // mutates process-wide environment variables.
 func TestLoadFromEnvUsesTriggerBranchAsPRBase(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
@@ -280,6 +308,8 @@ func TestLoadFromEnvUsesTriggerBranchAsPRBase(t *testing.T) {
 }
 
 // TestMissingRuntimeInputs verifies missing workspace or token inputs cause an error.
+//
+//nolint:paralleltest // mutates process-wide environment variables.
 func TestMissingRuntimeInputs(t *testing.T) {
 	dir := t.TempDir()
 
@@ -294,6 +324,8 @@ func TestMissingRuntimeInputs(t *testing.T) {
 }
 
 // TestParseTasksMultilineAndDedupe verifies multiline, comma-separated task input is deduped.
+//
+//nolint:paralleltest // mutates process-wide environment variables.
 func TestParseTasksMultilineAndDedupe(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
@@ -307,6 +339,8 @@ func TestParseTasksMultilineAndDedupe(t *testing.T) {
 }
 
 // TestRootTaskfileCustomPath verifies a custom root-taskfile input path is honored.
+//
+//nolint:paralleltest // mutates process-wide environment variables.
 func TestRootTaskfileCustomPath(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
@@ -325,6 +359,8 @@ func TestRootTaskfileCustomPath(t *testing.T) {
 }
 
 // TestRootTaskfileFollowsTargetFolder verifies the default root taskfile path tracks target-folder.
+//
+//nolint:paralleltest // mutates process-wide environment variables.
 func TestRootTaskfileFollowsTargetFolder(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
@@ -343,6 +379,8 @@ func TestRootTaskfileFollowsTargetFolder(t *testing.T) {
 }
 
 // TestEmptyTasksRejected verifies a blank tasks input fails validation.
+//
+//nolint:paralleltest // mutates process-wide environment variables.
 func TestEmptyTasksRejected(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
@@ -352,6 +390,8 @@ func TestEmptyTasksRejected(t *testing.T) {
 }
 
 // TestRootTaskfileMustStayInsideWorkspace verifies an escaping root-taskfile path is rejected.
+//
+//nolint:paralleltest // mutates process-wide environment variables.
 func TestRootTaskfileMustStayInsideWorkspace(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
@@ -361,6 +401,8 @@ func TestRootTaskfileMustStayInsideWorkspace(t *testing.T) {
 }
 
 // TestRootTaskfileMustBeYAML verifies a non-YAML root-taskfile path is rejected.
+//
+//nolint:paralleltest // mutates process-wide environment variables.
 func TestRootTaskfileMustBeYAML(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
@@ -370,6 +412,8 @@ func TestRootTaskfileMustBeYAML(t *testing.T) {
 }
 
 // TestStoreVersionAllowsSafeTag verifies a safe tag store-version value is accepted.
+//
+//nolint:paralleltest // mutates process-wide environment variables.
 func TestStoreVersionAllowsSafeTag(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
@@ -388,6 +432,8 @@ func TestStoreVersionAllowsSafeTag(t *testing.T) {
 }
 
 // TestTargetFolderSymlinkEscape verifies a target folder escaping via symlink is rejected.
+//
+//nolint:paralleltest // mutates process-wide environment variables.
 func TestTargetFolderSymlinkEscape(t *testing.T) {
 	workspace := t.TempDir()
 	outside := t.TempDir()
@@ -407,6 +453,8 @@ func TestTargetFolderSymlinkEscape(t *testing.T) {
 }
 
 // TestTargetFolderValidation verifies target-folder values are accepted or rejected as expected.
+//
+//nolint:paralleltest // mutates process-wide environment variables.
 func TestTargetFolderValidation(t *testing.T) {
 	dir := t.TempDir()
 
@@ -421,6 +469,8 @@ func TestTargetFolderValidation(t *testing.T) {
 }
 
 // TestUnsafeStoreVersion verifies an unsafe store-version value is rejected.
+//
+//nolint:paralleltest // mutates process-wide environment variables.
 func TestUnsafeStoreVersion(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
@@ -646,6 +696,8 @@ func jsEnv(dir, jsValue string) map[string]string {
 }
 
 // TestParseJSNodeJSDefaults verifies nodejs runtime defaults to the npm package manager.
+//
+//nolint:paralleltest // mutates process-wide environment variables.
 func TestParseJSNodeJSDefaults(t *testing.T) {
 	dir := t.TempDir()
 	cfg := loadEnvOK(t, jsEnv(dir, "runtime: nodejs\n"))
@@ -660,6 +712,8 @@ func TestParseJSNodeJSDefaults(t *testing.T) {
 }
 
 // TestParseJSBun verifies bun runtime sets the bun package manager.
+//
+//nolint:paralleltest // mutates process-wide environment variables.
 func TestParseJSBun(t *testing.T) {
 	dir := t.TempDir()
 	cfg := loadEnvOK(t, jsEnv(dir, "runtime: bun\n"))
@@ -674,6 +728,8 @@ func TestParseJSBun(t *testing.T) {
 }
 
 // TestParseJSBunRejectsVersionManager verifies the removed version-manager key fails under bun.
+//
+//nolint:paralleltest // mutates process-wide environment variables.
 func TestParseJSBunRejectsVersionManager(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
@@ -683,6 +739,8 @@ func TestParseJSBunRejectsVersionManager(t *testing.T) {
 }
 
 // TestParseJSBunRejectsPackageManager verifies bun runtime with an explicit package-manager fails.
+//
+//nolint:paralleltest // mutates process-wide environment variables.
 func TestParseJSBunRejectsPackageManager(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
@@ -692,6 +750,8 @@ func TestParseJSBunRejectsPackageManager(t *testing.T) {
 }
 
 // TestParseJSNodeJSRejectsBunPackageManager verifies nodejs runtime rejects the bun package manager.
+//
+//nolint:paralleltest // mutates process-wide environment variables.
 func TestParseJSNodeJSRejectsBunPackageManager(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
@@ -701,6 +761,8 @@ func TestParseJSNodeJSRejectsBunPackageManager(t *testing.T) {
 }
 
 // TestParseJSEmpty verifies an empty js input leaves runtime and package manager unset.
+//
+//nolint:paralleltest // mutates process-wide environment variables.
 func TestParseJSEmpty(t *testing.T) {
 	dir := t.TempDir()
 	setEnv(t, baseEnv(dir))
@@ -720,6 +782,8 @@ func TestParseJSEmpty(t *testing.T) {
 }
 
 // TestParseJSDefaultsRuntimeToNodeJS verifies the runtime defaults to nodejs when unset.
+//
+//nolint:paralleltest // mutates process-wide environment variables.
 func TestParseJSDefaultsRuntimeToNodeJS(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
@@ -738,6 +802,8 @@ func TestParseJSDefaultsRuntimeToNodeJS(t *testing.T) {
 }
 
 // TestParseJSRejectsInvalidYAML verifies malformed js YAML input is rejected.
+//
+//nolint:paralleltest // mutates process-wide environment variables.
 func TestParseJSRejectsInvalidYAML(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
@@ -747,6 +813,8 @@ func TestParseJSRejectsInvalidYAML(t *testing.T) {
 }
 
 // TestParseJSRejectsInvalidRuntime verifies an unrecognized runtime value is rejected.
+//
+//nolint:paralleltest // mutates process-wide environment variables.
 func TestParseJSRejectsInvalidRuntime(t *testing.T) {
 	dir := t.TempDir()
 	env := baseEnv(dir)
@@ -757,6 +825,8 @@ func TestParseJSRejectsInvalidRuntime(t *testing.T) {
 
 // TestParseJSRejectsVersionManager verifies the removed version-manager key is rejected outright,
 // including values that were valid before the store dropped its fnm and nvm variants.
+//
+//nolint:paralleltest // mutates process-wide environment variables.
 func TestParseJSRejectsVersionManager(t *testing.T) {
 	removed := []string{"fnm", "nvm", "volta"}
 

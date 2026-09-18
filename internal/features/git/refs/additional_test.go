@@ -3,7 +3,9 @@
 
 package refs
 
-import "testing"
+import (
+	"testing"
+)
 
 func TestValidateGitRefs(t *testing.T) {
 	t.Parallel()

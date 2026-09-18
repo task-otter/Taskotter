@@ -3,7 +3,9 @@
 
 package ports
 
-import "testing"
+import (
+	"testing"
+)
 
 func TestWriteLocalIdentity(t *testing.T) {
 	t.Parallel()

@@ -8,7 +8,9 @@ import (
 	"strings"
 )
 
-const parentPath = ".."
+const (
+	parentPath = ".."
+)
 
 // Escapes reports whether a relative path leaves its extraction root.
 func Escapes(rel string) bool {

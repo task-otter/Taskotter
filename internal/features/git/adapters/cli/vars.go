@@ -8,9 +8,8 @@ import (
 	"regexp"
 )
 
-const gitBinary = "git"
-
 const (
+	gitBinary                = "git"
 	errCheckBranchExists     = "check branch exists: %w"
 	errReadLastCommitMessage = "read last commit message: %w"
 	errStagePaths            = "stage paths: %w"

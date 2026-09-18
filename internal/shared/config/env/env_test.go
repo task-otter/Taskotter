@@ -3,7 +3,9 @@
 
 package env
 
-import "testing"
+import (
+	"testing"
+)
 
 func TestInputAndToken(t *testing.T) {
 	t.Setenv("INPUT_GITHUB-TOKEN", " hyphen-token ")

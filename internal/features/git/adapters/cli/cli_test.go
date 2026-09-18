@@ -351,6 +351,7 @@ func lockGitTestState(t *testing.T) {
 
 // TestCommandsSucceedWithStubbedGit verifies the success paths of the mutating commands.
 func TestCommandsSucceedWithStubbedGit(t *testing.T) {
+	t.Parallel()
 	lockGitTestState(t)
 
 	client := stubbedClient(t, stubOK)
@@ -363,18 +364,21 @@ func TestCommandsSucceedWithStubbedGit(t *testing.T) {
 
 // TestDefaultBranchUsesAbbrevRef verifies the abbrev-ref fallback resolves the branch.
 func TestDefaultBranchUsesAbbrevRef(t *testing.T) {
+	t.Parallel()
 	lockGitTestState(t)
 	assertDefaultBranch(t, stubAbbrev, mainBranch)
 }
 
 // TestDefaultBranchUsesRemoteShow verifies the remote show fallback resolves the branch.
 func TestDefaultBranchUsesRemoteShow(t *testing.T) {
+	t.Parallel()
 	lockGitTestState(t)
 	assertDefaultBranch(t, stubShowOK, mainBranch)
 }
 
 // TestDefaultBranchReportsMissingHeadLine verifies remote show without a HEAD line fails.
 func TestDefaultBranchReportsMissingHeadLine(t *testing.T) {
+	t.Parallel()
 	lockGitTestState(t)
 
 	client := stubbedClient(t, stubShowBad)
@@ -389,12 +393,14 @@ func TestDefaultBranchReportsMissingHeadLine(t *testing.T) {
 
 // TestOriginHeadCommitReportsRefListFailure verifies a failing ref listing is reported.
 func TestOriginHeadCommitReportsRefListFailure(t *testing.T) {
+	t.Parallel()
 	lockGitTestState(t)
 	assertOriginHeadCommitFails(t, stubBadRefs)
 }
 
 // TestOriginHeadCommitReportsMissingBranch verifies origin HEAD without a branch is reported.
 func TestOriginHeadCommitReportsMissingBranch(t *testing.T) {
+	t.Parallel()
 	lockGitTestState(t)
 	assertOriginHeadCommitFails(t, stubNoRefs)
 }

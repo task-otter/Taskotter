@@ -15,23 +15,25 @@ import (
 	yaml "go.yaml.in/yaml/v3"
 )
 
-type fileOps struct {
-	removeAll        func(string) error
-	removePath       func(string) error
-	mkdirAll         func(string, os.FileMode) error
-	mkdirTemp        func(string, string) (string, error)
-	createTemp       func(string, string) (*os.File, error)
-	renamePath       func(string, string) error
-	statPath         func(string) (os.FileInfo, error)
-	walkDir          func(string, fs.WalkDirFunc) error
-	writeFull        func(io.Writer, []byte) error
-	readAll          func(io.Reader) ([]byte, error)
-	openRelativeFile func(string, string) (*os.File, error)
-	relPath          func(string, string) (string, error)
-	closeFile        func(*os.File) error
-	chmodFile        func(*os.File, os.FileMode) error
-	marshalYAML      func(any) ([]byte, error)
-}
+type (
+	fileOps struct {
+		removeAll        func(string) error
+		removePath       func(string) error
+		mkdirAll         func(string, os.FileMode) error
+		mkdirTemp        func(string, string) (string, error)
+		createTemp       func(string, string) (*os.File, error)
+		renamePath       func(string, string) error
+		statPath         func(string) (os.FileInfo, error)
+		walkDir          func(string, fs.WalkDirFunc) error
+		writeFull        func(io.Writer, []byte) error
+		readAll          func(io.Reader) ([]byte, error)
+		openRelativeFile func(string, string) (*os.File, error)
+		relPath          func(string, string) (string, error)
+		closeFile        func(*os.File) error
+		chmodFile        func(*os.File, os.FileMode) error
+		marshalYAML      func(any) ([]byte, error)
+	}
+)
 
 func defaultFileOps() *fileOps {
 	return &fileOps{

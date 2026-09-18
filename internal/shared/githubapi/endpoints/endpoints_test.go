@@ -7,13 +7,15 @@ import (
 	"testing"
 )
 
+const testPullNumber = 7
+
 // TestPullPaths verifies pull-request endpoint construction.
 func TestPullPaths(t *testing.T) {
 	if got := PullsPath("owner", "repo"); got != "/repos/owner/repo/pulls" {
 		t.Fatalf("pulls path = %q", got)
 	}
 
-	if got := PullPath("owner", "repo", 7); got != "/repos/owner/repo/pulls/7" {
+	if got := PullPath("owner", "repo", testPullNumber); got != "/repos/owner/repo/pulls/7" {
 		t.Fatalf("pull path = %q", got)
 	}
 }

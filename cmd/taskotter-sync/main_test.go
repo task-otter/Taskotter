@@ -8,7 +8,6 @@ import (
 	"context"
 	"errors"
 	"io"
-	"os"
 	"path/filepath"
 	"sync"
 	"testing"
@@ -301,29 +300,7 @@ func setValidActionEnv(t *testing.T, outputPath string) {
 
 func setActionEnv(t *testing.T, key, value string) {
 	t.Helper()
-
-	original, present := os.LookupEnv(key)
-
-	err := os.Setenv(key, value)
-	if err != nil {
-		t.Fatalf("set %s: %v", key, err)
-	}
-
-	t.Cleanup(func() {
-		if present {
-			err := os.Setenv(key, original)
-			if err != nil {
-				t.Errorf("restore %s: %v", key, err)
-			}
-
-			return
-		}
-
-		err := os.Unsetenv(key)
-		if err != nil {
-			t.Errorf("unset %s: %v", key, err)
-		}
-	})
+	t.Setenv(key, value)
 }
 
 func swapExitFunc(t *testing.T, stub func(int)) {

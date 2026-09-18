@@ -18,20 +18,15 @@ import (
 )
 
 type (
-	// PrepareSyncInputFn prepares a sync input from store snapshot data.
-	PrepareSyncInputFn func(*syncsvc.PrepareSyncInputArgs) (syncdomain.SyncInput, error)
+	prepareSyncInputFn func(*syncsvc.PrepareSyncInputArgs) (syncdomain.SyncInput, error)
 
-	// BuildPlanFn compares managed files against the store snapshot.
-	BuildPlanFn func(*syncdomain.SyncInput) (*syncdomain.Plan, error)
+	buildPlanFn func(*syncdomain.SyncInput) (*syncdomain.Plan, error)
 
-	// ApplyPlanFn copies planned module files into the workspace.
-	ApplyPlanFn func(*syncdomain.Plan, *syncdomain.SyncInput) error
+	applyPlanFn func(*syncdomain.Plan, *syncdomain.SyncInput) error
 
-	// ResolveAllFn resolves requested logical tasks to store modules.
-	ResolveAllFn func(*resolvesvc.ResolveAllInput) ([]resolvesvc.Resolution, error)
+	resolveAllFn func(*resolvesvc.ResolveAllInput) ([]resolvesvc.Resolution, error)
 
-	// ResolveTransitiveFn resolves transitive module dependencies.
-	ResolveTransitiveFn func([]string, map[string][]string) ([]string, error)
+	resolveTransitiveFn func([]string, map[string][]string) ([]string, error)
 
 	// storeClient resolves store refs and downloads snapshots for the sync pipeline.
 	storeClient interface {
@@ -51,11 +46,11 @@ type (
 		GitIndexer        gitports.Indexer
 		GitPublisher      gitports.Publisher
 		PRClient          prports.PRClient
-		PrepareSyncInput  PrepareSyncInputFn
-		BuildPlan         BuildPlanFn
-		ApplyPlan         ApplyPlanFn
-		ResolveAll        ResolveAllFn
-		ResolveTransitive ResolveTransitiveFn
+		PrepareSyncInput  prepareSyncInputFn
+		BuildPlan         buildPlanFn
+		ApplyPlan         applyPlanFn
+		ResolveAll        resolveAllFn
+		ResolveTransitive resolveTransitiveFn
 	}
 
 	// Orchestrator coordinates store, git, and GitHub operations for a sync run.

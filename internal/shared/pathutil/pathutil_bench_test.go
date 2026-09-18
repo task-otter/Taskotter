@@ -50,23 +50,22 @@ func runValidateTargetFolderBenchmark(b *testing.B, depth int) {
 func benchmarkFolder(depth int) string {
 	var folderBuilder strings.Builder
 
-	var written int
-
-	written, err := folderBuilder.WriteString(benchmarkTaskfilesDir)
-	if err != nil {
+	if !writeBenchmarkFolderPrefix(&folderBuilder) {
 		return benchmarkEmptyString
 	}
 
-	if written == benchmarkEmptyLength {
-		return benchmarkEmptyString
-	}
-
-	err = appendBenchmarkModules(&folderBuilder, depth)
+	err := appendBenchmarkModules(&folderBuilder, depth)
 	if err != nil {
 		return benchmarkEmptyString
 	}
 
 	return folderBuilder.String()
+}
+
+func writeBenchmarkFolderPrefix(builder *strings.Builder) bool {
+	written, err := builder.WriteString(benchmarkTaskfilesDir)
+
+	return err == nil && written != benchmarkEmptyLength
 }
 
 func appendBenchmarkModules(builder *strings.Builder, depth int) error {

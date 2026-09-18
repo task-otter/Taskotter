@@ -100,10 +100,7 @@ func TestFailOnChangesDefaultsFalse(t *testing.T) {
 	dir := t.TempDir()
 	setEnv(t, baseEnv(dir))
 
-	cfg, err := config.LoadFromEnv()
-	if err != nil {
-		t.Fatalf(consts.FormatErr, err)
-	}
+	cfg := loadConfigFromEnv(t)
 
 	if cfg.FailOnChanges {
 		t.Fatal("FailOnChanges should default to false")
@@ -120,10 +117,7 @@ func TestFailOnChangesTrue(t *testing.T) {
 	env["INPUT_FAIL-ON-CHANGES"] = testTrueValue
 	setEnv(t, env)
 
-	cfg, err := config.LoadFromEnv()
-	if err != nil {
-		t.Fatalf(consts.FormatErr, err)
-	}
+	cfg := loadConfigFromEnv(t)
 
 	if !cfg.FailOnChanges {
 		t.Fatal("FailOnChanges = false, want true")
@@ -665,65 +659,105 @@ func runTargetFolderCase(t *testing.T, dir string, testCase *targetFolderCase) {
 	assertTargetFolderAccepted(t, env)
 }
 
-func setEnv(t *testing.T, kv map[string]string) {
+func setEnv(t *testing.T, variables map[string]string) {
 	t.Helper()
+
+	state, exists := lookupEnvState(t)
+
+	if !exists {
+		state = initializeEnvState(t)
+	}
+
+	applyEnvValues(t, state, variables)
+}
+
+func loadConfigFromEnv(t *testing.T) *config.Config {
+	t.Helper()
+
+	cfg, err := config.LoadFromEnv()
+	if err != nil {
+		t.Fatalf(consts.FormatErr, err)
+	}
+
+	return cfg
+}
+
+func lookupEnvState(t *testing.T) (map[string]envValue, bool) {
+	testEnvStateMu.Lock()
+	defer testEnvStateMu.Unlock()
+
+	state, exists := testEnvStates[t]
+
+	return state, exists
+}
+
+func initializeEnvState(t *testing.T) map[string]envValue {
+	testEnvMu.Lock()
+
+	state := make(map[string]envValue)
 
 	testEnvStateMu.Lock()
 
-	state, exists := testEnvStates[t]
+	testEnvStates[t] = state
+	testEnvStateMu.Unlock()
+	t.Cleanup(func() {
+		restoreEnvState(t, state)
+		testEnvMu.Unlock()
+	})
+
+	return state
+}
+
+func applyEnvValues(t *testing.T, state map[string]envValue, variables map[string]string) {
+	for key, value := range variables {
+		recordEnvValue(state, key)
+
+		err := os.Setenv(key, value)
+		if err != nil {
+			t.Fatalf("set %s: %v", key, err)
+		}
+	}
+}
+
+func restoreEnvState(t *testing.T, state map[string]envValue) {
+	testEnvStateMu.Lock()
+	delete(testEnvStates, t)
 	testEnvStateMu.Unlock()
 
-	if !exists {
-		testEnvMu.Lock()
-
-		state = make(map[string]envValue)
-
-		testEnvStateMu.Lock()
-
-		testEnvStates[t] = state
-		testEnvStateMu.Unlock()
-
-		t.Cleanup(func() {
-			testEnvStateMu.Lock()
-			delete(testEnvStates, t)
-			testEnvStateMu.Unlock()
-
-			for key, original := range state {
-				if original.present {
-					err := os.Setenv(key, original.value)
-					if err != nil {
-						t.Errorf("restore %s: %v", key, err)
-					}
-
-					continue
-				}
-
-				err := os.Unsetenv(key)
-				if err != nil {
-					t.Errorf("unset %s: %v", key, err)
-				}
-			}
-
-			testEnvMu.Unlock()
-		})
+	for key, original := range state {
+		restoreEnvValue(t, key, original)
 	}
+}
 
-	for k := range kv {
-		testEnvStateMu.Lock()
+func restoreEnvValue(t *testing.T, key string, original envValue) {
+	t.Helper()
 
-		if _, recorded := state[k]; !recorded {
-			value, present := os.LookupEnv(k)
-
-			state[k] = envValue{value: value, present: present}
-		}
-
-		testEnvStateMu.Unlock()
-
-		err := os.Setenv(k, kv[k])
+	if original.present {
+		err := os.Setenv(key, original.value)
 		if err != nil {
-			t.Fatalf("set %s: %v", k, err)
+			t.Errorf("restore %s: %v", key, err)
 		}
+
+		return
 	}
+
+	err := os.Unsetenv(key)
+	if err != nil {
+		t.Errorf("unset %s: %v", key, err)
+	}
+}
+
+func recordEnvValue(state map[string]envValue, key string) {
+	testEnvStateMu.Lock()
+	defer testEnvStateMu.Unlock()
+
+	if _, recorded := state[key]; recorded {
+		return
+	}
+
+	value, present := os.LookupEnv(key)
+
+	state[key] = envValue{value: value, present: present}
 }
 
 // TestValidationErrorFieldName covers FieldName.

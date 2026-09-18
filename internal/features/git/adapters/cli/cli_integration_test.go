@@ -286,10 +286,7 @@ func TestHasUnrelatedChanges(t *testing.T) {
 	writeAllowedTaskfile(t, cloneDir)
 	assertNoUnrelatedChanges(t, client, allowed)
 
-	err := os.WriteFile(filepath.Join(cloneDir, "notes.txt"), []byte("local\n"), consts.FilePerm644)
-	if err != nil {
-		t.Fatal(err)
-	}
+	writeNotesFile(t, cloneDir)
 
 	assertHasUnrelatedChanges(t, client, allowed)
 }
@@ -308,6 +305,21 @@ func TestStageForceAddsGitignoredMetadata(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	assertMetadataStaged(t, cloneDir)
+}
+
+func writeNotesFile(t *testing.T, cloneDir string) {
+	t.Helper()
+
+	err := os.WriteFile(filepath.Join(cloneDir, "notes.txt"), []byte("local\n"), consts.FilePerm644)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func assertMetadataStaged(t *testing.T, cloneDir string) {
+	t.Helper()
 
 	out := runGit(t, cloneDir, "status", "--porcelain")
 

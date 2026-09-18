@@ -8,6 +8,8 @@ import (
 	"strings"
 )
 
+const emptyValue = ""
+
 // Input reads INPUT_<NAME>, accepting both hyphen-preserving and underscore
 // spellings used by different GitHub Actions runners.
 func Input(name string) string {
@@ -18,17 +20,17 @@ func Input(name string) string {
 	}
 
 	for index := range keys {
-		if value := strings.TrimSpace(os.Getenv(keys[index])); value != "" {
+		if value := strings.TrimSpace(os.Getenv(keys[index])); value != emptyValue {
 			return value
 		}
 	}
 
-	return ""
+	return emptyValue
 }
 
 // Token reads the action token and falls back to GITHUB_TOKEN.
 func Token() string {
-	if token := Input("github-token"); token != "" {
+	if token := Input("github-token"); token != emptyValue {
 		return token
 	}
 

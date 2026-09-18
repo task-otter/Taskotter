@@ -10,6 +10,13 @@ import (
 	"path/filepath"
 )
 
+type collectChildrenParams struct {
+	modules map[string]struct{}
+	dir     string
+	prefix  string
+	entries []os.DirEntry
+}
+
 // Discover returns modules whose directories contain their own Taskfile.yml.
 // Directories without a Taskfile are intentionally not traversed.
 func Discover(root string) (map[string]struct{}, error) {
@@ -29,26 +36,32 @@ func collect(dir, prefix string, modules map[string]struct{}) error {
 		return fmt.Errorf("load module catalog: %w", err)
 	}
 
-	if prefix != "" {
-		if !isModule(entries) {
-			return nil
-		}
-
+	if shouldRegister(prefix, entries) {
 		modules[prefix] = struct{}{}
 	}
 
-	for index := range entries {
-		entry := entries[index]
+	return collectChildren(&collectChildrenParams{
+		dir: dir, prefix: prefix, entries: entries, modules: modules,
+	})
+}
+
+func shouldRegister(prefix string, entries []os.DirEntry) bool {
+	return prefix != "" && isModule(entries)
+}
+
+func collectChildren(params *collectChildrenParams) error {
+	for index := range params.entries {
+		entry := params.entries[index]
 
 		if !entry.IsDir() {
 			continue
 		}
 
-		name := path.Join(prefix, entry.Name())
+		name := path.Join(params.prefix, entry.Name())
 
-		err = collect(filepath.Join(dir, entry.Name()), name, modules)
-		if err != nil {
-			return fmt.Errorf("collect modules under %q: %w", name, err)
+		childErr := collect(filepath.Join(params.dir, entry.Name()), name, params.modules)
+		if childErr != nil {
+			return fmt.Errorf("collect modules under %q: %w", name, childErr)
 		}
 	}
 

@@ -34,7 +34,7 @@ func Clone(node *yaml.Node) *yaml.Node {
 
 	clone := *node
 
-	clone.Content = make([]*yaml.Node, 0, len(node.Content))
+	clone.Content = make([]*yaml.Node, zeroIndex, len(node.Content))
 
 	for index := range node.Content {
 		clone.Content = append(clone.Content, Clone(node.Content[index]))
@@ -47,7 +47,7 @@ func Clone(node *yaml.Node) *yaml.Node {
 func Keys(mapping *yaml.Node) map[string]struct{} {
 	keys := make(map[string]struct{}, len(mapping.Content)/mappingPairWidth)
 
-	for index := 0; index < len(mapping.Content); index += mappingPairWidth {
+	for index := zeroIndex; index < len(mapping.Content); index += mappingPairWidth {
 		keys[mapping.Content[index].Value] = struct{}{}
 	}
 
@@ -56,9 +56,9 @@ func Keys(mapping *yaml.Node) map[string]struct{} {
 
 // SetValue replaces or appends a mapping value.
 func SetValue(mapping *yaml.Node, key string, value *yaml.Node) {
-	for index := 0; index < len(mapping.Content); index += mappingPairWidth {
+	for index := zeroIndex; index < len(mapping.Content); index += mappingPairWidth {
 		if mapping.Content[index].Value == key {
-			mapping.Content[index+1] = value
+			mapping.Content[index+firstIndex] = value
 
 			return
 		}
@@ -69,7 +69,7 @@ func SetValue(mapping *yaml.Node, key string, value *yaml.Node) {
 
 // DeleteKey removes one mapping key when present.
 func DeleteKey(mapping *yaml.Node, key string) {
-	for index := 0; index < len(mapping.Content); index += mappingPairWidth {
+	for index := zeroIndex; index < len(mapping.Content); index += mappingPairWidth {
 		if mapping.Content[index].Value == key {
 			mapping.Content = append(
 				mapping.Content[:index],
@@ -82,7 +82,7 @@ func DeleteKey(mapping *yaml.Node, key string) {
 
 // SortedKeys returns keys in deterministic order.
 func SortedKeys(keys map[string]struct{}) []string {
-	result := make([]string, 0, len(keys))
+	result := make([]string, zeroIndex, len(keys))
 
 	for key := range keys {
 		result = append(result, key)

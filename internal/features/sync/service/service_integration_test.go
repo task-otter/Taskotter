@@ -618,6 +618,14 @@ func mutateGoWithDocsHashA(cfg *config.Config) {
 // TestMetadataOnlyChangeMarksChanged verifies a configuration hash-only change marks the plan changed.
 func TestMetadataOnlyChangeMarksChanged(t *testing.T) {
 	t.Parallel()
+
+	if !metadataOnlyChangePlan(t).Changed {
+		t.Fatal("expected metadata-only configuration hash change to mark plan changed")
+	}
+}
+
+func metadataOnlyChangePlan(t *testing.T) *syncdomain.Plan {
+	t.Helper()
 	lockSeams(t)
 
 	workspace := t.TempDir()
@@ -634,9 +642,7 @@ func TestMetadataOnlyChangeMarksChanged(t *testing.T) {
 
 	plan2 := replan(t, workspace, cfg)
 
-	if !plan2.Changed {
-		t.Fatal("expected metadata-only configuration hash change to mark plan changed")
-	}
+	return plan2
 }
 
 func rebuildPlanWithDifferentSHA(t *testing.T, workspace string) *syncdomain.Plan {
@@ -789,6 +795,11 @@ func TestConfigurationChangeMarksUpdated(t *testing.T) {
 // TestLoadMetadataCorruptFails verifies malformed metadata YAML returns an error.
 func TestLoadMetadataCorruptFails(t *testing.T) {
 	t.Parallel()
+	assertCorruptMetadata(t)
+}
+
+func assertCorruptMetadata(t *testing.T) {
+	t.Helper()
 	lockSeams(t)
 
 	root := t.TempDir()
@@ -810,6 +821,11 @@ func TestLoadMetadataCorruptFails(t *testing.T) {
 // TestLoadLockCorruptFails verifies malformed lock YAML returns an error.
 func TestLoadLockCorruptFails(t *testing.T) {
 	t.Parallel()
+	assertCorruptLock(t)
+}
+
+func assertCorruptLock(t *testing.T) {
+	t.Helper()
 	lockSeams(t)
 
 	root := t.TempDir()
@@ -1386,6 +1402,20 @@ func TestBuildPlanInitialSync(t *testing.T) {
 // TestBuildPlanCreatesRootTaskfile verifies the root Taskfile.yml is added on initial sync.
 func TestBuildPlanCreatesRootTaskfile(t *testing.T) {
 	t.Parallel()
+
+	plan := buildRootTaskfilePlan(t)
+
+	if !plan.Changed {
+		t.Fatal(errExpectedChangesInitial)
+	}
+
+	if !containsRootTaskfile(plan.Added) {
+		t.Fatalf("expected root Taskfile.yml in added files, got added=%v", plan.Added)
+	}
+}
+
+func buildRootTaskfilePlan(t *testing.T) *syncdomain.Plan {
+	t.Helper()
 	lockSeams(t)
 
 	workspace := t.TempDir()
@@ -1397,13 +1427,7 @@ func TestBuildPlanCreatesRootTaskfile(t *testing.T) {
 		t: t, cfg: cfg, snap: snap, resolutions: resolutions, depSources: depSources,
 	})
 
-	if !plan.Changed {
-		t.Fatal(errExpectedChangesInitial)
-	}
-
-	if !containsRootTaskfile(plan.Added) {
-		t.Fatalf("expected root Taskfile.yml in added files, got added=%v", plan.Added)
-	}
+	return plan
 }
 
 func containsRootTaskfile(list []string) bool {

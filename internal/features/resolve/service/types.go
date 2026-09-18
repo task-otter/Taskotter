@@ -4,9 +4,7 @@
 package service
 
 import (
-	"github.com/task-otter/Taskotter/internal/features/resolve/dependency"
 	"github.com/task-otter/Taskotter/internal/features/resolve/domain"
-	"github.com/task-otter/Taskotter/internal/features/resolve/normalize"
 	"github.com/task-otter/Taskotter/internal/shared/config"
 )
 
@@ -46,13 +44,4 @@ type (
 		left, right string
 		prev, curr  []int
 	}
-
-	// DepsResolver resolves transitive dependencies for requested modules.
-	DepsResolver = dependency.DepsResolver
-	// CycleError reports a dependency cycle.
-	CycleError = dependency.CycleError
-	// MissingDependencyError reports a missing dependency.
-	MissingDependencyError = dependency.MissingDependencyError
-	// CollisionError reports a destination collision.
-	CollisionError = normalize.CollisionError
 )

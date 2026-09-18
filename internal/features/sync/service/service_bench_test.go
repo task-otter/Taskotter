@@ -31,15 +31,7 @@ func BenchmarkSortManagedFiles(b *testing.B) {
 func runSortManagedFilesBenchmark(b *testing.B, size int) {
 	b.Helper()
 
-	files := make([]managedFile, benchmarkEmptyLength, size)
-
-	for i := range size {
-		files = append(files, managedFile{
-			Path:              fmt.Sprintf("taskfiles/"+benchmarkModuleFmt+"/Taskfile.yml", size-i),
-			SourceModule:      fmt.Sprintf(benchmarkModuleFmt, size-i),
-			DestinationModule: fmt.Sprintf(benchmarkModuleFmt, size-i),
-		})
-	}
+	files := benchmarkManagedFiles(size)
 
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -52,6 +44,20 @@ func runSortManagedFilesBenchmark(b *testing.B, size int) {
 			benchmarkSortedFileCountFailure(b, len(candidate), size)
 		}
 	}
+}
+
+func benchmarkManagedFiles(size int) []managedFile {
+	files := make([]managedFile, benchmarkEmptyLength, size)
+
+	for i := range size {
+		files = append(files, managedFile{
+			Path:              fmt.Sprintf("taskfiles/"+benchmarkModuleFmt+"/Taskfile.yml", size-i),
+			SourceModule:      fmt.Sprintf(benchmarkModuleFmt, size-i),
+			DestinationModule: fmt.Sprintf(benchmarkModuleFmt, size-i),
+		})
+	}
+
+	return files
 }
 
 func benchmarkSortedFileCountFailure(b *testing.B, got, want int) {

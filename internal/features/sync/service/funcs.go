@@ -368,13 +368,13 @@ func removeObsolete(plan *domain.Plan, workspace string) error {
 	return nil
 }
 
-func removeObsoleteFile(workspace, path string) error {
-	abs := pathutil.WorkspacePath(workspace, path)
+func removeObsoleteFile(workspace, relPath string) error {
+	abs := pathutil.WorkspacePath(workspace, relPath)
 
 	err := removePath(abs)
 
 	if err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf(errFmtRemoveObsoleteFile, path, err)
+		return fmt.Errorf(errFmtRemoveObsoleteFile, relPath, err)
 	}
 
 	return nil
@@ -479,8 +479,8 @@ func removeEmptyParentDir(dir string) (bool, error) {
 	return pathPresent(dir), nil
 }
 
-func pathPresent(path string) bool {
-	info, err := statPath(path)
+func pathPresent(filePath string) bool {
+	info, err := statPath(filePath)
 	iox.Discard(info)
 
 	return err == nil
@@ -948,35 +948,34 @@ func sortDiffLists(lists *diffLists) *diffLists {
 func diffManagedFilePaths(current map[string]managedFile, workspace string) (diffLists, error) {
 	var lists diffLists
 
-	for path := range current {
-		managed := current[path]
+	for relPath := range current {
+		managed := current[relPath]
 
-		change, changeErr := fileChanged(workspace, path, &managed)
+		change, changeErr := fileChanged(workspace, relPath, &managed)
 		if changeErr != nil {
-			return diffLists{}, fmt.Errorf("read managed file %q: %w", path, changeErr)
+			return diffLists{}, fmt.Errorf("read managed file %q: %w", relPath, changeErr)
 		}
 
-		lists = *applyFileChange(&lists, path, change)
+		lists = *applyFileChange(&lists, relPath, change)
 	}
 
 	return lists, nil
 }
 
-func applyFileChange(lists *diffLists, path string, change fileChangeKind) *diffLists {
+func applyFileChange(lists *diffLists, relPath string, change fileChangeKind) *diffLists {
 	switch change {
 	case fileAdded:
-		lists.added = append(lists.added, path)
+		lists.added = append(lists.added, relPath)
 	case fileUpdated:
-		lists.updated = append(lists.updated, path)
-	case fileUnchanged:
+		lists.updated = append(lists.updated, relPath)
 	default:
 	}
 
 	return lists
 }
 
-func fileChanged(workspace, path string, managed *managedFile) (fileChangeKind, error) {
-	data, readErr := pathutil.ReadRelativeFile(workspace, path)
+func fileChanged(workspace, relPath string, managed *managedFile) (fileChangeKind, error) {
+	data, readErr := pathutil.ReadRelativeFile(workspace, relPath)
 	if readErr == nil {
 		return fileChangeFromData(data, managed), nil
 	}
@@ -985,7 +984,7 @@ func fileChanged(workspace, path string, managed *managedFile) (fileChangeKind, 
 		return fileAdded, nil
 	}
 
-	return fileUnchanged, fmt.Errorf(errFmtReadQuoted, path, readErr)
+	return fileUnchanged, fmt.Errorf(errFmtReadQuoted, relPath, readErr)
 }
 
 func fileChangeFromData(data []byte, managed *managedFile) fileChangeKind {
@@ -1014,14 +1013,14 @@ func diffRootTaskfile(input *diffRootInput) *diffLists {
 	return &input.lists
 }
 
-func classifyAddedOrUpdated(prior priorContent, path string, lists *diffLists) *diffLists {
+func classifyAddedOrUpdated(prior priorContent, relPath string, lists *diffLists) *diffLists {
 	if prior == priorContentEmpty {
-		lists.added = append(lists.added, path)
+		lists.added = append(lists.added, relPath)
 
 		return lists
 	}
 
-	lists.updated = append(lists.updated, path)
+	lists.updated = append(lists.updated, relPath)
 
 	return lists
 }
@@ -1169,15 +1168,15 @@ func SetCopyFileToHookForTest(plan *domain.Plan, hook func(string, *domain.FileE
 	plan.CopyFileTo = hook
 }
 
-func writeFileAtomic(path string, data []byte, mode os.FileMode) error {
-	dir := filepath.Dir(path)
+func writeFileAtomic(filePath string, data []byte, mode os.FileMode) error {
+	dir := filepath.Dir(filePath)
 
 	tmp, err := createTempFile(dir)
 	if err != nil {
 		return fmt.Errorf("create temp file: %w", err)
 	}
 
-	err = finalizeTempFile(&finalizeTempArgs{tmp: tmp, data: data, mode: mode, path: path})
+	err = finalizeTempFile(&finalizeTempArgs{tmp: tmp, data: data, mode: mode, path: filePath})
 	if err != nil {
 		return fmt.Errorf("finalize temp file: %w", err)
 	}
@@ -1258,19 +1257,19 @@ func writeAndFinalizeTemp(tmp *os.File, data []byte, mode os.FileMode) error {
 	return nil
 }
 
-func renameTempFile(tmpPath, path string) error {
-	err := renamePath(tmpPath, path)
+func renameTempFile(tmpPath, filePath string) error {
+	err := renamePath(tmpPath, filePath)
 	if err != nil {
-		return fmt.Errorf("rename temp file to %q: %w", path, err)
+		return fmt.Errorf("rename temp file to %q: %w", filePath, err)
 	}
 
 	return nil
 }
 
-func copyFileTo(path string, entry *domain.FileEntry) error {
-	err := writeFileAtomic(path, entry.Data, entry.Mode)
+func copyFileTo(filePath string, entry *domain.FileEntry) error {
+	err := writeFileAtomic(filePath, entry.Data, entry.Mode)
 	if err != nil {
-		return fmt.Errorf("write file %q: %w", path, err)
+		return fmt.Errorf("write file %q: %w", filePath, err)
 	}
 
 	return nil

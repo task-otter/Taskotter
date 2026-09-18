@@ -20,4 +20,14 @@ const (
 
 	errParseTaskfileRoot  = "parse taskfile root: %w"
 	errMarshalAndValidate = "marshal and validate: %w"
+
+	lineFeed               = "\n"
+	carriageReturnLineFeed = "\r\n"
+	documentStartLineFeed  = "---\n"
+	documentStartCRLF      = "---\r\n"
+	nodeStartOffsetError   = "node start offset: %w"
+	lineStartOffsetError   = "line start offset: %w"
+	versionKey             = "version"
+	rootVarIndent          = 4
+	mappingPairIndent      = 2
 )

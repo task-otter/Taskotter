@@ -63,32 +63,52 @@ func rawModuleVarsByTask(input *rootUpdateInput) (rawModuleVars, error) {
 
 	for i := range input.Tasks {
 		task := input.Tasks[i]
-		content := input.ModuleTaskfiles[task]
 
-		root, err := parseModuleTaskfileNode(content)
+		values, found, err := rawModuleVarsForTask(input, task)
 		if err != nil {
-			if errors.Is(err, errNoModuleVars) {
-				continue
-			}
-
-			return nil, fmt.Errorf("parse module Taskfile for %q: %w", task, err)
+			return nil, err
 		}
 
-		varsNode := findMappingValue(root, keyVars)
-
-		if !hasModuleVars(varsNode) {
-			continue
+		if found {
+			out[task] = values
 		}
-
-		values, err := rawVarsFromNode(content, root, varsNode)
-		if err != nil {
-			return nil, fmt.Errorf("raw vars for %q: %w", task, err)
-		}
-
-		out[task] = values
 	}
 
 	return out, nil
+}
+
+func rawModuleVarsForTask(input *rootUpdateInput, task string) (map[string][]byte, bool, error) {
+	content := input.ModuleTaskfiles[task]
+	root, err := parseModuleTaskfileNode(content)
+
+	if errors.Is(err, errNoModuleVars) {
+		return map[string][]byte{}, false, nil
+	}
+
+	if err != nil {
+		return nil, false, fmt.Errorf("parse module Taskfile for %q: %w", task, err)
+	}
+
+	return rawVarsForParsedModule(content, root, task)
+}
+
+func rawVarsForParsedModule(
+	content []byte,
+	root *yaml.Node,
+	task string,
+) (map[string][]byte, bool, error) {
+	varsNode := findMappingValue(root, keyVars)
+
+	if !hasModuleVars(varsNode) {
+		return map[string][]byte{}, false, nil
+	}
+
+	values, err := rawVarsFromNode(content, root, varsNode)
+	if err != nil {
+		return nil, false, fmt.Errorf("raw vars for %q: %w", task, err)
+	}
+
+	return values, true, nil
 }
 
 func rawVarsFromNode(content []byte, root, varsNode *yaml.Node) (map[string][]byte, error) {
@@ -98,7 +118,9 @@ func rawVarsFromNode(content []byte, root, varsNode *yaml.Node) (map[string][]by
 	for idx := consts.IndexZero; idx < len(varsNode.Content); idx += yamlMappingPairKeyValue {
 		key := varsNode.Content[idx]
 
-		start, end, err := sourceNodeSpan(content, varsNode, idx, rootEnd)
+		start, end, err := sourceNodeSpan(&sourceNodeSpanParams{
+			content: content, parent: varsNode, pairIndex: idx, parentEnd: rootEnd,
+		})
 		if err != nil {
 			return nil, fmt.Errorf("source span for %q: %w", key.Value, err)
 		}
@@ -109,25 +131,15 @@ func rawVarsFromNode(content []byte, root, varsNode *yaml.Node) (map[string][]by
 	return out, nil
 }
 
-func patchRootTaskfile(
-	content []byte,
-	originalRoot, desiredRoot *yaml.Node,
-	input *rootUpdateInput,
-	rawVars rawModuleVars,
-) ([]byte, error) {
-	params := &rootPatchParams{
-		content: content, originalRoot: originalRoot, desiredRoot: desiredRoot,
-		input: input, rawVars: rawVars,
-	}
-
+func patchRootTaskfile(params *rootPatchParams) ([]byte, error) {
 	edits, err := rootTextEdits(params)
 	if err != nil {
 		return nil, fmt.Errorf("build root text edits: %w", err)
 	}
 
-	normalizeRootEditLineEndings(edits, rootLineEnding(content))
+	normalizeRootEditLineEndings(edits, rootLineEnding(params.content))
 
-	out := applyRootTextEdits(content, edits)
+	out := applyRootTextEdits(params.content, edits)
 
 	parsedRoot, parsedContent, err := parseTaskfileRoot(
 		out,
@@ -144,84 +156,121 @@ func patchRootTaskfile(
 }
 
 func normalizeRootEditLineEndings(edits []rootTextEdit, ending []byte) {
-	if bytes.Equal(ending, []byte("\n")) {
+	if bytes.Equal(ending, []byte(lineFeed)) {
 		return
 	}
 
 	for i := range edits {
-		replacement := bytes.ReplaceAll(edits[i].replacement, []byte("\r\n"), []byte("\n"))
+		replacement := bytes.ReplaceAll(
+			edits[i].replacement,
+			[]byte(carriageReturnLineFeed),
+			[]byte(lineFeed),
+		)
 
-		edits[i].replacement = bytes.ReplaceAll(replacement, []byte("\n"), ending)
+		edits[i].replacement = bytes.ReplaceAll(replacement, []byte(lineFeed), ending)
 	}
 }
 
 func rootLineEnding(content []byte) []byte {
-	if bytes.Contains(content, []byte("\r\n")) {
-		return []byte("\r\n")
+	if bytes.Contains(content, []byte(carriageReturnLineFeed)) {
+		return []byte(carriageReturnLineFeed)
 	}
 
-	return []byte("\n")
+	return []byte(lineFeed)
 }
 
 func rootTextEdits(params *rootPatchParams) ([]rootTextEdit, error) {
-	var edits []rootTextEdit
-
-	edits, err := appendVersionEdit(edits, params)
+	edits, err := appendVersionEdit(nil, params)
 	if err != nil {
 		return nil, fmt.Errorf("version edit: %w", err)
 	}
 
-	sections := []string{keyVars, keyIncludes, keyTasks}
-
-	for i := range sections {
-		section := sections[i]
-
-		var sectionEdits []rootTextEdit
-
-		sectionEdits, err = editsForRootSection(params, section)
+	for _, section := range []string{keyVars, keyIncludes, keyTasks} {
+		edits, err = appendSectionEdits(edits, params, section)
 		if err != nil {
-			return nil, fmt.Errorf("%s edits: %w", section, err)
+			return nil, err
 		}
-
-		edits = append(edits, sectionEdits...)
 	}
 
-	for i := range edits {
-		edits[i].order = i
+	return orderRootEdits(edits), nil
+}
+
+func appendSectionEdits(
+	edits []rootTextEdit,
+	params *rootPatchParams,
+	section string,
+) ([]rootTextEdit, error) {
+	sectionEdits, err := editsForRootSection(params, section)
+	if err != nil {
+		return nil, fmt.Errorf("%s edits: %w", section, err)
 	}
 
-	return edits, nil
+	return append(edits, sectionEdits...), nil
+}
+
+func orderRootEdits(edits []rootTextEdit) []rootTextEdit {
+	for index := range edits {
+		edits[index].order = index
+	}
+
+	return edits
 }
 
 func appendVersionEdit(edits []rootTextEdit, params *rootPatchParams) ([]rootTextEdit, error) {
-	original := findMappingPair(params.originalRoot, "version")
-	desired := findMappingPair(params.desiredRoot, "version")
+	desired := findMappingPair(params.desiredRoot, versionKey)
 
 	if desired.value == nil {
 		return edits, nil
 	}
 
+	return appendExistingVersionEdit(edits, params)
+}
+
+func appendExistingVersionEdit(
+	edits []rootTextEdit,
+	params *rootPatchParams,
+) ([]rootTextEdit, error) {
+	original := findMappingPair(params.originalRoot, versionKey)
+	desired := findMappingPair(params.desiredRoot, versionKey)
+
 	if original.value == nil {
-		return append(edits, rootTextEdit{
-			start:       documentBodyStart(params.content),
-			end:         documentBodyStart(params.content),
-			replacement: []byte("version: \"" + desired.value.Value + "\"\n"),
-		}), nil
+		return append(edits, missingVersionEdit(params, desired.value)), nil
 	}
 
 	if original.value.Value == desired.value.Value {
 		return edits, nil
 	}
 
-	start, end, err := scalarSourceSpan(params.content, original.key, original.value)
+	edit, err := changedVersionEdit(params, original, desired)
 	if err != nil {
-		return nil, fmt.Errorf("locate version span: %w", err)
+		return nil, err
 	}
 
-	return append(edits, rootTextEdit{
+	return append(edits, edit), nil
+}
+
+func missingVersionEdit(params *rootPatchParams, value *yaml.Node) rootTextEdit {
+	start := documentBodyStart(params.content)
+
+	return rootTextEdit{
+		start: start, end: start,
+		replacement: []byte(versionKey + ": \"" + value.Value + "\"" + lineFeed),
+	}
+}
+
+func changedVersionEdit(
+	params *rootPatchParams,
+	original, desired mappingPair,
+) (rootTextEdit, error) {
+	start, end, err := scalarSourceSpan(params.content, original.key, original.value)
+	if err != nil {
+		return rootTextEdit{}, fmt.Errorf("locate version span: %w", err)
+	}
+
+	return rootTextEdit{
 		start: start, end: end,
 		replacement: []byte(`"` + desired.value.Value + `"`),
-	}), nil
+	}, nil
 }
 
 func editsForRootSection(params *rootPatchParams, section string) ([]rootTextEdit, error) {
@@ -233,82 +282,106 @@ func editsForRootSection(params *rootPatchParams, section string) ([]rootTextEdi
 	}
 
 	if original.value == nil {
-		replacement, err := renderRootSection(
-			section,
-			desired.value,
-			params.rawVars,
-			params.input.Tasks,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("render %s section: %w", section, err)
-		}
-
-		start := len(params.content)
-
-		if start != consts.IndexZero && params.content[start-consts.IndexOne] != '\n' {
-			replacement = append([]byte{'\n'}, replacement...)
-		}
-
-		return []rootTextEdit{{start: start, end: start, replacement: replacement}}, nil
+		return appendRootSection(params, section, desired.value)
 	}
 
 	if !isBlockMapping(params.content, original.key, original.value) {
-		start, end := rootEntrySpan(params.content, params.originalRoot, original.key)
-
-		replacement, err := renderRootSection(
-			section,
-			desired.value,
-			params.rawVars,
-			params.input.Tasks,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("render %s section: %w", section, err)
-		}
-
-		return []rootTextEdit{{start: start, end: end, replacement: replacement}}, nil
+		return replaceRootSection(&rootSectionReplacementParams{
+			params: params, section: section, original: original, desired: desired,
+		})
 	}
 
-	switch section {
-	case keyVars:
-		edits, err := editsForRootVars(params, original.value, desired.value)
-		if err != nil {
-			return nil, fmt.Errorf("edit root vars: %w", err)
-		}
+	return editsForExistingRootSection(&rootSectionEditParams{
+		params: params, section: section, original: original.value, desired: desired.value,
+	})
+}
 
-		return edits, nil
-	case keyIncludes:
-		edits, err := editsForManagedMapping(
-			params,
-			original.value,
-			desired.value,
-			managedIncludeNames(params.input),
-		)
-		if err != nil {
-			return nil, fmt.Errorf("edit managed includes: %w", err)
-		}
+func appendRootSection(
+	params *rootPatchParams,
+	section string,
+	node *yaml.Node,
+) ([]rootTextEdit, error) {
+	replacement, err := renderRootSection(&renderSectionParams{
+		section: section, node: node, rawVars: params.rawVars, tasks: params.input.Tasks,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("render %s section: %w", section, err)
+	}
 
-		return edits, nil
-	case keyTasks:
-		edits, err := editsForManagedMapping(
-			params,
-			original.value,
-			desired.value,
-			managedRootTaskNames(params.input),
-		)
-		if err != nil {
-			return nil, fmt.Errorf("edit managed tasks: %w", err)
-		}
+	start := len(params.content)
 
-		return edits, nil
-	default:
+	if start != consts.IndexZero && params.content[start-consts.IndexOne] != '\n' {
+		replacement = append([]byte{'\n'}, replacement...)
+	}
+
+	return []rootTextEdit{{start: start, end: start, replacement: replacement}}, nil
+}
+
+func replaceRootSection(
+	input *rootSectionReplacementParams,
+) ([]rootTextEdit, error) {
+	start, end := rootEntrySpan(input.params.content, input.params.originalRoot, input.original.key)
+
+	replacement, err := renderRootSection(&renderSectionParams{
+		section: input.section, node: input.desired.value,
+		rawVars: input.params.rawVars, tasks: input.params.input.Tasks,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("render %s section: %w", input.section, err)
+	}
+
+	return []rootTextEdit{{start: start, end: end, replacement: replacement}}, nil
+}
+
+func editsForExistingRootSection(
+	input *rootSectionEditParams,
+) ([]rootTextEdit, error) {
+	if input.section == keyVars {
+		return editsForRootVars(input.params, input.original, input.desired)
+	}
+
+	managed := managedNamesForSection(input.params.input, input.section)
+
+	if managed == nil {
 		return nil, nil
 	}
+
+	edits, err := editsForManagedMapping(&managedMappingParams{
+		params: input.params, original: input.original, desired: input.desired, managed: managed,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("edit managed %s: %w", input.section, err)
+	}
+
+	return edits, nil
+}
+
+func managedNamesForSection(input *rootUpdateInput, section string) map[string]struct{} {
+	if section == keyIncludes {
+		return managedIncludeNames(input)
+	}
+
+	if section == keyTasks {
+		return managedRootTaskNames(input)
+	}
+
+	return nil
 }
 
 func editsForRootVars(
 	params *rootPatchParams,
 	original, desired *yaml.Node,
 ) ([]rootTextEdit, error) {
+	newPairs := newRootVarPairs(original, desired)
+
+	if len(newPairs) == consts.IndexZero {
+		return nil, nil
+	}
+
+	return insertRootVarPairs(params, original, newPairs)
+}
+
+func newRootVarPairs(original, desired *yaml.Node) []mappingPair {
 	originalKeys := mappingKeys(original)
 
 	var newPairs []mappingPair
@@ -325,14 +398,18 @@ func editsForRootVars(
 		})
 	}
 
-	if len(newPairs) == consts.IndexZero {
-		return nil, nil
-	}
+	return newPairs
+}
 
+func insertRootVarPairs(
+	params *rootPatchParams,
+	original *yaml.Node,
+	pairs []mappingPair,
+) ([]rootTextEdit, error) {
 	sectionEnd := topLevelNodeEnd(params.content, params.originalRoot, original)
 	insertAt := trimBlankLinesBackward(params.content, sectionEnd)
 
-	text, err := renderRootVarPairs(newPairs, params.rawVars, params.input.Tasks)
+	text, err := renderRootVarPairs(pairs, params.rawVars, params.input.Tasks)
 	if err != nil {
 		return nil, fmt.Errorf("render root vars: %w", err)
 	}
@@ -340,84 +417,130 @@ func editsForRootVars(
 	return []rootTextEdit{{start: insertAt, end: insertAt, replacement: text}}, nil
 }
 
-func editsForManagedMapping(
-	params *rootPatchParams,
-	original, desired *yaml.Node,
-	managed map[string]struct{},
-) ([]rootTextEdit, error) {
-	var edits []rootTextEdit
+func editsForManagedMapping(input *managedMappingParams) ([]rootTextEdit, error) {
+	params := input.params
+	sectionEnd := topLevelNodeEnd(params.content, params.originalRoot, input.original)
 
-	sectionEnd := topLevelNodeEnd(params.content, params.originalRoot, original)
-	originalKeys := mappingKeys(original)
-
-	for idx := consts.IndexZero; idx < len(original.Content); idx += yamlMappingPairKeyValue {
-		key := original.Content[idx].Value
-
-		if _, isManaged := managed[key]; !isManaged {
-			continue
-		}
-
-		newPair := desiredPair(desired, key)
-		start, end := mappingEntrySpan(params.content, original, idx, sectionEnd)
-
-		if newPair.value == nil {
-			edits = append(edits, rootTextEdit{start: start, end: end})
-
-			continue
-		}
-
-		replacement, err := renderMappingPair(newPair)
-		if err != nil {
-			return nil, fmt.Errorf("render managed entry %q: %w", key, err)
-		}
-
-		if bytes.Equal(params.content[start:end], replacement) {
-			continue
-		}
-
-		edits = append(edits, rootTextEdit{start: start, end: end, replacement: replacement})
+	removeOrUpdate, err := replaceManagedEntries(input, sectionEnd)
+	if err != nil {
+		return nil, err
 	}
 
-	var newEntries []mappingPair
+	return appendManagedEntries(removeOrUpdate, input, sectionEnd)
+}
 
-	for idx := consts.IndexZero; idx < len(desired.Content); idx += yamlMappingPairKeyValue {
-		key := desired.Content[idx].Value
+func replaceManagedEntries(input *managedMappingParams, sectionEnd int) ([]rootTextEdit, error) {
+	var edits []rootTextEdit
+
+	for idx := consts.IndexZero; idx < len(input.original.Content); idx += yamlMappingPairKeyValue {
+		key := input.original.Content[idx].Value
+
+		edit, changed, err := managedEntryEdit(&managedEntryParams{
+			input: input, key: key, pairIndex: idx, sectionEnd: sectionEnd,
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		if changed {
+			edits = append(edits, edit)
+		}
+	}
+
+	return edits, nil
+}
+
+func managedEntryEdit(params *managedEntryParams) (rootTextEdit, bool, error) {
+	if _, isManaged := params.input.managed[params.key]; !isManaged {
+		return rootTextEdit{}, false, nil
+	}
+
+	start, end := mappingEntrySpan(&mappingEntrySpanParams{
+		content: params.input.params.content, parent: params.input.original,
+		pairIndex: params.pairIndex, sectionEnd: params.sectionEnd,
+	})
+	newPair := desiredPair(params.input.desired, params.key)
+
+	if newPair.value == nil {
+		return rootTextEdit{start: start, end: end}, true, nil
+	}
+
+	return renderManagedEntry(params, newPair, start, end)
+}
+
+func renderManagedEntry(
+	params *managedEntryParams,
+	newPair mappingPair,
+	start, end int,
+) (rootTextEdit, bool, error) {
+	replacement, err := renderMappingPair(newPair)
+	if err != nil {
+		return rootTextEdit{}, false, fmt.Errorf("render managed entry %q: %w", params.key, err)
+	}
+
+	if bytes.Equal(params.input.params.content[start:end], replacement) {
+		return rootTextEdit{}, false, nil
+	}
+
+	return rootTextEdit{start: start, end: end, replacement: replacement}, true, nil
+}
+
+func appendManagedEntries(
+	edits []rootTextEdit,
+	input *managedMappingParams,
+	sectionEnd int,
+) ([]rootTextEdit, error) {
+	entries := newManagedEntries(input)
+
+	if len(entries) == consts.IndexZero {
+		return edits, nil
+	}
+
+	text, err := renderManagedEntries(entries)
+	if err != nil {
+		return nil, err
+	}
+
+	insertAt := trimBlankLinesBackward(input.params.content, sectionEnd)
+
+	return append(edits, rootTextEdit{start: insertAt, end: insertAt, replacement: text}), nil
+}
+
+func newManagedEntries(input *managedMappingParams) []mappingPair {
+	originalKeys := mappingKeys(input.original)
+
+	var entries []mappingPair
+
+	for idx := consts.IndexZero; idx < len(input.desired.Content); idx += yamlMappingPairKeyValue {
+		key := input.desired.Content[idx].Value
 
 		if _, already := originalKeys[key]; already {
 			continue
 		}
 
-		if _, isManaged := managed[key]; !isManaged {
-			continue
+		if _, isManaged := input.managed[key]; isManaged {
+			entries = append(entries, mappingPair{
+				key: input.desired.Content[idx], value: input.desired.Content[idx+consts.IndexOne],
+			})
 		}
-
-		newEntries = append(newEntries, mappingPair{
-			key: desired.Content[idx], value: desired.Content[idx+consts.IndexOne],
-		})
 	}
 
-	if len(newEntries) != consts.IndexZero {
-		insertAt := trimBlankLinesBackward(params.content, sectionEnd)
+	return entries
+}
 
-		var text []byte
+func renderManagedEntries(entries []mappingPair) ([]byte, error) {
+	var text []byte
 
-		for i := range newEntries {
-			entry, err := renderMappingPair(newEntries[i])
-			if err != nil {
-				return nil, fmt.Errorf(
-					"render new managed entry %q: %w",
-					newEntries[i].key.Value,
-					err,
-				)
-			}
-
-			text = append(text, entry...)
+	for i := range entries {
+		entry, err := renderMappingPair(entries[i])
+		if err != nil {
+			return nil, fmt.Errorf("render new managed entry %q: %w", entries[i].key.Value, err)
 		}
 
-		edits = append(edits, rootTextEdit{start: insertAt, end: insertAt, replacement: text})
+		text = append(text, entry...)
 	}
 
-	return edits, nil
+	return text, nil
 }
 
 func managedIncludeNames(input *rootUpdateInput) map[string]struct{} {
@@ -474,13 +597,27 @@ func findMappingPair(node *yaml.Node, key string) mappingPair {
 	return mappingPair{}
 }
 
-func renderRootSection(
-	section string,
-	node *yaml.Node,
-	rawVars rawModuleVars,
-	tasks []string,
-) ([]byte, error) {
-	out := []byte(section + ":\n")
+func renderRootSection(params *renderSectionParams) ([]byte, error) {
+	out := []byte(params.section + ":\n")
+	pairs := mappingPairs(params.node)
+
+	text, err := renderRootSectionBody(params, pairs)
+	if err != nil {
+		return nil, err
+	}
+
+	return append(out, text...), nil
+}
+
+func renderRootSectionBody(params *renderSectionParams, pairs []mappingPair) ([]byte, error) {
+	if params.section == keyVars {
+		return renderRootVarPairs(pairs, params.rawVars, params.tasks)
+	}
+
+	return renderMappingPairs(pairs)
+}
+
+func mappingPairs(node *yaml.Node) []mappingPair {
 	pairs := make([]mappingPair, consts.IndexZero, len(node.Content)/yamlMappingPairKeyValue)
 
 	for idx := consts.IndexZero; idx < len(node.Content); idx += yamlMappingPairKeyValue {
@@ -490,14 +627,11 @@ func renderRootSection(
 		)
 	}
 
-	if section == keyVars {
-		text, err := renderRootVarPairs(pairs, rawVars, tasks)
-		if err != nil {
-			return nil, fmt.Errorf("render root variable pairs: %w", err)
-		}
+	return pairs
+}
 
-		return append(out, text...), nil
-	}
+func renderMappingPairs(pairs []mappingPair) ([]byte, error) {
+	var out []byte
 
 	for i := range pairs {
 		text, err := renderMappingPair(pairs[i])
@@ -519,22 +653,9 @@ func renderRootVarPairs(
 	var out []byte
 
 	for i := range pairs {
-		var raw []byte
-
-		if tasks != nil {
-			raw = firstRawVar(tasks, rawVars, pairs[i].key.Value)
-		}
-
-		if len(raw) != consts.IndexZero &&
-			(pairs[i].value.Kind != yaml.ScalarNode || strings.Contains(string(raw), "| default")) {
-			out = append(out, renderRawRootVarPair(pairs[i], raw)...)
-
-			continue
-		}
-
-		text, err := renderMappingPair(pairs[i])
+		text, err := renderRootVarPair(pairs[i], rawVars, tasks)
 		if err != nil {
-			return nil, fmt.Errorf("render mapping pair: %w", err)
+			return nil, err
 		}
 
 		out = append(out, text...)
@@ -543,17 +664,28 @@ func renderRootVarPairs(
 	return out, nil
 }
 
+func renderRootVarPair(pair mappingPair, rawVars rawModuleVars, tasks []string) ([]byte, error) {
+	raw := firstRawVar(tasks, rawVars, pair.key.Value)
+
+	if len(raw) != consts.IndexZero &&
+		(pair.value.Kind != yaml.ScalarNode || strings.Contains(string(raw), "| default")) {
+
+		return renderRawRootVarPair(pair, raw), nil
+	}
+
+	text, err := renderMappingPair(pair)
+	if err != nil {
+		return nil, fmt.Errorf("render mapping pair: %w", err)
+	}
+
+	return text, nil
+}
+
 func renderRawRootVarPair(pair mappingPair, raw []byte) []byte {
 	raw = trimOneLineEnding(raw)
 
 	if pair.value.Kind != yaml.ScalarNode && pair.value.Style&yaml.FlowStyle == consts.IndexZero {
-		out := []byte("  " + pair.key.Value + ":\n")
-
-		out = append(out, bytes.Repeat([]byte{' '}, 4)...)
-		out = append(out, raw...)
-		out = append(out, '\n')
-
-		return out
+		return renderBlockRawVarPair(pair, raw)
 	}
 
 	out := []byte("  " + pair.key.Value + ": ")
@@ -564,16 +696,35 @@ func renderRawRootVarPair(pair mappingPair, raw []byte) []byte {
 	return out
 }
 
+func renderBlockRawVarPair(pair mappingPair, raw []byte) []byte {
+	out := []byte("  " + pair.key.Value + ":\n")
+
+	out = append(out, bytes.Repeat([]byte{' '}, rootVarIndent)...)
+	out = append(out, raw...)
+
+	return append(out, '\n')
+}
+
 func firstRawVar(tasks []string, rawVars rawModuleVars, key string) []byte {
 	for i := range tasks {
-		if values, ok := rawVars[tasks[i]]; ok {
-			if value, found := values[key]; found {
-				return value
-			}
+		if value, found := rawVarForTask(rawVars, tasks[i], key); found {
+			return value
 		}
 	}
 
 	return nil
+}
+
+func rawVarForTask(rawVars rawModuleVars, task, key string) ([]byte, bool) {
+	values, ok := rawVars[task]
+
+	if !ok {
+		return nil, false
+	}
+
+	value, found := values[key]
+
+	return value, found
 }
 
 func renderMappingPair(pair mappingPair) ([]byte, error) {
@@ -585,9 +736,9 @@ func renderMappingPair(pair mappingPair) ([]byte, error) {
 		return nil, fmt.Errorf("marshal mapping pair: %w", err)
 	}
 
-	body := bytes.TrimPrefix(encoded, []byte("---\n"))
+	body := bytes.TrimPrefix(encoded, []byte(documentStartLineFeed))
 
-	return indentLines(body, 2), nil
+	return indentLines(body, mappingPairIndent), nil
 }
 
 func indentLines(content []byte, spaces int) []byte {
@@ -597,19 +748,28 @@ func indentLines(content []byte, spaces int) []byte {
 	for len(content) != consts.IndexZero {
 		out = append(out, prefix...)
 
-		idx := bytes.IndexByte(content, '\n')
+		line, rest, done := nextIndentedLine(content)
 
-		if idx < consts.IndexZero {
-			out = append(out, content...)
+		out = append(out, line...)
 
+		if done {
 			break
 		}
 
-		out = append(out, content[:idx+consts.IndexOne]...)
-		content = content[idx+consts.IndexOne:]
+		content = rest
 	}
 
 	return out
+}
+
+func nextIndentedLine(content []byte) (line, rest []byte, done bool) {
+	idx := bytes.IndexByte(content, '\n')
+
+	if idx < consts.IndexZero {
+		return content, nil, true
+	}
+
+	return content[:idx+consts.IndexOne], content[idx+consts.IndexOne:], false
 }
 
 func applyRootTextEdits(content []byte, edits []rootTextEdit) []byte {
@@ -635,44 +795,68 @@ func applyRootTextEdits(content []byte, edits []rootTextEdit) []byte {
 	return out
 }
 
-func sourceNodeSpan(content []byte, parent *yaml.Node, pairIndex, parentEnd int) (int, int, error) {
-	key := parent.Content[pairIndex]
-	value := parent.Content[pairIndex+consts.IndexOne]
+func sourceNodeSpan(params *sourceNodeSpanParams) (startOffset, endOffset int, err error) {
+	key := params.parent.Content[params.pairIndex]
+	value := params.parent.Content[params.pairIndex+consts.IndexOne]
 
-	start, err := nodeStartOffset(content, value)
+	start, err := nodeStartOffset(params.content, value)
 	if err != nil {
-		return consts.IndexZero, consts.IndexZero, fmt.Errorf("node start offset: %w", err)
+		return consts.IndexZero, consts.IndexZero, fmt.Errorf(nodeStartOffsetError, err)
 	}
 
-	if value.Kind == yaml.ScalarNode {
-		var end int
-
-		end, err = scalarSourceEnd(content, key, value)
-		if err != nil {
-			return consts.IndexZero, consts.IndexZero, fmt.Errorf("scalar source end: %w", err)
-		}
-
-		return start, trimBlankLinesBackward(content, end), nil
-	}
-
-	end := parentEnd
-
-	if pairIndex+yamlMappingPairKeyValue < len(parent.Content) {
-		next := parent.Content[pairIndex+yamlMappingPairKeyValue]
-
-		end, err = lineStartOffset(content, next.Line)
-		if err != nil {
-			return consts.IndexZero, consts.IndexZero, fmt.Errorf("next line start offset: %w", err)
-		}
-	}
-
-	return start, trimBlankLinesBackward(content, end), nil
+	return sourceNodeEnd(params, key, value, start)
 }
 
-func scalarSourceSpan(content []byte, key, value *yaml.Node) (int, int, error) {
+func sourceNodeEnd(
+	params *sourceNodeSpanParams,
+	key, value *yaml.Node,
+	start int,
+) (int, int, error) {
+	if value.Kind == yaml.ScalarNode {
+		return scalarNodeSpan(&scalarNodeSpanParams{
+			content: params.content, key: key, value: value, start: start,
+		})
+	}
+
+	end, err := collectionNodeEnd(params)
+	if err != nil {
+		return consts.IndexZero, consts.IndexZero, err
+	}
+
+	return start, trimBlankLinesBackward(params.content, end), nil
+}
+
+func scalarNodeSpan(params *scalarNodeSpanParams) (startOffset, endOffset int, err error) {
+	end, err := scalarSourceEnd(params.content, params.key, params.value)
+	if err != nil {
+		return consts.IndexZero, consts.IndexZero, fmt.Errorf("scalar source end: %w", err)
+	}
+
+	return params.start, trimBlankLinesBackward(params.content, end), nil
+}
+
+func collectionNodeEnd(params *sourceNodeSpanParams) (int, error) {
+	if params.pairIndex+yamlMappingPairKeyValue >= len(params.parent.Content) {
+		return params.parentEnd, nil
+	}
+
+	next := params.parent.Content[params.pairIndex+yamlMappingPairKeyValue]
+
+	end, err := lineStartOffset(params.content, next.Line)
+	if err != nil {
+		return consts.IndexZero, fmt.Errorf(lineStartOffsetError, err)
+	}
+
+	return end, nil
+}
+
+func scalarSourceSpan(
+	content []byte,
+	key, value *yaml.Node,
+) (startOffset, endOffset int, err error) {
 	start, err := nodeStartOffset(content, value)
 	if err != nil {
-		return consts.IndexZero, consts.IndexZero, fmt.Errorf("node start offset: %w", err)
+		return consts.IndexZero, consts.IndexZero, fmt.Errorf(nodeStartOffsetError, err)
 	}
 
 	end, err := scalarSourceEnd(content, key, value)
@@ -686,61 +870,69 @@ func scalarSourceSpan(content []byte, key, value *yaml.Node) (int, int, error) {
 func scalarSourceEnd(content []byte, key, value *yaml.Node) (int, error) {
 	start, err := nodeStartOffset(content, value)
 	if err != nil {
-		return consts.IndexZero, fmt.Errorf("node start offset: %w", err)
+		return consts.IndexZero, fmt.Errorf(nodeStartOffsetError, err)
 	}
 
 	if value.Style&(yaml.LiteralStyle|yaml.FoldedStyle) != consts.IndexZero {
-		end, err := blockScalarEnd(content, key, value)
-		if err != nil {
-			return consts.IndexZero, fmt.Errorf("block scalar end: %w", err)
-		}
-
-		return end, nil
+		return blockScalarSourceEnd(content, key, value)
 	}
 
 	if quote, quoted := quoteForYAMLStyle(value.Style); quoted {
-		var closeIndex int
-
-		closeIndex, err = findClosingQuote(content, start, quote)
-		if err != nil {
-			return consts.IndexZero, fmt.Errorf("find closing quote: %w", err)
-		}
-
-		return closeIndex + consts.IndexOne, nil
+		return quotedScalarSourceEnd(content, start, quote)
 	}
 
 	return start + lineEndOffset(content, start), nil
 }
 
+func blockScalarSourceEnd(content []byte, key, value *yaml.Node) (int, error) {
+	end, err := blockScalarEnd(content, key, value)
+	if err != nil {
+		return consts.IndexZero, fmt.Errorf("block scalar end: %w", err)
+	}
+
+	return end, nil
+}
+
+func quotedScalarSourceEnd(content []byte, start int, quote byte) (int, error) {
+	closeIndex, err := findClosingQuote(content, start, quote)
+	if err != nil {
+		return consts.IndexZero, fmt.Errorf("find closing quote: %w", err)
+	}
+
+	return closeIndex + consts.IndexOne, nil
+}
+
 func blockScalarEnd(content []byte, key, value *yaml.Node) (int, error) {
 	keyIndent := key.Column - consts.IndexOne
-	line := value.Line + consts.IndexOne
 
-	for line <= countLines(content) {
-		start, err := lineStartOffset(content, line)
+	for line := value.Line + consts.IndexOne; line <= countLines(content); line++ {
+		start, inside, err := blockScalarLine(content, keyIndent, line)
 		if err != nil {
-			return consts.IndexZero, fmt.Errorf("line start offset: %w", err)
+			return consts.IndexZero, err
 		}
 
-		end := lineEndOffset(content, start)
-		lineText := content[start : start+end]
-
-		if len(bytes.TrimSpace(lineText)) == consts.IndexZero {
-			line++
-
-			continue
-		}
-
-		indent := leadingSpaces(lineText)
-
-		if indent <= keyIndent {
+		if !inside {
 			return start, nil
 		}
-
-		line++
 	}
 
 	return len(content), nil
+}
+
+func blockScalarLine(content []byte, keyIndent, line int) (int, bool, error) {
+	start, err := lineStartOffset(content, line)
+	if err != nil {
+		return consts.IndexZero, false, fmt.Errorf(lineStartOffsetError, err)
+	}
+
+	end := lineEndOffset(content, start)
+	lineText := content[start : start+end]
+
+	if len(bytes.TrimSpace(lineText)) == consts.IndexZero {
+		return start, true, nil
+	}
+
+	return start, leadingSpaces(lineText) > keyIndent, nil
 }
 
 func nodeStartOffset(content []byte, node *yaml.Node) (int, error) {
@@ -750,51 +942,56 @@ func nodeStartOffset(content []byte, node *yaml.Node) (int, error) {
 
 	start, err := lineStartOffset(content, node.Line)
 	if err != nil {
-		return consts.IndexZero, fmt.Errorf("line start offset: %w", err)
+		return consts.IndexZero, fmt.Errorf(lineStartOffsetError, err)
 	}
 
 	return start + node.Column - consts.IndexOne, nil
 }
 
 func documentBodyStart(content []byte) int {
-	if bytes.HasPrefix(content, []byte("---\r\n")) {
-		return len("---\r\n")
+	if bytes.HasPrefix(content, []byte(documentStartCRLF)) {
+		return len(documentStartCRLF)
 	}
 
-	if bytes.HasPrefix(content, []byte("---\n")) {
-		return len("---\n")
+	if bytes.HasPrefix(content, []byte(documentStartLineFeed)) {
+		return len(documentStartLineFeed)
 	}
 
 	return consts.IndexZero
 }
 
-func mappingEntrySpan(content []byte, parent *yaml.Node, pairIndex, sectionEnd int) (int, int) {
-	key := parent.Content[pairIndex]
+func mappingEntrySpan(params *mappingEntrySpanParams) (startOffset, endOffset int) {
+	key := params.parent.Content[params.pairIndex]
 
-	start, err := lineStartOffset(content, key.Line)
+	start, err := lineStartOffset(params.content, key.Line)
 	if err != nil {
 		return consts.IndexZero, consts.IndexZero
 	}
 
-	end := sectionEnd
+	end := params.sectionEnd
 
-	if pairIndex+yamlMappingPairKeyValue < len(parent.Content) {
-		end, err = lineStartOffset(content, parent.Content[pairIndex+yamlMappingPairKeyValue].Line)
+	if params.pairIndex+yamlMappingPairKeyValue < len(params.parent.Content) {
+		end, err = lineStartOffset(
+			params.content,
+			params.parent.Content[params.pairIndex+yamlMappingPairKeyValue].Line,
+		)
 		if err != nil {
 			return consts.IndexZero, consts.IndexZero
 		}
 	}
 
-	return start, trimBlankLinesBackward(content, end)
+	return start, trimBlankLinesBackward(params.content, end)
 }
 
-func rootEntrySpan(content []byte, root *yaml.Node, key *yaml.Node) (int, int) {
+func rootEntrySpan(content []byte, root *yaml.Node, key *yaml.Node) (startOffset, endOffset int) {
 	for idx := consts.IndexZero; idx < len(root.Content); idx += yamlMappingPairKeyValue {
 		if root.Content[idx] != key {
 			continue
 		}
 
-		return mappingEntrySpan(content, root, idx, len(content))
+		return mappingEntrySpan(&mappingEntrySpanParams{
+			content: content, parent: root, pairIndex: idx, sectionEnd: len(content),
+		})
 	}
 
 	return consts.IndexZero, consts.IndexZero
@@ -806,19 +1003,23 @@ func topLevelNodeEnd(content []byte, root, node *yaml.Node) int {
 			continue
 		}
 
-		if idx+yamlMappingPairKeyValue < len(root.Content) {
-			start, err := lineStartOffset(content, root.Content[idx+yamlMappingPairKeyValue].Line)
-			if err != nil {
-				return consts.IndexZero
-			}
-
-			return start
-		}
-
-		return len(content)
+		return nextTopLevelNodeStart(content, root, idx)
 	}
 
 	return len(content)
+}
+
+func nextTopLevelNodeStart(content []byte, root *yaml.Node, idx int) int {
+	if idx+yamlMappingPairKeyValue >= len(root.Content) {
+		return len(content)
+	}
+
+	start, err := lineStartOffset(content, root.Content[idx+yamlMappingPairKeyValue].Line)
+	if err != nil {
+		return consts.IndexZero
+	}
+
+	return start
 }
 
 func trimBlankLinesBackward(content []byte, end int) int {
@@ -842,7 +1043,7 @@ func trimBlankLinesBackward(content []byte, end int) int {
 }
 
 func trimOneLineEnding(content []byte) []byte {
-	content = bytes.TrimSuffix(content, []byte("\n"))
+	content = bytes.TrimSuffix(content, []byte(lineFeed))
 
 	return bytes.TrimSuffix(content, []byte("\r"))
 }
@@ -1217,7 +1418,7 @@ func invalidYAMLPosition(line, column int) error {
 func offsetForValidLineColumn(pos *yamlPosition) (int, error) {
 	offset, err := lineStartOffset(pos.content, pos.line)
 	if err != nil {
-		return consts.IndexZero, fmt.Errorf("line start offset: %w", err)
+		return consts.IndexZero, fmt.Errorf(lineStartOffsetError, err)
 	}
 
 	colOffset, err := columnOffsetInLine(pos, offset)
@@ -1324,16 +1525,15 @@ func spanForQuoteChoice(
 
 // quoteForYAMLStyle returns the quote byte for quoted scalar styles.
 func quoteForYAMLStyle(style yaml.Style) (quote byte, quoted bool) {
-	switch style {
-	case yaml.DoubleQuotedStyle:
+	if style == yaml.DoubleQuotedStyle {
 		return '"', true
-	case yaml.SingleQuotedStyle:
-		return '\'', true
-	case yaml.TaggedStyle, yaml.LiteralStyle, yaml.FoldedStyle, yaml.FlowStyle:
-		return byte(consts.IndexZero), false
-	default:
-		return byte(consts.IndexZero), false
 	}
+
+	if style == yaml.SingleQuotedStyle {
+		return '\'', true
+	}
+
+	return byte(consts.IndexZero), false
 }
 
 func wrapQuotedScalarSpan(params *scalarSpanParams, quote byte) (start, end int, err error) {
@@ -1659,26 +1859,41 @@ func UpdateRootTaskfile(content []byte, input *rootUpdateInput) ([]byte, error) 
 		return nil, fmt.Errorf(errParseTaskfileRoot, err)
 	}
 
-	originalRoot := cloneYAMLNode(root)
+	return updateParsedRootTaskfile(&parsedRootTaskfileParams{
+		content: content, input: input, node: node, root: root,
+	})
+}
 
-	rawModuleVars, err := rawModuleVarsByTask(input)
+func updateParsedRootTaskfile(params *parsedRootTaskfileParams) ([]byte, error) {
+	originalRoot := cloneYAMLNode(params.root)
+
+	rawModuleVars, err := rawModuleVarsByTask(params.input)
 	if err != nil {
 		return nil, fmt.Errorf("read raw module vars: %w", err)
 	}
 
-	setRootTaskfileVersion(root)
+	return applyParsedRootUpdates(params, originalRoot, rawModuleVars)
+}
 
-	err = applyRootUpdates(root, input)
+func applyParsedRootUpdates(
+	params *parsedRootTaskfileParams, originalRoot *yaml.Node, rawModuleVars rawModuleVars,
+) ([]byte, error) {
+	setRootTaskfileVersion(params.root)
+
+	err := applyRootUpdates(params.root, params.input)
 	if err != nil {
 		return nil, fmt.Errorf("apply root updates: %w", err)
 	}
 
-	out, err := patchRootTaskfile(content, originalRoot, root, input, rawModuleVars)
+	out, err := patchRootTaskfile(&rootPatchParams{
+		content: params.content, originalRoot: originalRoot, desiredRoot: params.root,
+		input: params.input, rawVars: rawModuleVars,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("patch root taskfile: %w", err)
 	}
 
-	iox.Discard(node)
+	iox.Discard(params.node)
 
 	return out, nil
 }
@@ -2415,7 +2630,7 @@ func setMappingValue(mapNode *yaml.Node, key string, value *yaml.Node) {
 }
 
 func setRootTaskfileVersion(root *yaml.Node) {
-	setMappingValue(root, "version", taskfileVersionScalar(rootTaskfileVersion))
+	setMappingValue(root, versionKey, taskfileVersionScalar(rootTaskfileVersion))
 }
 
 func taskfileVersionScalar(value string) *yaml.Node {

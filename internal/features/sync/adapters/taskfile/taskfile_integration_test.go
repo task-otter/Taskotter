@@ -588,23 +588,18 @@ func TestUpdateRootTaskfilePromotesSingleModuleVars(t *testing.T) {
 func TestUpdateRootTaskfilePreservesFoldedModuleVar(t *testing.T) {
 	t.Parallel()
 
-	modulePath := "../../../../../taskotter/go/Taskfile.yml"
-
-	module, err := os.ReadFile(modulePath)
-	if err != nil {
-		t.Fatal(err)
-	}
-
+	module := readGoModuleTaskfile(t)
 	input := goOnlyRootInput()
 
 	input.ModuleTaskfiles[consts.Go] = module
 
-	out, err := taskfile.UpdateRootTaskfile(taskfile.NewRootTemplate(), input)
-	if err != nil {
-		t.Fatal(err)
-	}
+	out := updateRootTaskfile(t, taskfile.NewRootTemplate(), input)
 
-	want := sourceVarEntry(t, string(module), "GO_LOAD", "\n\ntasks:")
+	want := sourceVarEntry(
+		t,
+		string(module),
+		sourceVarQuery{key: "GO_LOAD", endMarker: "\n\ntasks:"},
+	)
 
 	if !strings.Contains(string(out), want) {
 		t.Fatalf("promoted GO_LOAD changed source text; missing exact source entry:\n%s", out)
@@ -666,13 +661,41 @@ func TestUpdateRootTaskfilePreservesUnmanagedRootText(t *testing.T) {
 	t.Parallel()
 
 	root := []byte(
-		"---\nversion: '3'\n# keep this comment\nvars:\n  CUSTOM: >-\n    keep   spacing\n    keep line two\n\nincludes:\n  custom:\n    taskfile: custom/Taskfile.yml # keep this comment\n\n\ntasks:\n  custom:\n    cmds:\n      - echo   preserve\n",
+		"---\nversion: '3'\n# keep this comment\nvars:\n  CUSTOM: >-\n" +
+			"    keep   spacing\n    keep line two\n\nincludes:\n  custom:\n" +
+			"    taskfile: custom/Taskfile.yml # keep this comment\n\n\ntasks:\n" +
+			"  custom:\n    cmds:\n      - echo   preserve\n",
 	)
 
-	out, err := taskfile.UpdateRootTaskfile(root, goOnlyRootInput())
+	out := updateRootTaskfile(t, root, goOnlyRootInput())
+	assertPreservedRootText(t, out)
+	assertRootUpdateIdempotent(t, out)
+}
+
+func readGoModuleTaskfile(t *testing.T) []byte {
+	t.Helper()
+
+	module, err := os.ReadFile("../../../../../taskotter/go/Taskfile.yml")
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	return module
+}
+
+func updateRootTaskfile(t *testing.T, root []byte, input *rootupd.RootUpdateInput) []byte {
+	t.Helper()
+
+	out, err := taskfile.UpdateRootTaskfile(root, input)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return out
+}
+
+func assertPreservedRootText(t *testing.T, out []byte) {
+	t.Helper()
 
 	for _, preserved := range []string{
 		"# keep this comment\nvars:\n  CUSTOM: >-\n    keep   spacing\n    keep line two\n",
@@ -683,11 +706,12 @@ func TestUpdateRootTaskfilePreservesUnmanagedRootText(t *testing.T) {
 			t.Fatalf("unmanaged root text changed; missing %q:\n%s", preserved, out)
 		}
 	}
+}
 
-	second, err := taskfile.UpdateRootTaskfile(out, goOnlyRootInput())
-	if err != nil {
-		t.Fatal(err)
-	}
+func assertRootUpdateIdempotent(t *testing.T, out []byte) {
+	t.Helper()
+
+	second := updateRootTaskfile(t, out, goOnlyRootInput())
 
 	if !bytes.Equal(second, out) {
 		t.Fatalf("root update is not idempotent:\nfirst:\n%s\nsecond:\n%s", out, second)
@@ -711,19 +735,26 @@ func TestUpdateRootTaskfilePreservesCRLF(t *testing.T) {
 	}
 }
 
-func sourceVarEntry(t *testing.T, content, key, endMarker string) string {
+type sourceVarQuery struct {
+	key       string
+	endMarker string
+}
+
+const testNotFoundIndex = -1
+
+func sourceVarEntry(t *testing.T, content string, query sourceVarQuery) string {
 	t.Helper()
 
-	start := strings.Index(content, "  "+key+":")
+	start := strings.Index(content, "  "+query.key+":")
 
-	if start < 0 {
-		t.Fatalf("variable %s missing from content:\n%s", key, content)
+	if start == testNotFoundIndex {
+		t.Fatalf("variable %s missing from content:\n%s", query.key, content)
 	}
 
-	relEnd := strings.Index(content[start:], endMarker)
+	relEnd := strings.Index(content[start:], query.endMarker)
 
-	if relEnd < 0 {
-		t.Fatalf("end marker %q missing after %s:\n%s", endMarker, key, content)
+	if relEnd == testNotFoundIndex {
+		t.Fatalf("end marker %q missing after %s:\n%s", query.endMarker, query.key, content)
 	}
 
 	return content[start : start+relEnd]

@@ -7,6 +7,11 @@ import (
 	"strings"
 )
 
+const (
+	noSeparator = -1
+	indexStep   = 1
+)
+
 // NormalizeSlashes converts platform separators to forward slashes.
 func NormalizeSlashes(path string) string { return strings.ReplaceAll(path, "\\", separator) }
 
@@ -27,8 +32,8 @@ func IsTestPath(path string) bool {
 
 	base := path
 
-	if index := strings.LastIndex(path, separator); index >= 0 {
-		base = path[index+1:]
+	if index := strings.LastIndex(path, separator); index >= noSeparator {
+		base = path[index+indexStep:]
 	}
 
 	return strings.Contains(base, "_test.")

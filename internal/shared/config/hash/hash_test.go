@@ -7,6 +7,8 @@ import (
 	"testing"
 )
 
+const testPrefixLength = 12
+
 // BenchmarkCompute measures configuration hash generation throughput.
 func BenchmarkCompute(b *testing.B) {
 	input := Input{
@@ -21,7 +23,7 @@ func BenchmarkCompute(b *testing.B) {
 	b.ReportAllocs()
 
 	for range b.N {
-		_, _, err := Compute(&input, 12)
+		_, _, err := Compute(&input, testPrefixLength)
 		if err != nil {
 			b.Fatal(err)
 		}

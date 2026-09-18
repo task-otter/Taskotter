@@ -473,29 +473,34 @@ func writeEntry(extractor *tarExtractor, header *tar.Header, target string) erro
 }
 
 func dispatchWriteEntry(extractor *tarExtractor, header *tar.Header, target string) error {
-	if header.Typeflag == tar.TypeDir {
-		err := writeDirTarget(target)
-		if err != nil {
-			return fmt.Errorf("write directory target: %w", err)
-		}
-
-		return nil
-	}
-
-	if header.Typeflag == tar.TypeReg {
-		err := writeRegTarget(extractor, header, target)
-		if err != nil {
-			return fmt.Errorf("write regular target: %w", err)
-		}
-
-		return nil
-	}
-
-	if header.Typeflag == tar.TypeSymlink || header.Typeflag == tar.TypeLink {
+	switch header.Typeflag {
+	case tar.TypeDir:
+		return dispatchDirectoryTarget(target)
+	case tar.TypeReg:
+		return dispatchRegularTarget(extractor, header, target)
+	case tar.TypeSymlink, tar.TypeLink:
 		return fmt.Errorf("link entry: %w", linkEntryError(header.Name))
+	default:
+		return fmt.Errorf("unsupported entry: %w", unsupportedEntryError(header.Name))
+	}
+}
+
+func dispatchDirectoryTarget(target string) error {
+	err := writeDirTarget(target)
+	if err != nil {
+		return fmt.Errorf("write directory target: %w", err)
 	}
 
-	return fmt.Errorf("unsupported entry: %w", unsupportedEntryError(header.Name))
+	return nil
+}
+
+func dispatchRegularTarget(extractor *tarExtractor, header *tar.Header, target string) error {
+	err := writeRegTarget(extractor, header, target)
+	if err != nil {
+		return fmt.Errorf("write regular target: %w", err)
+	}
+
+	return nil
 }
 
 func writeRegEntry(extractor *tarExtractor, header *tar.Header, target string) error {

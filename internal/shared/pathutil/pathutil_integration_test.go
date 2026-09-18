@@ -358,17 +358,24 @@ func TestReadRelativeFile(t *testing.T) {
 	root := t.TempDir()
 	rel := pathGoTaskfile
 	want := []byte(taskfileVersion3)
-
 	writeTaskfileFixture(t, &taskfileFixture{root: root, rel: rel, data: want})
+
+	got := readTaskfile(t, root, rel)
+
+	if !bytes.Equal(got, want) {
+		t.Fatalf("ReadRelativeFile() = %q, want %q", got, want)
+	}
+}
+
+func readTaskfile(t *testing.T, root, rel string) []byte {
+	t.Helper()
 
 	got, err := pathutil.ReadRelativeFile(root, rel)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if !bytes.Equal(got, want) {
-		t.Fatalf("ReadRelativeFile() = %q, want %q", got, want)
-	}
+	return got
 }
 
 // TestNormalizeSlashes verifies mixed and redundant separators normalize to a clean path.
@@ -546,18 +553,25 @@ func TestOpenRelativeFile(t *testing.T) {
 
 	root := t.TempDir()
 	rel := pathGoTaskfile
-
 	writeTaskfileFixture(t, &taskfileFixture{root: root, rel: rel, data: []byte(taskfileVersion3)})
+
+	file := openTaskfile(t, root, rel)
+
+	err := file.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func openTaskfile(t *testing.T, root, rel string) *os.File {
+	t.Helper()
 
 	file, err := pathutil.OpenRelativeFile(root, rel)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = file.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
+	return file
 }
 
 // TestOpenRelativeFileRejectsUnsafePath verifies an unsafe relative path is rejected before opening.

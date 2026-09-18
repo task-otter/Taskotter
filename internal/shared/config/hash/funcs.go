@@ -12,15 +12,17 @@ import (
 	"github.com/task-otter/Taskotter/internal/shared/iox"
 )
 
+const zeroPrefixLength = 0
+
 // Compute returns the full SHA-256 hex digest and its TaskOtter sync branch.
-func Compute(input *Input, prefixLength int) (string, string, error) {
+func Compute(input *Input, prefixLength int) (fullDigest, branch string, err error) {
 	data, err := json.Marshal(input)
 	iox.Discard(err)
 
 	digest := sha256.Sum256(data)
 	full := hex.EncodeToString(digest[:])
 
-	if prefixLength < 0 || prefixLength > len(full) {
+	if prefixLength < zeroPrefixLength || prefixLength > len(full) {
 		return "", "", fmt.Errorf("%w: %d", ErrInvalidPrefixLength, prefixLength)
 	}
 

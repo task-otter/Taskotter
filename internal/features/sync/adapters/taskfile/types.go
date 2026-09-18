@@ -37,6 +37,69 @@ type (
 		content      []byte
 	}
 
+	renderSectionParams struct {
+		section string
+		node    *yaml.Node
+		rawVars rawModuleVars
+		tasks   []string
+	}
+
+	managedMappingParams struct {
+		params   *rootPatchParams
+		original *yaml.Node
+		desired  *yaml.Node
+		managed  map[string]struct{}
+	}
+
+	sourceNodeSpanParams struct {
+		parent    *yaml.Node
+		content   []byte
+		pairIndex int
+		parentEnd int
+	}
+
+	scalarNodeSpanParams struct {
+		key     *yaml.Node
+		value   *yaml.Node
+		content []byte
+		start   int
+	}
+
+	managedEntryParams struct {
+		input      *managedMappingParams
+		key        string
+		pairIndex  int
+		sectionEnd int
+	}
+
+	parsedRootTaskfileParams struct {
+		input   *rootUpdateInput
+		node    *yaml.Node
+		root    *yaml.Node
+		content []byte
+	}
+
+	rootSectionReplacementParams struct {
+		original mappingPair
+		desired  mappingPair
+		params   *rootPatchParams
+		section  string
+	}
+
+	rootSectionEditParams struct {
+		params   *rootPatchParams
+		original *yaml.Node
+		desired  *yaml.Node
+		section  string
+	}
+
+	mappingEntrySpanParams struct {
+		parent     *yaml.Node
+		content    []byte
+		pairIndex  int
+		sectionEnd int
+	}
+
 	mappingPair struct {
 		key   *yaml.Node
 		value *yaml.Node

@@ -224,7 +224,10 @@ func newCreatePRBody(opts *CreatePROptions) createPRBody {
 }
 
 func listOpenPRsPath(opts *ListOpenPROptions) string {
-	return endpoints.ListOpenPRPath(opts.Owner, opts.Repo, opts.Head, opts.Base)
+	return endpoints.ListOpenPRPath(opts.Owner, opts.Repo, endpoints.OpenPRQuery{
+		Head: opts.Head,
+		Base: opts.Base,
+	})
 }
 
 func pullsPath(owner, repo string) string {

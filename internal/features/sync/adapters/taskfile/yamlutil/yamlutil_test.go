@@ -9,41 +9,52 @@ import (
 	yaml "go.yaml.in/yaml/v3"
 )
 
+const (
+	testOldKey       = "old"
+	testValue        = "value"
+	testUpdatedValue = "updated"
+	testNewKey       = "new"
+	testCloneValue   = "changed"
+	testPairCount    = 2
+	testSingleCount  = 1
+	secondPairIndex  = 1
+)
+
 // TestNodeHelpersPreserveMappingSemantics verifies mapping mutations preserve keys.
 func TestNodeHelpersPreserveMappingSemantics(t *testing.T) {
 	mapping := Mapping()
-	AppendMappingPair(mapping, Scalar("old"), Scalar("value"))
-	SetValue(mapping, "old", Scalar("updated"))
-	SetValue(mapping, "new", Scalar("value"))
+	AppendMappingPair(mapping, Scalar(testOldKey), Scalar(testValue))
+	SetValue(mapping, testOldKey, Scalar(testUpdatedValue))
+	SetValue(mapping, testNewKey, Scalar(testValue))
 
-	if got := len(Keys(mapping)); got != 2 {
-		t.Fatalf("mapping key count = %d, want 2", got)
+	if got := len(Keys(mapping)); got != testPairCount {
+		t.Fatalf("mapping key count = %d, want %d", got, testPairCount)
 	}
 
-	DeleteKey(mapping, "old")
+	DeleteKey(mapping, testOldKey)
 
-	if got := len(Keys(mapping)); got != 1 {
-		t.Fatalf("mapping key count after delete = %d, want 1", got)
+	if got := len(Keys(mapping)); got != testSingleCount {
+		t.Fatalf("mapping key count after delete = %d, want %d", got, testSingleCount)
 	}
 }
 
 // TestCloneDeepCopiesContent verifies cloned nodes do not alias their source.
 func TestCloneDeepCopiesContent(t *testing.T) {
 	original := Mapping()
-	AppendMappingPair(original, Scalar("key"), Scalar("value"))
+	AppendMappingPair(original, Scalar("key"), Scalar(testValue))
 
 	clone := Clone(original)
 
-	clone.Content[1].Value = "changed"
+	clone.Content[secondPairIndex].Value = testCloneValue
 
-	if original.Content[1].Value != "value" {
-		t.Fatalf("clone mutated original: %q", original.Content[1].Value)
+	if original.Content[secondPairIndex].Value != testValue {
+		t.Fatalf("clone mutated original: %q", original.Content[secondPairIndex].Value)
 	}
 }
 
 // TestScalarAndSequenceKinds verifies YAML helper node kinds.
 func TestScalarAndSequenceKinds(t *testing.T) {
-	if Scalar("value").Kind != yaml.ScalarNode {
+	if Scalar(testValue).Kind != yaml.ScalarNode {
 		t.Fatal("scalar has wrong kind")
 	}
 

@@ -20,3 +20,4 @@ junit.xml
 custom-golangci-lint
 test-result.txt
 .lint
+.test

@@ -1,7 +1,6 @@
 // Taskotter 2026.
 // SPDX-License-Identifier: Apache-2.0.
 
-// Package managed holds managed-file lock-domain types.
 package managed
 
 type (
@@ -12,5 +11,10 @@ type (
 		SourcePath        string `yaml:"source_path"`
 		Path              string `yaml:"path"`
 		SHA256            string `yaml:"sha256"`
+	}
+
+	yamlDecodeTarget = struct {
+		Out any
+		Key string
 	}
 )

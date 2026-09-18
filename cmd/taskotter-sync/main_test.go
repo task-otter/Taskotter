@@ -8,7 +8,9 @@ import (
 	"context"
 	"errors"
 	"io"
+	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 
 	syncrun "github.com/task-otter/Taskotter/internal/features/syncrun/service"
@@ -34,10 +36,16 @@ const (
 	errExpectedOrchestrator = "expected orchestrator"
 )
 
-var errStubRun = errors.New("stub run failure")
+var (
+	errStubRun      = errors.New("stub run failure")
+	mainTestStateMu sync.Mutex
+)
 
 // TestMainExitsWithErrorWhenConfigMissing verifies main reports a failure exit code.
 func TestMainExitsWithErrorWhenConfigMissing(t *testing.T) {
+	t.Parallel()
+	lockMainTestState(t)
+
 	code := exitError * consts.IndexZero
 
 	swapExitFunc(t, func(got int) { code = got })
@@ -53,6 +61,8 @@ func TestMainExitsWithErrorWhenConfigMissing(t *testing.T) {
 
 // TestRunReportsConfigFailure verifies a missing configuration exits with an error code.
 func TestRunReportsConfigFailure(t *testing.T) {
+	t.Parallel()
+	lockMainTestState(t)
 	captureStreams(t)
 	clearActionEnv(t)
 
@@ -66,6 +76,7 @@ func TestRunReportsConfigFailure(t *testing.T) {
 // TestRunOrchestratorReportsWireFailure verifies orchestrator construction failures are wrapped.
 func TestRunOrchestratorReportsWireFailure(t *testing.T) {
 	t.Parallel()
+	lockMainTestState(t)
 
 	result, err := runOrchestrator(t.Context(), invalidRepoOrchestratorConfig())
 	iox.Discard(result)
@@ -77,6 +88,8 @@ func TestRunOrchestratorReportsWireFailure(t *testing.T) {
 
 // TestRunOrchestratorReportsRunFailure verifies orchestrator run failures are wrapped.
 func TestRunOrchestratorReportsRunFailure(t *testing.T) {
+	t.Parallel()
+	lockMainTestState(t)
 	swapOrchestrator(t, &stubOrchestrator{result: nil, err: errStubRun})
 
 	result, err := runOrchestrator(t.Context(), emptyConfig())
@@ -89,6 +102,8 @@ func TestRunOrchestratorReportsRunFailure(t *testing.T) {
 
 // TestLoadRunAndWriteReportsOutputFailure verifies an unwritable output path is reported.
 func TestLoadRunAndWriteReportsOutputFailure(t *testing.T) {
+	t.Parallel()
+	lockMainTestState(t)
 	captureStreams(t)
 	setValidActionEnv(t, filepath.Join(t.TempDir(), "missing", outputFileName))
 	swapOrchestrator(t, &stubOrchestrator{result: unchangedResult(), err: nil})
@@ -103,6 +118,8 @@ func TestLoadRunAndWriteReportsOutputFailure(t *testing.T) {
 
 // TestLoadRunAndWriteReportsRunFailure verifies orchestrator failures abort the run.
 func TestLoadRunAndWriteReportsRunFailure(t *testing.T) {
+	t.Parallel()
+	lockMainTestState(t)
 	captureStreams(t)
 	setValidActionEnv(t, filepath.Join(t.TempDir(), outputFileName))
 	swapOrchestrator(t, &stubOrchestrator{result: nil, err: errStubRun})
@@ -118,6 +135,7 @@ func TestLoadRunAndWriteReportsRunFailure(t *testing.T) {
 // TestDefaultWireRunBuildsRunFunc verifies the production seam wires adapters.
 func TestDefaultWireRunBuildsRunFunc(t *testing.T) {
 	t.Parallel()
+	lockMainTestState(t)
 
 	runSync, err := defaultWireRun(t.Context(), emptyConfig())
 	if err != nil {
@@ -131,6 +149,8 @@ func TestDefaultWireRunBuildsRunFunc(t *testing.T) {
 
 // TestRunSucceedsWithStubbedOrchestrator verifies a clean run exits successfully.
 func TestRunSucceedsWithStubbedOrchestrator(t *testing.T) {
+	t.Parallel()
+	lockMainTestState(t)
 	captureStreams(t)
 	setValidActionEnv(t, filepath.Join(t.TempDir(), outputFileName))
 	swapOrchestrator(t, &stubOrchestrator{result: unchangedResult(), err: nil})
@@ -144,6 +164,8 @@ func TestRunSucceedsWithStubbedOrchestrator(t *testing.T) {
 
 // TestReportResultChangedWithoutFailOnChanges verifies a changed run succeeds by default.
 func TestReportResultChangedWithoutFailOnChanges(t *testing.T) {
+	t.Parallel()
+	lockMainTestState(t)
 	captureStreams(t)
 
 	code := reportResult(emptyConfig(), changedResult())
@@ -155,6 +177,8 @@ func TestReportResultChangedWithoutFailOnChanges(t *testing.T) {
 
 // TestReportResultChangedWithFailOnChanges verifies fail-on-changes turns changes into failures.
 func TestReportResultChangedWithFailOnChanges(t *testing.T) {
+	t.Parallel()
+	lockMainTestState(t)
 	captureStreams(t)
 
 	code := reportResult(failOnChangesConfig(), changedResult())
@@ -166,6 +190,8 @@ func TestReportResultChangedWithFailOnChanges(t *testing.T) {
 
 // TestReportResultUnchangedWithFailOnChanges verifies an up-to-date run still succeeds.
 func TestReportResultUnchangedWithFailOnChanges(t *testing.T) {
+	t.Parallel()
+	lockMainTestState(t)
 	captureStreams(t)
 
 	code := reportResult(failOnChangesConfig(), unchangedResult())
@@ -177,6 +203,8 @@ func TestReportResultUnchangedWithFailOnChanges(t *testing.T) {
 
 // TestReportResultReportsWriteFailures verifies stdout failures become error exit codes.
 func TestReportResultReportsWriteFailures(t *testing.T) {
+	t.Parallel()
+	lockMainTestState(t)
 	swapStdout(t, &faults.StubWriter{Count: consts.IndexZero, Err: faults.ErrFault})
 
 	if reportResult(emptyConfig(), changedResult()) != exitError {
@@ -190,6 +218,9 @@ func TestReportResultReportsWriteFailures(t *testing.T) {
 
 // TestReportErrorWritesAnnotation verifies the error annotation reaches stderr.
 func TestReportErrorWritesAnnotation(t *testing.T) {
+	t.Parallel()
+	lockMainTestState(t)
+
 	var buf bytes.Buffer
 
 	swapStderr(t, &buf)
@@ -207,6 +238,13 @@ func (stub *stubOrchestrator) Run(
 	iox.Discard2(ctx, cfg)
 
 	return stub.result, stub.err
+}
+
+func lockMainTestState(t *testing.T) {
+	t.Helper()
+
+	mainTestStateMu.Lock()
+	t.Cleanup(mainTestStateMu.Unlock)
 }
 
 func swapOrchestrator(t *testing.T, stub *stubOrchestrator) {
@@ -231,9 +269,9 @@ func changedResult() *syncrun.Result {
 
 func clearActionEnv(t *testing.T) {
 	t.Helper()
-	t.Setenv(consts.EnvGithubWorkspace, consts.Empty)
-	t.Setenv(consts.InputGithubToken, consts.Empty)
-	t.Setenv("GITHUB_TOKEN", consts.Empty)
+	setActionEnv(t, consts.EnvGithubWorkspace, consts.Empty)
+	setActionEnv(t, consts.InputGithubToken, consts.Empty)
+	setActionEnv(t, "GITHUB_TOKEN", consts.Empty)
 }
 
 func emptyConfig() *config.Config {
@@ -254,11 +292,38 @@ func failOnChangesConfig() *config.Config {
 
 func setValidActionEnv(t *testing.T, outputPath string) {
 	t.Helper()
-	t.Setenv(consts.EnvGithubWorkspace, t.TempDir())
-	t.Setenv(consts.InputGithubToken, "token")
-	t.Setenv(consts.InputTasks, consts.Go)
-	t.Setenv("GITHUB_REPOSITORY", testRepository)
-	t.Setenv("GITHUB_OUTPUT", outputPath)
+	setActionEnv(t, consts.EnvGithubWorkspace, t.TempDir())
+	setActionEnv(t, consts.InputGithubToken, "token")
+	setActionEnv(t, consts.InputTasks, consts.Go)
+	setActionEnv(t, "GITHUB_REPOSITORY", testRepository)
+	setActionEnv(t, "GITHUB_OUTPUT", outputPath)
+}
+
+func setActionEnv(t *testing.T, key, value string) {
+	t.Helper()
+
+	original, present := os.LookupEnv(key)
+
+	err := os.Setenv(key, value)
+	if err != nil {
+		t.Fatalf("set %s: %v", key, err)
+	}
+
+	t.Cleanup(func() {
+		if present {
+			err := os.Setenv(key, original)
+			if err != nil {
+				t.Errorf("restore %s: %v", key, err)
+			}
+
+			return
+		}
+
+		err := os.Unsetenv(key)
+		if err != nil {
+			t.Errorf("unset %s: %v", key, err)
+		}
+	})
 }
 
 func swapExitFunc(t *testing.T, stub func(int)) {
@@ -301,5 +366,74 @@ func unchangedResult() *syncrun.Result {
 	return &syncrun.Result{
 		Changed:   false,
 		SourceSHA: sourceSHAHex,
+	}
+}
+
+// TestWireOrchestratorInvalidRepository verifies an invalid repository coordinate fails construction.
+func TestWireOrchestratorInvalidRepository(t *testing.T) {
+	t.Parallel()
+
+	orch, err := WireOrchestrator(t.Context(), invalidRepoOrchestratorConfig())
+	iox.Discard(orch)
+
+	if err == nil {
+		t.Fatal("expected repository parse error")
+	}
+}
+
+// TestWireOrchestratorWithoutRepository verifies an empty repository wires successfully.
+func TestWireOrchestratorWithoutRepository(t *testing.T) {
+	t.Parallel()
+
+	cfg := invalidRepoOrchestratorConfig()
+
+	cfg.Repository = consts.Empty
+
+	orch, err := WireOrchestrator(t.Context(), cfg)
+	if err != nil {
+		t.Fatalf(consts.UnexpectedErr, err)
+	}
+
+	if orch == nil {
+		t.Fatal(errExpectedOrchestrator)
+	}
+}
+
+// TestWireOrchestratorWithRepository verifies a valid repository wires successfully.
+func TestWireOrchestratorWithRepository(t *testing.T) {
+	t.Parallel()
+
+	cfg := invalidRepoOrchestratorConfig()
+
+	cfg.Repository = testRepository
+
+	orch, err := WireOrchestrator(t.Context(), cfg)
+	if err != nil {
+		t.Fatalf(consts.UnexpectedErr, err)
+	}
+
+	if orch == nil {
+		t.Fatal(errExpectedOrchestrator)
+	}
+}
+
+func invalidRepoOrchestratorConfig() *config.Config {
+	return &config.Config{
+		Tasks:              nil,
+		JSRuntime:          consts.Empty,
+		NodePackageManager: consts.Empty,
+		IncludesDoc:        false,
+		SyncRoot:           false,
+		FailOnChanges:      false,
+		StoreVersion:       consts.Empty,
+		TargetFolder:       consts.Empty,
+		RootTaskfile:       consts.Empty,
+		GitHubToken:        consts.Empty,
+		Workspace:          consts.Empty,
+		Repository:         "not-a-valid-repo",
+		GitHubOutput:       consts.Empty,
+		BaseBranch:         consts.Empty,
+		ConfigurationHash:  consts.Empty,
+		BranchName:         consts.Empty,
 	}
 }

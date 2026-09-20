@@ -19,3 +19,5 @@ junit.xml
 .task
 custom-golangci-lint
 test-result.txt
+.lint
+.test

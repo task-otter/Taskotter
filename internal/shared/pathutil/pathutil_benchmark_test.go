@@ -15,7 +15,8 @@ func BenchmarkValidateRelativePath(b *testing.B) {
 
 	b.ResetTimer()
 	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
+
+	for range b.N {
 		_, err := pathutil.ValidateRelativePath("testfield", rel)
 		if err != nil {
 			b.Fatal(err)
@@ -28,7 +29,8 @@ func BenchmarkNormalizeSlashes(b *testing.B) {
 
 	b.ResetTimer()
 	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
+
+	for range b.N {
 		_ = pathutil.NormalizeSlashes(p)
 	}
 }
@@ -38,8 +40,10 @@ func BenchmarkValidateTargetFolder(b *testing.B) {
 
 	b.ResetTimer()
 	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
+
+	for range b.N {
 		_, err := pathutil.ValidateTargetFolder("taskfiles", tmpDir)
+
 		if err != nil && !os.IsNotExist(err) {
 			b.Fatal(err)
 		}

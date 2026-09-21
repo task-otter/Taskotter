@@ -4,7 +4,6 @@
 package cli_test
 
 import (
-	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -15,26 +14,45 @@ import (
 
 func createBenchmarkRepo(b *testing.B) string {
 	b.Helper()
+
 	root := b.TempDir()
 
 	bareDir := filepath.Join(root, "bare.git")
-	if err := os.MkdirAll(bareDir, 0755); err != nil {
+
+	err := os.MkdirAll(bareDir, 0o755)
+	if err != nil {
 		b.Fatal(err)
 	}
-	cmdBare := exec.CommandContext(context.Background(), "git", "init", "--bare", "-b", testMainBranch)
+
+	cmdBare := exec.CommandContext(
+		b.Context(),
+		"git",
+		"init",
+		"--bare",
+		"-b",
+		testMainBranch,
+	)
+
 	cmdBare.Dir = bareDir
-	if err := cmdBare.Run(); err != nil {
+
+	err = cmdBare.Run()
+	if err != nil {
 		b.Fatal(err)
 	}
 
 	cloneDir := filepath.Join(root, "clone")
-	if err := os.MkdirAll(cloneDir, 0755); err != nil {
+
+	err = os.MkdirAll(cloneDir, 0o755)
+	if err != nil {
 		b.Fatal(err)
 	}
 
-	cmdInit := exec.CommandContext(context.Background(), "git", "init", "-b", testMainBranch)
+	cmdInit := exec.CommandContext(b.Context(), "git", "init", "-b", testMainBranch)
+
 	cmdInit.Dir = cloneDir
-	if err := cmdInit.Run(); err != nil {
+
+	err = cmdInit.Run()
+	if err != nil {
 		b.Fatal(err)
 	}
 
@@ -43,34 +61,56 @@ func createBenchmarkRepo(b *testing.B) string {
 		{"config", "user.email", "bench@test.local"},
 		{"remote", "add", "origin", bareDir},
 	}
+
 	for _, args := range configCmds {
-		c := exec.CommandContext(context.Background(), "git", args...)
+		c := exec.CommandContext(b.Context(), "git", args...)
+
 		c.Dir = cloneDir
-		if err := c.Run(); err != nil {
+
+		err := c.Run()
+		if err != nil {
 			b.Fatal(err)
 		}
 	}
 
 	dummyFile := filepath.Join(cloneDir, "README.md")
-	if err := os.WriteFile(dummyFile, []byte("# Test Repo\n"), 0644); err != nil {
+
+	err = os.WriteFile(dummyFile, []byte("# Test Repo\n"), 0o644)
+	if err != nil {
 		b.Fatal(err)
 	}
 
-	addCmd := exec.CommandContext(context.Background(), "git", "add", "README.md")
+	addCmd := exec.CommandContext(b.Context(), "git", "add", "README.md")
+
 	addCmd.Dir = cloneDir
-	if err := addCmd.Run(); err != nil {
+
+	err = addCmd.Run()
+	if err != nil {
 		b.Fatal(err)
 	}
 
-	commitCmd := exec.CommandContext(context.Background(), "git", "commit", "-m", "initial commit")
+	commitCmd := exec.CommandContext(b.Context(), "git", "commit", "-m", "initial commit")
+
 	commitCmd.Dir = cloneDir
-	if err := commitCmd.Run(); err != nil {
+
+	err = commitCmd.Run()
+	if err != nil {
 		b.Fatal(err)
 	}
 
-	pushCmd := exec.CommandContext(context.Background(), "git", "push", "-u", "origin", testMainBranch)
+	pushCmd := exec.CommandContext(
+		b.Context(),
+		"git",
+		"push",
+		"-u",
+		"origin",
+		testMainBranch,
+	)
+
 	pushCmd.Dir = cloneDir
-	if err := pushCmd.Run(); err != nil {
+
+	err = pushCmd.Run()
+	if err != nil {
 		b.Fatal(err)
 	}
 
@@ -83,8 +123,9 @@ func BenchmarkGitDefaultBranch(b *testing.B) {
 
 	b.ResetTimer()
 	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
-		_, err := client.DefaultBranch(context.Background())
+
+	for range b.N {
+		_, err := client.DefaultBranch(b.Context())
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -98,8 +139,9 @@ func BenchmarkGitHasUnrelatedChanges(b *testing.B) {
 
 	b.ResetTimer()
 	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
-		_, err := client.HasUnrelatedChanges(context.Background(), allowed)
+
+	for range b.N {
+		_, err := client.HasUnrelatedChanges(b.Context(), allowed)
 		if err != nil {
 			b.Fatal(err)
 		}

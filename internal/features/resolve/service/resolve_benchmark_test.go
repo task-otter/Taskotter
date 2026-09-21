@@ -146,7 +146,8 @@ func BenchmarkBuildDestinationMap(b *testing.B) {
 func BenchmarkLevenshtein(b *testing.B) {
 	b.ResetTimer()
 	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
+
+	for range b.N {
 		_ = service.Levenshtein("eslint/node/pnpm", "eslint/bun")
 	}
 }

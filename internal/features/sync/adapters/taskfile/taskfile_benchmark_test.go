@@ -158,7 +158,8 @@ func BenchmarkUpdateRootTaskfile(b *testing.B) {
 
 	b.ResetTimer()
 	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
+
+	for range b.N {
 		_, err := taskfile.UpdateRootTaskfile(template, input)
 		if err != nil {
 			b.Fatal(err)
@@ -167,7 +168,9 @@ func BenchmarkUpdateRootTaskfile(b *testing.B) {
 }
 
 func BenchmarkRewriteIncludesSpans(b *testing.B) {
-	input := []byte("version: \"3\"\nincludes:\n  pnpm:\n    taskfile: \"../../../pnpm/Taskfile.yml\"\n  eslint:\n    taskfile: \"../../../eslint/Taskfile.yml\"\n  prettier:\n    taskfile: \"../../prettier/Taskfile.yml\"\n")
+	input := []byte(
+		"version: \"3\"\nincludes:\n  pnpm:\n    taskfile: \"../../../pnpm/Taskfile.yml\"\n  eslint:\n    taskfile: \"../../../eslint/Taskfile.yml\"\n  prettier:\n    taskfile: \"../../prettier/Taskfile.yml\"\n",
+	)
 	mapping := map[string]string{
 		"../../../pnpm/Taskfile.yml":   "../pnpm/Taskfile.yml",
 		"../../../eslint/Taskfile.yml": "../eslint/Taskfile.yml",
@@ -176,7 +179,8 @@ func BenchmarkRewriteIncludesSpans(b *testing.B) {
 
 	b.ResetTimer()
 	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
+
+	for range b.N {
 		_, err := taskfile.RewriteIncludes(input, mapping, "eslint/node/pnpm")
 		if err != nil {
 			b.Fatal(err)

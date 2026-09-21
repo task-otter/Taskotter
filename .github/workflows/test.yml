@@ -63,6 +63,9 @@ jobs:
           persist-credentials: false
       - name: Install Task
         uses: go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e
+      - name: Run Fix CI
+        run: task taskotter:ci:fix
+      - uses: autofix-ci/action@c5b2d67aa2274e7b5a18224e8171550871fc7e4a  # v1.3.4
       - name: Run CI
         run: task taskotter:ci
       - name: Run Tests

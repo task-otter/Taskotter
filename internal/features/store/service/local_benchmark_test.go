@@ -131,7 +131,7 @@ func BenchmarkLocalSnapshot(b *testing.B) {
 	b.ResetTimer()
 	b.ReportAllocs()
 
-	for range b.N {
+	for b.Loop() {
 		_, err := storesvc.LocalSnapshot(fixtureStoreRoot, ref)
 		if err != nil {
 			b.Fatal(err)

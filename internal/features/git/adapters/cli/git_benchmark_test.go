@@ -124,7 +124,7 @@ func BenchmarkGitDefaultBranch(b *testing.B) {
 	b.ResetTimer()
 	b.ReportAllocs()
 
-	for range b.N {
+	for b.Loop() {
 		_, err := client.DefaultBranch(b.Context())
 		if err != nil {
 			b.Fatal(err)
@@ -140,7 +140,7 @@ func BenchmarkGitHasUnrelatedChanges(b *testing.B) {
 	b.ResetTimer()
 	b.ReportAllocs()
 
-	for range b.N {
+	for b.Loop() {
 		_, err := client.HasUnrelatedChanges(b.Context(), allowed)
 		if err != nil {
 			b.Fatal(err)

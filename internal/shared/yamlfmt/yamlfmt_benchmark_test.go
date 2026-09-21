@@ -25,7 +25,7 @@ func BenchmarkMarshal(b *testing.B) {
 	b.ResetTimer()
 	b.ReportAllocs()
 
-	for range b.N {
+	for b.Loop() {
 		_, err := yamlfmt.Marshal(data)
 		if err != nil {
 			b.Fatal(err)

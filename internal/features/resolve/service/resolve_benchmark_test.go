@@ -147,7 +147,7 @@ func BenchmarkLevenshtein(b *testing.B) {
 	b.ResetTimer()
 	b.ReportAllocs()
 
-	for range b.N {
+	for b.Loop() {
 		_ = service.Levenshtein("eslint/node/pnpm", "eslint/bun")
 	}
 }

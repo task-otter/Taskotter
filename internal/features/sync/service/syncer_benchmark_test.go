@@ -231,7 +231,7 @@ func BenchmarkBuildPlan(b *testing.B) {
 	b.ResetTimer()
 	b.ReportAllocs()
 
-	for range b.N {
+	for b.Loop() {
 		_, err := syncsvc.BuildPlan(&si)
 		if err != nil {
 			b.Fatal(err)
@@ -275,7 +275,7 @@ func BenchmarkDiff(b *testing.B) {
 	b.ResetTimer()
 	b.ReportAllocs()
 
-	for range b.N {
+	for b.Loop() {
 		_, err := syncsvc.BuildPlan(&si)
 		if err != nil {
 			b.Fatal(err)
@@ -300,7 +300,7 @@ func BenchmarkUpdateRootTaskfile(b *testing.B) {
 	b.ResetTimer()
 	b.ReportAllocs()
 
-	for range b.N {
+	for b.Loop() {
 		_, err := synctaskfile.UpdateRootTaskfile(template, input)
 		if err != nil {
 			b.Fatal(err)
@@ -319,7 +319,7 @@ func BenchmarkRewriteIncludes(b *testing.B) {
 	b.ResetTimer()
 	b.ReportAllocs()
 
-	for range b.N {
+	for b.Loop() {
 		_, err := synctaskfile.RewriteIncludes(input, mapping, "eslint/node/pnpm")
 		if err != nil {
 			b.Fatal(err)

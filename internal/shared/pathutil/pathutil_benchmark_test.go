@@ -13,10 +13,9 @@ import (
 func BenchmarkValidateRelativePath(b *testing.B) {
 	rel := "taskfiles/eslint/node/pnpm/Taskfile.yml"
 
-	b.ResetTimer()
 	b.ReportAllocs()
 
-	for range b.N {
+	for b.Loop() {
 		_, err := pathutil.ValidateRelativePath("testfield", rel)
 		if err != nil {
 			b.Fatal(err)
@@ -30,7 +29,7 @@ func BenchmarkNormalizeSlashes(b *testing.B) {
 	b.ResetTimer()
 	b.ReportAllocs()
 
-	for range b.N {
+	for b.Loop() {
 		_ = pathutil.NormalizeSlashes(p)
 	}
 }
@@ -41,7 +40,7 @@ func BenchmarkValidateTargetFolder(b *testing.B) {
 	b.ResetTimer()
 	b.ReportAllocs()
 
-	for range b.N {
+	for b.Loop() {
 		_, err := pathutil.ValidateTargetFolder("taskfiles", tmpDir)
 
 		if err != nil && !os.IsNotExist(err) {

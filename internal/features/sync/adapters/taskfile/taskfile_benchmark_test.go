@@ -159,7 +159,7 @@ func BenchmarkUpdateRootTaskfile(b *testing.B) {
 	b.ResetTimer()
 	b.ReportAllocs()
 
-	for range b.N {
+	for b.Loop() {
 		_, err := taskfile.UpdateRootTaskfile(template, input)
 		if err != nil {
 			b.Fatal(err)
@@ -180,7 +180,7 @@ func BenchmarkRewriteIncludesSpans(b *testing.B) {
 	b.ResetTimer()
 	b.ReportAllocs()
 
-	for range b.N {
+	for b.Loop() {
 		_, err := taskfile.RewriteIncludes(input, mapping, "eslint/node/pnpm")
 		if err != nil {
 			b.Fatal(err)

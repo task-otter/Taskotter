@@ -1,4 +1,8 @@
 ---
+# CodSpeed macro runners are hosted by CodSpeed, so actionlint cannot know them.
+self-hosted-runner:
+  labels:
+    - codspeed-macro
 # Temporary: actionlint 1.7.12 does not recognize GitHub's $/ self-repository
 # uses: form (rhysd/actionlint#711). Remove once a release includes  # 732.
 paths:

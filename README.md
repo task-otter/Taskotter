@@ -4,7 +4,7 @@
 
 # TaskOtter
 
-[![LICENSE](https://img.shields.io/github/license/task-otter/Taskotter)](/LICENSE) [![codecov](https://codecov.io/gh/task-otter/Taskotter/graph/badge.svg)](https://codecov.io/gh/task-otter/Taskotter)
+[![LICENSE](https://img.shields.io/github/license/task-otter/Taskotter)](/LICENSE) [![codecov](https://codecov.io/gh/task-otter/Taskotter/graph/badge.svg)](https://codecov.io/gh/task-otter/Taskotter) [![CodSpeed](https://img.shields.io/endpoint?url=https://codspeed.io/badge.json)](https://app.codspeed.io/task-otter/Taskotter?utm_source=badge)
 
 Docker-based GitHub Action that synchronizes task modules from the [TaskOtter store](https://github.com/task-otter/store) into your repository, resolves transitive dependencies, normalizes destination folder names, optionally updates your root `Taskfile.yml`, and opens or updates a deterministic pull request when changes exist.
 
@@ -262,6 +262,20 @@ go vet ./...
 go test -race ./...
 go build ./cmd/taskotter-sync
 docker build -t taskotter:local .
+```
+
+### Benchmarks
+
+Performance-critical paths (module resolution, Taskfile rewriting, lock file encoding, store catalog loading, sync planning, archive extraction) are covered by Go benchmarks and tracked continuously on [CodSpeed](https://app.codspeed.io/task-otter/Taskotter).
+
+```bash
+go test -bench=. ./...
+```
+
+Running them the way CI does requires the [CodSpeed runner](https://codspeed.io/docs/cli):
+
+```bash
+codspeed run --mode walltime -- go test -bench=. ./...
 ```
 
 ## Security

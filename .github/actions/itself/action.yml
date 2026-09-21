@@ -1,0 +1,96 @@
+---
+name: TaskOtter CI
+description: Run TaskOtter to validate, fix, and update repository tooling
+
+inputs:
+  github-token:
+    description: GitHub token used by TaskOtter
+    required: true
+
+  fail-on-changes:
+    description: Fail when TaskOtter produces changes
+    required: false
+    default: "true"
+
+  store-version:
+    description: TaskOtter store version
+    required: false
+    default: v0.0.12
+
+  tasks:
+    description: TaskOtter tasks to run
+    required: false
+    default: |
+      go
+      go-junit-report
+      golangci-lint
+      govulncheck
+      yamllint
+      yamlfix
+      actionlint
+      zizmor
+      adrs
+      hadolint
+
+  js:
+    description: JavaScript runtime configuration
+    required: false
+    default: |
+      runtime: bun
+
+  includes-doc:
+    description: Include documentation
+    required: false
+    default: "true"
+
+  target-folder:
+    description: Target folder for TaskOtter
+    required: false
+    default: taskotter
+
+outputs:
+  changed:
+    description: Whether TaskOtter changed the repository
+    value: ${{ steps.taskotter.outputs.changed }}
+
+  source-sha:
+    description: Source SHA processed by TaskOtter
+    value: ${{ steps.taskotter.outputs.source-sha }}
+
+  pull-request-url:
+    description: Pull request URL created by TaskOtter
+    value: ${{ steps.taskotter.outputs.pull-request-url }}
+
+runs:
+  using: composite
+
+  steps:
+    - name: Check out repository
+      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      with:
+        fetch-depth: 0
+        persist-credentials: true
+
+    - name: TaskOtter
+      id: taskotter
+      uses: ./
+      with:
+        github-token: ${{ inputs.github-token }}
+        fail-on-changes: ${{ inputs.fail-on-changes }}
+        store-version: ${{ inputs.store-version }}
+        tasks: ${{ inputs.tasks }}
+        js: ${{ inputs.js }}
+        includes-doc: ${{ inputs.includes-doc }}
+        target-folder: ${{ inputs.target-folder }}
+
+    - name: Print result
+      if: always()
+      shell: bash
+      env:
+        TASKOTTER_CHANGED: ${{ steps.taskotter.outputs.changed }}
+        TASKOTTER_SOURCE_SHA: ${{ steps.taskotter.outputs.source-sha }}
+        TASKOTTER_PULL_REQUEST_URL: ${{ steps.taskotter.outputs.pull-request-url }}
+      run: |
+        echo "Changed: ${TASKOTTER_CHANGED}"
+        echo "Source SHA: ${TASKOTTER_SOURCE_SHA}"
+        echo "Pull request: ${TASKOTTER_PULL_REQUEST_URL}"

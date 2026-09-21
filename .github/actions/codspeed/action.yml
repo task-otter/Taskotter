@@ -1,0 +1,33 @@
+---
+name: CodSpeed Benchmarks
+description: Run Go benchmarks with CodSpeed
+
+inputs:
+  mode:
+    description: CodSpeed measurement mode
+    required: false
+    default: walltime
+
+  benchmark-command:
+    description: Command used to run Go benchmarks
+    required: false
+    default: go test -bench=. ./...
+
+runs:
+  using: composite
+  steps:
+    - name: Check out repository
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        persist-credentials: false
+
+    - name: Set up Go
+      uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      with:
+        go-version-file: go.mod
+
+    - name: Run benchmarks
+      uses: CodSpeedHQ/action@373d6868929f444bc08d901fd0eb0ad52a8875ea # v5.2.1
+      with:
+        mode: ${{ inputs.mode }}
+        run: ${{ inputs.benchmark-command }}

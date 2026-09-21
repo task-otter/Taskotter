@@ -1,0 +1,47 @@
+---
+name: Go CI
+description: Run Task-based CI, autofix issues, generate test reports, and upload coverage/results to Codecov
+
+runs:
+  using: composite
+  steps:
+    - name: Check out repository
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        persist-credentials: false
+
+    - name: Install Task
+      uses: go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e
+
+    - name: Run CI and fix fixable issues
+      shell: bash
+      run: task taskotter:ci:fix
+
+    - name: Autofix
+      uses: autofix-ci/action@c5b2d67aa2274e7b5a18224e8171550871fc7e4a # v1.3.4
+
+    - name: Generate Tests Report
+      shell: bash
+      run: task taskotter:go-junit-report:report
+
+    - name: Upload Coverage Report To Codecov
+      uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
+      with:
+        use_oidc: true
+        files: ./coverage.out
+        report_type: coverage
+        name: coverage
+        disable_search: false
+        fail_ci_if_error: true
+        verbose: true
+
+    - name: Upload Test Report to Codecov
+      uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
+      with:
+        use_oidc: true
+        report_type: test_results
+        files: ./junit.xml
+        disable_search: false
+        name: go-test-results
+        fail_ci_if_error: true
+        verbose: true

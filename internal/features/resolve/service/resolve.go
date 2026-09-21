@@ -271,6 +271,11 @@ func similarity(left, right string) int {
 	return levenshtein(left, right)
 }
 
+// Levenshtein calculates the string distance similarity score between left and right.
+func Levenshtein(left, right string) int {
+	return levenshtein(left, right)
+}
+
 func levenshtein(left, right string) int {
 	if left == right {
 		return scoreIdenticalString

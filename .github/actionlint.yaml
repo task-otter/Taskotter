@@ -1,5 +1,6 @@
 ---
 # CodSpeed macro runners are hosted by CodSpeed, so actionlint cannot know them.
+# Declared ahead of switching the benchmark job over to them.
 self-hosted-runner:
   labels:
     - codspeed-macro

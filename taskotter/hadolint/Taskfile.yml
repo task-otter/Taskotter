@@ -12,12 +12,15 @@ silent: true
 includes:
   nix:
     taskfile: ../nix/Taskfile.yml
+  winget:
+    taskfile: ../winget/Taskfile.yml
 
 vars:
   HADOLINT_CONFIG: '{{.HADOLINT_CONFIG | default ""}}'
   HADOLINT_DOCKERFILE: '{{.HADOLINT_DOCKERFILE | default "Dockerfile"}}'
   HADOLINT_EXTRA_ARGS: '{{.HADOLINT_EXTRA_ARGS | default ""}}'
   HADOLINT_NIX_INSTALLABLE: '{{.HADOLINT_NIX_INSTALLABLE | default "nixpkgs#hadolint"}}'
+  HADOLINT_WINGET_INSTALLABLE: '{{.HADOLINT_WINGET_INSTALLABLE | default "hadolint.hadolint"}}'
 
 tasks:
   default:
@@ -29,17 +32,37 @@ tasks:
 
   install:
     run: once
-    desc: Install hadolint via the Nix profile
+    desc: Install hadolint via Nix (Unix) or WinGet (Windows)
     summary: |
-      Install hadolint into the user Nix profile when it is not already
-      available on PATH. Override the HADOLINT_NIX_INSTALLABLE
-      variable to pin a different package or version.
+      Install hadolint on Linux and macOS via the user Nix profile, and on
+      Windows via WinGet, when it is not already on PATH. Override
+      HADOLINT_NIX_INSTALLABLE or HADOLINT_WINGET_INSTALLABLE to pin a
+      different package or version.
+    cmds:
+      - task: _install:unix
+      - task: _install:windows
+
+  _install:unix:
+    internal: true
+    platforms: [linux, darwin]
     status:
       - command -v hadolint >/dev/null 2>&1
     cmds:
       - task: nix:install:profile
         vars:
           NIX_INSTALLABLE: "{{.HADOLINT_NIX_INSTALLABLE}}"
+
+  _install:windows:
+    internal: true
+    platforms: [windows]
+    status:
+      - >-
+        powershell -NoProfile -ExecutionPolicy Bypass -Command
+        "{{.WINGET_LOAD}}; hadolint --version; exit \$LASTEXITCODE"
+    cmds:
+      - task: winget:install:package
+        vars:
+          WINGET_INSTALLABLE: "{{.HADOLINT_WINGET_INSTALLABLE}}"
 
   version:
     run: once
@@ -65,23 +88,42 @@ tasks:
     deps:
       - task: install
     cmds:
-      - cmd: |
-          bash -lc '{{.NIX_LOAD}};
-          dockerfile="{{.HADOLINT_DOCKERFILE}}"
-          hadolint \
-            {{if .CLI_ARGS}}{{.CLI_ARGS}} \
-            {{else}}{{if .HADOLINT_CONFIG}}--config "{{.HADOLINT_CONFIG}}"{{end}} \
-            "$dockerfile" {{.HADOLINT_EXTRA_ARGS}}{{end}} \
-            && echo "✅ hadolint passed" || { echo "❌ hadolint failed"; exit 1; }'
-        platforms: [linux, darwin]
-      - cmd: >-
+      - task: _ci:unix
+      - task: _ci:windows
+
+  _ci:unix:
+    run: once
+    internal: true
+    platforms: [linux, darwin]
+    dir: "{{.USER_WORKING_DIR}}"
+    cmds:
+      - |
+        bash -lc '{{.NIX_LOAD}};
+        dockerfile="{{.HADOLINT_DOCKERFILE}}"
+        hadolint \
+          {{if .CLI_ARGS}}{{.CLI_ARGS}} \
+          {{else}}{{if .HADOLINT_CONFIG}}--config "{{.HADOLINT_CONFIG}}"{{end}} \
+          "$dockerfile" {{.HADOLINT_EXTRA_ARGS}}{{end}} \
+          && echo "✅ hadolint passed" || { echo "❌ hadolint failed"; exit 1; }'
+
+  _ci:windows:
+    run: once
+    internal: true
+    platforms: [windows]
+    dir: "{{.USER_WORKING_DIR}}"
+    preconditions:
+      - sh: >-
           powershell -NoProfile -ExecutionPolicy Bypass -Command
-          "$dockerfile='{{.HADOLINT_DOCKERFILE}}';
-          hadolint {{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}
-            {{if .HADOLINT_CONFIG}}--config '{{.HADOLINT_CONFIG}}'{{end}}
-            $dockerfile {{.HADOLINT_EXTRA_ARGS}}{{end}};
-          exit $LASTEXITCODE"
-        platforms: [windows]
+          "{{.WINGET_LOAD}}; hadolint --version; exit \$LASTEXITCODE"
+        msg: hadolint is not installed or not available in PATH.
+    cmds:
+      - >-
+        powershell -NoProfile -ExecutionPolicy Bypass -Command
+        "{{.WINGET_LOAD}}; \$dockerfile='{{.HADOLINT_DOCKERFILE}}';
+        hadolint {{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}
+          {{if .HADOLINT_CONFIG}}--config '{{.HADOLINT_CONFIG}}'{{end}}
+          \$dockerfile {{.HADOLINT_EXTRA_ARGS}}{{end}};
+        exit \$LASTEXITCODE"
 
   _version:unix:
     run: once
@@ -101,8 +143,9 @@ tasks:
     preconditions:
       - sh: >-
           powershell -NoProfile -ExecutionPolicy Bypass -Command
-          "if (Get-Command hadolint -ErrorAction SilentlyContinue) {
-          exit 0 } else { exit 1 }"
+          "{{.WINGET_LOAD}}; hadolint --version; exit \$LASTEXITCODE"
         msg: hadolint is not installed or not available in PATH.
     cmds:
-      - hadolint --version
+      - >-
+        powershell -NoProfile -ExecutionPolicy Bypass -Command
+        "{{.WINGET_LOAD}}; hadolint --version; exit \$LASTEXITCODE"

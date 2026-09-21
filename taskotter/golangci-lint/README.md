@@ -76,7 +76,7 @@ task golangci-lint:fmt
 ```
 
 The formatter runs `golangci-lint fmt` with `gci`, `gofmt`, `gofumpt`,
-`goimports`, `golines`, and `swaggo` enabled. It defaults to `.` and accepts
+`goimports`, and `golines` enabled. It defaults to `.` and accepts
 CLI arguments after `--`:
 
 ```sh
@@ -93,7 +93,7 @@ task golangci-lint:fmt -- ./internal/...
 | `ci:fix`      | Run `fmt` then `lint:fix` for CI |
 | `fmt`         | Format Go files with golangci-lint formatters            |
 | `fmt:check`   | Check Go formatting with golangci-lint formatters         |
-| `install` | Install golangci-lint via the Nix profile |
+| `install` | Install golangci-lint via Nix (Unix) or WinGet (Windows) |
 | `version` | Show the active golangci-lint version |
 
 ## Variables
@@ -101,12 +101,14 @@ task golangci-lint:fmt -- ./internal/...
 | Variable                             | Default                                   | Description                                                      |
 | ------------------------------------- | ------------------------------------------ | ------------------------------------------------------------------ |
 | `GOLANGCI_LINT_NIX_INSTALLABLE`       | `nixpkgs#go nixpkgs#golangci-lint`         | Flake installables passed to `nix:install:profile` (Go plus the linter) |
-| `GOLANGCI_LINT_FMT_FORMATTER_FLAGS`   | `-E gci -E gofmt -E gofumpt -E goimports -E golines -E swaggo` | Formatter set passed to `golangci-lint fmt`     |
+| `GOLANGCI_LINT_WINGET_INSTALLABLE` | `GolangCI.golangci-lint` | WinGet package ID for `winget:install:package` |
+| `GOLANGCI_LINT_FMT_FORMATTER_FLAGS`   | `-E gci -E gofmt -E gofumpt -E goimports -E golines` | Formatter set passed to `golangci-lint fmt`     |
 
 Pin a revision by overriding the installable, for example
 `GOLANGCI_LINT_NIX_INSTALLABLE=github:NixOS/nixpkgs/<rev>#golangci-lint`.
 
 ## Notes
 
-- Install goes through `nix:install:profile` (Nix is installed first if missing). Native Windows is not supported; use WSL2.
-- golangci-lint needs `go` on PATH, so the default installable includes both `nixpkgs#go` and `nixpkgs#golangci-lint`.
+- Install uses Nix on Linux and macOS (`GOLANGCI_LINT_NIX_INSTALLABLE`) and WinGet on Windows (`GOLANGCI_LINT_WINGET_INSTALLABLE`, default `GolangCI.golangci-lint`).
+
+- On Unix the default Nix installable includes both `nixpkgs#go` and `nixpkgs#golangci-lint`. On Windows, `go:install` runs first, then WinGet installs golangci-lint.

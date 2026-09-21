@@ -39,7 +39,7 @@ task yamllint:ci
 | -------------- | ----------------------------------------------- |
 | `ci`           | Strict lint for CI (fails on warnings)          |
 | `config:init`  | Create a default `.yamllint` configuration file |
-| `install`      | Install yamllint via the Nix profile            |
+| `install`      | Install yamllint via Nix (Unix) or uv tool (Windows) |
 | `version`      | Show the active yamllint version                |
 
 ## Variables
@@ -47,6 +47,7 @@ task yamllint:ci
 | Variable     | Default   | Description                                      |
 | ------------ | --------- | ------------------------------------------------ |
 | `YAMLLINT_NIX_INSTALLABLE` | `nixpkgs#yamllint` | Flake installable passed to `nix:install:profile` |
+| `YAMLLINT_UV_TOOL` | `yamllint` | uv tool name passed to `uv:tool:install` on Windows |
 | `YAMLLINT_TARGETS`    | `.`       | Files or directories to lint                     |
 | `YAMLLINT_CONFIG`     | _(empty)_ | Path to a yamllint config file passed via `-c`   |
 | `YAMLLINT_EXTRA_ARGS` | _(empty)_ | Extra flags forwarded to `yamllint` |
@@ -56,7 +57,7 @@ Pin a revision by overriding the installable, for example
 
 ## Notes
 
-- Install goes through `nix:install:profile` (Nix is installed first if missing). Native Windows is not supported; use WSL2.
+- Unix install uses Nix (`YAMLLINT_NIX_INSTALLABLE`). Windows installs via `uv:tool:install` (`YAMLLINT_UV_TOOL`).
 
 **`config:init`** writes a `.yamllint` file in the current directory and is
 skipped if the file already exists. To regenerate, delete `.yamllint` first.

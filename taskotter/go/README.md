@@ -6,9 +6,8 @@ A Taskfile for running Go unit tests, benchmarks, and fuzz targets. The Go
 toolchain is installed through `nix:install:profile`.
 
 Linting and formatting live in the [`golangci-lint`](../golangci-lint/README.md)
-Taskfile, vulnerability scanning lives in the
-[`govulncheck`](../govulncheck/README.md) Taskfile, and JUnit XML conversion
-lives in the [`go-junit-report`](../go-junit-report/README.md) Taskfile.
+Taskfile, and JUnit XML conversion lives in the
+[`go-junit-report`](../go-junit-report/README.md) Taskfile.
 
 ## Usage
 
@@ -81,7 +80,8 @@ Pin a revision by overriding the installable, for example
 | `test`   | Run Go unit tests                    |
 | `bench`  | Run Go benchmarks                    |
 | `fuzz`   | Run a Go fuzz target                 |
-| `install` | Install Go via the Nix profile |
+| `install` | Install Go via Nix (Unix) or WinGet (Windows) |
+| `install:pkg` | Install a Go package with `go install` (`GO_PKG`) |
 | `version` | Show the active Go version |
 
 ## Variables
@@ -89,9 +89,15 @@ Pin a revision by overriding the installable, for example
 | Variable             | Default      | Description                                       |
 | -------------------- | ------------ | ------------------------------------------------- |
 | `GO_NIX_INSTALLABLE` | `nixpkgs#go` | Flake installable passed to `nix:install:profile` |
+| `GO_WINGET_INSTALLABLE` | `GoLang.Go` | WinGet package ID for `winget:install:package` |
 | `GO_FUZZTIME`        | empty (`30s`) | Duration a single `fuzz` target runs before stopping |
+| `GO_PKG`             | empty        | Module path for `install:pkg`; required when running that task |
+| `GO_LOAD`            | reloads User Path; prepends GOPATH\bin | PowerShell snippet so `go`-installed tools from earlier in the same Task process are on PATH |
 
 ## Notes
 
-- Install goes through `nix:install:profile` (Nix is installed first if missing). Native Windows is not supported; use WSL2.
-- `test`, `bench`, `fuzz`, `which`, and `verify` auto-install Go.
+- Install uses Nix on Linux and macOS (`GO_NIX_INSTALLABLE`) and WinGet on Windows (`GO_WINGET_INSTALLABLE`, default `GoLang.Go`).
+
+- `test`, `bench`, `fuzz`, `which`, `verify`, and `install:pkg` auto-install Go.
+
+- On Windows, `install:pkg` prepends `$(go env GOPATH)\bin` to the User Path when missing.

@@ -44,7 +44,7 @@ task zizmor:version
 | Task | Description |
 |---|---|
 | `ci` | Audit GitHub Actions workflows for security issues |
-| `install` | Install zizmor via the Nix profile |
+| `install` | Install zizmor via Nix (Unix) or WinGet (Windows) |
 | `version` | Show the active zizmor version |
 
 ## Variables
@@ -52,6 +52,7 @@ task zizmor:version
 | Variable | Default | Description |
 |---|---|---|
 | `ZIZMOR_NIX_INSTALLABLE` | `nixpkgs#zizmor` | Flake installable passed to `nix:install:profile` |
+| `ZIZMOR_WINGET_INSTALLABLE` | `zizmor.zizmor` | WinGet package ID for `winget:install:package` |
 | `ZIZMOR_EXTRA_ARGS` | `"--offline"` | Additional flags passed to `zizmor` (e.g. `--format`, `--min-severity`, `--gh-token`) |
 | `ZIZMOR_TARGETS` | `".github"` | Path to audit; scans workflows and composite actions under `.github` |
 
@@ -60,5 +61,6 @@ Pin a revision by overriding the installable, for example
 
 ## Notes
 
-- Install goes through `nix:install:profile` (Nix is installed first if missing). Native Windows is not supported; use WSL2.
+- Install uses Nix on Linux and macOS (`ZIZMOR_NIX_INSTALLABLE`) and WinGet on Windows (`ZIZMOR_WINGET_INSTALLABLE`, default `zizmor.zizmor`).
+
 - The `ci` task auto-installs zizmor if it is not already present in `PATH`.

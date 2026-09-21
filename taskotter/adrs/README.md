@@ -47,7 +47,7 @@ Pass arguments and flags with `ADRS_EXTRA_ARGS=...` or after `--`.
 | `list` | List all ADRs |
 | `generate` | Generate ADR docs (`toc`, `graph`, or `book`) |
 | `exec` | Run any adrs subcommand |
-| `install` | Install adrs via the Nix profile |
+| `install` | Install adrs via Nix (Unix) or cargo install (Windows) |
 | `version` | Show the active adrs version |
 
 ## Variables
@@ -55,6 +55,7 @@ Pass arguments and flags with `ADRS_EXTRA_ARGS=...` or after `--`.
 | Variable | Default | Description |
 |---|---|---|
 | `ADRS_NIX_INSTALLABLE` | `nixpkgs#adrs` | Flake installable passed to `nix:install:profile` |
+| `ADRS_CARGO_CRATE` | `adrs` | Crate name for Windows `cargo:install:crate` |
 | `ADRS_EXTRA_ARGS` | `""` | Arguments and flags appended to the adrs subcommand |
 
 Pin a revision by overriding the installable, for example
@@ -62,4 +63,6 @@ Pin a revision by overriding the installable, for example
 
 ## Notes
 
-- Install goes through `nix:install:profile` (Nix is installed first if missing). Native Windows is not supported; use WSL2.
+- Unix install uses Nix (`ADRS_NIX_INSTALLABLE`). Windows installs via
+  `cargo:install:crate` (`ADRS_CARGO_CRATE`).
+

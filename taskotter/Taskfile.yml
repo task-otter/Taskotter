@@ -76,11 +76,14 @@ vars:
   GOLANGCI_LINT_WINGET_INSTALLABLE: '{{.GOLANGCI_LINT_WINGET_INSTALLABLE | default "GolangCI.golangci-lint"}}'
   GO_JUNIT_REPORT_GO_PKG: '{{.GO_JUNIT_REPORT_GO_PKG | default "github.com/jstemmer/go-junit-report/v2@latest"}}'
   GO_LOAD: >-
-    {{.GO_LOAD | default ` \$u = [Environment]::GetEnvironmentVariable('Path', 'User'); if (\$u) { \$env:Path = \$u + ';' + \$env:Path }; if (Get-Command go -ErrorAction SilentlyContinue) {
-
+    {{.GO_LOAD | default `
+    \$u = [Environment]::GetEnvironmentVariable('Path', 'User');
+    if (\$u) { \$env:Path = \$u + ';' + \$env:Path };
+    if (Get-Command go -ErrorAction SilentlyContinue) {
       \$goBin = Join-Path ((go env GOPATH).Trim()) 'bin';
       if (Test-Path -LiteralPath \$goBin) { \$env:Path = \$goBin + ';' + \$env:Path }
-    } `}}
+    }
+    `}}
   GO_PKG: '{{.GO_PKG | default ""}}'
   GO_WINGET_INSTALLABLE: '{{.GO_WINGET_INSTALLABLE | default "GoLang.Go"}}'
   HADOLINT_WINGET_INSTALLABLE: '{{.HADOLINT_WINGET_INSTALLABLE | default "hadolint.hadolint"}}'

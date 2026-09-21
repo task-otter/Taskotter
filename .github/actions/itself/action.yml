@@ -24,7 +24,6 @@ inputs:
       go
       go-junit-report
       golangci-lint
-      govulncheck
       yamllint
       yamlfix
       actionlint

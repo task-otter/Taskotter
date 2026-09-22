@@ -8,9 +8,10 @@ vars:
   ADRS_EXTRA_ARGS: ""
   ADRS_VERSION: ""
   CARGO_BIN_UNIX: "$HOME/.cargo/bin"
-  GOLANGCI_LINT_FMT_FORMATTER_FLAGS: >-
-    {{.GOLANGCI_LINT_FMT_FORMATTER_FLAGS | default "-E gci -E gofmt -E gofumpt
-    -E goimports -E golines"}}
+  GOLANGCI_LINT_FMT_FORMATTER_FLAGS: |-
+    >-
+        {{.GOLANGCI_LINT_FMT_FORMATTER_FLAGS | default "-E gci -E gofmt -E gofumpt
+        -E goimports -E golines"}}
   GOLANGCI_LINT_FMT_SKIP_PATTERN: ""
   GOLANGCI_LINT_INTERNAL_SKIP_CONFIG: ".golangci-taskotter-skip.yml"
   GOLANGCI_LINT_LINT_SKIP_PATTERN: ""
@@ -76,15 +77,16 @@ vars:
   ADRS_CARGO_CRATE: '{{.ADRS_CARGO_CRATE | default "adrs"}}'
   GOLANGCI_LINT_WINGET_INSTALLABLE: '{{.GOLANGCI_LINT_WINGET_INSTALLABLE | default "GolangCI.golangci-lint"}}'
   GO_JUNIT_REPORT_GO_PKG: '{{.GO_JUNIT_REPORT_GO_PKG | default "github.com/jstemmer/go-junit-report/v2@latest"}}'
-  GO_LOAD: >-
-    {{.GO_LOAD | default `
-    \$u = [Environment]::GetEnvironmentVariable('Path', 'User');
-    if (\$u) { \$env:Path = \$u + ';' + \$env:Path };
-    if (Get-Command go -ErrorAction SilentlyContinue) {
-      \$goBin = Join-Path ((go env GOPATH).Trim()) 'bin';
-      if (Test-Path -LiteralPath \$goBin) { \$env:Path = \$goBin + ';' + \$env:Path }
-    }
-    `}}
+  GO_LOAD: |-
+    >-
+        {{.GO_LOAD | default `
+        \$u = [Environment]::GetEnvironmentVariable('Path', 'User');
+        if (\$u) { \$env:Path = \$u + ';' + \$env:Path };
+        if (Get-Command go -ErrorAction SilentlyContinue) {
+          \$goBin = Join-Path ((go env GOPATH).Trim()) 'bin';
+          if (Test-Path -LiteralPath \$goBin) { \$env:Path = \$goBin + ';' + \$env:Path }
+        }
+        `}}
   GO_PKG: '{{.GO_PKG | default ""}}'
   GO_WINGET_INSTALLABLE: '{{.GO_WINGET_INSTALLABLE | default "GoLang.Go"}}'
   HADOLINT_WINGET_INSTALLABLE: '{{.HADOLINT_WINGET_INSTALLABLE | default "hadolint.hadolint"}}'

@@ -13,7 +13,7 @@ vars:
         {{.GOLANGCI_LINT_FMT_FORMATTER_FLAGS | default "-E gci -E gofmt -E gofumpt
         -E goimports -E golines"}}
   GOLANGCI_LINT_FMT_SKIP_PATTERN: ""
-  GOLANGCI_LINT_INTERNAL_SKIP_CONFIG: {{.GOLANGCI_LINT_INTERNAL_SKIP_CONFIG | default ".golangci-taskotter-skip.yml"}}
+  GOLANGCI_LINT_INTERNAL_SKIP_CONFIG: {? {.GOLANGCI_LINT_INTERNAL_SKIP_CONFIG | default ".golangci-taskotter-skip.yml": ''} : ''}
   GOLANGCI_LINT_LINT_SKIP_PATTERN: ""
   GOLANGCI_LINT_VERSION: ""
   GOVULNCHECK_LINT_SKIP_PATTERN: ""

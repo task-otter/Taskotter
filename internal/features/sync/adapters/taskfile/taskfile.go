@@ -1953,10 +1953,18 @@ func includeVarsNode(moduleVars *yaml.Node) *yaml.Node {
 	for idx := consts.IndexZero; idx < len(moduleVars.Content); idx += yamlMappingPairKeyValue {
 		key := moduleVars.Content[idx].Value
 
+		// original value node from module vars (value at idx+1)
+		origVal := cloneYAMLNode(moduleVars.Content[idx+1])
+
+		// If scalar without default wrapper, wrap it as overridable default
+		if origVal.Kind == yaml.ScalarNode && !strings.Contains(origVal.Value, "| default") {
+			origVal = overridableRootVar(key, origVal)
+		}
+
 		appendMappingPair(
 			out,
 			cloneYAMLNode(moduleVars.Content[idx]),
-			rootVarReference(key),
+			origVal,
 		)
 	}
 

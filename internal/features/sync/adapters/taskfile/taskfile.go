@@ -1055,28 +1055,28 @@ func overlayOneRawVar(dst, src map[string]string, key string) {
 }
 
 func placeholderRootBlockVars(root *yaml.Node, raw map[string]string) {
-	rootVars := findMappingValue(root, keyVars)
-	if rootVars == nil {
-		return
-	}
-
-	placeholderVarsMapping(rootVars, raw)
+    rootVars := findMappingValue(root, keyVars)
+    if rootVars == nil {
+        return
+    }
+    for k, v := range raw {
+        replaceOrAppendScalar(rootVars, k, v)
+    }
 }
+
+
 
 func placeholderVarsMapping(rootVars *yaml.Node, raw map[string]string) {
-	keys := rawVarKeysLongestFirst(raw)
-
-	for i := range keys {
-		placeholderOneRootVar(rootVars, keys[i], raw[keys[i]])
-	}
+    // No placeholder processing; vars already copied directly.
 }
 
-func placeholderOneRootVar(rootVars *yaml.Node, key, raw string) {
-	if raw == consts.Empty {
+
+
 		return
 	}
 
-	replaceOrAppendScalar(rootVars, key, rawVarPlaceholder(key))
+	// copy raw var value directly without placeholder
+	replaceOrAppendScalar(rootVars, key, raw)
 }
 
 func replaceOrAppendScalar(mapNode *yaml.Node, key, value string) {
@@ -1100,13 +1100,10 @@ func marshalRootWithRawVars(node *yaml.Node, raw map[string]string) ([]byte, err
 }
 
 func spliceRawPromotedVars(out []byte, raw map[string]string) []byte {
-	keys := rawVarKeysLongestFirst(raw)
+    // No placeholder splicing needed; vars are already copied directly.
+    return out
+}
 
-	for i := range keys {
-		out = spliceOneRawVar(out, keys[i], raw[keys[i]])
-	}
-
-	return out
 }
 
 func spliceOneRawVar(out []byte, key, value string) []byte {

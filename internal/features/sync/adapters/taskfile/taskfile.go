@@ -1072,12 +1072,9 @@ func placeholderVarsMapping(rootVars *yaml.Node, raw map[string]string) {
 
 
 
-		return
-	}
 
-	// copy raw var value directly without placeholder
-	replaceOrAppendScalar(rootVars, key, raw)
-}
+
+
 
 func replaceOrAppendScalar(mapNode *yaml.Node, key, value string) {
 	node := yamlScalar(value)
@@ -1104,7 +1101,7 @@ func spliceRawPromotedVars(out []byte, raw map[string]string) []byte {
     return out
 }
 
-}
+
 
 func spliceOneRawVar(out []byte, key, value string) []byte {
 	if value == consts.Empty {

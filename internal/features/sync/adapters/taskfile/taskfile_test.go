@@ -511,6 +511,61 @@ func assertGeneratedTasksAndPromotedVars(t *testing.T, text string) {
 	assertContainsNone(t, text, []string{"echo user lint", "previously generated"})
 }
 
+// TestUpdateRootTaskfileCopiesFoldedVarsVerbatim verifies folded `>-` module
+// vars keep their original characters when promoted to the root Taskfile.
+func TestUpdateRootTaskfileCopiesFoldedVarsVerbatim(t *testing.T) {
+	t.Parallel()
+
+	out, err := taskfile.UpdateRootTaskfile(taskfile.NewRootTemplate(), foldedGoLoadRootInput())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !strings.Contains(string(out), foldedGoLoadValue()) {
+		t.Fatalf("expected folded GO_LOAD copy in root Taskfile:\n%s", out)
+	}
+
+	assertContainsNone(t, string(out), []string{
+		"TASKOTTER_RAW_VAR_GO_LOAD_Z",
+		"default ` $u",
+	})
+}
+
+func foldedGoLoadRootInput() *rootupd.RootUpdateInput {
+	input := goOnlyRootInput()
+
+	input.ModuleTaskfiles = map[string][]byte{consts.Go: foldedGoLoadModuleTaskfile()}
+
+	return input
+}
+
+func foldedGoLoadModuleTaskfile() []byte {
+	return []byte(`version: "3"
+vars:
+  GO_LOAD: >-
+    {{.GO_LOAD | default ` + "`" + `
+    \$u = [Environment]::GetEnvironmentVariable('Path', 'User');
+    if (\$u) { \$env:Path = \$u + ';' + \$env:Path };
+    if (Get-Command go -ErrorAction SilentlyContinue) {
+      \$goBin = Join-Path ((go env GOPATH).Trim()) 'bin';
+      if (Test-Path -LiteralPath \$goBin) { \$env:Path = \$goBin + ';' + \$env:Path }
+    }
+    ` + "`" + `}}
+`)
+}
+
+func foldedGoLoadValue() string {
+	return `>-
+    {{.GO_LOAD | default ` + "`" + `
+    \$u = [Environment]::GetEnvironmentVariable('Path', 'User');
+    if (\$u) { \$env:Path = \$u + ';' + \$env:Path };
+    if (Get-Command go -ErrorAction SilentlyContinue) {
+      \$goBin = Join-Path ((go env GOPATH).Trim()) 'bin';
+      if (Test-Path -LiteralPath \$goBin) { \$env:Path = \$goBin + ';' + \$env:Path }
+    }
+    ` + "`" + `}}`
+}
+
 func assertContainsAll(t *testing.T, text string, wants []string) {
 	t.Helper()
 

@@ -76,6 +76,7 @@ type (
 	promotedVarParams struct {
 		root         *yaml.Node
 		moduleVars   map[string]*yaml.Node
+		rawVars      map[string]string
 		promotedVars map[string]struct{}
 		tasks        []string
 	}
@@ -84,9 +85,23 @@ type (
 	addPromotedVarParams struct {
 		rootVars   *yaml.Node
 		moduleVars map[string]*yaml.Node
+		rawVars    map[string]string
 		existing   map[string]struct{}
 		key        string
 		tasks      []string
+	}
+
+	// rootVarsResult is parsed module vars plus first-wins original block YAML.
+	rootVarsResult struct {
+		byTask yamlNodeMap
+		raw    map[string]string
+	}
+
+	// extractedVars is one module Taskfile's vars mapping and block-scalar YAML.
+	extractedVars struct {
+		node *yaml.Node
+		raw  map[string]string
+		ok   bool
 	}
 
 	// mergeModuleVarParams carries state for merging one module var into an include.
@@ -188,6 +203,9 @@ const (
 
 	errParseTaskfileRoot  = "parse taskfile root: %w"
 	errMarshalAndValidate = "marshal and validate: %w"
+	rawVarPlaceholderPref = "TASKOTTER_RAW_VAR_"
+	rawVarPlaceholderSuf  = "_Z"
+	yamlNewlineCutset     = "\r\n"
 )
 
 var errNoModuleVars = errors.New("module Taskfile has no vars")
@@ -964,6 +982,8 @@ func includeDirForRoot(rootDir string) string {
 }
 
 // UpdateRootTaskfile merges managed module includes into the root Taskfile.
+// Folded and literal module vars are copied from the module YAML bytes so
+// characters inside `>-` / `|` blocks are not rewritten by the encoder.
 func UpdateRootTaskfile(content []byte, input *rootUpdateInput) ([]byte, error) {
 	node, root, err := parseTaskfileRoot(
 		content,
@@ -983,19 +1003,74 @@ func UpdateRootTaskfile(content []byte, input *rootUpdateInput) ([]byte, error) 
 }
 
 func marshalUpdatedRootTaskfile(node, root *yaml.Node, input *rootUpdateInput) ([]byte, error) {
+	raw, err := applyPreparedRoot(root, input)
+	if err != nil {
+		return nil, fmt.Errorf("apply prepared root: %w", err)
+	}
+
+	return marshalRootWithRawVars(node, raw)
+}
+
+func applyPreparedRoot(root *yaml.Node, input *rootUpdateInput) (map[string]string, error) {
 	setRootTaskfileVersion(root)
 
-	err := applyRootUpdates(root, input)
+	raw, err := applyRootUpdates(root, input)
 	if err != nil {
 		return nil, fmt.Errorf("apply root updates: %w", err)
 	}
 
+	return raw, nil
+}
+
+func marshalRootWithRawVars(node *yaml.Node, raw map[string]string) ([]byte, error) {
 	out, err := marshalRootTaskfile(node)
 	if err != nil {
 		return nil, fmt.Errorf("marshal root taskfile: %w", err)
 	}
 
-	return out, nil
+	return spliceRawPromotedVars(out, raw), nil
+}
+
+func spliceRawPromotedVars(out []byte, raw map[string]string) []byte {
+	keys := rawVarKeysLongestFirst(raw)
+
+	for i := range keys {
+		out = spliceOneRawVar(out, keys[i], raw[keys[i]])
+	}
+
+	return out
+}
+
+func spliceOneRawVar(out []byte, key, value string) []byte {
+	if value == consts.Empty {
+		return out
+	}
+
+	return bytes.ReplaceAll(out, []byte(rawVarPlaceholder(key)), []byte(value))
+}
+
+func rawVarKeysLongestFirst(raw map[string]string) []string {
+	keys := make([]string, consts.IndexZero, len(raw))
+
+	for key := range raw {
+		keys = append(keys, key)
+	}
+
+	slices.SortFunc(keys, cmpLongerKeyFirst)
+
+	return keys
+}
+
+func cmpLongerKeyFirst(left, right string) int {
+	if len(left) != len(right) {
+		return len(right) - len(left)
+	}
+
+	return cmp.Compare(left, right)
+}
+
+func rawVarPlaceholder(key string) string {
+	return rawVarPlaceholderPref + key + rawVarPlaceholderSuf
 }
 
 func marshalRootTaskfile(node *yaml.Node) ([]byte, error) {
@@ -1007,41 +1082,55 @@ func marshalRootTaskfile(node *yaml.Node) ([]byte, error) {
 	return out, nil
 }
 
-func applyRootUpdates(root *yaml.Node, input *rootUpdateInput) error {
-	moduleVars, err := applyRootVars(root, input)
+func applyRootUpdates(root *yaml.Node, input *rootUpdateInput) (map[string]string, error) {
+	result, err := applyRootVars(root, input)
 	if err != nil {
-		return fmt.Errorf("apply root vars: %w", err)
+		return nil, fmt.Errorf("apply root vars: %w", err)
 	}
 
-	err = applyRootIncludesAndTasks(root, &includesUpdateParams{
+	err = applyRootIncludesAndTasks(root, includesParamsWithVars(input, result.byTask))
+	if err != nil {
+		return nil, fmt.Errorf("apply root includes and tasks: %w", err)
+	}
+
+	return result.raw, nil
+}
+
+func includesParamsWithVars(input *rootUpdateInput, moduleVars yamlNodeMap) *includesUpdateParams {
+	return &includesUpdateParams{
 		includesNode: nil,
 		existing:     nil,
 		input:        input,
 		moduleVars:   moduleVars,
-	})
-	if err != nil {
-		return fmt.Errorf("apply root includes and tasks: %w", err)
 	}
-
-	return nil
 }
 
-func applyRootVars(root *yaml.Node, input *rootUpdIn) (yamlNodeMap, error) {
-	moduleVars, err := moduleVarsByTask(input)
+func applyRootVars(root *yaml.Node, input *rootUpdIn) (*rootVarsResult, error) {
+	result, err := moduleVarsByTask(input)
 	if err != nil {
 		return nil, fmt.Errorf("module vars by task: %w", err)
 	}
 
-	promotedVars := promotedModuleVarNames(input.Tasks, moduleVars)
-
-	err = upsertRootPromotedVars(&promotedVarParams{
-		root: root, tasks: input.Tasks, moduleVars: moduleVars, promotedVars: promotedVars,
-	})
+	err = upsertRootPromotedVars(newPromotedVarParams(root, input, result))
 	if err != nil {
 		return nil, fmt.Errorf("upsert root promoted vars: %w", err)
 	}
 
-	return moduleVars, nil
+	return result, nil
+}
+
+func newPromotedVarParams(
+	root *yaml.Node,
+	input *rootUpdIn,
+	result *rootVarsResult,
+) *promotedVarParams {
+	return &promotedVarParams{
+		root:         root,
+		tasks:        input.Tasks,
+		moduleVars:   result.byTask,
+		rawVars:      result.raw,
+		promotedVars: promotedModuleVarNames(input.Tasks, result.byTask),
+	}
 }
 
 func applyRootIncludesAndTasks(root *yaml.Node, params *includesUpdateParams) error {
@@ -1303,11 +1392,33 @@ func setOrAppendMappingScalar(entry *yaml.Node, key, value string) {
 }
 
 func extractVarsNode(content []byte) (*yaml.Node, error) {
+	extracted, err := extractModuleVars(content)
+	if err != nil {
+		return nil, err
+	}
+
+	return extracted.node, nil
+}
+
+func extractModuleVars(content []byte) (*extractedVars, error) {
+	moduleVars, err := clonedModuleVarsNode(content)
+	if err != nil {
+		return nil, err
+	}
+
+	return newExtractedVars(content, moduleVars), nil
+}
+
+func clonedModuleVarsNode(content []byte) (*yaml.Node, error) {
 	root, err := parseModuleTaskfileNode(content)
 	if err != nil {
 		return nil, fmt.Errorf("parse module taskfile node: %w", err)
 	}
 
+	return clonedVarsMapping(root)
+}
+
+func clonedVarsMapping(root *yaml.Node) (*yaml.Node, error) {
 	varsNode := findMappingValue(root, keyVars)
 
 	if !hasModuleVars(varsNode) {
@@ -1315,6 +1426,186 @@ func extractVarsNode(content []byte) (*yaml.Node, error) {
 	}
 
 	return cloneYAMLNode(varsNode), nil
+}
+
+func newExtractedVars(content []byte, moduleVars *yaml.Node) *extractedVars {
+	return &extractedVars{
+		node: moduleVars,
+		raw:  extractRawBlockVars(content, moduleVars),
+		ok:   true,
+	}
+}
+
+func extractRawBlockVars(content []byte, varsNode *yaml.Node) map[string]string {
+	out := make(map[string]string)
+
+	appendRawBlockVars(out, content, varsNode)
+
+	return out
+}
+
+func appendRawBlockVars(out map[string]string, content []byte, varsNode *yaml.Node) {
+	if varsNode == nil {
+		return
+	}
+
+	for idx := consts.IndexZero; idx < len(varsNode.Content); idx += yamlMappingPairKeyValue {
+		putRawBlockVar(out, content, varsNode.Content[idx], varsNode.Content[idx+consts.IndexOne])
+	}
+}
+
+func putRawBlockVar(out map[string]string, content []byte, key, value *yaml.Node) {
+	if !shouldCopyRawVar(value) {
+		return
+	}
+
+	out[key.Value] = rawBlockYAML(content, key, value)
+}
+
+func shouldCopyRawVar(value *yaml.Node) bool {
+	return value != nil && value.Kind == yaml.ScalarNode &&
+		value.Line > consts.IndexZero && isBlockScalar(value)
+}
+
+func isBlockScalar(value *yaml.Node) bool {
+	return value.Style == yaml.FoldedStyle || value.Style == yaml.LiteralStyle ||
+		strings.Contains(value.Value, "\n")
+}
+
+func rawBlockYAML(content []byte, key, value *yaml.Node) string {
+	start := yamlLineColOffset(content, value.Line, value.Column)
+	end := blockScalarEnd(content, start, key.Column)
+
+	return trimRawBlock(content, start, end)
+}
+
+func trimRawBlock(content []byte, start, end int) string {
+	if start >= len(content) || end < start {
+		return consts.Empty
+	}
+
+	return string(bytes.TrimRight(content[start:end], yamlNewlineCutset))
+}
+
+func yamlLineColOffset(content []byte, line, column int) int {
+	return addColumnOffset(content, offsetOfLine(content, line), column)
+}
+
+func offsetOfLine(content []byte, line int) int {
+	if line <= consts.IndexOne {
+		return consts.IndexZero
+	}
+
+	return scanLineOffset(content, line)
+}
+
+func scanLineOffset(content []byte, line int) int {
+	current := consts.IndexOne
+
+	for i := range content {
+		current = nextYAMLLine(content[i], current)
+		if current == line {
+			return i + consts.IndexOne
+		}
+	}
+
+	return len(content)
+}
+
+func nextYAMLLine(b byte, current int) int {
+	if b != '\n' {
+		return current
+	}
+
+	return current + consts.IndexOne
+}
+
+func addColumnOffset(content []byte, offset, column int) int {
+	if column <= consts.IndexZero {
+		return offset
+	}
+
+	return clampOffset(len(content), offset+column-consts.IndexOne)
+}
+
+func clampOffset(length, offset int) int {
+	if offset > length {
+		return length
+	}
+
+	return offset
+}
+
+func blockScalarEnd(content []byte, start, keyColumn int) int {
+	end, found := scanBlockScalarEnd(content, start, keyColumn)
+	if found {
+		return end
+	}
+
+	return len(content)
+}
+
+func scanBlockScalarEnd(content []byte, start, keyColumn int) (int, bool) {
+	idx := start
+
+	for idx < len(content) {
+		next, done := advanceBlockLine(content, idx, keyColumn)
+		if done {
+			return next, true
+		}
+
+		idx = next
+	}
+
+	return consts.IndexZero, false
+}
+
+func advanceBlockLine(content []byte, idx, keyColumn int) (int, bool) {
+	next, ok := nextLineStart(content, idx)
+	if !ok {
+		return len(content), true
+	}
+
+	return next, isBlockEndLine(content[next:], keyColumn)
+}
+
+func nextLineStart(content []byte, idx int) (int, bool) {
+	nl := bytes.IndexByte(content[idx:], '\n')
+	if nl < consts.IndexZero {
+		return consts.IndexZero, false
+	}
+
+	return idx + nl + consts.IndexOne, true
+}
+
+func isBlockEndLine(line []byte, keyColumn int) bool {
+	prefix := linePrefix(line)
+	if isBlankYAMLLine(prefix) {
+		return false
+	}
+
+	return yamlIndentColumn(prefix) <= keyColumn
+}
+
+func linePrefix(line []byte) []byte {
+	nl := bytes.IndexByte(line, '\n')
+	if nl < consts.IndexZero {
+		return line
+	}
+
+	return line[:nl]
+}
+
+func isBlankYAMLLine(line []byte) bool {
+	return len(bytes.TrimSpace(line)) == consts.IndexZero
+}
+
+func yamlIndentColumn(line []byte) int {
+	return bytes.IndexFunc(line, notYAMLIndent) + consts.IndexOne
+}
+
+func notYAMLIndent(r rune) bool {
+	return r != ' ' && r != '\t'
 }
 
 func hasModuleVars(varsNode *yaml.Node) bool {
@@ -1341,25 +1632,30 @@ func parseModuleTaskfileNode(content []byte) (*yaml.Node, error) {
 	return node.Content[consts.IndexZero], nil
 }
 
-func moduleVarsByTask(input *rootUpdateInput) (map[string]*yaml.Node, error) {
-	out := make(map[string]*yaml.Node, len(input.Tasks))
+func moduleVarsByTask(input *rootUpdateInput) (*rootVarsResult, error) {
+	result := newRootVarsResult(len(input.Tasks))
 
 	for i := range input.Tasks {
-		task := input.Tasks[i]
-
-		err := addTaskModuleVar(out, input, task)
+		err := addTaskModuleVar(result, input, input.Tasks[i])
 		if err != nil {
-			return nil, fmt.Errorf("add task module var for %q: %w", task, err)
+			return nil, fmt.Errorf("add task module var for %q: %w", input.Tasks[i], err)
 		}
 	}
 
-	return out, nil
+	return result, nil
 }
 
-func addTaskModuleVar(out map[string]*yaml.Node, input *rootUpdateInput, task string) error {
-	moduleVars, include, err := moduleVarForTask(input.ModuleTaskfiles[task], task)
+func newRootVarsResult(n int) *rootVarsResult {
+	return &rootVarsResult{
+		byTask: make(map[string]*yaml.Node, n),
+		raw:    make(map[string]string),
+	}
+}
 
-	if errors.Is(err, errNoModuleVars) {
+func addTaskModuleVar(result *rootVarsResult, input *rootUpdateInput, task string) error {
+	extracted, err := moduleVarForTask(input.ModuleTaskfiles[task], task)
+
+	if skipMissingModuleVars(err) {
 		return nil
 	}
 
@@ -1367,38 +1663,50 @@ func addTaskModuleVar(out map[string]*yaml.Node, input *rootUpdateInput, task st
 		return fmt.Errorf("module var for task %q: %w", task, err)
 	}
 
-	if include {
-		out[task] = moduleVars
-	}
+	storeExtractedVars(result, task, extracted)
 
 	return nil
 }
 
-func moduleVarForTask(content []byte, task string) (*yaml.Node, bool, error) {
-	moduleVars, ok, err := tryExtractVarsNode(content)
+func skipMissingModuleVars(err error) bool {
+	return errors.Is(err, errNoModuleVars)
+}
 
-	if errors.Is(err, errNoModuleVars) {
-		return nil, false, errNoModuleVars
+func storeExtractedVars(result *rootVarsResult, task string, extracted *extractedVars) {
+	if extracted == nil || !extracted.ok {
+		return
+	}
+
+	result.byTask[task] = extracted.node
+	mergeFirstRawVars(result.raw, extracted.node, extracted.raw)
+}
+
+func mergeFirstRawVars(dst map[string]string, varsNode *yaml.Node, raw map[string]string) {
+	for key := range varKeySet(varsNode) {
+		lockFirstRawVar(dst, raw, key)
+	}
+}
+
+func lockFirstRawVar(dst, raw map[string]string, key string) {
+	if _, exists := dst[key]; exists {
+		return
+	}
+
+	dst[key] = raw[key]
+}
+
+func moduleVarForTask(content []byte, task string) (*extractedVars, error) {
+	extracted, err := extractModuleVars(content)
+
+	if skipMissingModuleVars(err) {
+		return nil, errNoModuleVars
 	}
 
 	if err != nil {
-		return nil, false, fmt.Errorf("try extract vars node for task %q: %w", task, err)
+		return nil, fmt.Errorf("extract module vars for task %q: %w", task, err)
 	}
 
-	return moduleVars, ok, nil
-}
-
-func tryExtractVarsNode(content []byte) (*yaml.Node, bool, error) {
-	moduleVars, err := extractVarsNode(content)
-	if err == nil {
-		return moduleVars, true, nil
-	}
-
-	if errors.Is(err, errNoModuleVars) {
-		return nil, false, errNoModuleVars
-	}
-
-	return nil, false, fmt.Errorf("extract vars node: %w", err)
+	return extracted, nil
 }
 
 func promotedModuleVarNames(tasks []string, modVars yamlNodeMap) strSet {
@@ -1459,19 +1767,39 @@ func addPromotedVarsToRoot(rootVars *yaml.Node, params *promotedVarParams) {
 	for i := range keys {
 		addMissingPromotedVar(&addPromotedVarParams{
 			rootVars: rootVars, tasks: params.tasks, moduleVars: params.moduleVars,
-			key: keys[i], existing: existing,
+			rawVars: params.rawVars, key: keys[i], existing: existing,
 		})
 	}
 }
 
 func addMissingPromotedVar(params *addPromotedVarParams) {
-	existingVal, ok := params.existing[params.key]
-	iox.Discard(existingVal)
-
-	if ok {
+	if _, ok := params.existing[params.key]; ok {
 		return
 	}
 
+	if appendRawPromotedVar(params) {
+		return
+	}
+
+	appendWrappedPromotedVar(params)
+}
+
+func appendRawPromotedVar(params *addPromotedVarParams) bool {
+	raw := params.rawVars[params.key]
+	if raw == consts.Empty {
+		return false
+	}
+
+	appendMappingPair(
+		params.rootVars,
+		yamlScalar(params.key),
+		yamlScalar(rawVarPlaceholder(params.key)),
+	)
+
+	return true
+}
+
+func appendWrappedPromotedVar(params *addPromotedVarParams) {
 	value := firstVarValue(params.tasks, params.moduleVars, params.key)
 
 	if value == nil {

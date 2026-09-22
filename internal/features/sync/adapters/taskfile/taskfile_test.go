@@ -47,6 +47,7 @@ const (
 	wantGoCmdUnixRef        = `GO_CMD_UNIX: '{{.GO_CMD_UNIX}}'`
 	wantIncludeDirDot       = "dir: ."
 	wantIncludeDirParent    = "dir: .."
+	foldedGoLoadCollapsed   = `GetEnvironmentVariable('Path', 'User'); if (\$u)`
 )
 
 func rewriteIncludesInput() []byte {
@@ -527,8 +528,42 @@ func TestUpdateRootTaskfileCopiesFoldedVarsVerbatim(t *testing.T) {
 
 	assertContainsNone(t, string(out), []string{
 		"TASKOTTER_RAW_VAR_GO_LOAD_Z",
-		"default ` $u",
+		foldedGoLoadCollapsed,
 	})
+}
+
+// TestUpdateRootTaskfileKeepsFoldedVarsOnResync verifies a second sync does not
+// fold existing root block scalars through the YAML encoder.
+func TestUpdateRootTaskfileKeepsFoldedVarsOnResync(t *testing.T) {
+	t.Parallel()
+
+	assertFoldedGoLoadPreserved(t, resyncFoldedGoLoad(t))
+}
+
+func resyncFoldedGoLoad(t *testing.T) []byte {
+	t.Helper()
+
+	first, err := taskfile.UpdateRootTaskfile(taskfile.NewRootTemplate(), foldedGoLoadRootInput())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	out, err := taskfile.UpdateRootTaskfile(first, foldedGoLoadRootInput())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return out
+}
+
+func assertFoldedGoLoadPreserved(t *testing.T, out []byte) {
+	t.Helper()
+
+	if !strings.Contains(string(out), foldedGoLoadValue()) {
+		t.Fatalf("expected folded GO_LOAD copy after resync:\n%s", out)
+	}
+
+	assertContainsNone(t, string(out), []string{foldedGoLoadCollapsed})
 }
 
 func foldedGoLoadRootInput() *rootupd.RootUpdateInput {

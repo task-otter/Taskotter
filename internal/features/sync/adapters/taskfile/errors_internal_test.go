@@ -315,7 +315,7 @@ func TestMarshalNodeReportsEncoderFailure(t *testing.T) {
 	iox.Discard(out)
 	assertFails(t, err)
 
-	out, err = marshalUpdatedRootTaskfile(emptyDocumentNode(), newYAMLMappingNode(), goRootInput())
+	out, err = marshalUpdatedRootTaskfile(emptyDocumentNode(), newYAMLMappingNode(), nil, goRootInput())
 	iox.Discard(out)
 	assertFails(t, err)
 }

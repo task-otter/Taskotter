@@ -994,7 +994,7 @@ func UpdateRootTaskfile(content []byte, input *rootUpdateInput) ([]byte, error) 
 		return nil, fmt.Errorf(errParseTaskfileRoot, err)
 	}
 
-	out, err := marshalUpdatedRootTaskfile(node, root, input)
+	out, err := marshalUpdatedRootTaskfile(node, root, content, input)
 	if err != nil {
 		return nil, fmt.Errorf("marshal updated root taskfile: %w", err)
 	}
@@ -1002,8 +1002,12 @@ func UpdateRootTaskfile(content []byte, input *rootUpdateInput) ([]byte, error) 
 	return out, nil
 }
 
-func marshalUpdatedRootTaskfile(node, root *yaml.Node, input *rootUpdateInput) ([]byte, error) {
-	raw, err := applyPreparedRoot(root, input)
+func marshalUpdatedRootTaskfile(
+	node, root *yaml.Node,
+	content []byte,
+	input *rootUpdateInput,
+) ([]byte, error) {
+	raw, err := applyPreparedRoot(root, content, input)
 	if err != nil {
 		return nil, fmt.Errorf("apply prepared root: %w", err)
 	}
@@ -1011,7 +1015,7 @@ func marshalUpdatedRootTaskfile(node, root *yaml.Node, input *rootUpdateInput) (
 	return marshalRootWithRawVars(node, raw)
 }
 
-func applyPreparedRoot(root *yaml.Node, input *rootUpdateInput) (map[string]string, error) {
+func applyPreparedRoot(root *yaml.Node, content []byte, input *rootUpdateInput) (map[string]string, error) {
 	setRootTaskfileVersion(root)
 
 	raw, err := applyRootUpdates(root, input)
@@ -1019,7 +1023,71 @@ func applyPreparedRoot(root *yaml.Node, input *rootUpdateInput) (map[string]stri
 		return nil, fmt.Errorf("apply root updates: %w", err)
 	}
 
-	return raw, nil
+	return protectRootBlockVars(root, content, raw), nil
+}
+
+func protectRootBlockVars(root *yaml.Node, content []byte, moduleRaw map[string]string) map[string]string {
+	raw := mergeBlockVarRaw(content, root, moduleRaw)
+	placeholderRootBlockVars(root, raw)
+
+	return raw
+}
+
+func mergeBlockVarRaw(content []byte, root *yaml.Node, moduleRaw map[string]string) map[string]string {
+	raw := extractRawBlockVars(content, findMappingValue(root, keyVars))
+	overlayNonEmptyRaw(raw, moduleRaw)
+
+	return raw
+}
+
+func overlayNonEmptyRaw(dst, src map[string]string) {
+	for key := range src {
+		overlayOneRawVar(dst, src, key)
+	}
+}
+
+func overlayOneRawVar(dst, src map[string]string, key string) {
+	if src[key] == consts.Empty {
+		return
+	}
+
+	dst[key] = src[key]
+}
+
+func placeholderRootBlockVars(root *yaml.Node, raw map[string]string) {
+	rootVars := findMappingValue(root, keyVars)
+	if rootVars == nil {
+		return
+	}
+
+	placeholderVarsMapping(rootVars, raw)
+}
+
+func placeholderVarsMapping(rootVars *yaml.Node, raw map[string]string) {
+	keys := rawVarKeysLongestFirst(raw)
+
+	for i := range keys {
+		placeholderOneRootVar(rootVars, keys[i], raw[keys[i]])
+	}
+}
+
+func placeholderOneRootVar(rootVars *yaml.Node, key, raw string) {
+	if raw == consts.Empty {
+		return
+	}
+
+	replaceOrAppendScalar(rootVars, key, rawVarPlaceholder(key))
+}
+
+func replaceOrAppendScalar(mapNode *yaml.Node, key, value string) {
+	node := yamlScalar(value)
+	if findMappingValue(mapNode, key) == nil {
+		appendMappingPair(mapNode, yamlScalar(key), node)
+
+		return
+	}
+
+	setMappingValue(mapNode, key, node)
 }
 
 func marshalRootWithRawVars(node *yaml.Node, raw map[string]string) ([]byte, error) {

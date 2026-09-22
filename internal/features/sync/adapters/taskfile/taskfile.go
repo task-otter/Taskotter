@@ -1097,11 +1097,12 @@ func marshalRootWithRawVars(node *yaml.Node, raw map[string]string) ([]byte, err
 }
 
 func spliceRawPromotedVars(out []byte, raw map[string]string) []byte {
-    // No placeholder splicing needed; vars are already copied directly.
+    // Replace placeholders for each raw var (longest key first).
+    for _, key := range rawVarKeysLongestFirst(raw) {
+        out = spliceOneRawVar(out, key, raw[key])
+    }
     return out
 }
-
-
 
 func spliceOneRawVar(out []byte, key, value string) []byte {
 	if value == consts.Empty {

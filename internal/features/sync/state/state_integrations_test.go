@@ -158,7 +158,7 @@ func loadCorruptMetadata(root, rel string) error {
 	meta, err := LoadMetadata(root, rel)
 	iox.Discard(meta)
 
-	return fmt.Errorf("load metadata: %w", err)
+	return fmt.Errorf(loadMetadataErrorFormat, err)
 }
 
 func loadCorruptLock(root, rel string) error {

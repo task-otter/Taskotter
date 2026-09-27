@@ -230,7 +230,7 @@ func prepareBenchmarkInput(b *testing.B) syncdomain.SyncInput {
 	b.Helper()
 
 	ws := b.TempDir()
-	writeRootTaskfileBench(b, ws)
+	writeRootTaskfile(b, ws)
 
 	return prepareSyncInputBench(b, testConfig(ws, mutateEslintGoPnpm), createBenchmarkStore(b))
 }
@@ -320,27 +320,6 @@ func BenchmarkRewriteIncludes(b *testing.B) {
 		if err != nil {
 			b.Fatal(err)
 		}
-	}
-}
-
-func writeRootTaskfileBench(b *testing.B, workspace string) {
-	b.Helper()
-
-	content := []byte(benchRootBody)
-	writeFileWithDirBench(b, filepath.Join(workspace, testTaskfileName), content)
-}
-
-func writeFileWithDirBench(b *testing.B, path string, content []byte) {
-	b.Helper()
-
-	err := os.MkdirAll(filepath.Dir(path), consts.FilePerm755)
-	if err != nil {
-		b.Fatal(err)
-	}
-
-	err = os.WriteFile(path, content, consts.FilePerm644)
-	if err != nil {
-		b.Fatal(err)
 	}
 }
 

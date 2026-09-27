@@ -1386,14 +1386,6 @@ func fixtureStore(t *testing.T) *storedomain.Snapshot {
 	return snap
 }
 
-func writeRootTaskfile(t *testing.T, workspace string) {
-	t.Helper()
-
-	content := []byte(benchRootBody)
-
-	writeFileWithDir(t, filepath.Join(workspace, testTaskfileName), content)
-}
-
 func dependencySources(
 	t *testing.T,
 	sources []string,
@@ -1861,20 +1853,6 @@ func testConfig(workspace string, mutate func(*config.Config)) *config.Config {
 	}
 
 	return cfg
-}
-
-func writeFileWithDir(t *testing.T, path string, data []byte) {
-	t.Helper()
-
-	err := os.MkdirAll(filepath.Dir(path), consts.FilePerm755)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = os.WriteFile(path, data, consts.FilePerm644)
-	if err != nil {
-		t.Fatal(err)
-	}
 }
 
 func writeTaskotterMetadata(input *metadataWriteInput) {

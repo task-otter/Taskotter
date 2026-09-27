@@ -95,7 +95,7 @@ type (
 
 	fileChangeKind int
 
-	docPolicy int
+	docPolicy = DocPolicy
 
 	// DocPolicy controls whether documentation files are included during module collection.
 	DocPolicy int

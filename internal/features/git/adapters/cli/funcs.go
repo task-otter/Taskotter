@@ -394,17 +394,7 @@ func (client *Client) CheckoutBranch(ctx context.Context, branch string) error {
 }
 
 func checkoutBranch(ctx context.Context, client *Client, branch string) error {
-	err := ValidateGitRef(branch)
-	if err != nil {
-		return fmt.Errorf(fmtValidateGitRefErr, err)
-	}
-
-	err = run(ctx, client, gitCheckout, branch)
-	if err != nil {
-		return fmt.Errorf(fmtCheckoutBranchErr, err)
-	}
-
-	return nil
+	return runValidatedBranchCommand(ctx, client, branch, fmtCheckoutBranchErr, gitCheckout, branch)
 }
 
 func isNothingToCommit(err error) bool {
@@ -499,17 +489,15 @@ func (client *Client) CreateOrResetBranch(ctx context.Context, branch string) er
 }
 
 func createOrResetBranch(ctx context.Context, client *Client, branch string) error {
-	err := ValidateGitRef(branch)
-	if err != nil {
-		return fmt.Errorf(fmtValidateGitRefErr, err)
-	}
-
-	err = run(ctx, client, gitCheckout, "-B", branch)
-	if err != nil {
-		return fmt.Errorf(fmtCheckoutBranchErr, err)
-	}
-
-	return nil
+	return runValidatedBranchCommand(
+		ctx,
+		client,
+		branch,
+		fmtCheckoutBranchErr,
+		gitCheckout,
+		"-B",
+		branch,
+	)
 }
 
 // DefaultBranch resolves the repository default branch from origin metadata.
@@ -605,17 +593,15 @@ func (client *Client) Push(ctx context.Context, branch string) error {
 }
 
 func push(ctx context.Context, client *Client, branch string) error {
-	err := ValidateGitRef(branch)
-	if err != nil {
-		return fmt.Errorf(fmtValidateGitRefErr, err)
-	}
-
-	err = run(ctx, client, gitPush, consts.GitOrigin, branch)
-	if err != nil {
-		return fmt.Errorf(fmtGitPushErr, err)
-	}
-
-	return nil
+	return runValidatedBranchCommand(
+		ctx,
+		client,
+		branch,
+		fmtGitPushErr,
+		gitPush,
+		consts.GitOrigin,
+		branch,
+	)
 }
 
 // PushForceWithLease pushes a branch to origin with force-with-lease.
@@ -631,14 +617,27 @@ func (client *Client) PushForceWithLease(ctx context.Context, branch string) err
 }
 
 func pushForceWithLease(ctx context.Context, client *Client, branch string) error {
+	return runValidatedBranchCommand(
+		ctx, client, branch, fmtGitPushErr, gitPush, "--force-with-lease", consts.GitOrigin, branch,
+	)
+}
+
+func runValidatedBranchCommand(
+	ctx context.Context,
+	client *Client,
+	branch string,
+	errFmt string,
+	command string,
+	args ...string,
+) error {
 	err := ValidateGitRef(branch)
 	if err != nil {
 		return fmt.Errorf(fmtValidateGitRefErr, err)
 	}
 
-	err = run(ctx, client, gitPush, "--force-with-lease", consts.GitOrigin, branch)
+	err = run(ctx, client, append([]string{command}, args...)...)
 	if err != nil {
-		return fmt.Errorf(fmtGitPushErr, err)
+		return fmt.Errorf(errFmt, err)
 	}
 
 	return nil

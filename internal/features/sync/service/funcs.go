@@ -2027,7 +2027,7 @@ func mergeLogicalRootDocs(
 ) (map[string]struct{}, error) {
 	parentDocs := make(map[string]struct{})
 
-	if policy != docPolicyInclude {
+	if policy != DocPolicyInclude {
 		return parentDocs, nil
 	}
 
@@ -2116,7 +2116,7 @@ func scanLogicalRootDocs(args *mergeParentDocsArgs) (fMap, error) {
 		ops:          args.collect.syncInput.TaskfileOps,
 		sourceDir:    args.destRoot,
 		fromDest:     args.collect.mod.DestinationModule,
-		docPolicy:    docPolicyInclude,
+		docPolicy:    DocPolicyInclude,
 		sourceToDest: args.collect.syncInput.SourceToDest,
 	})
 	if err != nil {
@@ -2490,7 +2490,7 @@ func setLockSource(lock *syncLock, syncInput *domain.SyncInput) {
 }
 
 func shouldSkipModuleFile(rel string, policy docPolicy) bool {
-	if policy == docPolicySkip && pathutil.IsDocPath(rel) {
+	if policy == DocPolicySkip && pathutil.IsDocPath(rel) {
 		return true
 	}
 
@@ -2918,18 +2918,18 @@ func collectOptionsFrom(opts *CollectOptions) *collectOptions {
 
 func docPolicyFromConfig(cfg *config.Config) docPolicy {
 	if cfg.IncludesDoc {
-		return docPolicyInclude
+		return DocPolicyInclude
 	}
 
-	return docPolicySkip
+	return DocPolicySkip
 }
 
 func docPolicyFromExported(policy DocPolicy) docPolicy {
 	if policy == DocPolicyInclude {
-		return docPolicyInclude
+		return DocPolicyInclude
 	}
 
-	return docPolicySkip
+	return DocPolicySkip
 }
 
 func syncRootFromConfig(cfg *config.Config) syncRootPolicy {

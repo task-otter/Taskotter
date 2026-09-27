@@ -14,34 +14,41 @@ import (
 
 // LoadMetadata reads and decodes module metadata from the workspace.
 func LoadMetadata(workspace, rel string) (*domain.Metadata, error) {
-	data, err := pathutil.ReadRelativeFile(workspace, rel)
-	if err != nil {
-		return nil, fmt.Errorf("read metadata %q: %w", rel, err)
-	}
-
-	var meta domain.Metadata
-
-	err = yaml.Unmarshal(data, &meta)
-	if err != nil {
-		return nil, fmt.Errorf("parse metadata %q: %w", rel, err)
-	}
-
-	return &meta, nil
+	return loadStateFile[domain.Metadata](
+		workspace,
+		rel,
+		"metadata",
+		func(data []byte, meta *domain.Metadata) error {
+			return yaml.Unmarshal(data, meta)
+		},
+	)
 }
 
 // LoadLock reads and decodes synchronization state from the workspace.
 func LoadLock(workspace, rel string) (*lockmodel.LockFile, error) {
+	return loadStateFile[lockmodel.LockFile](
+		workspace,
+		rel,
+		"lock file",
+		lockmodel.DecodeLockFileYAML,
+	)
+}
+
+func loadStateFile[T any](
+	workspace, rel, label string,
+	decode func([]byte, *T) error,
+) (*T, error) {
 	data, err := pathutil.ReadRelativeFile(workspace, rel)
 	if err != nil {
-		return nil, fmt.Errorf("read lock file %q: %w", rel, err)
+		return nil, fmt.Errorf("read %s %q: %w", label, rel, err)
 	}
 
-	var lock lockmodel.LockFile
+	var value T
 
-	err = lockmodel.DecodeLockFileYAML(data, &lock)
+	err = decode(data, &value)
 	if err != nil {
-		return nil, fmt.Errorf("parse lock file %q: %w", rel, err)
+		return nil, fmt.Errorf("parse %s %q: %w", label, rel, err)
 	}
 
-	return &lock, nil
+	return &value, nil
 }

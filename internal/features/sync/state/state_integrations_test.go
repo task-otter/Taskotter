@@ -65,20 +65,17 @@ func assertMetadataFixture(t *testing.T, meta *domain.Metadata) {
 func TestLoadMetadataCorruptFails(t *testing.T) {
 	t.Parallel()
 
-	root := t.TempDir()
-	rel := testMetadataFileName
+	assertCorruptLoadFails(
+		t,
+		testMetadataFileName,
+		errExpectedCorruptMetadata,
+		func(root, rel string) error {
+			meta, err := LoadMetadata(root, rel)
+			iox.Discard(meta)
 
-	err := os.WriteFile(filepath.Join(root, rel), []byte(testBadYAML), consts.FilePerm644)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	meta, err := LoadMetadata(root, rel)
-	iox.Discard(meta)
-
-	if err == nil {
-		t.Fatal(errExpectedCorruptMetadata)
-	}
+			return err
+		},
+	)
 }
 
 // TestLoadMetadataMissingFileFails verifies the behavior covered by this test.
@@ -145,19 +142,30 @@ func assertLockFixture(t *testing.T, got, want *lockmodel.LockFile) {
 func TestLoadLockCorruptFails(t *testing.T) {
 	t.Parallel()
 
+	assertCorruptLoadFails(t, testLockFile, errExpectedCorruptLock, func(root, rel string) error {
+		lock, err := LoadLock(root, rel)
+		iox.Discard(lock)
+
+		return err
+	})
+}
+
+func assertCorruptLoadFails(
+	t *testing.T,
+	rel, want string,
+	load func(string, string) error,
+) {
+	t.Helper()
+
 	root := t.TempDir()
-	rel := testLockFile
 
 	err := os.WriteFile(filepath.Join(root, rel), []byte(testBadYAML), consts.FilePerm644)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	lock, err := LoadLock(root, rel)
-	iox.Discard(lock)
-
-	if err == nil {
-		t.Fatal(errExpectedCorruptLock)
+	if err = load(root, rel); err == nil {
+		t.Fatal(want)
 	}
 }
 

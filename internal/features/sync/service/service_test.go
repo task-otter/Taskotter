@@ -1245,10 +1245,7 @@ func TestCollectModuleContentsReportsMergeFailure(t *testing.T) {
 	args := distinctDocCollectArgs(t)
 	swapWalkThenFail(t)
 
-	contents, docs, err := collectModuleContents(args)
-	iox.Discard(contents)
-	iox.Discard(docs)
-	assertFails(t, err)
+	assertCollectModuleContentsFails(t, args)
 	restoreTestSeams(t)
 	t.Parallel()
 }
@@ -1257,12 +1254,18 @@ func TestCollectModuleContentsReportsMergeFailure(t *testing.T) {
 func TestCollectModuleContentsReportsScanFailure(t *testing.T) {
 	swapWalkDir(t, failingWalk)
 
-	contents, docs, err := collectModuleContents(sampleCollectArgs(t.TempDir()))
+	assertCollectModuleContentsFails(t, sampleCollectArgs(t.TempDir()))
+	restoreTestSeams(t)
+	t.Parallel()
+}
+
+func assertCollectModuleContentsFails(t *testing.T, args *collectModuleArgs) {
+	t.Helper()
+
+	contents, docs, err := collectModuleContents(args)
 	iox.Discard(contents)
 	iox.Discard(docs)
 	assertFails(t, err)
-	restoreTestSeams(t)
-	t.Parallel()
 }
 
 // TestCollectModuleFileReportsStoreFailure verifies the expected behavior.
@@ -1372,7 +1375,7 @@ func TestMergeLogicalRootDocsReportsMergeFailure(t *testing.T) {
 
 	swapWalkDir(t, failingWalk)
 
-	docs, err := mergeLogicalRootDocs(args, fMap{}, docPolicyInclude)
+	docs, err := mergeLogicalRootDocs(args, fMap{}, DocPolicyInclude)
 	iox.Discard(docs)
 	assertFails(t, err)
 	restoreTestSeams(t)

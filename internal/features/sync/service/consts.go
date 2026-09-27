@@ -44,41 +44,45 @@ const (
 
 	// storeMetadataSchema is the only metadata.yml schema this version understands.
 	storeMetadataSchema = "taskotter.dev/taskfile-metadata/v1"
+)
 
-	fileUnchanged fileChangeKind = 0
+const (
+	fileUnchanged fileChangeKind = iota
+	fileAdded
+	fileUpdated
+)
 
-	fileAdded = 1
-
-	fileUpdated = 2
-
-	docPolicySkip docPolicy = docPolicy(fileUnchanged)
-
-	docPolicyInclude = docPolicy(fileAdded)
-
+const (
 	// DocPolicySkip excludes README and docs/ paths from collected module files.
-	DocPolicySkip DocPolicy = DocPolicy(fileUnchanged)
+	DocPolicySkip DocPolicy = iota
 
 	// DocPolicyInclude copies documentation paths alongside taskfiles.
-	DocPolicyInclude = DocPolicy(fileAdded)
+	DocPolicyInclude
+)
 
-	syncRootDisabled syncRootPolicy = syncRootPolicy(fileUnchanged)
+const (
+	syncRootDisabled syncRootPolicy = iota
+	syncRootEnabled
+)
 
-	syncRootEnabled = syncRootPolicy(fileAdded)
+const (
+	rootAbsent rootState = iota
+	rootPresent
+)
 
-	rootAbsent rootState = rootState(fileUnchanged)
+const (
+	priorContentEmpty priorContent = iota
+	priorContentExists
+)
 
-	rootPresent = rootState(fileAdded)
+const (
+	metadataNotCandidate metadataScanResult = iota
+	metadataIsCandidate
+)
 
-	priorContentEmpty priorContent = priorContent(fileUnchanged)
-
-	priorContentExists = priorContent(fileAdded)
-
-	metadataNotCandidate metadataScanResult = metadataScanResult(fileUnchanged)
-
-	metadataIsCandidate = metadataScanResult(fileAdded)
-
-	yamlStagedSkip     yamlStagedKind = 0
-	yamlStagedRoot     yamlStagedKind = 1
-	yamlStagedLock     yamlStagedKind = 2
-	yamlStagedMetadata yamlStagedKind = 3
+const (
+	yamlStagedSkip yamlStagedKind = iota
+	yamlStagedRoot
+	yamlStagedLock
+	yamlStagedMetadata
 )

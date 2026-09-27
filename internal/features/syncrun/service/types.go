@@ -19,16 +19,22 @@ import (
 )
 
 type (
+	// PrepareSyncInputFn defines the function signature used for this orchestration step.
 	PrepareSyncInputFn func(*syncprepare.PrepareSyncInputArgs) (syncdomain.SyncInput, error)
 
+	// BuildPlanFn defines the function signature used for this orchestration step.
 	BuildPlanFn func(*syncdomain.SyncInput) (*syncdomain.Plan, error)
 
+	// ApplyPlanFn defines the function signature used for this orchestration step.
 	ApplyPlanFn func(*syncdomain.Plan, *syncdomain.SyncInput) error
 
+	// ResolveAllFn defines the function signature used for this orchestration step.
 	ResolveAllFn func(*resolvesvc.ResolveAllInput) ([]resolvesvc.Resolution, error)
 
+	// ResolveTransitiveFn defines the function signature used for this orchestration step.
 	ResolveTransitiveFn func([]string, map[string][]string) ([]string, error)
 
+	// RunFn defines the function signature used for this orchestration step.
 	RunFn func(context.Context, *config.Config) (*rundomain.Result, error)
 
 	storeClient interface {
@@ -39,6 +45,7 @@ type (
 		) (*storedomain.Snapshot, error)
 	}
 
+	// Deps describes the deps.
 	Deps = struct {
 		Logger            *logging.Logger
 		StoreClient       storeClient
@@ -54,6 +61,7 @@ type (
 		ResolveTransitive ResolveTransitiveFn
 	}
 
+	// Orchestrator describes the orchestrator.
 	Orchestrator RunFn
 
 	buildPlanInput = struct {

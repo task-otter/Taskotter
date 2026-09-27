@@ -10,6 +10,7 @@ import (
 	storedomain "github.com/task-otter/Taskotter/internal/features/store/domain"
 )
 
+// TestAdapterReturnsSnapshotValues verifies the behavior covered by this test.
 func TestAdapterReturnsSnapshotValues(t *testing.T) {
 	t.Parallel()
 

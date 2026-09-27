@@ -246,6 +246,7 @@ func (body *stubBody) Read(data []byte) (int, error) {
 		if errors.Is(err, io.EOF) {
 			return read, err
 		}
+
 		return read, fmt.Errorf("read delegated response body: %w", err)
 	}
 

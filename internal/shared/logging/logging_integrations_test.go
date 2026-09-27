@@ -19,6 +19,7 @@ const (
 	errUnexpectedFmt = "Err() = %v, want %v"
 )
 
+// TestLoggerWritesGitHubActionsCommands verifies the behavior covered by this test.
 func TestLoggerWritesGitHubActionsCommands(t *testing.T) {
 	t.Parallel()
 
@@ -38,6 +39,7 @@ func TestLoggerWritesGitHubActionsCommands(t *testing.T) {
 	}
 }
 
+// TestLoggerEscapesJSONMessage verifies the behavior covered by this test.
 func TestLoggerEscapesJSONMessage(t *testing.T) {
 	t.Parallel()
 
@@ -53,6 +55,7 @@ func TestLoggerEscapesJSONMessage(t *testing.T) {
 	}
 }
 
+// TestNew verifies the behavior covered by this test.
 func TestNew(t *testing.T) {
 	t.Parallel()
 
@@ -61,6 +64,7 @@ func TestNew(t *testing.T) {
 	}
 }
 
+// TestLoggerRecordsFirstWriteError verifies the behavior covered by this test.
 func TestLoggerRecordsFirstWriteError(t *testing.T) {
 	t.Parallel()
 
@@ -81,6 +85,7 @@ func TestLoggerRecordsFirstWriteError(t *testing.T) {
 	}
 }
 
+// TestLoggerRecordsShortWrite verifies the behavior covered by this test.
 func TestLoggerRecordsShortWrite(t *testing.T) {
 	t.Parallel()
 
@@ -94,6 +99,7 @@ func TestLoggerRecordsShortWrite(t *testing.T) {
 	}
 }
 
+// TestLoggerRecordsCommandWriteError verifies the behavior covered by this test.
 func TestLoggerRecordsCommandWriteError(t *testing.T) {
 	t.Parallel()
 
@@ -107,6 +113,7 @@ func TestLoggerRecordsCommandWriteError(t *testing.T) {
 	}
 }
 
+// TestLoggerErrIsNilWhenWritesSucceed verifies the behavior covered by this test.
 func TestLoggerErrIsNilWhenWritesSucceed(t *testing.T) {
 	t.Parallel()
 
@@ -120,6 +127,7 @@ func TestLoggerErrIsNilWhenWritesSucceed(t *testing.T) {
 	}
 }
 
+// TestRedact verifies the behavior covered by this test.
 func TestRedact(t *testing.T) {
 	t.Parallel()
 
@@ -157,6 +165,7 @@ func capturedLogOutput() string {
 	return buf.String()
 }
 
+// TestLoggerErrNilWriteFunc verifies the behavior covered by this test.
 func TestLoggerErrNilWriteFunc(t *testing.T) {
 	t.Parallel()
 

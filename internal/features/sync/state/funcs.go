@@ -12,6 +12,7 @@ import (
 	yaml "go.yaml.in/yaml/v3"
 )
 
+// LoadMetadata reads and decodes module metadata from the workspace.
 func LoadMetadata(workspace, rel string) (*domain.Metadata, error) {
 	data, err := pathutil.ReadRelativeFile(workspace, rel)
 	if err != nil {
@@ -28,6 +29,7 @@ func LoadMetadata(workspace, rel string) (*domain.Metadata, error) {
 	return &meta, nil
 }
 
+// LoadLock reads and decodes synchronization state from the workspace.
 func LoadLock(workspace, rel string) (*lockmodel.LockFile, error) {
 	data, err := pathutil.ReadRelativeFile(workspace, rel)
 	if err != nil {

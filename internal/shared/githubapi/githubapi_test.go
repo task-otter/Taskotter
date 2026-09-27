@@ -49,6 +49,7 @@ const (
 
 var errStub = errors.New("stub failure")
 
+// TestNewClientUsesDefaultBaseURL verifies the behavior covered by this test.
 func TestNewClientUsesDefaultBaseURL(t *testing.T) {
 	t.Parallel()
 
@@ -59,6 +60,7 @@ func TestNewClientUsesDefaultBaseURL(t *testing.T) {
 	}
 }
 
+// TestNewClientWithHTTPRejectsInvalidURL verifies the behavior covered by this test.
 func TestNewClientWithHTTPRejectsInvalidURL(t *testing.T) {
 	t.Parallel()
 
@@ -70,6 +72,7 @@ func TestNewClientWithHTTPRejectsInvalidURL(t *testing.T) {
 	}
 }
 
+// TestCreatePRReturnsPullRequest verifies the behavior covered by this test.
 func TestCreatePRReturnsPullRequest(t *testing.T) {
 	t.Parallel()
 
@@ -85,6 +88,7 @@ func TestCreatePRReturnsPullRequest(t *testing.T) {
 	}
 }
 
+// TestCreatePRReportsStatusError verifies the behavior covered by this test.
 func TestCreatePRReportsStatusError(t *testing.T) {
 	t.Parallel()
 
@@ -98,6 +102,7 @@ func TestCreatePRReportsStatusError(t *testing.T) {
 	}
 }
 
+// TestEditPRBodyIgnoresResponseBody verifies the behavior covered by this test.
 func TestEditPRBodyIgnoresResponseBody(t *testing.T) {
 	t.Parallel()
 
@@ -109,6 +114,7 @@ func TestEditPRBodyIgnoresResponseBody(t *testing.T) {
 	}
 }
 
+// TestEditPRBodyReportsStatusError verifies the behavior covered by this test.
 func TestEditPRBodyReportsStatusError(t *testing.T) {
 	t.Parallel()
 
@@ -120,6 +126,7 @@ func TestEditPRBodyReportsStatusError(t *testing.T) {
 	}
 }
 
+// TestListOpenPRsDecodesResults verifies the behavior covered by this test.
 func TestListOpenPRsDecodesResults(t *testing.T) {
 	t.Parallel()
 
@@ -135,6 +142,7 @@ func TestListOpenPRsDecodesResults(t *testing.T) {
 	}
 }
 
+// TestListOpenPRsReportsDecodeError verifies the behavior covered by this test.
 func TestListOpenPRsReportsDecodeError(t *testing.T) {
 	t.Parallel()
 
@@ -148,6 +156,7 @@ func TestListOpenPRsReportsDecodeError(t *testing.T) {
 	}
 }
 
+// TestListOpenPRsReportsTransportError verifies the behavior covered by this test.
 func TestListOpenPRsReportsTransportError(t *testing.T) {
 	t.Parallel()
 
@@ -164,6 +173,7 @@ func TestListOpenPRsReportsTransportError(t *testing.T) {
 	}
 }
 
+// TestMarshalPayloadReportsError verifies the behavior covered by this test.
 func TestMarshalPayloadReportsError(t *testing.T) {
 	t.Parallel()
 
@@ -175,16 +185,19 @@ func TestMarshalPayloadReportsError(t *testing.T) {
 	}
 }
 
+// TestNewAPIRequestReportsError verifies the behavior covered by this test.
 func TestNewAPIRequestReportsError(t *testing.T) {
 	t.Parallel()
 	assertNewAPIRequestFails(t, newCall(badMethod, nil))
 }
 
+// TestNewAPIRequestReportsMarshalError verifies the behavior covered by this test.
 func TestNewAPIRequestReportsMarshalError(t *testing.T) {
 	t.Parallel()
 	assertNewAPIRequestFails(t, newCall(http.MethodPost, make(chan int)))
 }
 
+// TestDoRequestReportsBuildError verifies the behavior covered by this test.
 func TestDoRequestReportsBuildError(t *testing.T) {
 	t.Parallel()
 
@@ -201,6 +214,7 @@ func TestDoRequestReportsBuildError(t *testing.T) {
 	}
 }
 
+// TestAppendBodyCloseReportsFailures verifies the behavior covered by this test.
 func TestAppendBodyCloseReportsFailures(t *testing.T) {
 	t.Parallel()
 
@@ -217,6 +231,7 @@ func TestAppendBodyCloseReportsFailures(t *testing.T) {
 	}
 }
 
+// TestAppendBodyCloseReportsCloseFailure verifies the behavior covered by this test.
 func TestAppendBodyCloseReportsCloseFailure(t *testing.T) {
 	t.Parallel()
 
@@ -226,6 +241,7 @@ func TestAppendBodyCloseReportsCloseFailure(t *testing.T) {
 	}
 }
 
+// TestAppendBodyCloseKeepsExistingError verifies the behavior covered by this test.
 func TestAppendBodyCloseKeepsExistingError(t *testing.T) {
 	t.Parallel()
 

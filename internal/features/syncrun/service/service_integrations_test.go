@@ -27,7 +27,6 @@ import (
 )
 
 type (
-
 	localStore struct {
 		resolveErr  error
 		downloadErr error
@@ -470,7 +469,7 @@ func runPreparedGitWorkspace(t *testing.T, gitWork *mockWorkspace) {
 func TestOrchestratorRunRequiresConfiguration(t *testing.T) {
 	t.Parallel()
 
-	result, err := (&service.Orchestrator{}).Run(t.Context(), &config.Config{})
+	result, err := new(service.Orchestrator).Run(t.Context(), &config.Config{})
 	iox.Discard(result)
 
 	if err == nil {

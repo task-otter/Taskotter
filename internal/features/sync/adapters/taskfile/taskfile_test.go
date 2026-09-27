@@ -977,6 +977,7 @@ func newReplacement() *includePathReplacement {
 	}
 }
 
+// TestRawVarHelpersCoverReplacementBranches verifies the behavior covered by this test.
 func TestRawVarHelpersCoverReplacementBranches(t *testing.T) {
 	t.Parallel()
 
@@ -1004,6 +1005,7 @@ func TestRawVarHelpersCoverReplacementBranches(t *testing.T) {
 	}
 }
 
+// TestRawBlockOffsetHelpersCoverBounds verifies the behavior covered by this test.
 func TestRawBlockOffsetHelpersCoverBounds(t *testing.T) {
 	t.Parallel()
 
@@ -1048,6 +1050,7 @@ func assertInt(t *testing.T, got, want int, label string) {
 	}
 }
 
+// TestStoreExtractedVarsSkipsNilAndNotOK verifies the behavior covered by this test.
 func TestStoreExtractedVarsSkipsNilAndNotOK(t *testing.T) {
 	t.Parallel()
 

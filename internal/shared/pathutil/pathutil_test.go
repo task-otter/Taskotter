@@ -21,6 +21,8 @@ const (
 
 var errAbsFailed = errors.New("abs failed")
 
+// TestValidateTargetFolderReportsAbsFailure verifies the behavior covered by this test.
+//
 //nolint:paralleltest // swaps the package-level absPath seam
 func TestValidateTargetFolderReportsAbsFailure(t *testing.T) {
 	failAbsPath(t)
@@ -31,6 +33,8 @@ func TestValidateTargetFolderReportsAbsFailure(t *testing.T) {
 	}
 }
 
+// TestValidateRelativePathReportsAbsFailure verifies the behavior covered by this test.
+//
 //nolint:paralleltest // swaps the package-level absPath seam
 func TestValidateRelativePathReportsAbsFailure(t *testing.T) {
 	failAbsPath(t)
@@ -41,6 +45,8 @@ func TestValidateRelativePathReportsAbsFailure(t *testing.T) {
 	}
 }
 
+// TestResolveValidatedRootReportsAbsFailure verifies the behavior covered by this test.
+//
 //nolint:paralleltest // swaps the package-level absPath seam
 func TestResolveValidatedRootReportsAbsFailure(t *testing.T) {
 	root := t.TempDir()
@@ -64,6 +70,7 @@ func TestResolveValidatedRootReportsAbsFailure(t *testing.T) {
 	}
 }
 
+// TestEnsureInsideRootRejectsEscape verifies the behavior covered by this test.
 func TestEnsureInsideRootRejectsEscape(t *testing.T) {
 	t.Parallel()
 
@@ -79,6 +86,7 @@ func TestEnsureInsideRootRejectsEscape(t *testing.T) {
 	}
 }
 
+// TestEnsureSafeTargetFolderRejectsEscape verifies the behavior covered by this test.
 func TestEnsureSafeTargetFolderRejectsEscape(t *testing.T) {
 	t.Parallel()
 
@@ -88,6 +96,7 @@ func TestEnsureSafeTargetFolderRejectsEscape(t *testing.T) {
 	}
 }
 
+// TestValidateInsideRootRejectsEscape verifies the behavior covered by this test.
 func TestValidateInsideRootRejectsEscape(t *testing.T) {
 	t.Parallel()
 

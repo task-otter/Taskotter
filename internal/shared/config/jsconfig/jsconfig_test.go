@@ -17,6 +17,7 @@ type parseCase struct {
 	wantManager PackageManager
 }
 
+// TestParseValidSettings verifies the behavior covered by this test.
 func TestParseValidSettings(t *testing.T) {
 	t.Parallel()
 
@@ -50,6 +51,7 @@ func TestParseValidSettings(t *testing.T) {
 	}
 }
 
+// TestParseValidationErrors verifies the behavior covered by this test.
 func TestParseValidationErrors(t *testing.T) {
 	t.Parallel()
 

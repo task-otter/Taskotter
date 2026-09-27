@@ -15,10 +15,12 @@ type (
 		updateRoot func([]byte, *rootupd.RootUpdateInput) ([]byte, error)
 	}
 
+	// Ops describes the ops.
 	Ops struct {
 		fns opsFns
 	}
 
+	// RewriteError describes the rewrite \1rror.
 	RewriteError struct {
 		Message string
 	}

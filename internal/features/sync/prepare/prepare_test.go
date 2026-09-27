@@ -77,6 +77,7 @@ func TestCollectRequestedSourcesPreservesOrder(t *testing.T) {
 	}
 }
 
+// TestPrepareSyncInputBuildsRecords verifies the behavior covered by this test.
 func TestPrepareSyncInputBuildsRecords(t *testing.T) {
 	t.Parallel()
 

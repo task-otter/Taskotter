@@ -24,14 +24,14 @@ const (
 	escapePath   = "../escape"
 	commitMsg    = "message"
 	stageFile    = "file.txt"
-	stubModeEnv = "TASKOTTER_GIT_STUB_MODE"
-	stubOK      = "ok"
-	stubAbbrev  = "abbrev"
-	stubNoRefs  = "norefs"
-	stubBadRefs = "badrefs"
-	stubShowOK  = "showok"
-	stubShowBad = "showbad"
-	stubScript  = `#!/bin/sh
+	stubModeEnv  = "TASKOTTER_GIT_STUB_MODE"
+	stubOK       = "ok"
+	stubAbbrev   = "abbrev"
+	stubNoRefs   = "norefs"
+	stubBadRefs  = "badrefs"
+	stubShowOK   = "showok"
+	stubShowBad  = "showbad"
+	stubScript   = `#!/bin/sh
 mode="$TASKOTTER_GIT_STUB_MODE"
 args="$*"
 case "$mode" in

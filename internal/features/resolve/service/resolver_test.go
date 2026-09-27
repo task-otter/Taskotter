@@ -5,6 +5,7 @@ package service
 
 import "testing"
 
+// TestTransitiveResolverResolveReturnsDependencies verifies the behavior covered by this test.
 func TestTransitiveResolverResolveReturnsDependencies(t *testing.T) {
 	t.Parallel()
 
@@ -21,6 +22,7 @@ func TestTransitiveResolverResolveReturnsDependencies(t *testing.T) {
 	}
 }
 
+// TestTransitiveResolverResolveWrapsErrors verifies the behavior covered by this test.
 func TestTransitiveResolverResolveWrapsErrors(t *testing.T) {
 	t.Parallel()
 
@@ -34,6 +36,7 @@ func TestTransitiveResolverResolveWrapsErrors(t *testing.T) {
 	}
 }
 
+// TestLevenshtein verifies the behavior covered by this test.
 func TestLevenshtein(t *testing.T) {
 	t.Parallel()
 

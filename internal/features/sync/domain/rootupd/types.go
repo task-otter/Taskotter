@@ -8,7 +8,9 @@ import (
 )
 
 type (
+	// GeneratedRootTask describes the generated \1oot \1ask.
 	GeneratedRootTask = ports.GeneratedRootTask
 
+	// RootUpdateInput describes the root \1pdate \1nput.
 	RootUpdateInput = ports.RootUpdateInput
 )

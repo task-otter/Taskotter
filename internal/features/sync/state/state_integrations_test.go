@@ -20,6 +20,7 @@ const (
 	errExpectedCorruptLock     = "expected corrupt lock error"
 )
 
+// TestLoadMetadataReadsFile verifies the behavior covered by this test.
 func TestLoadMetadataReadsFile(t *testing.T) {
 	t.Parallel()
 
@@ -44,6 +45,7 @@ func TestLoadMetadataReadsFile(t *testing.T) {
 	}
 }
 
+// TestLoadMetadataCorruptFails verifies the behavior covered by this test.
 func TestLoadMetadataCorruptFails(t *testing.T) {
 	t.Parallel()
 
@@ -63,6 +65,7 @@ func TestLoadMetadataCorruptFails(t *testing.T) {
 	}
 }
 
+// TestLoadMetadataMissingFileFails verifies the behavior covered by this test.
 func TestLoadMetadataMissingFileFails(t *testing.T) {
 	t.Parallel()
 
@@ -74,6 +77,7 @@ func TestLoadMetadataMissingFileFails(t *testing.T) {
 	}
 }
 
+// TestLoadLockReadsFile verifies the behavior covered by this test.
 func TestLoadLockReadsFile(t *testing.T) {
 	t.Parallel()
 
@@ -106,6 +110,7 @@ func TestLoadLockReadsFile(t *testing.T) {
 	}
 }
 
+// TestLoadLockCorruptFails verifies the behavior covered by this test.
 func TestLoadLockCorruptFails(t *testing.T) {
 	t.Parallel()
 
@@ -125,6 +130,7 @@ func TestLoadLockCorruptFails(t *testing.T) {
 	}
 }
 
+// TestLoadLockMissingFileFails verifies the behavior covered by this test.
 func TestLoadLockMissingFileFails(t *testing.T) {
 	t.Parallel()
 

@@ -108,6 +108,7 @@ func sourceModulesOf(resolutions []resolvesvc.Resolution) []string {
 	return requestedSources
 }
 
+// NewOrchestrator documents the behavior of this declaration.
 func NewOrchestrator(deps *Deps) *Orchestrator {
 	run := Orchestrator(func(ctx context.Context, cfg *config.Config) (*rundomain.Result, error) {
 		wireDefaults(deps)
@@ -123,6 +124,7 @@ func NewOrchestrator(deps *Deps) *Orchestrator {
 	return &run
 }
 
+// Run executes the configured synchronization orchestration.
 func (orch *Orchestrator) Run(ctx context.Context, cfg *config.Config) (*rundomain.Result, error) {
 	if orch == nil || *orch == nil {
 		return nil, errOrchestratorNotConfigured

@@ -34,6 +34,7 @@ const (
 	testPRNumber42 = "42"
 )
 
+// TestReportSyncRequiredWithPullRequest verifies the behavior covered by this test.
 func TestReportSyncRequiredWithPullRequest(t *testing.T) {
 	t.Parallel()
 
@@ -53,12 +54,14 @@ func TestReportSyncRequiredWithPullRequest(t *testing.T) {
 	assertContains(t, got, "::notice title=What happened::")
 }
 
+// TestReportSyncRequiredWritesToStderr verifies the behavior covered by this test.
 func TestReportSyncRequiredWritesToStderr(t *testing.T) {
 	t.Parallel()
 
 	reporting.ReportSyncRequired(changedResult())
 }
 
+// TestReportSyncRequiredWithUnknownPullRequestNumber verifies the behavior covered by this test.
 func TestReportSyncRequiredWithUnknownPullRequestNumber(t *testing.T) {
 	t.Parallel()
 
@@ -72,6 +75,7 @@ func TestReportSyncRequiredWithUnknownPullRequestNumber(t *testing.T) {
 	assertContains(t, out.String(), "sync PR #unknown")
 }
 
+// TestReportSyncRequiredWithoutPullRequest verifies the behavior covered by this test.
 func TestReportSyncRequiredWithoutPullRequest(t *testing.T) {
 	t.Parallel()
 
@@ -81,6 +85,7 @@ func TestReportSyncRequiredWithoutPullRequest(t *testing.T) {
 	assertContains(t, out.String(), "did not return a pull request URL")
 }
 
+// TestReportSyncUpToDateWritesNotice verifies the behavior covered by this test.
 func TestReportSyncUpToDateWritesNotice(t *testing.T) {
 	t.Parallel()
 
@@ -90,6 +95,7 @@ func TestReportSyncUpToDateWritesNotice(t *testing.T) {
 	reporting.ReportSyncUpToDate(result)
 }
 
+// TestResolvedTaskMarshalJSON verifies the behavior covered by this test.
 func TestResolvedTaskMarshalJSON(t *testing.T) {
 	t.Parallel()
 
@@ -111,6 +117,7 @@ func TestResolvedTaskMarshalJSON(t *testing.T) {
 	})
 }
 
+// TestSyncRequired verifies the behavior covered by this test.
 func TestSyncRequired(t *testing.T) {
 	t.Parallel()
 
@@ -123,6 +130,7 @@ func TestSyncRequired(t *testing.T) {
 	}
 }
 
+// TestWriteActionOutputsToFile verifies the behavior covered by this test.
 func TestWriteActionOutputsToFile(t *testing.T) {
 	t.Parallel()
 
@@ -144,6 +152,7 @@ func TestWriteActionOutputsToFile(t *testing.T) {
 	})
 }
 
+// TestWriteActionOutputsToStdout verifies the behavior covered by this test.
 func TestWriteActionOutputsToStdout(t *testing.T) {
 	t.Parallel()
 
@@ -153,6 +162,7 @@ func TestWriteActionOutputsToStdout(t *testing.T) {
 	}
 }
 
+// TestWriteActionOutputsWrapsFileError verifies the behavior covered by this test.
 func TestWriteActionOutputsWrapsFileError(t *testing.T) {
 	t.Parallel()
 

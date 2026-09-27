@@ -8,6 +8,7 @@ import (
 	"testing"
 )
 
+// TestResolvedTaskMarshalJSONUsesOutputKeys verifies the behavior covered by this test.
 func TestResolvedTaskMarshalJSONUsesOutputKeys(t *testing.T) {
 	t.Parallel()
 

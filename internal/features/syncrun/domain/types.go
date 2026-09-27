@@ -9,6 +9,7 @@ import (
 )
 
 type (
+	// Result describes the result.
 	Result struct {
 		ResolvedOutput
 		PullRequestOutput
@@ -22,16 +23,19 @@ type (
 		Changed      bool
 	}
 
+	// ResolvedOutput describes the resolved \1utput.
 	ResolvedOutput struct {
 		ResolvedTasksJSON    string
 		ResolvedDependencies string
 	}
 
+	// PullRequestOutput describes the pull \1equest \1utput.
 	PullRequestOutput struct {
 		PullRequestNumber string
 		PullRequestURL    string
 	}
 
+	// ResolvedTask describes the resolved \1ask.
 	ResolvedTask struct {
 		SourceModule      string
 		DestinationModule string

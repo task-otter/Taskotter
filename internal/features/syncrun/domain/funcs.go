@@ -7,11 +7,17 @@ import (
 	"encoding/json"
 )
 
+const (
+	jsonKeySourceModule      = "source_module"
+	jsonKeyDestinationModule = "destination_module"
+	jsonKeyPath              = "path"
+)
+
 // MarshalJSON encodes the resolved task using the public output keys.
 func (task *ResolvedTask) MarshalJSON() ([]byte, error) {
 	return json.Marshal(map[string]string{
-		"source_module":      task.SourceModule,
-		"destination_module": task.DestinationModule,
-		"path":               task.Path,
+		jsonKeySourceModule:      task.SourceModule,
+		jsonKeyDestinationModule: task.DestinationModule,
+		jsonKeyPath:              task.Path,
 	})
 }

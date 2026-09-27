@@ -4,7 +4,14 @@
 package service
 
 const (
-	errFmtVisitModule = "visit module %q: %w"
+	jsonKeySourceModule      = "source_module"
+	jsonKeyDestinationModule = "destination_module"
+	jsonKeyPath              = "path"
+	resolveApp               = "app"
+	resolveLib               = "lib"
+	resolveTask              = "task"
+	fmtResolve               = "Resolve() = %#v"
+	errFmtVisitModule        = "visit module %q: %w"
 
 	maxCloseMatches      = 5
 	scoreExactMatch      = 1000

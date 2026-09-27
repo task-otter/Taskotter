@@ -20,6 +20,11 @@ import (
 	"github.com/task-otter/Taskotter/internal/shared/repo"
 )
 
+const (
+	errReadLastCommitMessage = "read last commit message: %w"
+	errStagePaths            = "stage paths: %w"
+)
+
 // NewClient returns a git client bound to the given workspace path.
 func NewClient(workspace string) *Client {
 	return &Client{fns: clientFns{
@@ -333,7 +338,7 @@ func verifyExistingBranchOwned(
 ) error {
 	msg, err := ops.LastCommitMessage(ctx, branch)
 	if err != nil {
-		return fmt.Errorf("read last commit message: %w", err)
+		return fmt.Errorf(errReadLastCommitMessage, err)
 	}
 
 	err = checkBranchOwnership(msg, branch)
@@ -645,7 +650,7 @@ func (client *Client) Stage(ctx context.Context, paths []string) error {
 
 	err := stage(ctx, client, paths)
 	if err != nil {
-		return fmt.Errorf("stage paths: %w", err)
+		return fmt.Errorf(errStagePaths, err)
 	}
 
 	return nil
@@ -878,7 +883,7 @@ func runStageAdd(ctx context.Context, client *Client, paths []string) error {
 
 	err := run(ctx, client, args...)
 	if err != nil {
-		return fmt.Errorf("stage paths: %w", err)
+		return fmt.Errorf(errStagePaths, err)
 	}
 
 	return nil

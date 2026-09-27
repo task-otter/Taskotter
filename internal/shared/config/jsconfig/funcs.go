@@ -11,6 +11,12 @@ import (
 	yaml "go.yaml.in/yaml/v3"
 )
 
+const (
+	fieldJSRuntime     = "js.runtime"
+	packageManagerNPM  = "npm"
+	packageManagerPNPM = "pnpm"
+)
+
 func jsRuntimeParsers() map[JSRuntime]func(*jsInput) (*Settings, error) {
 	return map[JSRuntime]func(*jsInput) (*Settings, error){
 		JSRuntimeBun:    parseJSBun,
@@ -57,7 +63,7 @@ func parseWithJSRuntime(yamlInput *jsInput, runtime string) (*Settings, error) {
 
 	if !ok {
 		return nil, &ValidationError{
-			Field:   "js.runtime",
+			Field:   fieldJSRuntime,
 			Message: fmt.Sprintf("invalid value %q: allowed values are bun or nodejs", runtime),
 		}
 	}
@@ -141,7 +147,7 @@ func parseJSInput(raw string) (jsInput, error) {
 }
 
 func parseJSNodeJS(yamlInput *jsInput) (*Settings, error) {
-	packageManagerRaw := defaultedRaw(yamlInput.PackageManager, "npm")
+	packageManagerRaw := defaultedRaw(yamlInput.PackageManager, packageManagerNPM)
 
 	packageManager, err := validatePackageManager(packageManagerRaw)
 	if err != nil {
@@ -178,7 +184,7 @@ func parseJSYAML(raw string) (jsInput, error) {
 
 func parseNodePackageManager(raw string) (PackageManager, error) {
 	switch raw {
-	case "npm", "yarn", "pnpm":
+	case packageManagerNPM, "yarn", packageManagerPNPM:
 		return raw, nil
 	default:
 		return consts.Empty, &ValidationError{

@@ -70,7 +70,7 @@ func (client *Client) CreatePR(ctx context.Context, opts *CreatePROptions) (Pull
 
 	pull, err := invokeCreatePR(ctx, client, opts)
 	if err != nil {
-		return PullRequest{}, fmt.Errorf("create pull request: %w", err)
+		return PullRequest{}, fmt.Errorf(errCreatePullRequest, err)
 	}
 
 	return pull, nil
@@ -90,7 +90,7 @@ func invokeCreatePR(
 		dest:    &pull,
 	})
 	if err != nil {
-		return PullRequest{}, fmt.Errorf("create pull request: %w", err)
+		return PullRequest{}, fmt.Errorf(errCreatePullRequest, err)
 	}
 
 	return pull, nil

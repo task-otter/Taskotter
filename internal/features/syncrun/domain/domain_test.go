@@ -19,9 +19,9 @@ func TestResolvedTaskMarshalJSONUsesOutputKeys(t *testing.T) {
 	}
 	got := marshalTask(t, task)
 
-	assertJSONField(t, got, jsonFieldAssertion{"source_module", task.SourceModule})
-	assertJSONField(t, got, jsonFieldAssertion{"destination_module", task.DestinationModule})
-	assertJSONField(t, got, jsonFieldAssertion{"path", task.Path})
+	assertJSONField(t, got, jsonFieldAssertion{jsonKeySourceModule, task.SourceModule})
+	assertJSONField(t, got, jsonFieldAssertion{jsonKeyDestinationModule, task.DestinationModule})
+	assertJSONField(t, got, jsonFieldAssertion{jsonKeyPath, task.Path})
 }
 
 func marshalTask(t *testing.T, task *ResolvedTask) map[string]string {

@@ -16,6 +16,8 @@ import (
 	"github.com/task-otter/Taskotter/internal/shared/iox"
 )
 
+const appendBodyCloseName = "appendBodyClose"
+
 type (
 	stubBody struct {
 		reader   io.Reader
@@ -226,7 +228,7 @@ func TestAppendBodyCloseReportsFailures(t *testing.T) {
 	for i := range cases {
 		err := appendStubBodyClose(nil, cases[i])
 		if err == nil {
-			t.Fatalf(wantErrFmt, "appendBodyClose")
+			t.Fatalf(wantErrFmt, appendBodyCloseName)
 		}
 	}
 }
@@ -237,7 +239,7 @@ func TestAppendBodyCloseReportsCloseFailure(t *testing.T) {
 
 	err := appendStubBodyClose(nil, &closeOnlyStubBody{closeErr: errStub})
 	if err == nil {
-		t.Fatalf(wantErrFmt, "appendBodyClose")
+		t.Fatalf(wantErrFmt, appendBodyCloseName)
 	}
 }
 

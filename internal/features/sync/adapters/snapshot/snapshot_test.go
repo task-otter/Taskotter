@@ -10,6 +10,8 @@ import (
 	storedomain "github.com/task-otter/Taskotter/internal/features/store/domain"
 )
 
+const snapshotLintModule = "lint"
+
 // TestAdapterReturnsSnapshotValues verifies the behavior covered by this test.
 func TestAdapterReturnsSnapshotValues(t *testing.T) {
 	t.Parallel()
@@ -31,10 +33,10 @@ func TestAdapterReturnsSnapshotValues(t *testing.T) {
 		adapter.ResolvedCommit(),
 		adapter.SourceRef(),
 		adapter.WorkspaceRoot(),
-		adapter.ModuleDir("lint"),
+		adapter.ModuleDir(snapshotLintModule),
 	}
 
-	wantModuleDir := filepath.Join(root, "taskfiles", "lint")
+	wantModuleDir := filepath.Join(root, "taskfiles", snapshotLintModule)
 	want := []string{
 		snap.Ref.DefaultBranch,
 		snap.Ref.ResolvedCommit,

@@ -23,12 +23,17 @@ func TestParseValidSettings(t *testing.T) {
 
 	cases := []parseCase{
 		{name: "empty", raw: "", wantRuntime: consts.Empty, wantManager: consts.Empty},
-		{name: "default node", raw: "{}", wantRuntime: JSRuntimeNodeJS, wantManager: "npm"},
+		{
+			name:        "default node",
+			raw:         "{}",
+			wantRuntime: JSRuntimeNodeJS,
+			wantManager: packageManagerNPM,
+		},
 		{
 			name:        "node pnpm",
 			raw:         "runtime: nodejs\npackage-manager: pnpm\n",
 			wantRuntime: JSRuntimeNodeJS,
-			wantManager: "pnpm",
+			wantManager: packageManagerPNPM,
 		},
 		{name: "bun", raw: "runtime: bun\n", wantRuntime: JSRuntimeBun, wantManager: JSRuntimeBun},
 	}
@@ -66,7 +71,7 @@ func TestParseValidationErrors(t *testing.T) {
 		wantField string
 	}{
 		{name: "invalid yaml", raw: ":", wantField: consts.FieldJS},
-		{name: "invalid runtime", raw: "runtime: deno\n", wantField: "js.runtime"},
+		{name: "invalid runtime", raw: "runtime: deno\n", wantField: fieldJSRuntime},
 		{
 			name:      "invalid package manager",
 			raw:       "package-manager: bun\n",

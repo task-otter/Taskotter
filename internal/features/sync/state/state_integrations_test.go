@@ -19,6 +19,9 @@ const (
 	testBadYAML                = ":"
 	errExpectedCorruptMetadata = "expected corrupt metadata error"
 	errExpectedCorruptLock     = "expected corrupt lock error"
+	testTargetFolder           = "taskfiles"
+	testMissingFile            = "missing.yml"
+	testLockFile               = "lock.yml"
 )
 
 // TestLoadMetadataReadsFile verifies the behavior covered by this test.
@@ -53,7 +56,7 @@ func writeMetadataFixture(t *testing.T, root, rel string) {
 func assertMetadataFixture(t *testing.T, meta *domain.Metadata) {
 	t.Helper()
 
-	if meta.TargetFolder != "taskfiles" || meta.LockFile != ".taskotter-lock.yml" {
+	if meta.TargetFolder != testTargetFolder || meta.LockFile != ".taskotter-lock.yml" {
 		t.Fatalf("metadata = %#v", meta)
 	}
 }
@@ -82,7 +85,7 @@ func TestLoadMetadataCorruptFails(t *testing.T) {
 func TestLoadMetadataMissingFileFails(t *testing.T) {
 	t.Parallel()
 
-	meta, err := LoadMetadata(t.TempDir(), "missing.yml")
+	meta, err := LoadMetadata(t.TempDir(), testMissingFile)
 	iox.Discard(meta)
 
 	if err == nil {
@@ -95,7 +98,7 @@ func TestLoadLockReadsFile(t *testing.T) {
 	t.Parallel()
 
 	root := t.TempDir()
-	rel := "lock.yml"
+	rel := testLockFile
 	want := writeLockFixture(t, root, rel)
 
 	lock, err := LoadLock(root, rel)
@@ -114,7 +117,7 @@ func writeLockFixture(t *testing.T, root, rel string) lockmodel.LockFile {
 			Repository: "task-otter/Taskotter-store",
 			SourceRef:  "refs/heads/main",
 		},
-		Configuration: lockmodel.LockConfiguration{TargetFolder: "taskfiles"},
+		Configuration: lockmodel.LockConfiguration{TargetFolder: testTargetFolder},
 	}
 
 	err := os.WriteFile(
@@ -134,6 +137,7 @@ func assertLockFixture(t *testing.T, got, want *lockmodel.LockFile) {
 
 	if got.Source.Repository != want.Source.Repository ||
 		got.Configuration.TargetFolder != want.Configuration.TargetFolder {
+
 		t.Fatalf("lock = %#v", got)
 	}
 }
@@ -143,7 +147,7 @@ func TestLoadLockCorruptFails(t *testing.T) {
 	t.Parallel()
 
 	root := t.TempDir()
-	rel := "lock.yml"
+	rel := testLockFile
 
 	err := os.WriteFile(filepath.Join(root, rel), []byte(testBadYAML), consts.FilePerm644)
 	if err != nil {
@@ -162,7 +166,7 @@ func TestLoadLockCorruptFails(t *testing.T) {
 func TestLoadLockMissingFileFails(t *testing.T) {
 	t.Parallel()
 
-	lock, err := LoadLock(t.TempDir(), "missing.yml")
+	lock, err := LoadLock(t.TempDir(), testMissingFile)
 	iox.Discard(lock)
 
 	if err == nil {

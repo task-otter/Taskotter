@@ -13,16 +13,16 @@ import (
 func TestTransitiveResolverResolveReturnsDependencies(t *testing.T) {
 	t.Parallel()
 
-	got, err := (transitiveResolver{}).Resolve([]string{"app"}, map[string][]string{
-		"app": {"lib"},
-		"lib": nil,
+	got, err := (transitiveResolver{}).Resolve([]string{resolveApp}, map[string][]string{
+		resolveApp: {resolveLib},
+		resolveLib: nil,
 	})
 	if err != nil {
 		t.Fatalf("Resolve() error = %v", err)
 	}
 
-	if len(got) != consts.IndexOne || got[consts.IndexZero] != "lib" {
-		t.Fatalf("Resolve() = %#v", got)
+	if len(got) != consts.IndexOne || got[consts.IndexZero] != resolveLib {
+		t.Fatalf(fmtResolve, got)
 	}
 }
 
@@ -36,7 +36,7 @@ func TestTransitiveResolverResolveWrapsErrors(t *testing.T) {
 	}
 
 	if got != nil {
-		t.Fatalf("Resolve() = %#v", got)
+		t.Fatalf(fmtResolve, got)
 	}
 }
 
@@ -44,7 +44,7 @@ func TestTransitiveResolverResolveWrapsErrors(t *testing.T) {
 func TestLevenshtein(t *testing.T) {
 	t.Parallel()
 
-	if got := Levenshtein("task", "task"); got != scoreIdenticalString {
+	if got := Levenshtein(resolveTask, resolveTask); got != scoreIdenticalString {
 		t.Fatalf("Levenshtein() = %d", got)
 	}
 }

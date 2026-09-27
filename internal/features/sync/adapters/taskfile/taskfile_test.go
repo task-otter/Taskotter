@@ -68,6 +68,9 @@ const (
 	twoLines     = "first\nsecond\n"
 	otherLine    = "other\n"
 	taskfileKey  = "taskfile: "
+	oldTask      = "old"
+	rawVarAA     = "AA"
+	rawVarB      = "B"
 )
 
 // TestRewriteIncludesRejectsLiteralBlockPath verifies the expected behavior.
@@ -444,7 +447,7 @@ func TestUpdateRootTaskfilePrunesRemovedManagedIncludes(t *testing.T) {
 	root := []byte(yamlHeader + "includes:\n  old:\n    taskfile: taskfiles/old/Taskfile.yml\n")
 	input := goRootInput()
 
-	input.ManagedTasks = []string{"old"}
+	input.ManagedTasks = []string{oldTask}
 
 	out, err := UpdateRootTaskfile(root, input)
 	if err != nil {
@@ -979,9 +982,9 @@ func TestRawVarHelpersCoverReplacementBranches(t *testing.T) {
 	t.Parallel()
 
 	raw := map[string]string{
-		rawVarA: "one",
-		"AA":    "two",
-		"B":     consts.Empty,
+		rawVarA:  "one",
+		rawVarAA: "two",
+		rawVarB:  consts.Empty,
 	}
 	assertRawVarReplacement(t, raw)
 }
@@ -998,7 +1001,7 @@ func assertRawVarKeys(t *testing.T, raw map[string]string) {
 
 	keys := rawVarKeysLongestFirst(raw)
 
-	if len(keys) != consts.IndexThree || keys[consts.IndexZero] != "AA" {
+	if len(keys) != consts.IndexThree || keys[consts.IndexZero] != rawVarAA {
 		t.Fatalf("keys = %#v", keys)
 	}
 }
@@ -1007,12 +1010,12 @@ func assertRawVarSplice(t *testing.T, raw map[string]string) {
 	t.Helper()
 
 	mapNode := &yaml.Node{Kind: yaml.MappingNode}
-	replaceOrAppendScalar(mapNode, rawVarA, "old")
+	replaceOrAppendScalar(mapNode, rawVarA, oldTask)
 	replaceOrAppendScalar(mapNode, rawVarA, "new")
-	placeholderOneRootVar(mapNode, "B", consts.Empty)
+	placeholderOneRootVar(mapNode, rawVarB, consts.Empty)
 
 	out := spliceRawPromotedVars(
-		[]byte(rawVarPlaceholder("AA")+" "+rawVarPlaceholder(rawVarA)),
+		[]byte(rawVarPlaceholder(rawVarAA)+" "+rawVarPlaceholder(rawVarA)),
 		raw,
 	)
 
@@ -1088,6 +1091,7 @@ func assertRawBlockLineTraversal(t *testing.T) {
 		consts.IndexZero,
 	); next != consts.IndexZero ||
 		ok {
+
 		t.Fatalf("nextLineStart() = %d, %t", next, ok)
 	}
 }

@@ -51,31 +51,31 @@ const (
 
 	fileUpdated = 2
 
-	docPolicySkip docPolicy = 0
+	docPolicySkip docPolicy = docPolicy(fileUnchanged)
 
-	docPolicyInclude = 1
+	docPolicyInclude = docPolicy(fileAdded)
 
 	// DocPolicySkip excludes README and docs/ paths from collected module files.
-	DocPolicySkip DocPolicy = 0
+	DocPolicySkip DocPolicy = DocPolicy(fileUnchanged)
 
 	// DocPolicyInclude copies documentation paths alongside taskfiles.
-	DocPolicyInclude = 1
+	DocPolicyInclude = DocPolicy(fileAdded)
 
-	syncRootDisabled syncRootPolicy = 0
+	syncRootDisabled syncRootPolicy = syncRootPolicy(fileUnchanged)
 
-	syncRootEnabled = 1
+	syncRootEnabled = syncRootPolicy(fileAdded)
 
-	rootAbsent rootState = 0
+	rootAbsent rootState = rootState(fileUnchanged)
 
-	rootPresent = 1
+	rootPresent = rootState(fileAdded)
 
-	priorContentEmpty priorContent = 0
+	priorContentEmpty priorContent = priorContent(fileUnchanged)
 
-	priorContentExists = 1
+	priorContentExists = priorContent(fileAdded)
 
-	metadataNotCandidate metadataScanResult = 0
+	metadataNotCandidate metadataScanResult = metadataScanResult(fileUnchanged)
 
-	metadataIsCandidate = 1
+	metadataIsCandidate = metadataScanResult(fileAdded)
 
 	yamlStagedSkip     yamlStagedKind = 0
 	yamlStagedRoot     yamlStagedKind = 1

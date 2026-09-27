@@ -89,6 +89,7 @@ func makeDir(b *testing.B, dir string) {
 func benchRunGit(b *testing.B, dir string, args ...string) {
 	b.Helper()
 
+	//nolint:gosec // gitBinaryName is constant and args are controlled benchmark inputs.
 	cmd := exec.CommandContext(b.Context(), gitBinaryName, args...)
 
 	cmd.Dir = dir

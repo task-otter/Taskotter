@@ -220,6 +220,7 @@ func assertFormatWrite(
 func assertOutputsFile(t *testing.T, path string) {
 	t.Helper()
 
+	//nolint:gosec // Integration test reads a path it created.
 	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf(unexpectFmt, "read outputs", err)

@@ -123,6 +123,7 @@ func parseValidationError(t *testing.T, raw string) *ValidationError {
 	if err == nil {
 		t.Fatal("expected validation error")
 	}
+
 	if parsed != nil {
 		t.Fatalf("Parse() config = %#v, want nil", parsed)
 	}

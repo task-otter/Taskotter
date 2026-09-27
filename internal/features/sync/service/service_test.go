@@ -1136,6 +1136,7 @@ func TestWriteFullStubWriterUsedDocumentsFaults(t *testing.T) {
 func assertFilePayload(t *testing.T, path, want string) {
 	t.Helper()
 
+	//nolint:gosec // Test helper reads a path created by its caller.
 	data, err := os.ReadFile(path)
 	assertNoErr(t, err)
 
@@ -1975,6 +1976,7 @@ func restoreTestSeams(t *testing.T) {
 	t.Helper()
 
 	restores := testSeamRestores[t]
+
 	if len(restores) == consts.IndexZero {
 		return
 	}

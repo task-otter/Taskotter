@@ -1089,12 +1089,12 @@ func assertRawBlockLineTraversal(t *testing.T) {
 		t.Fatalf("advanceBlockLine() = %d, %t", next, done)
 	}
 
-	if next, ok := nextLineStart(
+	next, ok := nextLineStart(
 		[]byte(rawBlockLast),
 		consts.IndexZero,
-	); next != consts.IndexZero ||
-		ok {
+	)
 
+	if next != consts.IndexZero || ok {
 		t.Fatalf("nextLineStart() = %d, %t", next, ok)
 	}
 }

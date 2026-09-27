@@ -132,9 +132,11 @@ func TestDoGetReportsInvalidURL(t *testing.T) {
 	client := NewClientWithHTTP(t.Context(), "token", &stubDoer{err: errStub}).WithBaseURL("://bad")
 
 	resp, err := doGet(t.Context(), client, "\n")
+
 	if resp != nil && resp.Body != nil {
 		t.Cleanup(func() {
-			if closeErr := resp.Body.Close(); closeErr != nil {
+			closeErr := resp.Body.Close()
+			if closeErr != nil {
 				t.Errorf("close response body: %v", closeErr)
 			}
 		})

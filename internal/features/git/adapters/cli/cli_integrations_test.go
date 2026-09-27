@@ -652,6 +652,7 @@ func originHEADPath(cloneDir string) string {
 func runGit(t *testing.T, dir string, args ...string) string {
 	t.Helper()
 
+	//nolint:gosec // gitBinaryName is constant and args are controlled test inputs.
 	cmd := exec.CommandContext(t.Context(), gitBinaryName, args...)
 
 	cmd.Dir = dir

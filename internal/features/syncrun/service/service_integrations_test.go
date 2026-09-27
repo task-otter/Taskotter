@@ -176,7 +176,7 @@ func applyBuildPlanFail(env *failEnv) {
 }
 
 func applyPrepareFail(env *failEnv) {
-	env.deps.PrepareSyncInput = func(*syncprepare.PrepareSyncInputArgs) (syncdomain.SyncInput, error) {
+	env.deps.PrepareSyncInput = func(*syncprepare.SyncInputArgs) (syncdomain.SyncInput, error) {
 		return syncdomain.SyncInput{}, errTestBoom
 	}
 }

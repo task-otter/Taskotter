@@ -28,6 +28,20 @@ type (
 	rootUpdateInput   = rootupd.RootUpdateInput
 	generatedRootTask = rootupd.GeneratedRootTask
 
+	marshalRootParams struct {
+		node    *yaml.Node
+		root    *yaml.Node
+		input   *rootUpdateInput
+		content []byte
+	}
+
+	rawBlockVarParams struct {
+		out     map[string]string
+		key     *yaml.Node
+		value   *yaml.Node
+		content []byte
+	}
+
 	includesUpdateParams = struct {
 		includesNode *yaml.Node
 		existing     map[string]*yaml.Node

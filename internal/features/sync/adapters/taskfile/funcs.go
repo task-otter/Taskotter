@@ -841,7 +841,9 @@ func UpdateRootTaskfile(content []byte, input *rootUpdateInput) ([]byte, error) 
 		return nil, fmt.Errorf(errParseTaskfileRoot, err)
 	}
 
-	out, err := marshalUpdatedRootTaskfile(node, root, content, input)
+	out, err := marshalUpdatedRootTaskfile(&marshalRootParams{
+		node: node, root: root, content: content, input: input,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("marshal updated root taskfile: %w", err)
 	}
@@ -849,17 +851,13 @@ func UpdateRootTaskfile(content []byte, input *rootUpdateInput) ([]byte, error) 
 	return out, nil
 }
 
-func marshalUpdatedRootTaskfile(
-	node, root *yaml.Node,
-	content []byte,
-	input *rootUpdateInput,
-) ([]byte, error) {
-	raw, err := applyPreparedRoot(root, content, input)
+func marshalUpdatedRootTaskfile(params *marshalRootParams) ([]byte, error) {
+	raw, err := applyPreparedRoot(params.root, params.content, params.input)
 	if err != nil {
 		return nil, fmt.Errorf("apply prepared root: %w", err)
 	}
 
-	out, err := marshalRootWithRawVars(node, raw)
+	out, err := marshalRootWithRawVars(params.node, raw)
 	if err != nil {
 		return nil, fmt.Errorf("marshal root with raw vars: %w", err)
 	}
@@ -1387,16 +1385,21 @@ func appendRawBlockVars(out map[string]string, content []byte, varsNode *yaml.No
 	}
 
 	for idx := consts.IndexZero; idx < len(varsNode.Content); idx += yamlMappingPairKeyValue {
-		putRawBlockVar(out, content, varsNode.Content[idx], varsNode.Content[idx+consts.IndexOne])
+		putRawBlockVar(&rawBlockVarParams{
+			out:     out,
+			content: content,
+			key:     varsNode.Content[idx],
+			value:   varsNode.Content[idx+consts.IndexOne],
+		})
 	}
 }
 
-func putRawBlockVar(out map[string]string, content []byte, key, value *yaml.Node) {
-	if !shouldCopyRawVar(value) {
+func putRawBlockVar(params *rawBlockVarParams) {
+	if !shouldCopyRawVar(params.value) {
 		return
 	}
 
-	out[key.Value] = rawBlockYAML(content, key, value)
+	params.out[params.key.Value] = rawBlockYAML(params.content, params.key, params.value)
 }
 
 func shouldCopyRawVar(value *yaml.Node) bool {

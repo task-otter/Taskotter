@@ -17,117 +17,86 @@ func createBenchmarkRepo(b *testing.B) string {
 	b.Helper()
 
 	root := b.TempDir()
-
 	bareDir := filepath.Join(root, testBareRepoDir)
-
-	err := os.MkdirAll(bareDir, consts.FilePerm755)
-	if err != nil {
-		b.Fatal(err)
-	}
-
-	cmdBare := exec.CommandContext(
-		b.Context(),
-		gitBinaryName,
-		gitSubcommandInit,
-		flagBare,
-		flagB,
-		testMainBranch,
-	)
-
-	cmdBare.Dir = bareDir
-
-	err = cmdBare.Run()
-	if err != nil {
-		b.Fatal(err)
-	}
+	createBareRepo(b, bareDir)
 
 	cloneDir := filepath.Join(root, "clone")
+	createCloneRepo(b, cloneDir)
+	configureClone(b, cloneDir, bareDir)
+	commitReadme(b, cloneDir)
+	pushClone(b, cloneDir)
 
-	err = os.MkdirAll(cloneDir, consts.FilePerm755)
-	if err != nil {
-		b.Fatal(err)
-	}
+	return cloneDir
+}
 
-	cmdInit := exec.CommandContext(
-		b.Context(),
-		gitBinaryName,
-		gitSubcommandInit,
-		flagB,
-		testMainBranch,
-	)
+func createBareRepo(b *testing.B, dir string) {
+	b.Helper()
 
-	cmdInit.Dir = cloneDir
+	makeDir(b, dir)
+	benchRunGit(b, dir, gitSubcommandInit, flagBare, flagB, testMainBranch)
+}
 
-	err = cmdInit.Run()
-	if err != nil {
-		b.Fatal(err)
-	}
+func createCloneRepo(b *testing.B, dir string) {
+	b.Helper()
 
-	configCmds := [][]string{
+	makeDir(b, dir)
+	benchRunGit(b, dir, gitSubcommandInit, flagB, testMainBranch)
+}
+
+func configureClone(b *testing.B, dir, bareDir string) {
+	b.Helper()
+
+	commands := [][]string{
 		{gitCmdConfig, "user.name", "Bench Test"},
 		{gitCmdConfig, "user.email", "bench@test.local"},
 		{gitCmdRemote, gitCmdAdd, consts.GitOrigin, bareDir},
 	}
 
-	for _, args := range configCmds {
-		c := exec.CommandContext(b.Context(), gitBinaryName, args...)
-
-		c.Dir = cloneDir
-
-		err := c.Run()
-		if err != nil {
-			b.Fatal(err)
-		}
+	for _, args := range commands {
+		benchRunGit(b, dir, args...)
 	}
+}
 
-	dummyFile := filepath.Join(cloneDir, consts.ReadmeMD)
+func commitReadme(b *testing.B, dir string) {
+	b.Helper()
 
-	err = os.WriteFile(dummyFile, []byte("# Test Repo\n"), consts.FilePerm644)
+	readme := filepath.Join(dir, consts.ReadmeMD)
+
+	err := os.WriteFile(readme, []byte("# Test Repo\n"), consts.FilePerm644)
 	if err != nil {
 		b.Fatal(err)
 	}
 
-	addCmd := exec.CommandContext(b.Context(), gitBinaryName, gitCmdAdd, consts.ReadmeMD)
+	benchRunGit(b, dir, gitCmdAdd, consts.ReadmeMD)
+	benchRunGit(b, dir, gitCmdCommit, flagM, "initial commit")
+}
 
-	addCmd.Dir = cloneDir
+func pushClone(b *testing.B, dir string) {
+	b.Helper()
 
-	err = addCmd.Run()
+	benchRunGit(b, dir, gitCmdPush, flagSetUpstream, consts.GitOrigin, testMainBranch)
+}
+
+func makeDir(b *testing.B, dir string) {
+	b.Helper()
+
+	err := os.MkdirAll(dir, consts.FilePerm755)
 	if err != nil {
 		b.Fatal(err)
 	}
+}
 
-	commitCmd := exec.CommandContext(
-		b.Context(),
-		gitBinaryName,
-		gitCmdCommit,
-		flagM,
-		"initial commit",
-	)
+func benchRunGit(b *testing.B, dir string, args ...string) {
+	b.Helper()
 
-	commitCmd.Dir = cloneDir
+	cmd := exec.CommandContext(b.Context(), gitBinaryName, args...)
 
-	err = commitCmd.Run()
+	cmd.Dir = dir
+
+	err := cmd.Run()
 	if err != nil {
 		b.Fatal(err)
 	}
-
-	pushCmd := exec.CommandContext(
-		b.Context(),
-		gitBinaryName,
-		gitCmdPush,
-		flagSetUpstream,
-		consts.GitOrigin,
-		testMainBranch,
-	)
-
-	pushCmd.Dir = cloneDir
-
-	err = pushCmd.Run()
-	if err != nil {
-		b.Fatal(err)
-	}
-
-	return cloneDir
 }
 
 // BenchmarkGitDefaultBranch measures performance.

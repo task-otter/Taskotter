@@ -19,24 +19,6 @@ import (
 )
 
 type (
-	// PrepareSyncInputFn defines the function signature used for this orchestration step.
-	PrepareSyncInputFn func(*syncprepare.PrepareSyncInputArgs) (syncdomain.SyncInput, error)
-
-	// BuildPlanFn defines the function signature used for this orchestration step.
-	BuildPlanFn func(*syncdomain.SyncInput) (*syncdomain.Plan, error)
-
-	// ApplyPlanFn defines the function signature used for this orchestration step.
-	ApplyPlanFn func(*syncdomain.Plan, *syncdomain.SyncInput) error
-
-	// ResolveAllFn defines the function signature used for this orchestration step.
-	ResolveAllFn func(*resolvesvc.ResolveAllInput) ([]resolvesvc.Resolution, error)
-
-	// ResolveTransitiveFn defines the function signature used for this orchestration step.
-	ResolveTransitiveFn func([]string, map[string][]string) ([]string, error)
-
-	// RunFn defines the function signature used for this orchestration step.
-	RunFn func(context.Context, *config.Config) (*rundomain.Result, error)
-
 	storeClient interface {
 		ResolveRef(ctx context.Context, requestedVersion string) (storedomain.RefInfo, error)
 		DownloadSnapshot(
@@ -60,9 +42,6 @@ type (
 		ResolveAll        ResolveAllFn
 		ResolveTransitive ResolveTransitiveFn
 	}
-
-	// Orchestrator describes the orchestrator.
-	Orchestrator RunFn
 
 	buildPlanInput = struct {
 		cfg         *config.Config
@@ -170,4 +149,20 @@ type (
 		Result *rundomain.Result
 		PRURL  string
 	}
+
+	// PrepareSyncInputFn defines the function signature used for this orchestration step.
+	PrepareSyncInputFn func(*syncprepare.SyncInputArgs) (syncdomain.SyncInput, error)
+	// BuildPlanFn defines the function signature used for this orchestration step.
+	BuildPlanFn func(*syncdomain.SyncInput) (*syncdomain.Plan, error)
+	// ApplyPlanFn defines the function signature used for this orchestration step.
+	ApplyPlanFn func(*syncdomain.Plan, *syncdomain.SyncInput) error
+	// ResolveAllFn defines the function signature used for this orchestration step.
+	ResolveAllFn func(*resolvesvc.ResolveAllInput) ([]resolvesvc.Resolution, error)
+	// ResolveTransitiveFn defines the function signature used for this orchestration step.
+	ResolveTransitiveFn func([]string, map[string][]string) ([]string, error)
+
+	// RunFn defines the function signature used for this orchestration step.
+	RunFn func(context.Context, *config.Config) (*rundomain.Result, error)
+	// Orchestrator describes the orchestrator.
+	Orchestrator RunFn
 )

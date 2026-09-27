@@ -23,7 +23,7 @@ const (
 func TestPrepareSyncInputReportsDestinationCollision(t *testing.T) {
 	t.Parallel()
 
-	input, err := PrepareSyncInput(&PrepareSyncInputArgs{
+	input, err := SyncInput(&SyncInputArgs{
 		Cfg: &config.Config{
 			TargetFolder: config.DefaultTargetFolder,
 		},
@@ -45,7 +45,7 @@ func TestPrepareSyncInputReportsDestinationCollision(t *testing.T) {
 func TestPrepareSyncInputWrapsAssembleFailure(t *testing.T) {
 	t.Parallel()
 
-	input, err := PrepareSyncInput(&PrepareSyncInputArgs{
+	input, err := SyncInput(&SyncInputArgs{
 		Snapshot:    nil,
 		TaskfileOps: nil,
 		DepSources:  nil,
@@ -81,7 +81,7 @@ func TestCollectRequestedSourcesPreservesOrder(t *testing.T) {
 func TestPrepareSyncInputBuildsRecords(t *testing.T) {
 	t.Parallel()
 
-	input, err := PrepareSyncInput(&PrepareSyncInputArgs{
+	input, err := SyncInput(&SyncInputArgs{
 		Cfg: &config.Config{TargetFolder: config.DefaultTargetFolder},
 		Resolutions: []resolvesvc.Resolution{
 			{LogicalTask: pathA, SourceModule: consts.Go},
@@ -89,25 +89,33 @@ func TestPrepareSyncInputBuildsRecords(t *testing.T) {
 		DepSources: []string{"shellcheck"},
 	})
 	if err != nil {
-		t.Fatalf("PrepareSyncInput() error = %v", err)
+		t.Fatalf("SyncInput() error = %v", err)
 	}
 
 	requested := input.Requested[pathA]
-	assertPrepareRecord(t, requested.SourceModule, consts.Go, "requested source")
-	assertPrepareRecord(t, requested.Path, "taskfiles/go", "requested path")
-	assertPrepareRecord(t, input.DestByTask[pathA], consts.Go, "dest by task")
 	assertPrepareRecord(
 		t,
-		input.Dependencies[consts.IndexZero].Path,
-		"taskfiles/shellcheck",
-		"dependency path",
+		prepareRecordAssertion{requested.SourceModule, consts.Go, "requested source"},
 	)
+	assertPrepareRecord(t, prepareRecordAssertion{requested.Path, "taskfiles/go", "requested path"})
+	assertPrepareRecord(
+		t,
+		prepareRecordAssertion{input.DestByTask[pathA], consts.Go, "dest by task"},
+	)
+	assertPrepareRecord(t, prepareRecordAssertion{
+		input.Dependencies[consts.IndexZero].Path, "taskfiles/shellcheck", "dependency path",
+	})
 }
 
-func assertPrepareRecord(t *testing.T, got, want, label string) {
+type prepareRecordAssertion struct {
+	got, want string
+	label     string
+}
+
+func assertPrepareRecord(t *testing.T, assertion prepareRecordAssertion) {
 	t.Helper()
 
-	if got != want {
-		t.Fatalf("%s = %q, want %q", label, got, want)
+	if assertion.got != assertion.want {
+		t.Fatalf("%s = %q, want %q", assertion.label, assertion.got, assertion.want)
 	}
 }

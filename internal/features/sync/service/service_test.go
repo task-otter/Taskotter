@@ -1952,14 +1952,8 @@ func swapSeam[T any](t *testing.T, target *T, stub T) {
 	t.Helper()
 
 	original := *target
-	restored := false
 	restore := func() {
-		if restored {
-			return
-		}
-
 		*target = original
-		restored = true
 	}
 
 	*target = stub

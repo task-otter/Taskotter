@@ -17,6 +17,15 @@ func TestResolvedTaskMarshalJSONUsesOutputKeys(t *testing.T) {
 		DestinationModule: "eslint",
 		Path:              "taskfiles/eslint",
 	}
+	got := marshalTask(t, task)
+
+	assertJSONField(t, got, jsonFieldAssertion{"source_module", task.SourceModule})
+	assertJSONField(t, got, jsonFieldAssertion{"destination_module", task.DestinationModule})
+	assertJSONField(t, got, jsonFieldAssertion{"path", task.Path})
+}
+
+func marshalTask(t *testing.T, task *ResolvedTask) map[string]string {
+	t.Helper()
 
 	data, err := task.MarshalJSON()
 	if err != nil {
@@ -25,20 +34,21 @@ func TestResolvedTaskMarshalJSONUsesOutputKeys(t *testing.T) {
 
 	var got map[string]string
 
-	err = json.Unmarshal(data, &got)
-	if err != nil {
+	if err := json.Unmarshal(data, &got); err != nil {
 		t.Fatalf("Unmarshal() error = %v", err)
 	}
 
-	if got["source_module"] != task.SourceModule {
-		t.Fatalf("source_module = %q", got["source_module"])
-	}
+	return got
+}
 
-	if got["destination_module"] != task.DestinationModule {
-		t.Fatalf("destination_module = %q", got["destination_module"])
-	}
+type jsonFieldAssertion struct {
+	name, want string
+}
 
-	if got["path"] != task.Path {
-		t.Fatalf("path = %q", got["path"])
+func assertJSONField(t *testing.T, got map[string]string, assertion jsonFieldAssertion) {
+	t.Helper()
+
+	if got[assertion.name] != assertion.want {
+		t.Fatalf("%s = %q", assertion.name, got[assertion.name])
 	}
 }

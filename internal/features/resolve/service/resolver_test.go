@@ -3,7 +3,11 @@
 
 package service
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/task-otter/Taskotter/internal/shared/consts"
+)
 
 // TestTransitiveResolverResolveReturnsDependencies verifies the behavior covered by this test.
 func TestTransitiveResolverResolveReturnsDependencies(t *testing.T) {
@@ -17,7 +21,7 @@ func TestTransitiveResolverResolveReturnsDependencies(t *testing.T) {
 		t.Fatalf("Resolve() error = %v", err)
 	}
 
-	if len(got) != 1 || got[0] != "lib" {
+	if len(got) != consts.IndexOne || got[consts.IndexZero] != "lib" {
 		t.Fatalf("Resolve() = %#v", got)
 	}
 }

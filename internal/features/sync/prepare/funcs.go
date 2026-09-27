@@ -13,8 +13,8 @@ import (
 	"github.com/task-otter/Taskotter/internal/shared/pathutil"
 )
 
-// PrepareSyncInput maps resolved modules and dependencies into syncer input records.
-func PrepareSyncInput(args *PrepareSyncInputArgs) (domain.SyncInput, error) {
+// SyncInput maps resolved modules and dependencies into syncer input records.
+func SyncInput(args *SyncInputArgs) (domain.SyncInput, error) {
 	requestedSources := collectRequestedSources(args.Resolutions)
 	allSources := append(append([]string{}, requestedSources...), args.DepSources...)
 
@@ -26,7 +26,7 @@ func PrepareSyncInput(args *PrepareSyncInputArgs) (domain.SyncInput, error) {
 	return input, nil
 }
 
-func assembleSyncInput(args *PrepareSyncInputArgs, allSources []string) (domain.SyncInput, error) {
+func assembleSyncInput(args *SyncInputArgs, allSources []string) (domain.SyncInput, error) {
 	sourceToDest, err := resolvesvc.BuildDestinationMap(allSources)
 	if err != nil {
 		return domain.SyncInput{}, fmt.Errorf("build destination map: %w", err)

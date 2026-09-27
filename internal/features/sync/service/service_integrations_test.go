@@ -218,7 +218,7 @@ func prepareSyncInputForTest(t *testing.T, cfg *config.Config) syncdomain.SyncIn
 	snap := fixtureStore(t)
 	resolutions, depSources := resolveModsForTest(&moduleTestInput{t: t, cfg: cfg, snap: snap})
 
-	syncInput, err := syncprepare.PrepareSyncInput(&syncprepare.PrepareSyncInputArgs{
+	syncInput, err := syncprepare.SyncInput(&syncprepare.SyncInputArgs{
 		Cfg: cfg, Snapshot: syncsnapshot.New(snap), TaskfileOps: synctaskfile.NewOps(),
 		Resolutions: resolutions, DepSources: depSources,
 	})
@@ -684,7 +684,7 @@ func indexOfContains(paths []string, part string) int {
 func buildPlanFrom(input *buildPlanFromInput) *syncdomain.Plan {
 	input.t.Helper()
 
-	syncInput, err := syncprepare.PrepareSyncInput(&syncprepare.PrepareSyncInputArgs{
+	syncInput, err := syncprepare.SyncInput(&syncprepare.SyncInputArgs{
 		Cfg:         input.cfg,
 		Snapshot:    syncsnapshot.New(input.snap),
 		TaskfileOps: synctaskfile.NewOps(),

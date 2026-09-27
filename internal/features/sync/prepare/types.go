@@ -11,8 +11,8 @@ import (
 )
 
 type (
-	// PrepareSyncInputArgs bundles inputs for PrepareSyncInput.
-	PrepareSyncInputArgs = struct {
+	// SyncInputArgs bundles inputs for SyncInput.
+	SyncInputArgs = struct {
 		Cfg         *config.Config
 		Snapshot    ports.Snapshot
 		TaskfileOps ports.TaskfileOps

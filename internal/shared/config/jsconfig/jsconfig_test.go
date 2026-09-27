@@ -38,16 +38,21 @@ func TestParseValidSettings(t *testing.T) {
 
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-
-			got, err := Parse(tc.raw)
-			if err != nil {
-				t.Fatalf("Parse() error = %v", err)
-			}
-
-			if got.Runtime != tc.wantRuntime || got.NodePackageManager != tc.wantManager {
-				t.Fatalf("Parse() = %#v", got)
-			}
+			assertValidSettings(t, tc)
 		})
+	}
+}
+
+func assertValidSettings(t *testing.T, tc parseCase) {
+	t.Helper()
+
+	got, err := Parse(tc.raw)
+	if err != nil {
+		t.Fatalf("Parse() error = %v", err)
+	}
+
+	if got.Runtime != tc.wantRuntime || got.NodePackageManager != tc.wantManager {
+		t.Fatalf("Parse() = %#v", got)
 	}
 }
 
@@ -93,6 +98,20 @@ func TestParseValidationErrors(t *testing.T) {
 func assertValidationError(t *testing.T, raw, wantField string) {
 	t.Helper()
 
+	validationErr := parseValidationError(t, raw)
+
+	if validationErr.FieldName() != wantField {
+		t.Fatalf("field = %q, want %q", validationErr.FieldName(), wantField)
+	}
+
+	if validationErr.Error() == consts.Empty {
+		t.Fatal("empty validation error")
+	}
+}
+
+func parseValidationError(t *testing.T, raw string) *ValidationError {
+	t.Helper()
+
 	_, err := Parse(raw)
 	if err == nil {
 		t.Fatal("expected validation error")
@@ -104,11 +123,5 @@ func assertValidationError(t *testing.T, raw, wantField string) {
 		t.Fatalf("error = %T %[1]v", err)
 	}
 
-	if validationErr.FieldName() != wantField {
-		t.Fatalf("field = %q, want %q", validationErr.FieldName(), wantField)
-	}
-
-	if validationErr.Error() == consts.Empty {
-		t.Fatal("empty validation error")
-	}
+	return validationErr
 }

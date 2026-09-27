@@ -63,15 +63,15 @@ func TestSimilarityScoresExactAndPrefixMatches(t *testing.T) {
 func TestLevenshteinHandlesEmptyAndIdenticalInputs(t *testing.T) {
 	t.Parallel()
 
-	if got := levenshtein(goTask, goTask); got != scoreIdenticalString {
+	if got := levenshteinDistance(goTask, goTask); got != scoreIdenticalString {
 		t.Fatalf(scoreFmt, got, scoreIdenticalString)
 	}
 
-	if got := levenshtein(consts.Empty, goTask); got != consts.IndexZero {
+	if got := levenshteinDistance(consts.Empty, goTask); got != consts.IndexZero {
 		t.Fatalf(scoreFmt, got, consts.IndexZero)
 	}
 
-	if got := levenshtein(golangName, "rust"); got < consts.IndexZero {
+	if got := levenshteinDistance(golangName, "rust"); got < consts.IndexZero {
 		t.Fatalf("score = %d, want non-negative", got)
 	}
 }

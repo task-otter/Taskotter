@@ -29,7 +29,7 @@ import (
 
 func wireSyncHooks(deps *Deps) {
 	if deps.PrepareSyncInput == nil {
-		deps.PrepareSyncInput = syncprepare.PrepareSyncInput
+		deps.PrepareSyncInput = syncprepare.SyncInput
 	}
 
 	if deps.BuildPlan == nil {
@@ -179,7 +179,7 @@ func buildPlanResult(deps *Deps, inp *buildPlanInput, ref *refInfo) (planResult,
 
 //nolint:gocritic // single-line sig for whitespace
 func buildSyncPlan(deps *Deps, inp *buildPlanInput) (*syncIn, *syncPlan, error) {
-	syncInput, err := deps.PrepareSyncInput(&syncprepare.PrepareSyncInputArgs{
+	syncInput, err := deps.PrepareSyncInput(&syncprepare.SyncInputArgs{
 		Cfg:         inp.cfg,
 		Snapshot:    syncsnapshot.New(inp.snapshot),
 		TaskfileOps: synctaskfile.NewOps(),

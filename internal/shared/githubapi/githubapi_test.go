@@ -280,6 +280,8 @@ func (body *closeOnlyStubBody) Close() error {
 }
 
 func (body *closeOnlyStubBody) Read(_ []byte) (int, error) {
+	iox.Discard(body)
+
 	return consts.IndexZero, io.EOF
 }
 

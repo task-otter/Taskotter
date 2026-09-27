@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/task-otter/Taskotter/internal/features/sync/domain"
 	"github.com/task-otter/Taskotter/internal/features/sync/domain/lockmodel"
 	"github.com/task-otter/Taskotter/internal/shared/consts"
 	"github.com/task-otter/Taskotter/internal/shared/iox"
@@ -26,6 +27,19 @@ func TestLoadMetadataReadsFile(t *testing.T) {
 
 	root := t.TempDir()
 	rel := testMetadataFileName
+	writeMetadataFixture(t, root, rel)
+
+	meta, err := LoadMetadata(root, rel)
+	if err != nil {
+		t.Fatalf("LoadMetadata() error = %v", err)
+	}
+
+	assertMetadataFixture(t, meta)
+}
+
+func writeMetadataFixture(t *testing.T, root, rel string) {
+	t.Helper()
+
 	data := []byte(
 		"target_folder: taskfiles\nlock_file: .taskotter-lock.yml\nconfiguration_hash: abc\n",
 	)
@@ -34,11 +48,10 @@ func TestLoadMetadataReadsFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+}
 
-	meta, err := LoadMetadata(root, rel)
-	if err != nil {
-		t.Fatalf("LoadMetadata() error = %v", err)
-	}
+func assertMetadataFixture(t *testing.T, meta *domain.Metadata) {
+	t.Helper()
 
 	if meta.TargetFolder != "taskfiles" || meta.LockFile != ".taskotter-lock.yml" {
 		t.Fatalf("metadata = %#v", meta)
@@ -83,30 +96,45 @@ func TestLoadLockReadsFile(t *testing.T) {
 
 	root := t.TempDir()
 	rel := "lock.yml"
-	want := lockmodel.LockFile{
-		Source: lockmodel.LockSource{
-			Repository: "task-otter/Taskotter-store",
-			SourceRef:  "refs/heads/main",
-		},
-		Configuration: lockmodel.LockConfiguration{
-			TargetFolder: "taskfiles",
-		},
-	}
-
-	err := os.WriteFile(filepath.Join(root, rel), lockmodel.MarshalLock(&want), consts.FilePerm644)
-	if err != nil {
-		t.Fatal(err)
-	}
+	want := writeLockFixture(t, root, rel)
 
 	lock, err := LoadLock(root, rel)
 	if err != nil {
 		t.Fatalf("LoadLock() error = %v", err)
 	}
 
-	if lock.Source.Repository != want.Source.Repository ||
-		lock.Configuration.TargetFolder != want.Configuration.TargetFolder {
+	assertLockFixture(t, lock, &want)
+}
 
-		t.Fatalf("lock = %#v", lock)
+func writeLockFixture(t *testing.T, root, rel string) lockmodel.LockFile {
+	t.Helper()
+
+	want := lockmodel.LockFile{
+		Source: lockmodel.LockSource{
+			Repository: "task-otter/Taskotter-store",
+			SourceRef:  "refs/heads/main",
+		},
+		Configuration: lockmodel.LockConfiguration{TargetFolder: "taskfiles"},
+	}
+
+	err := os.WriteFile(
+		filepath.Join(root, rel),
+		lockmodel.MarshalLock(&want),
+		consts.FilePerm644,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return want
+}
+
+func assertLockFixture(t *testing.T, got, want *lockmodel.LockFile) {
+	t.Helper()
+
+	if got.Source.Repository != want.Source.Repository ||
+		got.Configuration.TargetFolder != want.Configuration.TargetFolder {
+		t.Fatalf("lock = %#v", got)
 	}
 }
 

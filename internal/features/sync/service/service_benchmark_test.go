@@ -161,7 +161,7 @@ func benchSyncInput(b *testing.B) syncdomain.SyncInput {
 	snap := benchSnapshot(b)
 	cfg := benchPlanConfig(b)
 
-	input, err := syncprepare.PrepareSyncInput(&syncprepare.PrepareSyncInputArgs{
+	input, err := syncprepare.SyncInput(&syncprepare.SyncInputArgs{
 		Cfg:         cfg,
 		Snapshot:    syncsnapshot.New(snap),
 		TaskfileOps: synctaskfile.NewOps(),
@@ -207,7 +207,7 @@ func prepareSyncInputBench(
 		b.Fatal(err)
 	}
 
-	si, err := syncprepare.PrepareSyncInput(&syncprepare.PrepareSyncInputArgs{
+	si, err := syncprepare.SyncInput(&syncprepare.SyncInputArgs{
 		Cfg:         cfg,
 		Snapshot:    syncsnapshot.New(snap),
 		TaskfileOps: synctaskfile.NewOps(),
@@ -223,19 +223,26 @@ func prepareSyncInputBench(
 
 // BenchmarkBuildPlan measures performance.
 func BenchmarkBuildPlan(b *testing.B) {
+	runBuildPlanBenchmark(b, prepareBenchmarkInput(b))
+}
+
+func prepareBenchmarkInput(b *testing.B) syncdomain.SyncInput {
+	b.Helper()
+
 	ws := b.TempDir()
 	writeRootTaskfileBench(b, ws)
 
-	snap := createBenchmarkStore(b)
-	cfg := testConfig(ws, mutateEslintGoPnpm)
+	return prepareSyncInputBench(b, testConfig(ws, mutateEslintGoPnpm), createBenchmarkStore(b))
+}
 
-	si := prepareSyncInputBench(b, cfg, snap)
+func runBuildPlanBenchmark(b *testing.B, input syncdomain.SyncInput) {
+	b.Helper()
 
 	b.ResetTimer()
 	b.ReportAllocs()
 
 	for b.Loop() {
-		_, err := syncsvc.BuildPlan(&si)
+		_, err := syncsvc.BuildPlan(&input)
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -263,30 +270,13 @@ func BenchmarkPlan(b *testing.B) {
 
 // BenchmarkDiff measures performance.
 func BenchmarkDiff(b *testing.B) {
-	ws := b.TempDir()
-	writeRootTaskfileBench(b, ws)
+	input := prepareBenchmarkInput(b)
 
-	snap := createBenchmarkStore(b)
-	cfg := testConfig(ws, mutateEslintGoPnpm)
-
-	si := prepareSyncInputBench(b, cfg, snap)
-
-	plan, err := syncsvc.BuildPlan(&si)
-	if err != nil {
+	if _, err := syncsvc.BuildPlan(&input); err != nil {
 		b.Fatal(err)
 	}
 
-	b.ResetTimer()
-	b.ReportAllocs()
-
-	for b.Loop() {
-		_, err := syncsvc.BuildPlan(&si)
-		if err != nil {
-			b.Fatal(err)
-		}
-	}
-
-	_ = plan
+	runBuildPlanBenchmark(b, input)
 }
 
 // BenchmarkUpdateRootTaskfile measures performance.

@@ -11,7 +11,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
-	"path"
+	pathpkg "path"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -20,7 +20,7 @@ import (
 	"github.com/task-otter/Taskotter/internal/features/sync/domain"
 	"github.com/task-otter/Taskotter/internal/features/sync/domain/lockmodel"
 	"github.com/task-otter/Taskotter/internal/features/sync/ports"
-	"github.com/task-otter/Taskotter/internal/features/sync/state"
+	statepkg "github.com/task-otter/Taskotter/internal/features/sync/state"
 	"github.com/task-otter/Taskotter/internal/shared/config"
 	"github.com/task-otter/Taskotter/internal/shared/consts"
 	"github.com/task-otter/Taskotter/internal/shared/iox"
@@ -968,7 +968,6 @@ func applyFileChange(lists *diffLists, path string, change fileChangeKind) *diff
 		lists.added = append(lists.added, path)
 	case fileUpdated:
 		lists.updated = append(lists.updated, path)
-	case fileUnchanged:
 	default:
 	}
 
@@ -1423,7 +1422,7 @@ func tryLegacyMetadata(
 func loadMetadataIfExists(
 	workspace, metadataPath string,
 ) (meta *domain.Metadata, found bool, err error) {
-	meta, err = state.LoadMetadata(workspace, metadataPath)
+	meta, err = statepkg.LoadMetadata(workspace, metadataPath)
 
 	if errors.Is(err, os.ErrNotExist) {
 		return nil, false, errMetadataNotFound
@@ -1443,7 +1442,7 @@ func loadPreviousLock(
 ) (lock *syncLock, target string, err error) {
 	resolved := resolveOldLockPathAndTarget(resolveLockArgs{cfg: cfg, oldMeta: oldMeta})
 
-	oldLock, err := state.LoadLock(workspace, resolved.lockPath)
+	oldLock, err := statepkg.LoadLock(workspace, resolved.lockPath)
 
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return nil, consts.Empty, fmt.Errorf("load lock %q: %w", resolved.lockPath, err)
@@ -1546,7 +1545,7 @@ func recordMetadataCandidate(candidates *[]string, rel string, scan metadataScan
 }
 
 func loadFirstCandidate(workspace string, candidates []string) (*domain.Metadata, error) {
-	meta, err := state.LoadMetadata(workspace, candidates[consts.IndexZero])
+	meta, err := statepkg.LoadMetadata(workspace, candidates[consts.IndexZero])
 	if err != nil {
 		return nil, fmt.Errorf("load previous metadata %q: %w", candidates[consts.IndexZero], err)
 	}
@@ -2577,7 +2576,7 @@ func rootUpdateInputFrom(input *updateRootArgs) *rootUpdateInput {
 	return &rootUpdateInput{
 		Tasks:            cfg.Tasks,
 		TargetFolder:     cfg.TargetFolder,
-		RootTaskfileDir:  path.Dir(cfg.RootTaskfile),
+		RootTaskfileDir:  pathpkg.Dir(cfg.RootTaskfile),
 		DestByTask:       input.args.syncInput.DestByTask,
 		ManagedTasks:     input.managedTasks,
 		ModuleTaskfiles:  input.moduleTaskfiles,
@@ -2649,7 +2648,7 @@ func appendUniqueExportedTask(out []string, seen map[string]struct{}, task strin
 }
 
 func climbToParentModule(current string) (string, bool) {
-	parent := path.Dir(current)
+	parent := pathpkg.Dir(current)
 
 	if parent == "." || parent == current {
 		return consts.Empty, false

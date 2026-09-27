@@ -615,12 +615,9 @@ func TestMarshalNodeReportsEncoderFailure(t *testing.T) {
 	iox.Discard(out)
 	assertFails(t, err)
 
-	out, err = marshalUpdatedRootTaskfile(
-		emptyDocumentNode(),
-		newYAMLMappingNode(),
-		nil,
-		goRootInput(),
-	)
+	out, err = marshalUpdatedRootTaskfile(&marshalRootParams{
+		node: emptyDocumentNode(), root: newYAMLMappingNode(), input: goRootInput(),
+	})
 	iox.Discard(out)
 	assertFails(t, err)
 }
@@ -982,23 +979,42 @@ func TestRawVarHelpersCoverReplacementBranches(t *testing.T) {
 	t.Parallel()
 
 	raw := map[string]string{
-		"A":  "one",
-		"AA": "two",
-		"B":  consts.Empty,
+		rawVarA: "one",
+		"AA":    "two",
+		"B":     consts.Empty,
 	}
+	assertRawVarReplacement(t, raw)
+}
+
+func assertRawVarReplacement(t *testing.T, raw map[string]string) {
+	t.Helper()
+
+	assertRawVarKeys(t, raw)
+	assertRawVarSplice(t, raw)
+}
+
+func assertRawVarKeys(t *testing.T, raw map[string]string) {
+	t.Helper()
 
 	keys := rawVarKeysLongestFirst(raw)
 
 	if len(keys) != consts.IndexThree || keys[consts.IndexZero] != "AA" {
 		t.Fatalf("keys = %#v", keys)
 	}
+}
+
+func assertRawVarSplice(t *testing.T, raw map[string]string) {
+	t.Helper()
 
 	mapNode := &yaml.Node{Kind: yaml.MappingNode}
-	replaceOrAppendScalar(mapNode, "A", "old")
-	replaceOrAppendScalar(mapNode, "A", "new")
+	replaceOrAppendScalar(mapNode, rawVarA, "old")
+	replaceOrAppendScalar(mapNode, rawVarA, "new")
 	placeholderOneRootVar(mapNode, "B", consts.Empty)
 
-	out := spliceRawPromotedVars([]byte(rawVarPlaceholder("AA")+" "+rawVarPlaceholder("A")), raw)
+	out := spliceRawPromotedVars(
+		[]byte(rawVarPlaceholder("AA")+" "+rawVarPlaceholder(rawVarA)),
+		raw,
+	)
 
 	if !bytes.Contains(out, []byte("two one")) {
 		t.Fatalf("spliced = %q", out)
@@ -1011,42 +1027,82 @@ func TestRawBlockOffsetHelpersCoverBounds(t *testing.T) {
 
 	content := []byte("vars:\n  A: |\n    one\n")
 
-	assertInt(
-		t,
-		len(trimRawBlock(content, len(content), consts.IndexOne)),
-		consts.IndexZero,
-		"trimRawBlock",
-	)
-	assertInt(t, offsetOfLine(content, consts.Index99), len(content), "offsetOfLine")
-	assertInt(t, offsetOfLine(content, consts.IndexOne), consts.IndexZero, "offsetOfLine(first)")
-	assertInt(
-		t,
-		addColumnOffset(content, consts.IndexOne, consts.IndexZero),
-		consts.IndexOne,
-		"addColumnOffset",
-	)
-	assertInt(t, clampOffset(consts.IndexOne, consts.IndexTwo), consts.IndexOne, "clampOffset")
+	assertRawBlockOffsets(t, content)
+	assertRawBlockLineTraversal(t)
+}
 
-	if next, done := advanceBlockLine(
-		[]byte("last"),
+const (
+	rawVarA      = "A"
+	rawBlockLast = "last"
+)
+
+func assertRawBlockOffsets(t *testing.T, content []byte) {
+	t.Helper()
+
+	assertInt(t, intAssertion{
+		got:   len(trimRawBlock(content, len(content), consts.IndexOne)),
+		want:  consts.IndexZero,
+		label: "trimRawBlock",
+	})
+	assertInt(t, intAssertion{
+		got:   offsetOfLine(content, consts.Index99),
+		want:  len(content),
+		label: "offsetOfLine",
+	})
+	assertInt(t, intAssertion{
+		got:   offsetOfLine(content, consts.IndexOne),
+		want:  consts.IndexZero,
+		label: "offsetOfLine(first)",
+	})
+	assertInt(t, intAssertion{
+		got: addColumnOffset(
+			content,
+			consts.IndexOne,
+			consts.IndexZero,
+		),
+		want:  consts.IndexOne,
+		label: "addColumnOffset",
+	})
+	assertInt(t, intAssertion{
+		got:   clampOffset(consts.IndexOne, consts.IndexTwo),
+		want:  consts.IndexOne,
+		label: "clampOffset",
+	})
+}
+
+func assertRawBlockLineTraversal(t *testing.T) {
+	t.Helper()
+
+	next, done := advanceBlockLine(
+		[]byte(rawBlockLast),
 		consts.IndexZero,
 		consts.IndexOne,
-	); next != len("last") ||
-		!done {
+	)
 
+	if next != len(rawBlockLast) || !done {
 		t.Fatalf("advanceBlockLine() = %d, %t", next, done)
 	}
 
-	if next, ok := nextLineStart([]byte("last"), consts.IndexZero); next != consts.IndexZero || ok {
+	if next, ok := nextLineStart(
+		[]byte(rawBlockLast),
+		consts.IndexZero,
+	); next != consts.IndexZero ||
+		ok {
 		t.Fatalf("nextLineStart() = %d, %t", next, ok)
 	}
 }
 
-func assertInt(t *testing.T, got, want int, label string) {
+type intAssertion struct {
+	label string
+	got   int
+	want  int
+}
+
+func assertInt(t *testing.T, assertion intAssertion) {
 	t.Helper()
 
-	if got != want {
-		t.Fatalf("%s = %d, want %d", label, got, want)
+	if assertion.got != assertion.want {
+		t.Fatalf("%s = %d, want %d", assertion.label, assertion.got, assertion.want)
 	}
 }
 

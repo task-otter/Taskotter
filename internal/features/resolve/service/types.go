@@ -47,11 +47,24 @@ type (
 		Destination string
 	}
 
-	// Mapping records a source module and its normalized destination name.
-	Mapping = struct {
-		Source      string
-		Destination string
+	// taskContext bundles the catalog and JS settings shared across one task resolution.
+	taskContext = struct {
+		catalog        map[string]struct{}
+		packageManager config.PackageManager
 	}
+
+	scoredCandidate struct {
+		name  string
+		score int
+	}
+
+	// dpState holds the rolling Levenshtein distance rows shared across computeRow calls.
+	dpState struct {
+		left, right string
+		prev, curr  []int
+	}
+
+	pkgMgr = config.PackageManager
 
 	// Resolution is a resolved logical task and its source module.
 	Resolution = domain.Resolution
@@ -71,23 +84,4 @@ type (
 		PackageManager config.PackageManager
 		Tasks          []string
 	}
-
-	// taskContext bundles the catalog and JS settings shared across one task resolution.
-	taskContext = struct {
-		catalog        map[string]struct{}
-		packageManager config.PackageManager
-	}
-
-	scoredCandidate struct {
-		name  string
-		score int
-	}
-
-	// dpState holds the rolling Levenshtein distance rows shared across computeRow calls.
-	dpState struct {
-		left, right string
-		prev, curr  []int
-	}
-
-	pkgMgr = config.PackageManager
 )

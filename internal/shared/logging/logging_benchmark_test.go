@@ -7,6 +7,7 @@ import (
 	"io"
 	"testing"
 
+	"github.com/task-otter/Taskotter/internal/shared/consts"
 	"github.com/task-otter/Taskotter/internal/shared/logging"
 )
 
@@ -30,6 +31,6 @@ func BenchmarkLoggerPrintf(b *testing.B) {
 	b.ResetTimer()
 
 	for b.Loop() {
-		logger.Printf("files changed: %d", 3)
+		logger.Printf("files changed: %d", consts.IndexThree)
 	}
 }

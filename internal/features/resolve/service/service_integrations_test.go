@@ -16,32 +16,6 @@ import (
 )
 
 type (
-
-	// TestResolveTransitive verifies transitive dependencies resolve in dependency order.
-
-	// TestDuplicateDependencyDeduped verifies a module already requested is excluded from its own deps.
-
-	// TestMissingDependency verifies a dependency missing from .deps.yml returns an error.
-
-	// TestDependencyCycle verifies a circular dependency chain returns a cycle error.
-
-	// TestRequestedModuleMissingFromDependencyFile verifies a requested module absent from the file errors.
-
-	// toolNormalizeCases covers flat store modules, which normalize to themselves
-	// now that the store has no version-manager variant directories.
-
-	// TestNormalizeExamples verifies variant module source names normalize to expected destinations.
-
-	// TestLongestSuffixFirst verifies the longest matching suffix is normalized first.
-
-	// TestNormalizeRejectsEmptySource verifies an empty source name returns an error.
-
-	// TestBuildDestinationMapPropagatesNormalizeError verifies a normalize failure propagates from the map builder.
-
-	// TestDestinationCollision verifies two sources normalizing to the same destination error.
-
-	// TestBuildDestinationMapSortsSources verifies sources are returned sorted by destination.
-
 	resolveInputParams struct {
 		task           string
 		cat            map[string]struct{}
@@ -65,24 +39,6 @@ type (
 		pm   config.PackageManager
 		want string
 	}
-
-	// TestMissingTaskCloseMatches verifies a misspelled task name returns close match suggestions.
-
-	// TestMissingTaskWithoutCloseMatches verifies an unrelated missing task returns no close matches.
-
-	// TestNodeAttemptedSourceMissing verifies the error names the attempted source module when missing.
-
-	// TestResolveAll verifies multiple logical tasks resolve into the expected number of resolutions.
-
-	// TestResolveAllStopsOnError verifies resolution stops and errors on the first missing task.
-
-	// TestResolveInvalidPackageManager verifies an unrecognized package manager value is rejected.
-
-	// TestResolveNodeConfigurationErrors verifies node tasks fail without required JS settings.
-
-	// TestResolveNodeVariants verifies node tasks resolve to the module matching the package manager.
-
-	// TestResolveNonNodeTask verifies a non-node task resolves directly to its module.
 
 	buildSourceModuleCase struct {
 		task   string

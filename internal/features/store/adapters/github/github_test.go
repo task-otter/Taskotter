@@ -243,6 +243,9 @@ func (body *stubBody) Read(data []byte) (int, error) {
 
 	read, err := body.reader.Read(data)
 	if err != nil {
+		if errors.Is(err, io.EOF) {
+			return read, err
+		}
 		return read, fmt.Errorf("read delegated response body: %w", err)
 	}
 

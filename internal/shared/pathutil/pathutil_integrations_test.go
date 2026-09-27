@@ -16,23 +16,6 @@ import (
 )
 
 type (
-
-	// TestValidateTargetFolderAcceptsMissingWorkspace verifies an unresolvable workspace still validates.
-
-	// TestValidateTargetFolderRejectsEmptyAfterNormalization verifies separator-only input is rejected.
-
-	// TestValidateRelativePathRejectsEmptyAfterNormalization verifies separator-only input is rejected.
-
-	// TestValidateTargetFolderFollowsInternalSymlink verifies a symlink inside the workspace is accepted.
-
-	// TestValidateTargetFolderRejectsDanglingSymlink verifies an unresolvable symlink is rejected.
-
-	// TestValidateTargetFolderReportsStatFailure verifies an unreadable path component is rejected.
-
-	// TestReadRelativeFileRejectsUnsafePath verifies traversal is rejected before reading.
-
-	// TestOpenRelativeFileMissingFile verifies opening a missing file reports an error.
-
 	boolCase struct {
 		path string
 		want bool

@@ -4,9 +4,7 @@
 package yamlfmt
 
 const (
-	// IndentSpaces is the two-space indentation used for all generated YAML.
-	indentSpaces = 2
-	// DocumentStart is the yamllint-required document-start marker.
+	indentSpaces        = 2
 	documentStart       = "---\n"
 	errEncodeYAMLDoc    = "encode yaml document"
 	errCloseYAMLEncoder = "close yaml encoder"

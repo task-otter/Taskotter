@@ -15,8 +15,6 @@ var (
 
 	errPathComponentNotExist = errors.New("path component does not exist")
 
-	// absPath resolves a path against the working directory. It is a variable so
-	// tests can exercise the failure branches of the callers below.
 	//nolint:gochecknoglobals // seam so tests can reach the filepath.Abs failure branches
 	absPath = filepath.Abs
 )

@@ -272,6 +272,8 @@ linters:
           match-type: prefix
         - module: github.com/golangci
           match-type: prefix
+        - module: github.com/rs/zerolog
+          match-type: exact
       blocked: []
     gosec:
       includes: []

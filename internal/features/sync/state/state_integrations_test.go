@@ -1,14 +1,14 @@
 // Taskotter 2026.
 // SPDX-License-Identifier: Apache-2.0.
 
-package state_test
+package state
 
 import (
 	"os"
 	"path/filepath"
 	"testing"
 
-	"github.com/task-otter/Taskotter/internal/features/sync/state"
+	"github.com/task-otter/Taskotter/internal/features/sync/domain/lockmodel"
 	"github.com/task-otter/Taskotter/internal/shared/consts"
 	"github.com/task-otter/Taskotter/internal/shared/iox"
 )
@@ -20,7 +20,30 @@ const (
 	errExpectedCorruptLock     = "expected corrupt lock error"
 )
 
-// TestLoadMetadataCorruptFails verifies malformed metadata YAML returns an error.
+func TestLoadMetadataReadsFile(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	rel := testMetadataFileName
+	data := []byte(
+		"target_folder: taskfiles\nlock_file: .taskotter-lock.yml\nconfiguration_hash: abc\n",
+	)
+
+	err := os.WriteFile(filepath.Join(root, rel), data, consts.FilePerm644)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	meta, err := LoadMetadata(root, rel)
+	if err != nil {
+		t.Fatalf("LoadMetadata() error = %v", err)
+	}
+
+	if meta.TargetFolder != "taskfiles" || meta.LockFile != ".taskotter-lock.yml" {
+		t.Fatalf("metadata = %#v", meta)
+	}
+}
+
 func TestLoadMetadataCorruptFails(t *testing.T) {
 	t.Parallel()
 
@@ -32,7 +55,7 @@ func TestLoadMetadataCorruptFails(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	meta, err := state.LoadMetadata(root, rel)
+	meta, err := LoadMetadata(root, rel)
 	iox.Discard(meta)
 
 	if err == nil {
@@ -40,7 +63,49 @@ func TestLoadMetadataCorruptFails(t *testing.T) {
 	}
 }
 
-// TestLoadLockCorruptFails verifies malformed lock YAML returns an error.
+func TestLoadMetadataMissingFileFails(t *testing.T) {
+	t.Parallel()
+
+	meta, err := LoadMetadata(t.TempDir(), "missing.yml")
+	iox.Discard(meta)
+
+	if err == nil {
+		t.Fatal("expected missing metadata error")
+	}
+}
+
+func TestLoadLockReadsFile(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	rel := "lock.yml"
+	want := lockmodel.LockFile{
+		Source: lockmodel.LockSource{
+			Repository: "task-otter/Taskotter-store",
+			SourceRef:  "refs/heads/main",
+		},
+		Configuration: lockmodel.LockConfiguration{
+			TargetFolder: "taskfiles",
+		},
+	}
+
+	err := os.WriteFile(filepath.Join(root, rel), lockmodel.MarshalLock(&want), consts.FilePerm644)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	lock, err := LoadLock(root, rel)
+	if err != nil {
+		t.Fatalf("LoadLock() error = %v", err)
+	}
+
+	if lock.Source.Repository != want.Source.Repository ||
+		lock.Configuration.TargetFolder != want.Configuration.TargetFolder {
+
+		t.Fatalf("lock = %#v", lock)
+	}
+}
+
 func TestLoadLockCorruptFails(t *testing.T) {
 	t.Parallel()
 
@@ -52,10 +117,21 @@ func TestLoadLockCorruptFails(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	lock, err := state.LoadLock(root, rel)
+	lock, err := LoadLock(root, rel)
 	iox.Discard(lock)
 
 	if err == nil {
 		t.Fatal(errExpectedCorruptLock)
+	}
+}
+
+func TestLoadLockMissingFileFails(t *testing.T) {
+	t.Parallel()
+
+	lock, err := LoadLock(t.TempDir(), "missing.yml")
+	iox.Discard(lock)
+
+	if err == nil {
+		t.Fatal("expected missing lock error")
 	}
 }

@@ -28,30 +28,6 @@ import (
 
 type (
 
-	// TestOrchestratorRunReportsFailures verifies pipeline error branches are wrapped.
-
-	// TestOrchestratorHookFailures verifies sync and resolve seams wrap injected errors.
-
-	// TestOrchestratorCreatesPRAgainstTriggerBranch verifies the PR targets the configured base branch.
-
-	// TestOrchestratorCreatesPRWithResolvedBase verifies the PR base resolves to the default branch.
-
-	// TestOrchestratorLogsDependencies verifies transitive dependency modules are resolved.
-
-	// TestOrchestratorNoChangeAfterApply verifies a second run reports no changes after apply.
-
-	// TestOrchestratorPreparesGitWorkspace verifies credentials are configured when GitClient is set.
-
-	// TestOrchestratorReportsCleanupFailureQuietly verifies snapshot cleanup errors are logged only.
-
-	// TestOrchestratorUnrelatedDirtyTreeFails verifies unrelated dirty changes fail the run.
-
-	// TestOrchestratorSkipsPRWithoutClient verifies git sync succeeds when PRClient is nil.
-
-	// TestOrchestratorUpdatesExistingPR verifies an existing open pull request is updated.
-
-	// TestOrchestratorRunRequiresConfiguration covers an unconfigured orchestrator.
-
 	localStore struct {
 		resolveErr  error
 		downloadErr error

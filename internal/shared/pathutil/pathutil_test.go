@@ -21,8 +21,6 @@ const (
 
 var errAbsFailed = errors.New("abs failed")
 
-// TestValidateTargetFolderReportsAbsFailure verifies an unresolvable workspace is reported.
-//
 //nolint:paralleltest // swaps the package-level absPath seam
 func TestValidateTargetFolderReportsAbsFailure(t *testing.T) {
 	failAbsPath(t)
@@ -33,8 +31,6 @@ func TestValidateTargetFolderReportsAbsFailure(t *testing.T) {
 	}
 }
 
-// TestValidateRelativePathReportsAbsFailure verifies an unresolvable root is reported.
-//
 //nolint:paralleltest // swaps the package-level absPath seam
 func TestValidateRelativePathReportsAbsFailure(t *testing.T) {
 	failAbsPath(t)
@@ -45,8 +41,6 @@ func TestValidateRelativePathReportsAbsFailure(t *testing.T) {
 	}
 }
 
-// TestResolveValidatedRootReportsAbsFailure verifies the second abs call failure is reported.
-//
 //nolint:paralleltest // swaps the package-level absPath seam
 func TestResolveValidatedRootReportsAbsFailure(t *testing.T) {
 	root := t.TempDir()
@@ -70,7 +64,6 @@ func TestResolveValidatedRootReportsAbsFailure(t *testing.T) {
 	}
 }
 
-// TestEnsureInsideRootRejectsEscape verifies a normalized path leaving the base is rejected.
 func TestEnsureInsideRootRejectsEscape(t *testing.T) {
 	t.Parallel()
 
@@ -86,7 +79,6 @@ func TestEnsureInsideRootRejectsEscape(t *testing.T) {
 	}
 }
 
-// TestEnsureSafeTargetFolderRejectsEscape verifies the target-folder guard rejects escapes.
 func TestEnsureSafeTargetFolderRejectsEscape(t *testing.T) {
 	t.Parallel()
 
@@ -96,7 +88,6 @@ func TestEnsureSafeTargetFolderRejectsEscape(t *testing.T) {
 	}
 }
 
-// TestValidateInsideRootRejectsEscape verifies the relative-path guard rejects escapes.
 func TestValidateInsideRootRejectsEscape(t *testing.T) {
 	t.Parallel()
 

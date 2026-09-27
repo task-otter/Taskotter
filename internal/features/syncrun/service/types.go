@@ -19,23 +19,18 @@ import (
 )
 
 type (
-
-	// PrepareSyncInputFn prepares a sync input from store snapshot data.
 	PrepareSyncInputFn func(*syncprepare.PrepareSyncInputArgs) (syncdomain.SyncInput, error)
 
-	// BuildPlanFn compares managed files against the store snapshot.
 	BuildPlanFn func(*syncdomain.SyncInput) (*syncdomain.Plan, error)
 
-	// ApplyPlanFn copies planned module files into the workspace.
 	ApplyPlanFn func(*syncdomain.Plan, *syncdomain.SyncInput) error
 
-	// ResolveAllFn resolves requested logical tasks to store modules.
 	ResolveAllFn func(*resolvesvc.ResolveAllInput) ([]resolvesvc.Resolution, error)
 
-	// ResolveTransitiveFn resolves transitive module dependencies.
 	ResolveTransitiveFn func([]string, map[string][]string) ([]string, error)
 
-	// storeClient resolves store refs and downloads snapshots for the sync pipeline.
+	RunFn func(context.Context, *config.Config) (*rundomain.Result, error)
+
 	storeClient interface {
 		ResolveRef(ctx context.Context, requestedVersion string) (storedomain.RefInfo, error)
 		DownloadSnapshot(
@@ -44,7 +39,6 @@ type (
 		) (*storedomain.Snapshot, error)
 	}
 
-	// Deps holds collaborators for one sync run pipeline.
 	Deps = struct {
 		Logger            *logging.Logger
 		StoreClient       storeClient
@@ -60,10 +54,7 @@ type (
 		ResolveTransitive ResolveTransitiveFn
 	}
 
-	// Orchestrator coordinates store, git, and GitHub operations for a sync run.
-	Orchestrator struct {
-		run func(context.Context, *config.Config) (*rundomain.Result, error)
-	}
+	Orchestrator RunFn
 
 	buildPlanInput = struct {
 		cfg         *config.Config

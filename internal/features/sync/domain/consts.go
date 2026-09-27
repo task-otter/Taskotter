@@ -8,7 +8,6 @@ import (
 )
 
 const (
-	// YAMLMappingPairKeyValue is the stride between key and value nodes in a YAML mapping.
 	YAMLMappingPairKeyValue = consts.IndexTwo
 
 	errDecode                = "decode %q: %w"
@@ -17,18 +16,13 @@ const (
 	yamlKeyLockFile          = "lock_file"
 	yamlKeyTargetFolder      = "target_folder"
 
-	// YAMLKeyExportedTasks is the store metadata key for exported tasks.
 	YAMLKeyExportedTasks = "exported_tasks"
 
-	// YAMLKeyModule is the store metadata key for the module name.
 	YAMLKeyModule = "module"
 
-	// YAMLKeySchema is the store metadata key for the schema version.
 	YAMLKeySchema = "schema"
 
-	// YAMLKeyTaskfile is the store metadata key for the taskfile path.
 	YAMLKeyTaskfile = "taskfile"
 
-	// YAMLKeyVariants is the store metadata key for module variants.
 	YAMLKeyVariants = "variants"
 )

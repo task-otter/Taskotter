@@ -15,12 +15,10 @@ type (
 		updateRoot func([]byte, *rootupd.RootUpdateInput) ([]byte, error)
 	}
 
-	// Ops adapts package-level Taskfile helpers to ports.TaskfileOps.
 	Ops struct {
 		fns opsFns
 	}
 
-	// RewriteError reports Taskfile YAML rewrite failures.
 	RewriteError struct {
 		Message string
 	}
@@ -28,7 +26,6 @@ type (
 	rootUpdateInput   = rootupd.RootUpdateInput
 	generatedRootTask = rootupd.GeneratedRootTask
 
-	// includesUpdateParams carries state for merging managed includes into the root Taskfile.
 	includesUpdateParams = struct {
 		includesNode *yaml.Node
 		existing     map[string]*yaml.Node
@@ -36,7 +33,6 @@ type (
 		input        *rootUpdateInput
 	}
 
-	// includeUpsertParams carries state for upserting one managed include entry.
 	includeUpsertParams = struct {
 		includesNode *yaml.Node
 		existing     map[string]*yaml.Node
@@ -45,7 +41,6 @@ type (
 		task         string
 	}
 
-	// existingIncludeParams carries state for updating an existing include entry.
 	existingIncludeParams struct {
 		entry        *yaml.Node
 		moduleVars   *yaml.Node
@@ -55,7 +50,6 @@ type (
 		managedTasks []string
 	}
 
-	// managedIncludeParams carries state for checking whether an include is managed.
 	managedIncludeParams struct {
 		entry        *yaml.Node
 		expectedPath string
@@ -63,7 +57,6 @@ type (
 		managedTasks []string
 	}
 
-	// pruneIncludesParams carries state for removing stale managed includes.
 	pruneIncludesParams struct {
 		includesNode *yaml.Node
 		existing     map[string]*yaml.Node
@@ -71,7 +64,6 @@ type (
 		managedTasks []string
 	}
 
-	// promotedVarParams carries state for promoting module vars to the root.
 	promotedVarParams struct {
 		root         *yaml.Node
 		moduleVars   map[string]*yaml.Node
@@ -80,7 +72,6 @@ type (
 		tasks        []string
 	}
 
-	// addPromotedVarParams carries state for adding one promoted var to the root.
 	addPromotedVarParams struct {
 		rootVars   *yaml.Node
 		moduleVars map[string]*yaml.Node
@@ -90,20 +81,17 @@ type (
 		tasks      []string
 	}
 
-	// rootVarsResult is parsed module vars plus first-wins original block YAML.
 	rootVarsResult struct {
 		byTask yamlNodeMap
 		raw    map[string]string
 	}
 
-	// extractedVars is one module Taskfile's vars mapping and block-scalar YAML.
 	extractedVars struct {
 		node *yaml.Node
 		raw  map[string]string
 		ok   bool
 	}
 
-	// mergeModuleVarParams carries state for merging one module var into an include.
 	mergeModuleVarParams struct {
 		existingVars *yaml.Node
 		key          string
@@ -120,7 +108,6 @@ type (
 		dir          string
 	}
 
-	// includePathReplacement locates one include taskfile scalar in the original YAML.
 	includePathReplacement struct {
 		oldPath string
 		newPath string
@@ -129,14 +116,12 @@ type (
 		style   yaml.Style
 	}
 
-	// includePathSpan is a byte range in the original content to overwrite.
 	includePathSpan struct {
 		value string
 		start int
 		end   int
 	}
 
-	// rewriteIncludesParams carries state for rewriting include paths in a Taskfile.
 	rewriteIncludesParams struct {
 		root         *yaml.Node
 		sourceToDest map[string]string
@@ -144,14 +129,12 @@ type (
 		content      []byte
 	}
 
-	// yamlPosition locates a scalar at a 1-based YAML line/column in content.
 	yamlPosition struct {
 		content []byte
 		line    int
 		column  int
 	}
 
-	// scalarSpanParams locates the byte span of a scalar value at offset.
 	scalarSpanParams struct {
 		oldPath string
 		content []byte
@@ -159,7 +142,6 @@ type (
 		style   yaml.Style
 	}
 
-	// quotedSpanParams locates the interior of a quoted scalar at offset.
 	quotedSpanParams struct {
 		oldPath string
 		content []byte
@@ -167,7 +149,6 @@ type (
 		quote   byte
 	}
 
-	// replaceSpanParams overwrites content[start:end] with value.
 	replaceSpanParams struct {
 		value   string
 		content []byte
@@ -175,7 +156,6 @@ type (
 		end     int
 	}
 
-	// collectIncludeReplacementsParams carries state for collecting include path edits.
 	collectIncludeReplacementsParams = struct {
 		includes     *yaml.Node
 		entry        *yaml.Node

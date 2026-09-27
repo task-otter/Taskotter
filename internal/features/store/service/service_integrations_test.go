@@ -18,27 +18,6 @@ import (
 )
 
 type (
-
-	// TestLocalSnapshotLoadsFixtureStore verifies a snapshot is built from an on-disk store.
-
-	// TestLocalSnapshotReportsMissingStore verifies a root without a taskfiles tree fails.
-
-	// TestLoadCatalogAndDepsReportsMissingDepsFile verifies a store without .deps.yml fails.
-
-	// TestLoadCatalogAndDepsReportsInvalidDepsFile verifies malformed YAML is reported.
-
-	// TestLoadCatalogAndDepsReportsUnknownModule verifies deps for unknown modules are rejected.
-
-	// TestLoadCatalogAndDepsReportsUnknownDependency verifies unknown dependencies are rejected.
-
-	// TestLoadCatalogAndDepsAcceptsValidDeps verifies a consistent store loads cleanly.
-
-	// TestLoadCatalogAndDepsReportsUnreadableChildDir verifies unreadable subdirectories fail.
-
-	// newStore writes a minimal store tree with a single "go" module and returns its root.
-	// An empty depsYAML omits the .deps.yml file entirely.
-
-	// fixtureStore holds the catalog and dependency graph of the fixture store.
 	fixtureStore struct {
 		catalog map[string]struct{}
 		deps    map[string][]string

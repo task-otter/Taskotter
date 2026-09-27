@@ -34,7 +34,6 @@ const (
 	testPRNumber42 = "42"
 )
 
-// TestReportSyncRequiredWithPullRequest verifies the report includes the opened pull request summary.
 func TestReportSyncRequiredWithPullRequest(t *testing.T) {
 	t.Parallel()
 
@@ -54,14 +53,12 @@ func TestReportSyncRequiredWithPullRequest(t *testing.T) {
 	assertContains(t, got, "::notice title=What happened::")
 }
 
-// TestReportSyncRequiredWritesToStderr verifies the stderr wrapper emits annotations.
 func TestReportSyncRequiredWritesToStderr(t *testing.T) {
 	t.Parallel()
 
 	reporting.ReportSyncRequired(changedResult())
 }
 
-// TestReportSyncRequiredWithUnknownPullRequestNumber verifies an unknown PR number falls back gracefully.
 func TestReportSyncRequiredWithUnknownPullRequestNumber(t *testing.T) {
 	t.Parallel()
 
@@ -75,7 +72,6 @@ func TestReportSyncRequiredWithUnknownPullRequestNumber(t *testing.T) {
 	assertContains(t, out.String(), "sync PR #unknown")
 }
 
-// TestReportSyncRequiredWithoutPullRequest verifies the report falls back when no PR URL is set.
 func TestReportSyncRequiredWithoutPullRequest(t *testing.T) {
 	t.Parallel()
 
@@ -85,7 +81,6 @@ func TestReportSyncRequiredWithoutPullRequest(t *testing.T) {
 	assertContains(t, out.String(), "did not return a pull request URL")
 }
 
-// TestReportSyncUpToDateWritesNotice verifies the up-to-date notice path runs.
 func TestReportSyncUpToDateWritesNotice(t *testing.T) {
 	t.Parallel()
 
@@ -95,7 +90,6 @@ func TestReportSyncUpToDateWritesNotice(t *testing.T) {
 	reporting.ReportSyncUpToDate(result)
 }
 
-// TestResolvedTaskMarshalJSON verifies resolved tasks encode with snake_case keys.
 func TestResolvedTaskMarshalJSON(t *testing.T) {
 	t.Parallel()
 
@@ -117,7 +111,6 @@ func TestResolvedTaskMarshalJSON(t *testing.T) {
 	})
 }
 
-// TestSyncRequired verifies changed results require sync and unchanged ones do not.
 func TestSyncRequired(t *testing.T) {
 	t.Parallel()
 
@@ -130,7 +123,6 @@ func TestSyncRequired(t *testing.T) {
 	}
 }
 
-// TestWriteActionOutputsToFile verifies action outputs are written to the GitHub output file.
 func TestWriteActionOutputsToFile(t *testing.T) {
 	t.Parallel()
 
@@ -152,7 +144,6 @@ func TestWriteActionOutputsToFile(t *testing.T) {
 	})
 }
 
-// TestWriteActionOutputsToStdout verifies empty GitHubOutput prints key/value pairs.
 func TestWriteActionOutputsToStdout(t *testing.T) {
 	t.Parallel()
 
@@ -162,7 +153,6 @@ func TestWriteActionOutputsToStdout(t *testing.T) {
 	}
 }
 
-// TestWriteActionOutputsWrapsFileError verifies a missing output path returns a wrapped error.
 func TestWriteActionOutputsWrapsFileError(t *testing.T) {
 	t.Parallel()
 
@@ -235,33 +225,41 @@ func emptyRefInfo() storedomain.RefInfo {
 
 func emptyResult() *rundomain.Result {
 	return &rundomain.Result{
-		Changed:              false,
-		StoreVersion:         consts.Empty,
-		SourceRef:            consts.Empty,
-		SourceSHA:            consts.Empty,
-		TargetFolder:         consts.Empty,
-		ResolvedTasksJSON:    consts.Empty,
-		ResolvedDependencies: consts.Empty,
-		PullRequestNumber:    consts.Empty,
-		PullRequestURL:       consts.Empty,
-		Plan:                 nil,
-		Ref:                  emptyRefInfo(),
+		ResolvedOutput: rundomain.ResolvedOutput{
+			ResolvedTasksJSON:    consts.Empty,
+			ResolvedDependencies: consts.Empty,
+		},
+		PullRequestOutput: rundomain.PullRequestOutput{
+			PullRequestNumber: consts.Empty,
+			PullRequestURL:    consts.Empty,
+		},
+		Changed:      false,
+		StoreVersion: consts.Empty,
+		SourceRef:    consts.Empty,
+		SourceSHA:    consts.Empty,
+		TargetFolder: consts.Empty,
+		Plan:         nil,
+		Ref:          emptyRefInfo(),
 	}
 }
 
 func newResultWithOutputs() *rundomain.Result {
 	return &rundomain.Result{
-		Changed:              true,
-		StoreVersion:         "v1.2.3",
-		SourceRef:            "refs/tags/v1.2.3",
-		SourceSHA:            testSourceSHA,
-		TargetFolder:         testTargetFolder,
-		ResolvedTasksJSON:    "{}",
-		ResolvedDependencies: emptyJSONArray,
-		PullRequestNumber:    testPRNumber42,
-		PullRequestURL:       testPullRequestURL,
-		Plan:                 nil,
-		Ref:                  emptyRefInfo(),
+		ResolvedOutput: rundomain.ResolvedOutput{
+			ResolvedTasksJSON:    "{}",
+			ResolvedDependencies: emptyJSONArray,
+		},
+		PullRequestOutput: rundomain.PullRequestOutput{
+			PullRequestNumber: testPRNumber42,
+			PullRequestURL:    testPullRequestURL,
+		},
+		Changed:      true,
+		StoreVersion: "v1.2.3",
+		SourceRef:    "refs/tags/v1.2.3",
+		SourceSHA:    testSourceSHA,
+		TargetFolder: testTargetFolder,
+		Plan:         nil,
+		Ref:          emptyRefInfo(),
 	}
 }
 

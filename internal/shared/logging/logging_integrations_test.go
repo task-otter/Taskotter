@@ -14,7 +14,11 @@ import (
 	"github.com/task-otter/Taskotter/internal/testsupport/faults"
 )
 
-// TestLoggerWritesGitHubActionsCommands verifies log levels emit GitHub Actions workflow commands.
+const (
+	errLogOutputFmt  = "log output = %q, want %q"
+	errUnexpectedFmt = "Err() = %v, want %v"
+)
+
 func TestLoggerWritesGitHubActionsCommands(t *testing.T) {
 	t.Parallel()
 
@@ -30,11 +34,10 @@ func TestLoggerWritesGitHubActionsCommands(t *testing.T) {
 		"::endgroup::\n"
 
 	if got != want {
-		t.Fatalf("log output = %q, want %q", got, want)
+		t.Fatalf(errLogOutputFmt, got, want)
 	}
 }
 
-// TestLoggerEscapesJSONMessage verifies native zerolog JSON escaping is retained.
 func TestLoggerEscapesJSONMessage(t *testing.T) {
 	t.Parallel()
 
@@ -46,11 +49,10 @@ func TestLoggerEscapesJSONMessage(t *testing.T) {
 	want := "{\"level\":\"info\",\"message\":\"quoted \\\"value\\\"\\nnext\"}\n"
 
 	if buf.String() != want {
-		t.Fatalf("log output = %q, want %q", buf.String(), want)
+		t.Fatalf(errLogOutputFmt, buf.String(), want)
 	}
 }
 
-// TestNew verifies New returns a non-nil logger.
 func TestNew(t *testing.T) {
 	t.Parallel()
 
@@ -59,7 +61,6 @@ func TestNew(t *testing.T) {
 	}
 }
 
-// TestLoggerRecordsFirstWriteError verifies a failing writer is reported once and then ignored.
 func TestLoggerRecordsFirstWriteError(t *testing.T) {
 	t.Parallel()
 
@@ -80,7 +81,6 @@ func TestLoggerRecordsFirstWriteError(t *testing.T) {
 	}
 }
 
-// TestLoggerRecordsShortWrite verifies incomplete output is surfaced through Err.
 func TestLoggerRecordsShortWrite(t *testing.T) {
 	t.Parallel()
 
@@ -90,11 +90,23 @@ func TestLoggerRecordsShortWrite(t *testing.T) {
 	log.Print("incomplete")
 
 	if !errors.Is(log.Err(), io.ErrShortWrite) {
-		t.Fatalf("Err() = %v, want %v", log.Err(), io.ErrShortWrite)
+		t.Fatalf(errUnexpectedFmt, log.Err(), io.ErrShortWrite)
 	}
 }
 
-// TestLoggerErrIsNilWhenWritesSucceed verifies a healthy logger reports no error.
+func TestLoggerRecordsCommandWriteError(t *testing.T) {
+	t.Parallel()
+
+	writer := &faults.StubWriter{Count: consts.IndexZero, Err: faults.ErrFault}
+	log := logging.NewWithWriter(writer)
+
+	log.Noticef("failed command")
+
+	if !errors.Is(log.Err(), faults.ErrFault) {
+		t.Fatalf(errUnexpectedFmt, log.Err(), faults.ErrFault)
+	}
+}
+
 func TestLoggerErrIsNilWhenWritesSucceed(t *testing.T) {
 	t.Parallel()
 
@@ -108,7 +120,6 @@ func TestLoggerErrIsNilWhenWritesSucceed(t *testing.T) {
 	}
 }
 
-// TestRedact verifies secret values are masked while empty input stays empty.
 func TestRedact(t *testing.T) {
 	t.Parallel()
 
@@ -146,7 +157,6 @@ func capturedLogOutput() string {
 	return buf.String()
 }
 
-// TestLoggerErrNilWriteFunc covers Err when the logger has no err hook.
 func TestLoggerErrNilWriteFunc(t *testing.T) {
 	t.Parallel()
 
@@ -155,4 +165,6 @@ func TestLoggerErrNilWriteFunc(t *testing.T) {
 	if logger.Err() != nil {
 		t.Fatalf("Err = %v", logger.Err())
 	}
+
+	logger.Noticef("ignored")
 }

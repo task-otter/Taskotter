@@ -76,3 +76,37 @@ func TestCollectRequestedSourcesPreservesOrder(t *testing.T) {
 		t.Fatalf("sources = %v", got)
 	}
 }
+
+func TestPrepareSyncInputBuildsRecords(t *testing.T) {
+	t.Parallel()
+
+	input, err := PrepareSyncInput(&PrepareSyncInputArgs{
+		Cfg: &config.Config{TargetFolder: config.DefaultTargetFolder},
+		Resolutions: []resolvesvc.Resolution{
+			{LogicalTask: pathA, SourceModule: consts.Go},
+		},
+		DepSources: []string{"shellcheck"},
+	})
+	if err != nil {
+		t.Fatalf("PrepareSyncInput() error = %v", err)
+	}
+
+	requested := input.Requested[pathA]
+	assertPrepareRecord(t, requested.SourceModule, consts.Go, "requested source")
+	assertPrepareRecord(t, requested.Path, "taskfiles/go", "requested path")
+	assertPrepareRecord(t, input.DestByTask[pathA], consts.Go, "dest by task")
+	assertPrepareRecord(
+		t,
+		input.Dependencies[consts.IndexZero].Path,
+		"taskfiles/shellcheck",
+		"dependency path",
+	)
+}
+
+func assertPrepareRecord(t *testing.T, got, want, label string) {
+	t.Helper()
+
+	if got != want {
+		t.Fatalf("%s = %q, want %q", label, got, want)
+	}
+}

@@ -126,11 +126,6 @@ func validateModuleDeps(module string, deps []string, catalog map[string]struct{
 	return nil
 }
 
-// collectModules walks the store taskfiles tree and records module names. A
-// directory with a Taskfile.yml is a module, and its subdirectories are its
-// variants. A directory without a Taskfile.yml is not a module and its
-// subdirectories are not visited, so a Taskfile-less directory can no longer
-// act as a namespace prefix.
 func collectModules(dir, prefix string, catalog map[string]struct{}) error {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -154,8 +149,6 @@ func collectModules(dir, prefix string, catalog map[string]struct{}) error {
 	return nil
 }
 
-// recordModule catalogs dir under prefix and reports whether its child
-// directories should be visited. The root is always walked but never cataloged.
 func recordModule(prefix string, entries []os.DirEntry, catalog map[string]struct{}) bool {
 	if prefix == consts.Empty {
 		return true

@@ -49,18 +49,6 @@ type (
 		marker    string
 	}
 
-	// TestApplyPlanWritesFiles verifies applying a plan writes module and metadata files.
-
-	// TestApplyPlanMigratesLegacyMetadataPath verifies legacy metadata is migrated and the old file removed.
-
-	// TestApplyPlanSkipsRootTaskfileWhenDisabled verifies the root Taskfile is left untouched when sync-root is off.
-
-	// TestApplyPlanPreservesExecutableMode verifies executable bits are preserved when writing files.
-
-	// TestApplyPlanPromoteBeforeDelete verifies obsolete files remain if a promote step fails before delete.
-
-	// TestApplyPlanWriteOrder verifies modules are written before the lock and before metadata.
-
 	buildPlanFromInput struct {
 		t           *testing.T
 		cfg         *config.Config
@@ -68,19 +56,6 @@ type (
 		resolutions []resolvesvc.Resolution
 		depSources  []string
 	}
-
-	// writeCorruptLock seeds workspace with metadata pointing at a lock file whose
-	// contents are not valid YAML.
-
-	// TestBuildPlanCorruptLockFails verifies a corrupt lock file fails plan building.
-
-	// TestBuildPlanCorruptMetadataFails verifies corrupt metadata fails plan building.
-
-	// TestMetadataOnlyChangeMarksChanged verifies a configuration hash-only change marks the plan changed.
-
-	// TestSHAOnlyLockChangeNotChanged verifies a resolved-commit-only difference does not mark files changed.
-
-	// TestConfigurationChangeMarksUpdated verifies a config field change marks the plan updated.
 
 	migrationAssertInput struct {
 		t          *testing.T
@@ -93,36 +68,6 @@ type (
 		oldManaged string
 		oldUser    string
 	}
-
-	// TestPackageManagerSwitchSameDestination verifies different package manager variants normalize to eslint.
-
-	// TestPrefixSafetyPreservesUnrelatedPaths verifies paths sharing a prefix with the target folder are untouched.
-
-	// TestTargetFolderMigration verifies files migrate to the new target folder while unmanaged files stay.
-
-	// TestCollectModuleFilesSkipsTestsAndDocs verifies test and doc files are excluded unless requested.
-
-	// TestLogicalRootDocsMergedFromParent verifies parent README is collected when includes-doc is
-	// true and skipped when false, with logical-root docs winning over a leaf README.
-
-	// TestStoreMetadataAcceptsCurrentSchema verifies the pinned metadata.yml schema is accepted.
-
-	// TestStoreMetadataRejectsUnknownSchema verifies an unrecognized metadata.yml schema
-	// fails the sync rather than being silently ignored.
-
-	// TestBuildPlanInitialSync verifies an initial sync marks the plan changed and generates root tasks.
-
-	// TestBuildPlanCreatesRootTaskfile verifies the root Taskfile.yml is added on initial sync.
-
-	// TestUnmanagedDestinationConflict verifies planning refuses to overwrite an unmanaged existing file.
-
-	// TestIncludesDocFalseSkipsReadme verifies README is excluded when includes-doc is false.
-
-	// TestIncludesDocTrueIncludesEslintReadme verifies nested eslint pulls README when includes-doc is true.
-
-	// TestIncludesDocFalseSkipsFixtureDocs verifies go fixture README and docs/ are excluded when includes-doc is false.
-
-	// TestIncludesDocTrueIncludesFixtureDocs verifies go fixture README and docs/ are managed when includes-doc is true.
 
 	copyHookInput struct {
 		t    *testing.T

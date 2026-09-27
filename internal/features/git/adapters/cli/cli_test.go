@@ -24,53 +24,6 @@ const (
 	escapePath   = "../escape"
 	commitMsg    = "message"
 	stageFile    = "file.txt"
-
-	// TestNoOpHelpers verifies the no-op compatibility helpers stay callable.
-
-	// TestDefaultBranchFailureJoinsRefreshError verifies the refresh error is joined when present.
-
-	// TestFirstPlausibleRefRejectsOriginHead verifies origin/HEAD alone yields no branch.
-
-	// TestFirstPlausibleRefFindsBranch verifies the first usable remote ref is returned.
-
-	// TestIsChangeAllowedMatchesExactPath verifies an exact allow-list entry is honored.
-
-	// TestHexHelpers verifies the hex classification helpers accept the expected ranges.
-
-	// TestIsPlausibleDefaultBranchRejectsCommitSHA verifies commit-like branch names are rejected.
-
-	// TestParseHEADBranchLine verifies the remote show output parser.
-
-	// TestParseStatusPathRejectsShortLines verifies short and blank status lines are ignored.
-
-	// TestValidateStagePathsRejectsEscape verifies staging paths outside the workspace fail.
-
-	// TestClientRejectsInvalidRefs verifies every ref-taking method validates its input.
-
-	// TestBranchExistsRejectsInvalidRef verifies an invalid ref is reported before running git.
-
-	// TestLastCommitMessageRejectsInvalidRef verifies an invalid ref is reported before running git.
-
-	// TestClientMethodsReportGitFailures verifies commands fail outside a repository.
-
-	// TestLastCommitMessageReportsGitFailure verifies git log failures are wrapped.
-
-	// TestHasUnrelatedChangesReportsGitFailure verifies git status failures are wrapped.
-
-	// TestDefaultBranchReportsDetectionFailure verifies detection failure outside a repository.
-
-	// TestDefaultBranchFromRemoteShowReportsFailure verifies git remote show failures are wrapped.
-
-	// TestRefsAtOriginHEADReportsFailure verifies for-each-ref failures are wrapped.
-
-	// TestStageSkipsEmptyPaths verifies staging nothing is a no-op.
-
-	// TestStageReportsInvalidPath verifies an escaping stage path is rejected.
-
-	// TestStageReportsGitFailure verifies git add failures outside a repository are wrapped.
-
-	// TestConfigureCredentialsReportsRemoteFailure verifies remote set-url failures are wrapped.
-
 	stubModeEnv = "TASKOTTER_GIT_STUB_MODE"
 	stubOK      = "ok"
 	stubAbbrev  = "abbrev"

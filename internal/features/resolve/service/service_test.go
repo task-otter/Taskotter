@@ -10,9 +10,6 @@ import (
 )
 
 const (
-
-	// TestTransitiveResolverResolve covers the DepsResolver adapter.
-
 	scoreFmt   = "score = %d, want %d"
 	goTask     = "go"
 	golangName = "golang"

@@ -9,22 +9,29 @@ import (
 )
 
 type (
-	// Result captures sync outcomes for logging, GitHub Actions output, and PR metadata.
 	Result struct {
-		Plan                 *syncdomain.Plan
-		Ref                  storedomain.RefInfo
-		StoreVersion         string
-		SourceRef            string
-		SourceSHA            string
-		TargetFolder         string
-		ResolvedTasksJSON    string
-		ResolvedDependencies string
-		PullRequestNumber    string
-		PullRequestURL       string
-		Changed              bool
+		ResolvedOutput
+		PullRequestOutput
+
+		Plan         *syncdomain.Plan
+		Ref          storedomain.RefInfo
+		StoreVersion string
+		SourceRef    string
+		SourceSHA    string
+		TargetFolder string
+		Changed      bool
 	}
 
-	// ResolvedTask is the JSON representation of a resolved task module mapping.
+	ResolvedOutput struct {
+		ResolvedTasksJSON    string
+		ResolvedDependencies string
+	}
+
+	PullRequestOutput struct {
+		PullRequestNumber string
+		PullRequestURL    string
+	}
+
 	ResolvedTask struct {
 		SourceModule      string
 		DestinationModule string

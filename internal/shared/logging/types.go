@@ -22,7 +22,12 @@ type (
 	// Logger emits GitHub Actions log commands.
 	Logger struct {
 		output zerolog.Logger
-		sink   *failureSink
+		sink   logWriter
+	}
+
+	logWriter interface {
+		io.Writer
+		Err() error
 	}
 
 	failureSink struct {

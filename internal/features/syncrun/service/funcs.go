@@ -108,29 +108,27 @@ func sourceModulesOf(resolutions []resolvesvc.Resolution) []string {
 	return requestedSources
 }
 
-// NewOrchestrator builds an Orchestrator that runs the sync pipeline with deps.
 func NewOrchestrator(deps *Deps) *Orchestrator {
-	return &Orchestrator{
-		run: func(ctx context.Context, cfg *config.Config) (*rundomain.Result, error) {
-			wireDefaults(deps)
+	run := Orchestrator(func(ctx context.Context, cfg *config.Config) (*rundomain.Result, error) {
+		wireDefaults(deps)
 
-			result, err := execPipeline(ctx, deps, cfg)
-			if err != nil {
-				return nil, fmt.Errorf(errFmtRun, err)
-			}
+		result, err := execPipeline(ctx, deps, cfg)
+		if err != nil {
+			return nil, fmt.Errorf(errFmtRun, err)
+		}
 
-			return result, nil
-		},
-	}
+		return result, nil
+	})
+
+	return &run
 }
 
-// Run executes the full sync pipeline.
 func (orch *Orchestrator) Run(ctx context.Context, cfg *config.Config) (*rundomain.Result, error) {
-	if orch == nil || orch.run == nil {
+	if orch == nil || *orch == nil {
 		return nil, errOrchestratorNotConfigured
 	}
 
-	result, err := orch.run(ctx, cfg)
+	result, err := (*orch)(ctx, cfg)
 	if err != nil {
 		return nil, fmt.Errorf(errFmtRun, err)
 	}
@@ -172,10 +170,7 @@ func buildPlanResult(deps *Deps, inp *buildPlanInput, ref *refInfo) (planResult,
 		return planResult{}, fmt.Errorf(errFmtBuildSyncPlan, err)
 	}
 
-	result, err := buildResult(inp.cfg, plan, ref)
-	if err != nil {
-		return planResult{}, fmt.Errorf("build result: %w", err)
-	}
+	result := buildResult(inp.cfg, plan, ref)
 
 	return planResult{syncInput: syncInput, plan: plan, result: result}, nil
 }
@@ -900,7 +895,7 @@ func wireDefaults(deps *Deps) {
 	wireSyncHooks(deps)
 }
 
-func buildResolvedDependenciesJSON(deps []lockmodel.ModuleRecord) (string, error) {
+func buildResolvedDependenciesJSON(deps []lockmodel.ModuleRecord) string {
 	out := make([]rundomain.ResolvedTask, consts.IndexZero, len(deps))
 
 	for i := range deps {
@@ -913,15 +908,12 @@ func buildResolvedDependenciesJSON(deps []lockmodel.ModuleRecord) (string, error
 		})
 	}
 
-	data, err := json.MarshalIndent(out, consts.Empty, jsonIndent)
-	if err != nil {
-		return consts.Empty, fmt.Errorf("marshal resolved dependencies: %w", err)
-	}
+	data, _ := json.MarshalIndent(out, consts.Empty, jsonIndent)
 
-	return string(data), nil
+	return string(data)
 }
 
-func buildResolvedTasksJSON(requested map[string]lockmodel.ModuleRecord) (string, error) {
+func buildResolvedTasksJSON(requested map[string]lockmodel.ModuleRecord) string {
 	out := make(map[string]rundomain.ResolvedTask, len(requested))
 
 	for task := range requested {
@@ -934,27 +926,21 @@ func buildResolvedTasksJSON(requested map[string]lockmodel.ModuleRecord) (string
 		}
 	}
 
-	data, err := json.MarshalIndent(out, consts.Empty, jsonIndent)
-	if err != nil {
-		return consts.Empty, fmt.Errorf("marshal resolved tasks: %w", err)
-	}
+	data, _ := json.MarshalIndent(out, consts.Empty, jsonIndent)
 
-	return string(data), nil
+	return string(data)
 }
 
 func buildResult(
 	cfg *config.Config,
 	plan *syncdomain.Plan,
 	ref *storedomain.RefInfo,
-) (*rundomain.Result, error) {
+) *rundomain.Result {
 	result := newResultShell(cfg, plan, ref)
 
-	err := fillResolvedJSON(result, plan)
-	if err != nil {
-		return nil, fmt.Errorf("fill resolved JSON: %w", err)
-	}
+	fillResolvedJSON(result, plan)
 
-	return result, nil
+	return result
 }
 
 func empty(v string) string {
@@ -965,21 +951,9 @@ func empty(v string) string {
 	return v
 }
 
-func fillResolvedJSON(result *rundomain.Result, plan *syncdomain.Plan) error {
-	resolvedTasks, err := buildResolvedTasksJSON(plan.Requested)
-	if err != nil {
-		return fmt.Errorf("build resolved tasks JSON: %w", err)
-	}
-
-	resolvedDependencies, err := buildResolvedDependenciesJSON(plan.Dependencies)
-	if err != nil {
-		return fmt.Errorf("build resolved dependencies JSON: %w", err)
-	}
-
-	result.ResolvedTasksJSON = resolvedTasks
-	result.ResolvedDependencies = resolvedDependencies
-
-	return nil
+func fillResolvedJSON(result *rundomain.Result, plan *syncdomain.Plan) {
+	result.ResolvedTasksJSON = buildResolvedTasksJSON(plan.Requested)
+	result.ResolvedDependencies = buildResolvedDependenciesJSON(plan.Dependencies)
 }
 
 func logDependencyModules(log *logging.Logger, plan *syncdomain.Plan) {
@@ -1029,17 +1003,21 @@ func newResultShell(
 	ref *storedomain.RefInfo,
 ) *rundomain.Result {
 	return &rundomain.Result{
-		Changed:              plan.Changed,
-		StoreVersion:         cfg.StoreVersion,
-		SourceRef:            ref.SourceRef,
-		SourceSHA:            ref.ResolvedCommit,
-		TargetFolder:         cfg.TargetFolder,
-		ResolvedTasksJSON:    consts.Empty,
-		ResolvedDependencies: consts.Empty,
-		PullRequestNumber:    consts.Empty,
-		PullRequestURL:       consts.Empty,
-		Plan:                 plan,
-		Ref:                  *ref,
+		ResolvedOutput: rundomain.ResolvedOutput{
+			ResolvedTasksJSON:    consts.Empty,
+			ResolvedDependencies: consts.Empty,
+		},
+		PullRequestOutput: rundomain.PullRequestOutput{
+			PullRequestNumber: consts.Empty,
+			PullRequestURL:    consts.Empty,
+		},
+		Changed:      plan.Changed,
+		StoreVersion: cfg.StoreVersion,
+		SourceRef:    ref.SourceRef,
+		SourceSHA:    ref.ResolvedCommit,
+		TargetFolder: cfg.TargetFolder,
+		Plan:         plan,
+		Ref:          *ref,
 	}
 }
 

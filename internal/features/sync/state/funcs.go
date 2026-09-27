@@ -12,7 +12,6 @@ import (
 	yaml "go.yaml.in/yaml/v3"
 )
 
-// LoadMetadata reads TaskOtter metadata from workspace-relative path rel.
 func LoadMetadata(workspace, rel string) (*domain.Metadata, error) {
 	data, err := pathutil.ReadRelativeFile(workspace, rel)
 	if err != nil {
@@ -21,14 +20,14 @@ func LoadMetadata(workspace, rel string) (*domain.Metadata, error) {
 
 	var meta domain.Metadata
 
-	if err = yaml.Unmarshal(data, &meta); err != nil {
+	err = yaml.Unmarshal(data, &meta)
+	if err != nil {
 		return nil, fmt.Errorf("parse metadata %q: %w", rel, err)
 	}
 
 	return &meta, nil
 }
 
-// LoadLock reads the TaskOtter lock file from workspace-relative path rel.
 func LoadLock(workspace, rel string) (*lockmodel.LockFile, error) {
 	data, err := pathutil.ReadRelativeFile(workspace, rel)
 	if err != nil {
@@ -37,7 +36,8 @@ func LoadLock(workspace, rel string) (*lockmodel.LockFile, error) {
 
 	var lock lockmodel.LockFile
 
-	if err = lockmodel.DecodeLockFileYAML(data, &lock); err != nil {
+	err = lockmodel.DecodeLockFileYAML(data, &lock)
+	if err != nil {
 		return nil, fmt.Errorf("parse lock file %q: %w", rel, err)
 	}
 

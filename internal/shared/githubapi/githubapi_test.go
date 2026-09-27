@@ -22,6 +22,10 @@ type (
 		readErr  error
 		closeErr error
 	}
+
+	closeOnlyStubBody struct {
+		closeErr error
+	}
 )
 
 const (
@@ -45,7 +49,6 @@ const (
 
 var errStub = errors.New("stub failure")
 
-// TestNewClientUsesDefaultBaseURL verifies the authenticated client targets api.github.com.
 func TestNewClientUsesDefaultBaseURL(t *testing.T) {
 	t.Parallel()
 
@@ -56,7 +59,6 @@ func TestNewClientUsesDefaultBaseURL(t *testing.T) {
 	}
 }
 
-// TestNewClientWithHTTPRejectsInvalidURL verifies an unparsable base URL is reported.
 func TestNewClientWithHTTPRejectsInvalidURL(t *testing.T) {
 	t.Parallel()
 
@@ -68,7 +70,6 @@ func TestNewClientWithHTTPRejectsInvalidURL(t *testing.T) {
 	}
 }
 
-// TestCreatePRReturnsPullRequest verifies a created pull request is decoded.
 func TestCreatePRReturnsPullRequest(t *testing.T) {
 	t.Parallel()
 
@@ -84,7 +85,6 @@ func TestCreatePRReturnsPullRequest(t *testing.T) {
 	}
 }
 
-// TestCreatePRReportsStatusError verifies a non-2xx response is reported.
 func TestCreatePRReportsStatusError(t *testing.T) {
 	t.Parallel()
 
@@ -98,7 +98,6 @@ func TestCreatePRReportsStatusError(t *testing.T) {
 	}
 }
 
-// TestEditPRBodyIgnoresResponseBody verifies a nil destination skips decoding.
 func TestEditPRBodyIgnoresResponseBody(t *testing.T) {
 	t.Parallel()
 
@@ -110,7 +109,6 @@ func TestEditPRBodyIgnoresResponseBody(t *testing.T) {
 	}
 }
 
-// TestEditPRBodyReportsStatusError verifies a failed edit surfaces the status error.
 func TestEditPRBodyReportsStatusError(t *testing.T) {
 	t.Parallel()
 
@@ -122,7 +120,6 @@ func TestEditPRBodyReportsStatusError(t *testing.T) {
 	}
 }
 
-// TestListOpenPRsDecodesResults verifies query building and list decoding.
 func TestListOpenPRsDecodesResults(t *testing.T) {
 	t.Parallel()
 
@@ -138,7 +135,6 @@ func TestListOpenPRsDecodesResults(t *testing.T) {
 	}
 }
 
-// TestListOpenPRsReportsDecodeError verifies malformed JSON is reported.
 func TestListOpenPRsReportsDecodeError(t *testing.T) {
 	t.Parallel()
 
@@ -152,7 +148,6 @@ func TestListOpenPRsReportsDecodeError(t *testing.T) {
 	}
 }
 
-// TestListOpenPRsReportsTransportError verifies transport failures are wrapped.
 func TestListOpenPRsReportsTransportError(t *testing.T) {
 	t.Parallel()
 
@@ -169,7 +164,6 @@ func TestListOpenPRsReportsTransportError(t *testing.T) {
 	}
 }
 
-// TestMarshalPayloadReportsError verifies unencodable payloads are reported.
 func TestMarshalPayloadReportsError(t *testing.T) {
 	t.Parallel()
 
@@ -181,33 +175,32 @@ func TestMarshalPayloadReportsError(t *testing.T) {
 	}
 }
 
-// TestNewAPIRequestReportsError verifies an invalid method is reported.
 func TestNewAPIRequestReportsError(t *testing.T) {
 	t.Parallel()
 	assertNewAPIRequestFails(t, newCall(badMethod, nil))
 }
 
-// TestNewAPIRequestReportsMarshalError verifies an unencodable payload aborts request building.
 func TestNewAPIRequestReportsMarshalError(t *testing.T) {
 	t.Parallel()
 	assertNewAPIRequestFails(t, newCall(http.MethodPost, make(chan int)))
 }
 
-// TestDoRequestReportsBuildError verifies request-building failures are wrapped.
 func TestDoRequestReportsBuildError(t *testing.T) {
 	t.Parallel()
 
 	client := newStubClient(t, http.StatusOK, consts.Empty)
 
 	resp, err := doRequest(t.Context(), client, newCall(badMethod, nil))
-	iox.Discard(resp)
+
+	if resp != nil {
+		err = appendBodyClose(err, resp)
+	}
 
 	if err == nil {
 		t.Fatalf(wantErrFmt, "doRequest")
 	}
 }
 
-// TestAppendBodyCloseReportsFailures verifies drain and close failures are reported.
 func TestAppendBodyCloseReportsFailures(t *testing.T) {
 	t.Parallel()
 
@@ -217,24 +210,36 @@ func TestAppendBodyCloseReportsFailures(t *testing.T) {
 	}
 
 	for i := range cases {
-		err := appendBodyClose(nil, newStubResponse(cases[i]))
+		err := appendStubBodyClose(nil, cases[i])
 		if err == nil {
 			t.Fatalf(wantErrFmt, "appendBodyClose")
 		}
 	}
 }
 
-// TestAppendBodyCloseKeepsExistingError verifies an earlier error wins over cleanup errors.
+func TestAppendBodyCloseReportsCloseFailure(t *testing.T) {
+	t.Parallel()
+
+	err := appendStubBodyClose(nil, &closeOnlyStubBody{closeErr: errStub})
+	if err == nil {
+		t.Fatalf(wantErrFmt, "appendBodyClose")
+	}
+}
+
 func TestAppendBodyCloseKeepsExistingError(t *testing.T) {
 	t.Parallel()
 
 	body := &stubBody{reader: strings.NewReader(consts.Empty), readErr: errStub, closeErr: errStub}
 
-	err := appendBodyClose(errStub, newStubResponse(body))
+	err := appendStubBodyClose(errStub, body)
 
 	if !errors.Is(err, errStub) {
 		t.Fatalf("err = %v, want %v", err, errStub)
 	}
+}
+
+func appendStubBodyClose(err error, body io.ReadCloser) error {
+	return appendBodyClose(err, newStubResponse(body))
 }
 
 func (body *stubBody) Close() error {
@@ -252,6 +257,14 @@ func (body *stubBody) Read(data []byte) (int, error) {
 	}
 
 	return read, nil
+}
+
+func (body *closeOnlyStubBody) Close() error {
+	return body.closeErr
+}
+
+func (body *closeOnlyStubBody) Read(_ []byte) (int, error) {
+	return consts.IndexZero, io.EOF
 }
 
 func assertNewAPIRequestFails(t *testing.T, call *jsonCall) {

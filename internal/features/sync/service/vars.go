@@ -15,10 +15,6 @@ import (
 )
 
 var (
-
-	// Package-level FS seams let tests reach OS failure branches without depending on
-	// platform-specific permission tricks. Production keeps the stdlib defaults.
-
 	//nolint:gochecknoglobals // test seams for OS failure branches
 	removeAll = os.RemoveAll
 

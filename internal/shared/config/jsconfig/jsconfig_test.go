@@ -1,0 +1,112 @@
+// Taskotter 2026.
+// SPDX-License-Identifier: Apache-2.0.
+
+package jsconfig
+
+import (
+	"errors"
+	"testing"
+
+	"github.com/task-otter/Taskotter/internal/shared/consts"
+)
+
+type parseCase struct {
+	name        string
+	raw         string
+	wantRuntime JSRuntime
+	wantManager PackageManager
+}
+
+func TestParseValidSettings(t *testing.T) {
+	t.Parallel()
+
+	cases := []parseCase{
+		{name: "empty", raw: "", wantRuntime: consts.Empty, wantManager: consts.Empty},
+		{name: "default node", raw: "{}", wantRuntime: JSRuntimeNodeJS, wantManager: "npm"},
+		{
+			name:        "node pnpm",
+			raw:         "runtime: nodejs\npackage-manager: pnpm\n",
+			wantRuntime: JSRuntimeNodeJS,
+			wantManager: "pnpm",
+		},
+		{name: "bun", raw: "runtime: bun\n", wantRuntime: JSRuntimeBun, wantManager: JSRuntimeBun},
+	}
+
+	for i := range cases {
+		tc := cases[i]
+
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := Parse(tc.raw)
+			if err != nil {
+				t.Fatalf("Parse() error = %v", err)
+			}
+
+			if got.Runtime != tc.wantRuntime || got.NodePackageManager != tc.wantManager {
+				t.Fatalf("Parse() = %#v", got)
+			}
+		})
+	}
+}
+
+func TestParseValidationErrors(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name      string
+		raw       string
+		wantField string
+	}{
+		{name: "invalid yaml", raw: ":", wantField: consts.FieldJS},
+		{name: "invalid runtime", raw: "runtime: deno\n", wantField: "js.runtime"},
+		{
+			name:      "invalid package manager",
+			raw:       "package-manager: bun\n",
+			wantField: fieldJSPackageManager,
+		},
+		{
+			name:      "bun package manager",
+			raw:       "runtime: bun\npackage-manager: npm\n",
+			wantField: fieldJSPackageManager,
+		},
+		{
+			name:      "version manager",
+			raw:       "version-manager: nodenv\n",
+			wantField: fieldJSVersionManager,
+		},
+	}
+
+	for i := range cases {
+		tc := cases[i]
+
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			assertValidationError(t, tc.raw, tc.wantField)
+		})
+	}
+}
+
+func assertValidationError(t *testing.T, raw, wantField string) {
+	t.Helper()
+
+	_, err := Parse(raw)
+	if err == nil {
+		t.Fatal("expected validation error")
+	}
+
+	var validationErr *ValidationError
+
+	if !errors.As(err, &validationErr) {
+		t.Fatalf("error = %T %[1]v", err)
+	}
+
+	if validationErr.FieldName() != wantField {
+		t.Fatalf("field = %q, want %q", validationErr.FieldName(), wantField)
+	}
+
+	if validationErr.Error() == consts.Empty {
+		t.Fatal("empty validation error")
+	}
+}

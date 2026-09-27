@@ -16,81 +16,6 @@ import (
 )
 
 type (
-
-	// TestRewriteIncludesRejectsLiteralBlockPath verifies a literal block include path fails.
-
-	// TestRewriteIncludesRewritesQuotedPath verifies a quoted include path is rewritten in place.
-
-	// TestRewriteIncludesSkipsNonMappingIncludes verifies unusable include sections are left alone.
-
-	// TestRewriteIncludesHandlesDotSlashPrefix verifies "./" prefixed paths are rewritten.
-
-	// TestRelativePathHelpersFallBackOnFailure verifies absolute/relative mismatches fall back.
-
-	// TestUpdateRootTaskfileRejectsNonMappingTasks verifies a non-mapping tasks section fails.
-
-	// TestUpdateRootTaskfileKeepsStillGeneratedTasks verifies regenerated tasks are not pruned.
-
-	// TestIsManagedIncludeFallsBackToManagedTasks verifies aliases without a taskfile key.
-
-	// TestPromotedVarHelpersHandleMissingValues verifies missing module vars are skipped.
-
-	// TestAddMissingPromotedVarSkipsUnknownKey verifies a key without a value is not added.
-
-	// TestMergeIncludeVarsSkipsNonMappingNodes verifies non-mapping vars are left untouched.
-
-	// TestOverridableRootVarSkipsNilAndNonScalar covers early-return branches.
-
-	// TestOverridableRootVarPreservesExistingDefault covers the | default short-circuit.
-
-	// TestOverridableRootVarWrapsScalars covers plain and quote-containing defaults.
-
-	// TestOverridableDefaultArgBranches covers quote vs backtick wrapping.
-
-	// TestOpsDelegatesToPackageHelpers verifies the ports adapter forwards to the helpers.
-
-	// TestOpsReportsFailures verifies malformed YAML surfaces through the ports adapter.
-
-	// TestRewriteIncludesRejectsMalformedYAML verifies parse and empty-document failures.
-
-	// TestUpdateRootTaskfileRejectsMalformedYAML verifies parse and empty-document failures.
-
-	// TestUpdateRootTaskfileRejectsNonMappingSections verifies includes and vars must be mappings.
-
-	// TestUpdateRootTaskfileRejectsMissingDestination verifies a task without a destination fails.
-
-	// TestUpdateRootTaskfileRejectsUnmanagedAlias verifies a foreign include alias fails.
-
-	// TestUpdateRootTaskfileRejectsMalformedModuleTaskfile verifies module parse failures surface.
-
-	// TestUpdateRootTaskfileSkipsModulesWithoutVars verifies missing module vars are not fatal.
-
-	// TestUpdateRootTaskfilePrunesRemovedManagedIncludes verifies stale managed aliases are dropped.
-
-	// TestUpdateRootTaskfileMergesExistingIncludeVars verifies an existing managed entry is updated.
-
-	// TestUpdateRootTaskfileAcceptsScalarManagedInclude verifies a scalar include entry is managed.
-
-	// TestIncludeTaskfileScalarRejectsNonMappingEntries verifies non-mapping include entries are skipped.
-
-	// TestApplyIncludePathReplacementsReportsSpanFailure verifies unresolvable spans fail.
-
-	// TestRewriteIncludePathKeepsUnrelatedPaths verifies non-Taskfile and unmapped paths are kept.
-
-	// TestDestinationIncludePathFallsBackToOriginal verifies an empty fromDest keeps the path.
-
-	// TestFinalizeRelativePrefixRejectsRemainingParent verifies a residual ".." clears the split.
-
-	// TestModuleIncludePathAndDirForNestedRoot verifies nested aggregator paths are relative.
-
-	// TestExtractVarsNodeReportsMissingVars verifies module Taskfiles without vars are reported.
-
-	// TestParseModuleTaskfileNodeRejectsEmptyContent verifies empty and blank documents fail.
-
-	// TestMarshalNodeReportsEncoderFailure verifies an unencodable node is reported.
-
-	// TestCloneYAMLNodeCopiesNestedContent verifies clones are independent of the source.
-
 	closingQuoteCase struct {
 		content []byte
 		want    int
@@ -1049,5 +974,89 @@ func newReplacement() *includePathReplacement {
 		line:    consts.IndexOne,
 		column:  consts.IndexOne,
 		style:   yaml.Style(consts.IndexZero),
+	}
+}
+
+func TestRawVarHelpersCoverReplacementBranches(t *testing.T) {
+	t.Parallel()
+
+	raw := map[string]string{
+		"A":  "one",
+		"AA": "two",
+		"B":  consts.Empty,
+	}
+
+	keys := rawVarKeysLongestFirst(raw)
+
+	if len(keys) != consts.IndexThree || keys[consts.IndexZero] != "AA" {
+		t.Fatalf("keys = %#v", keys)
+	}
+
+	mapNode := &yaml.Node{Kind: yaml.MappingNode}
+	replaceOrAppendScalar(mapNode, "A", "old")
+	replaceOrAppendScalar(mapNode, "A", "new")
+	placeholderOneRootVar(mapNode, "B", consts.Empty)
+
+	out := spliceRawPromotedVars([]byte(rawVarPlaceholder("AA")+" "+rawVarPlaceholder("A")), raw)
+
+	if !bytes.Contains(out, []byte("two one")) {
+		t.Fatalf("spliced = %q", out)
+	}
+}
+
+func TestRawBlockOffsetHelpersCoverBounds(t *testing.T) {
+	t.Parallel()
+
+	content := []byte("vars:\n  A: |\n    one\n")
+
+	assertInt(
+		t,
+		len(trimRawBlock(content, len(content), consts.IndexOne)),
+		consts.IndexZero,
+		"trimRawBlock",
+	)
+	assertInt(t, offsetOfLine(content, consts.Index99), len(content), "offsetOfLine")
+	assertInt(t, offsetOfLine(content, consts.IndexOne), consts.IndexZero, "offsetOfLine(first)")
+	assertInt(
+		t,
+		addColumnOffset(content, consts.IndexOne, consts.IndexZero),
+		consts.IndexOne,
+		"addColumnOffset",
+	)
+	assertInt(t, clampOffset(consts.IndexOne, consts.IndexTwo), consts.IndexOne, "clampOffset")
+
+	if next, done := advanceBlockLine(
+		[]byte("last"),
+		consts.IndexZero,
+		consts.IndexOne,
+	); next != len("last") ||
+		!done {
+
+		t.Fatalf("advanceBlockLine() = %d, %t", next, done)
+	}
+
+	if next, ok := nextLineStart([]byte("last"), consts.IndexZero); next != consts.IndexZero || ok {
+		t.Fatalf("nextLineStart() = %d, %t", next, ok)
+	}
+}
+
+func assertInt(t *testing.T, got, want int, label string) {
+	t.Helper()
+
+	if got != want {
+		t.Fatalf("%s = %d, want %d", label, got, want)
+	}
+}
+
+func TestStoreExtractedVarsSkipsNilAndNotOK(t *testing.T) {
+	t.Parallel()
+
+	result := &rootVarsResult{byTask: map[string]*yaml.Node{}, raw: map[string]string{}}
+
+	storeExtractedVars(result, "nil", nil)
+	storeExtractedVars(result, "not-ok", &extractedVars{})
+
+	if len(result.byTask) != consts.IndexZero {
+		t.Fatalf("byTask = %#v", result.byTask)
 	}
 }

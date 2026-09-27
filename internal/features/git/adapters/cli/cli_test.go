@@ -14,28 +14,34 @@ import (
 )
 
 const (
-	wantErrText  = "expected error"
-	badRef       = "bad ref"
-	mainBranch   = "main"
-	statusPrefix = " M "
-	errFmt       = "err = %v"
-	allowedFile  = "taskfiles/Taskfile.yml"
-	noPathFmt    = "parseStatusPath() = %q, want no path"
-	escapePath   = "../escape"
-	commitMsg    = "message"
-	stageFile    = "file.txt"
-	stubModeEnv  = "TASKOTTER_GIT_STUB_MODE"
-	stubOK       = "ok"
-	stubAbbrev   = "abbrev"
-	stubNoRefs   = "norefs"
-	stubBadRefs  = "badrefs"
-	stubShowOK   = "showok"
-	stubShowBad  = "showbad"
-	stubScript   = `#!/bin/sh
+	wantErrText   = "expected error"
+	badRef        = "bad ref"
+	mainBranch    = "main"
+	statusPrefix  = " M "
+	errFmt        = "err = %v"
+	allowedFile   = "taskfiles/Taskfile.yml"
+	noPathFmt     = "parseStatusPath() = %q, want no path"
+	escapePath    = "../escape"
+	commitMsg     = "message"
+	stageFile     = "file.txt"
+	stubModeEnv   = "TASKOTTER_GIT_STUB_MODE"
+	stubOK        = "ok"
+	stubNoChanges = "nochanges"
+	stubAbbrev    = "abbrev"
+	stubNoRefs    = "norefs"
+	stubBadRefs   = "badrefs"
+	stubShowOK    = "showok"
+	stubShowBad   = "showbad"
+	stubScript    = `#!/bin/sh
 mode="$TASKOTTER_GIT_STUB_MODE"
 args="$*"
 case "$mode" in
 ok) exit 0 ;;
+nochanges)
+  case "$args" in
+  *"commit -m"*) echo "nothing to commit" >&2; exit 1 ;;
+  *) exit 1 ;;
+  esac ;;
 abbrev)
   case "$args" in
   *symbolic-ref*) exit 1 ;;
@@ -375,6 +381,15 @@ func TestCommandsSucceedWithStubbedGit(t *testing.T) {
 	failIfErr(t, client.CheckoutBranch(ctx, mainBranch))
 	failIfErr(t, client.Commit(ctx, commitMsg))
 	failIfErr(t, client.Push(ctx, mainBranch))
+}
+
+// TestCommitSkipsNoChanges verifies committing an unchanged tree succeeds.
+//
+//nolint:paralleltest // swaps the package-level gitBinary seam
+func TestCommitSkipsNoChanges(t *testing.T) {
+	client := stubbedClient(t, stubNoChanges)
+
+	failIfErr(t, client.Commit(t.Context(), commitMsg))
 }
 
 // TestDefaultBranchUsesAbbrevRef verifies the abbrev-ref fallback resolves the branch.

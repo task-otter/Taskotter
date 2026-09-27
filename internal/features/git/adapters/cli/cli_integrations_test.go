@@ -30,8 +30,8 @@ type (
 
 	clientFixture struct {
 		t        *testing.T
-		cloneDir string
 		client   *cli.Client
+		cloneDir string
 	}
 
 	accessRepo struct {
@@ -78,6 +78,12 @@ const (
 	testGitUserName = "Test"
 
 	taskotterAuthorName = "Taskotter"
+
+	testCommitPath = "taskotter.txt"
+
+	testCommitContents = "synced\n"
+
+	testSyncCommitMessage = "sync taskfiles"
 
 	pathRefs = "refs"
 
@@ -743,40 +749,24 @@ func (fixture *clientFixture) assertSafeDirectoryAndIdentity() {
 	cli.WriteLocalIdentity()
 }
 
+func (fixture *clientFixture) commit(message string) {
+	fixture.t.Helper()
+
+	err := fixture.client.Commit(fixture.t.Context(), message)
+	if err != nil {
+		fixture.t.Fatal(err)
+	}
+}
+
 func (fixture *clientFixture) commitAndPush() {
 	fixture.t.Helper()
 
-	err := fixture.client.CreateOrResetBranch(fixture.t.Context(), testFeatureBranch)
-	if err != nil {
-		fixture.t.Fatal(err)
-	}
-
-	commitPath := filepath.Join(fixture.cloneDir, "taskotter.txt")
-
-	err = os.WriteFile(commitPath, []byte("synced\n"), consts.FilePerm644)
-	if err != nil {
-		fixture.t.Fatal(err)
-	}
-
-	err = fixture.client.Stage(fixture.t.Context(), []string{"taskotter.txt"})
-	if err != nil {
-		fixture.t.Fatal(err)
-	}
-
-	err = fixture.client.Commit(fixture.t.Context(), "sync taskfiles")
-	if err != nil {
-		fixture.t.Fatal(err)
-	}
-
-	gotAuthor := strings.TrimSpace(runGit(fixture.t, fixture.cloneDir, gitLog, "-1", "--format=%an"))
-	if gotAuthor != taskotterAuthorName {
-		fixture.t.Fatalf("commit author = %q, want %q", gotAuthor, taskotterAuthorName)
-	}
-
-	err = fixture.client.PushForceWithLease(fixture.t.Context(), testFeatureBranch)
-	if err != nil {
-		fixture.t.Fatal(err)
-	}
+	fixture.createBranch(testFeatureBranch)
+	fixture.writeCommitFile()
+	fixture.stage(testCommitPath)
+	fixture.commit(testSyncCommitMessage)
+	fixture.expectLatestCommitAuthor(taskotterAuthorName)
+	fixture.pushForceWithLease(testFeatureBranch)
 }
 
 func (fixture *clientFixture) createBranch(branch string) {
@@ -821,6 +811,49 @@ func (fixture *clientFixture) expectLastCommitMessage(branch, want string) {
 
 	if err != nil || msg != want {
 		fixture.t.Fatalf("LastCommitMessage() = %q, %v; want %q, nil", msg, err, want)
+	}
+}
+
+func (fixture *clientFixture) expectLatestCommitAuthor(want string) {
+	fixture.t.Helper()
+
+	gotAuthor := strings.TrimSpace(
+		runGit(fixture.t, fixture.cloneDir, gitLog, "-1", "--format=%an"),
+	)
+
+	if gotAuthor != want {
+		fixture.t.Fatalf("commit author = %q, want %q", gotAuthor, want)
+	}
+}
+
+func (fixture *clientFixture) pushForceWithLease(branch string) {
+	fixture.t.Helper()
+
+	err := fixture.client.PushForceWithLease(fixture.t.Context(), branch)
+	if err != nil {
+		fixture.t.Fatal(err)
+	}
+}
+
+func (fixture *clientFixture) stage(path string) {
+	fixture.t.Helper()
+
+	err := fixture.client.Stage(fixture.t.Context(), []string{path})
+	if err != nil {
+		fixture.t.Fatal(err)
+	}
+}
+
+func (fixture *clientFixture) writeCommitFile() {
+	fixture.t.Helper()
+
+	err := os.WriteFile(
+		filepath.Join(fixture.cloneDir, testCommitPath),
+		[]byte(testCommitContents),
+		consts.FilePerm644,
+	)
+	if err != nil {
+		fixture.t.Fatal(err)
 	}
 }
 

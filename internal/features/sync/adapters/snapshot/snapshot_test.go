@@ -15,6 +15,8 @@ const (
 )
 
 // TestAdapterReturnsSnapshotValues verifies the behavior covered by this test.
+//
+//nolint:funlen,maintidx // The explicit adapter-to-snapshot field mapping is the assertion.
 func TestAdapterReturnsSnapshotValues(t *testing.T) {
 	t.Parallel()
 

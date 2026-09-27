@@ -97,6 +97,7 @@ const (
 	modXName    = "mod-x"
 )
 
+//nolint:gochecknoglobals // Test seam restoration is shared across helpers and guarded by testSeamMu.
 var (
 	errStub          = errors.New("stub failure")
 	testSeamRestores = make(map[*testing.T][]func())
@@ -1924,6 +1925,7 @@ func failingRemove(string) error { return errStub }
 
 func failingRename(string, string) error { return errStub }
 
+//nolint:ireturn // os.FileInfo is required by the filesystem seam signature.
 func failingStat(string) (os.FileInfo, error) { return nil, errStub }
 
 func failingWalk(string, fs.WalkDirFunc) error { return errStub }
@@ -1981,8 +1983,8 @@ func restoreTestSeams(t *testing.T) {
 		return
 	}
 
-	for _, restore := range slices.Backward(restores) {
-		restore()
+	for idx := range slices.Backward(restores) {
+		restores[idx]()
 	}
 
 	delete(testSeamRestores, t)
@@ -2214,6 +2216,7 @@ func TestTryLegacyMetadataSkipsWhenAlreadyLegacy(t *testing.T) {
 	}
 }
 
+//nolint:ireturn // os.FileInfo is required by fs.DirEntry.
 func (fakeDirEntry) Info() (os.FileInfo, error) { return nil, errStub }
 
 func (entry fakeDirEntry) IsDir() bool { return entry.dir }

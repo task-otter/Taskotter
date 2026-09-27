@@ -1370,8 +1370,8 @@ func TestStoreMetadataRejectsUnknownSchema(t *testing.T) {
 	}
 }
 
-func fixtureStore(t *testing.T) *storedomain.Snapshot {
-	t.Helper()
+func fixtureStore(tb testing.TB) *storedomain.Snapshot {
+	tb.Helper()
 
 	root := filepath.Join(
 		consts.PathParent, consts.PathParent, consts.PathParent, consts.PathParent,
@@ -1380,7 +1380,7 @@ func fixtureStore(t *testing.T) *storedomain.Snapshot {
 
 	snap, err := storesvc.LocalSnapshot(root, testStoreRefInfo())
 	if err != nil {
-		t.Fatal(err)
+		tb.Fatal(err)
 	}
 
 	return snap

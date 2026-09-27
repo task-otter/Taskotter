@@ -4,6 +4,7 @@
 package state
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -12,6 +13,14 @@ import (
 	"github.com/task-otter/Taskotter/internal/features/sync/domain/lockmodel"
 	"github.com/task-otter/Taskotter/internal/shared/consts"
 	"github.com/task-otter/Taskotter/internal/shared/iox"
+)
+
+type (
+	corruptLoadCase struct {
+		load func(string, string) error
+		rel  string
+		want string
+	}
 )
 
 const (
@@ -65,17 +74,11 @@ func assertMetadataFixture(t *testing.T, meta *domain.Metadata) {
 func TestLoadMetadataCorruptFails(t *testing.T) {
 	t.Parallel()
 
-	assertCorruptLoadFails(
-		t,
-		testMetadataFileName,
-		errExpectedCorruptMetadata,
-		func(root, rel string) error {
-			meta, err := LoadMetadata(root, rel)
-			iox.Discard(meta)
-
-			return err
-		},
-	)
+	assertCorruptLoadFails(t, &corruptLoadCase{
+		rel:  testMetadataFileName,
+		want: errExpectedCorruptMetadata,
+		load: loadCorruptMetadata,
+	})
 }
 
 // TestLoadMetadataMissingFileFails verifies the behavior covered by this test.
@@ -132,8 +135,10 @@ func writeLockFixture(t *testing.T, root, rel string) lockmodel.LockFile {
 func assertLockFixture(t *testing.T, got, want *lockmodel.LockFile) {
 	t.Helper()
 
-	if got.Source.Repository != want.Source.Repository ||
-		got.Configuration.TargetFolder != want.Configuration.TargetFolder {
+	differentSource := got.Source.Repository != want.Source.Repository
+	differentTarget := got.Configuration.TargetFolder != want.Configuration.TargetFolder
+
+	if differentSource || differentTarget {
 		t.Fatalf("lock = %#v", got)
 	}
 }
@@ -142,30 +147,40 @@ func assertLockFixture(t *testing.T, got, want *lockmodel.LockFile) {
 func TestLoadLockCorruptFails(t *testing.T) {
 	t.Parallel()
 
-	assertCorruptLoadFails(t, testLockFile, errExpectedCorruptLock, func(root, rel string) error {
-		lock, err := LoadLock(root, rel)
-		iox.Discard(lock)
-
-		return err
+	assertCorruptLoadFails(t, &corruptLoadCase{
+		rel:  testLockFile,
+		want: errExpectedCorruptLock,
+		load: loadCorruptLock,
 	})
 }
 
-func assertCorruptLoadFails(
-	t *testing.T,
-	rel, want string,
-	load func(string, string) error,
-) {
+func loadCorruptMetadata(root, rel string) error {
+	meta, err := LoadMetadata(root, rel)
+	iox.Discard(meta)
+
+	return fmt.Errorf("load metadata: %w", err)
+}
+
+func loadCorruptLock(root, rel string) error {
+	lock, err := LoadLock(root, rel)
+	iox.Discard(lock)
+
+	return fmt.Errorf("load lock: %w", err)
+}
+
+func assertCorruptLoadFails(t *testing.T, testCase *corruptLoadCase) {
 	t.Helper()
 
 	root := t.TempDir()
 
-	err := os.WriteFile(filepath.Join(root, rel), []byte(testBadYAML), consts.FilePerm644)
+	err := os.WriteFile(filepath.Join(root, testCase.rel), []byte(testBadYAML), consts.FilePerm644)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err = load(root, rel); err == nil {
-		t.Fatal(want)
+	err = testCase.load(root, testCase.rel)
+	if err == nil {
+		t.Fatal(testCase.want)
 	}
 }
 

@@ -14,6 +14,9 @@ import (
 	yaml "go.yaml.in/yaml/v3"
 )
 
+//nolint:grouper // This format is local to the YAML decoding helper below.
+const errDecodeYAMLFormat = "decode %s YAML: %w"
+
 // MarshalLock encodes a lock file using stable on-disk keys. The encoded map
 // holds only strings, bools, and slices of them, so encoding cannot fail.
 func MarshalLock(lock *LockFile) []byte {
@@ -67,19 +70,16 @@ func UnmarshalLockFile(value *yaml.Node, lock *LockFile) error {
 }
 
 // DecodeLockFileYAML unmarshals YAML bytes into a lock file.
+//
+//nolint:wrapcheck // decodeYAMLInto already adds the relevant YAML decoding context.
 func DecodeLockFileYAML(data []byte, lock *LockFile) error {
-	err := decodeYAMLDocumentWithContext(
+	return decodeYAMLInto(
 		data,
 		"lock file",
 		func(node *yaml.Node) error {
 			return UnmarshalLockFile(node, lock)
 		},
 	)
-	if err != nil {
-		return fmt.Errorf("decode lock file YAML: %w", err)
-	}
-
-	return nil
 }
 
 // UnmarshalModuleRecord decodes a module record from the lock file's snake_case keys.
@@ -128,16 +128,22 @@ func UnmarshalOrderedRequested(value *yaml.Node, requested *OrderedRequested) er
 }
 
 // DecodeOrderedRequestedYAML unmarshals YAML bytes into ordered requested modules.
+//
+//nolint:wrapcheck // decodeYAMLInto already adds the relevant YAML decoding context.
 func DecodeOrderedRequestedYAML(data []byte, requested *OrderedRequested) error {
-	err := decodeYAMLDocumentWithContext(
+	return decodeYAMLInto(
 		data,
 		"ordered requested",
 		func(node *yaml.Node) error {
 			return UnmarshalOrderedRequested(node, requested)
 		},
 	)
+}
+
+func decodeYAMLInto(data []byte, label string, unmarshal func(*yaml.Node) error) error {
+	err := decodeYAMLDocumentWithContext(data, label, unmarshal)
 	if err != nil {
-		return fmt.Errorf("decode ordered requested YAML: %w", err)
+		return fmt.Errorf(errDecodeYAMLFormat, label, err)
 	}
 
 	return nil

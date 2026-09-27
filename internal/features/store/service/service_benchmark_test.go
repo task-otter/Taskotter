@@ -111,6 +111,8 @@ func benchStoreRoot(b *testing.B) string {
 }
 
 // BenchmarkLoadCatalogAndDeps measures walking a store tree and parsing its dependency graph.
+//
+//nolint:unqueryvet // The benchmark intentionally measures a complete independent catalog load per iteration.
 func BenchmarkLoadCatalogAndDeps(b *testing.B) {
 	root := benchStoreRoot(b)
 

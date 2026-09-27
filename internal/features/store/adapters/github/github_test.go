@@ -126,6 +126,8 @@ func TestBuildSnapshotReportsTempDirFailure(t *testing.T) {
 }
 
 // TestDoGetReportsInvalidURL verifies an unbuildable request is reported.
+//
+//nolint:bodyclose // doGet may return a partially constructed response only for this invalid-request test.
 func TestDoGetReportsInvalidURL(t *testing.T) {
 	t.Parallel()
 
@@ -133,14 +135,7 @@ func TestDoGetReportsInvalidURL(t *testing.T) {
 
 	resp, err := doGet(t.Context(), client, "\n")
 
-	if resp != nil && resp.Body != nil {
-		t.Cleanup(func() {
-			closeErr := resp.Body.Close()
-			if closeErr != nil {
-				t.Errorf("close response body: %v", closeErr)
-			}
-		})
-	}
+	cleanupResponse(t, resp)
 
 	iox.Discard(resp)
 	assertFails(t, err)
@@ -202,12 +197,16 @@ func TestSnapshotCleanupReportsRemoveFailure(t *testing.T) {
 }
 
 // TestDrainResponseBodyReportsReadFailure verifies unreadable bodies are reported.
+//
+//nolint:bodyclose // drainResponseBody owns consuming and closing its response.
 func TestDrainResponseBodyReportsReadFailure(t *testing.T) {
 	t.Parallel()
 	assertFails(t, drainResponseBody(failingResponse()))
 }
 
 // TestDrainArchiveBodyReportsFailures verifies read and close failures are reported.
+//
+//nolint:bodyclose // drainArchiveBody owns consuming and closing its response.
 func TestDrainArchiveBodyReportsFailures(t *testing.T) {
 	t.Parallel()
 
@@ -216,6 +215,8 @@ func TestDrainArchiveBodyReportsFailures(t *testing.T) {
 }
 
 // TestCloseOnArchiveStatusErrorReportsCleanupFailures verifies drain and close failures join.
+//
+//nolint:bodyclose // closeOnArchiveStatusError owns consuming and closing its response.
 func TestCloseOnArchiveStatusErrorReportsCleanupFailures(t *testing.T) {
 	t.Parallel()
 
@@ -246,15 +247,57 @@ func (body *stubBody) Read(data []byte) (int, error) {
 	}
 
 	read, err := body.reader.Read(data)
-	if err != nil {
-		if errors.Is(err, io.EOF) {
-			return read, err
-		}
-
-		return read, fmt.Errorf("read delegated response body: %w", err)
+	if err == nil {
+		return read, nil
 	}
 
-	return read, nil
+	if errors.Is(err, io.EOF) {
+		//nolint:wrapcheck // io.EOF is a required terminal Reader result.
+		return read, err
+	}
+
+	return read, fmt.Errorf("read delegated response body: %w", err)
+}
+
+func cleanupResponse(t *testing.T, resp *http.Response) {
+	t.Helper()
+
+	if resp == nil {
+		return
+	}
+
+	if resp.Body == nil {
+		return
+	}
+
+	t.Cleanup(func() {
+		reportResponseCleanup(t, resp.Body)
+	})
+}
+
+func reportResponseCleanup(t *testing.T, body io.ReadCloser) {
+	t.Helper()
+
+	discardErr := discardResponseBody(body)
+	if discardErr != nil {
+		t.Errorf("discard response body: %v", discardErr)
+	}
+
+	closeErr := body.Close()
+	if closeErr != nil {
+		t.Errorf("close response body: %v", closeErr)
+	}
+}
+
+func discardResponseBody(body io.Reader) error {
+	copied, err := io.Copy(io.Discard, body)
+	iox.Discard(copied)
+
+	if err != nil {
+		return fmt.Errorf("discard response body: %w", err)
+	}
+
+	return nil
 }
 
 func (doer *stubDoer) Do(*http.Request) (*http.Response, error) {

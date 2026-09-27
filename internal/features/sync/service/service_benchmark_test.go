@@ -175,22 +175,7 @@ func benchSyncInput(b *testing.B) syncdomain.SyncInput {
 	return input
 }
 
-func createBenchmarkStore(b *testing.B) *storedomain.Snapshot {
-	b.Helper()
-
-	root := filepath.Join(
-		consts.PathParent, consts.PathParent, consts.PathParent, consts.PathParent,
-		dirTests, dirFixtures, dirStore,
-	)
-
-	snap, err := storesvc.LocalSnapshot(root, testStoreRefInfo())
-	if err != nil {
-		b.Fatal(err)
-	}
-
-	return snap
-}
-
+//nolint:funlen,maintidx // The benchmark setup mirrors the complete sync input under measurement.
 func prepareSyncInputBench(
 	b *testing.B,
 	cfg *config.Config,
@@ -207,7 +192,7 @@ func prepareSyncInputBench(
 		b.Fatal(err)
 	}
 
-	si, err := syncprepare.SyncInput(&syncprepare.SyncInputArgs{
+	input, err := syncprepare.SyncInput(&syncprepare.SyncInputArgs{
 		Cfg:         cfg,
 		Snapshot:    syncsnapshot.New(snap),
 		TaskfileOps: synctaskfile.NewOps(),
@@ -218,12 +203,13 @@ func prepareSyncInputBench(
 		b.Fatal(err)
 	}
 
-	return si
+	return input
 }
 
 // BenchmarkBuildPlan measures performance.
 func BenchmarkBuildPlan(b *testing.B) {
-	runBuildPlanBenchmark(b, prepareBenchmarkInput(b))
+	input := prepareBenchmarkInput(b)
+	runBuildPlanBenchmark(b, &input)
 }
 
 func prepareBenchmarkInput(b *testing.B) syncdomain.SyncInput {
@@ -232,17 +218,17 @@ func prepareBenchmarkInput(b *testing.B) syncdomain.SyncInput {
 	ws := b.TempDir()
 	writeRootTaskfile(b, ws)
 
-	return prepareSyncInputBench(b, testConfig(ws, mutateEslintGoPnpm), createBenchmarkStore(b))
+	return prepareSyncInputBench(b, testConfig(ws, mutateEslintGoPnpm), fixtureStore(b))
 }
 
-func runBuildPlanBenchmark(b *testing.B, input syncdomain.SyncInput) {
+func runBuildPlanBenchmark(b *testing.B, input *syncdomain.SyncInput) {
 	b.Helper()
 
 	b.ResetTimer()
 	b.ReportAllocs()
 
 	for b.Loop() {
-		_, err := syncsvc.BuildPlan(&input)
+		_, err := syncsvc.BuildPlan(input)
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -272,11 +258,14 @@ func BenchmarkPlan(b *testing.B) {
 func BenchmarkDiff(b *testing.B) {
 	input := prepareBenchmarkInput(b)
 
-	if _, err := syncsvc.BuildPlan(&input); err != nil {
+	plan, err := syncsvc.BuildPlan(&input)
+	iox.Discard(plan)
+
+	if err != nil {
 		b.Fatal(err)
 	}
 
-	runBuildPlanBenchmark(b, input)
+	runBuildPlanBenchmark(b, &input)
 }
 
 // BenchmarkUpdateRootTaskfile measures performance.

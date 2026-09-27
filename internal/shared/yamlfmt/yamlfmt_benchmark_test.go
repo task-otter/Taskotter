@@ -11,17 +11,7 @@ import (
 
 // BenchmarkMarshal measures performance.
 func BenchmarkMarshal(b *testing.B) {
-	data := map[string]any{
-		fixtureVersionKey: fixtureVersion,
-		fixtureVarsKey: map[string]string{
-			fixtureGoVersionKey: fixtureGoVersion,
-			"NODE_ENV":          "production",
-		},
-		"includes": map[string]any{
-			"go":     "taskfiles/go/Taskfile.yml",
-			"eslint": "taskfiles/eslint/Taskfile.yml",
-		},
-	}
+	data := benchmarkMarshalData()
 
 	b.ResetTimer()
 	b.ReportAllocs()
@@ -31,5 +21,19 @@ func BenchmarkMarshal(b *testing.B) {
 		if err != nil {
 			b.Fatal(err)
 		}
+	}
+}
+
+func benchmarkMarshalData() map[string]any {
+	return map[string]any{
+		fixtureVersionKey: fixtureVersion,
+		fixtureVarsKey: map[string]string{
+			fixtureGoVersionKey: fixtureGoVersion,
+			"NODE_ENV":          "production",
+		},
+		"includes": map[string]any{
+			"go":     "taskfiles/go/Taskfile.yml",
+			"eslint": "taskfiles/eslint/Taskfile.yml",
+		},
 	}
 }

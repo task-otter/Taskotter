@@ -1042,6 +1042,7 @@ func TestRawBlockOffsetHelpersCoverBounds(t *testing.T) {
 	assertRawBlockLineTraversal(t)
 }
 
+//nolint:funlen,maintidx // This test helper deliberately lists each boundary assertion.
 func assertRawBlockOffsets(t *testing.T, content []byte) {
 	t.Helper()
 

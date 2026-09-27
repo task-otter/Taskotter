@@ -40,7 +40,8 @@ func marshalTask(t *testing.T, task *ResolvedTask) map[string]string {
 
 	var got map[string]string
 
-	if err := json.Unmarshal(data, &got); err != nil {
+	err = json.Unmarshal(data, &got)
+	if err != nil {
 		t.Fatalf("Unmarshal() error = %v", err)
 	}
 

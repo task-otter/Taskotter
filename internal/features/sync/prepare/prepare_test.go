@@ -85,6 +85,8 @@ func TestCollectRequestedSourcesPreservesOrder(t *testing.T) {
 }
 
 // TestPrepareSyncInputBuildsRecords verifies the behavior covered by this test.
+//
+//nolint:funlen,maintidx // The explicit requested/dependency record assertions document the contract.
 func TestPrepareSyncInputBuildsRecords(t *testing.T) {
 	t.Parallel()
 

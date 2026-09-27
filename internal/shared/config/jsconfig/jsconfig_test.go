@@ -20,6 +20,8 @@ type (
 )
 
 // TestParseValidSettings verifies the behavior covered by this test.
+//
+//nolint:funlen,maintidx // The table cases are intentionally written in full for parser coverage.
 func TestParseValidSettings(t *testing.T) {
 	t.Parallel()
 
@@ -40,30 +42,32 @@ func TestParseValidSettings(t *testing.T) {
 		{name: "bun", raw: "runtime: bun\n", wantRuntime: JSRuntimeBun, wantManager: JSRuntimeBun},
 	}
 
-	for i := range cases {
-		tc := cases[i]
+	for idx := range cases {
+		testCase := &cases[idx]
 
-		t.Run(tc.name, func(t *testing.T) {
+		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
-			assertValidSettings(t, tc)
+			assertValidSettings(t, testCase)
 		})
 	}
 }
 
-func assertValidSettings(t *testing.T, tc parseCase) {
+func assertValidSettings(t *testing.T, testCase *parseCase) {
 	t.Helper()
 
-	got, err := Parse(tc.raw)
+	got, err := Parse(testCase.raw)
 	if err != nil {
 		t.Fatalf("Parse() error = %v", err)
 	}
 
-	if got.Runtime != tc.wantRuntime || got.NodePackageManager != tc.wantManager {
+	if got.Runtime != testCase.wantRuntime || got.NodePackageManager != testCase.wantManager {
 		t.Fatalf("Parse() = %#v", got)
 	}
 }
 
 // TestParseValidationErrors verifies the behavior covered by this test.
+//
+//nolint:funlen,maintidx // The table cases are intentionally written in full for parser coverage.
 func TestParseValidationErrors(t *testing.T) {
 	t.Parallel()
 

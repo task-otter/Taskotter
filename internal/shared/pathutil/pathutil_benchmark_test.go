@@ -26,13 +26,13 @@ func BenchmarkValidateRelativePath(b *testing.B) {
 
 // BenchmarkNormalizeSlashes measures performance.
 func BenchmarkNormalizeSlashes(b *testing.B) {
-	p := `taskfiles\eslint\node\pnpm\Taskfile.yml`
+	path := `taskfiles\eslint\node\pnpm\Taskfile.yml`
 
 	b.ResetTimer()
 	b.ReportAllocs()
 
 	for b.Loop() {
-		_ = pathutil.NormalizeSlashes(p)
+		_ = pathutil.NormalizeSlashes(path)
 	}
 }
 

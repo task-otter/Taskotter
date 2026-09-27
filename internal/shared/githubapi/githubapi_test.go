@@ -255,7 +255,9 @@ func TestAppendBodyCloseKeepsExistingError(t *testing.T) {
 	}
 }
 
+//nolint:wrapcheck // The helper intentionally forwards appendBodyClose's combined error for assertion.
 func appendStubBodyClose(err error, body io.ReadCloser) error {
+	//nolint:bodyclose // appendBodyClose owns consuming and closing the response.
 	return appendBodyClose(err, newStubResponse(body))
 }
 

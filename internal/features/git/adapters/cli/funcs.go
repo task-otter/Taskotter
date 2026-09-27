@@ -1,6 +1,7 @@
 // Taskotter 2026.
 // SPDX-License-Identifier: Apache-2.0.
 
+//nolint:dupl // Port methods intentionally provide distinct operation-specific error context.
 package cli
 
 import (

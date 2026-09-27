@@ -1,6 +1,7 @@
 // Taskotter 2026.
 // SPDX-License-Identifier: Apache-2.0.
 
+//nolint:decorder,goconst,grouper // Independent typed iota groups must each start at zero.
 package service
 
 const (

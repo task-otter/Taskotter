@@ -19,9 +19,9 @@ func TestResolvedTaskMarshalJSONUsesOutputKeys(t *testing.T) {
 	}
 	got := marshalTask(t, task)
 
-	assertJSONField(t, got, jsonFieldAssertion{jsonKeySourceModule, task.SourceModule})
-	assertJSONField(t, got, jsonFieldAssertion{jsonKeyDestinationModule, task.DestinationModule})
-	assertJSONField(t, got, jsonFieldAssertion{jsonKeyPath, task.Path})
+	assertJSONField(t, got, &jsonFieldAssertion{jsonKeySourceModule, task.SourceModule})
+	assertJSONField(t, got, &jsonFieldAssertion{jsonKeyDestinationModule, task.DestinationModule})
+	assertJSONField(t, got, &jsonFieldAssertion{jsonKeyPath, task.Path})
 }
 
 func marshalTask(t *testing.T, task *ResolvedTask) map[string]string {
@@ -41,11 +41,13 @@ func marshalTask(t *testing.T, task *ResolvedTask) map[string]string {
 	return got
 }
 
-type jsonFieldAssertion struct {
-	name, want string
-}
+type (
+	jsonFieldAssertion struct {
+		name, want string
+	}
+)
 
-func assertJSONField(t *testing.T, got map[string]string, assertion jsonFieldAssertion) {
+func assertJSONField(t *testing.T, got map[string]string, assertion *jsonFieldAssertion) {
 	t.Helper()
 
 	if got[assertion.name] != assertion.want {

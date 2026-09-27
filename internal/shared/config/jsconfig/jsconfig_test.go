@@ -10,12 +10,14 @@ import (
 	"github.com/task-otter/Taskotter/internal/shared/consts"
 )
 
-type parseCase struct {
-	name        string
-	raw         string
-	wantRuntime JSRuntime
-	wantManager PackageManager
-}
+type (
+	parseCase struct {
+		name        string
+		raw         string
+		wantRuntime JSRuntime
+		wantManager PackageManager
+	}
+)
 
 // TestParseValidSettings verifies the behavior covered by this test.
 func TestParseValidSettings(t *testing.T) {

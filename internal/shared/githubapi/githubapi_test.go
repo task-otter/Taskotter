@@ -16,8 +16,6 @@ import (
 	"github.com/task-otter/Taskotter/internal/shared/iox"
 )
 
-const appendBodyCloseName = "appendBodyClose"
-
 type (
 	stubBody struct {
 		reader   io.Reader
@@ -31,22 +29,23 @@ type (
 )
 
 const (
-	ownerName   = "task-otter"
-	repoName    = "Taskotter"
-	branchHead  = "sync"
-	branchBase  = "main"
-	titleText   = "title"
-	bodyText    = "body"
-	badMethod   = "bad method"
-	exampleURL  = "http://example.test/"
-	prJSON      = `{"html_url":"https://example.test/pr/1","number":1}`
-	prListJSON  = `[{"html_url":"https://example.test/pr/1","number":1}]`
-	unexpectFmt = "%s: unexpected error: %v"
-	wantErrFmt  = "%s: expected error"
-	opNewClient = "NewClientWithHTTP"
-	opEditPR    = "EditPRBody"
-	opListPRs   = "ListOpenPRs"
-	opNewReq    = "newAPIRequest"
+	appendBodyCloseName = "appendBodyClose"
+	ownerName           = "task-otter"
+	repoName            = "Taskotter"
+	branchHead          = "sync"
+	branchBase          = "main"
+	titleText           = "title"
+	bodyText            = "body"
+	badMethod           = "bad method"
+	exampleURL          = "http://example.test/"
+	prJSON              = `{"html_url":"https://example.test/pr/1","number":1}`
+	prListJSON          = `[{"html_url":"https://example.test/pr/1","number":1}]`
+	unexpectFmt         = "%s: unexpected error: %v"
+	wantErrFmt          = "%s: expected error"
+	opNewClient         = "NewClientWithHTTP"
+	opEditPR            = "EditPRBody"
+	opListPRs           = "ListOpenPRs"
+	opNewReq            = "newAPIRequest"
 )
 
 var errStub = errors.New("stub failure")

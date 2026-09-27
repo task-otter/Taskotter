@@ -964,8 +964,10 @@ func marshalRootWithRawVars(node *yaml.Node, raw map[string]string) ([]byte, err
 }
 
 func spliceRawPromotedVars(out []byte, raw map[string]string) []byte {
-	for _, key := range rawVarKeysLongestFirst(raw) {
-		out = spliceOneRawVar(out, key, raw[key])
+	keys := rawVarKeysLongestFirst(raw)
+
+	for i := range keys {
+		out = spliceOneRawVar(out, keys[i], raw[keys[i]])
 	}
 
 	return out

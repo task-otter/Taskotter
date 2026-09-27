@@ -71,6 +71,8 @@ const (
 	oldTask      = "old"
 	rawVarAA     = "AA"
 	rawVarB      = "B"
+	rawVarA      = "A"
+	rawBlockLast = "last"
 )
 
 // TestRewriteIncludesRejectsLiteralBlockPath verifies the expected behavior.
@@ -1034,30 +1036,25 @@ func TestRawBlockOffsetHelpersCoverBounds(t *testing.T) {
 	assertRawBlockLineTraversal(t)
 }
 
-const (
-	rawVarA      = "A"
-	rawBlockLast = "last"
-)
-
 func assertRawBlockOffsets(t *testing.T, content []byte) {
 	t.Helper()
 
-	assertInt(t, intAssertion{
+	assertInt(t, &intAssertion{
 		got:   len(trimRawBlock(content, len(content), consts.IndexOne)),
 		want:  consts.IndexZero,
 		label: "trimRawBlock",
 	})
-	assertInt(t, intAssertion{
+	assertInt(t, &intAssertion{
 		got:   offsetOfLine(content, consts.Index99),
 		want:  len(content),
 		label: "offsetOfLine",
 	})
-	assertInt(t, intAssertion{
+	assertInt(t, &intAssertion{
 		got:   offsetOfLine(content, consts.IndexOne),
 		want:  consts.IndexZero,
 		label: "offsetOfLine(first)",
 	})
-	assertInt(t, intAssertion{
+	assertInt(t, &intAssertion{
 		got: addColumnOffset(
 			content,
 			consts.IndexOne,
@@ -1066,7 +1063,7 @@ func assertRawBlockOffsets(t *testing.T, content []byte) {
 		want:  consts.IndexOne,
 		label: "addColumnOffset",
 	})
-	assertInt(t, intAssertion{
+	assertInt(t, &intAssertion{
 		got:   clampOffset(consts.IndexOne, consts.IndexTwo),
 		want:  consts.IndexOne,
 		label: "clampOffset",
@@ -1091,18 +1088,19 @@ func assertRawBlockLineTraversal(t *testing.T) {
 		consts.IndexZero,
 	); next != consts.IndexZero ||
 		ok {
-
 		t.Fatalf("nextLineStart() = %d, %t", next, ok)
 	}
 }
 
-type intAssertion struct {
-	label string
-	got   int
-	want  int
-}
+type (
+	intAssertion struct {
+		label string
+		got   int
+		want  int
+	}
+)
 
-func assertInt(t *testing.T, assertion intAssertion) {
+func assertInt(t *testing.T, assertion *intAssertion) {
 	t.Helper()
 
 	if assertion.got != assertion.want {

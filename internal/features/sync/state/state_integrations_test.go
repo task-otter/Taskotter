@@ -137,7 +137,6 @@ func assertLockFixture(t *testing.T, got, want *lockmodel.LockFile) {
 
 	if got.Source.Repository != want.Source.Repository ||
 		got.Configuration.TargetFolder != want.Configuration.TargetFolder {
-
 		t.Fatalf("lock = %#v", got)
 	}
 }

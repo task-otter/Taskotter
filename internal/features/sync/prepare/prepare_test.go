@@ -95,24 +95,29 @@ func TestPrepareSyncInputBuildsRecords(t *testing.T) {
 	requested := input.Requested[pathA]
 	assertPrepareRecord(
 		t,
-		prepareRecordAssertion{requested.SourceModule, consts.Go, "requested source"},
+		&prepareRecordAssertion{requested.SourceModule, consts.Go, "requested source"},
 	)
-	assertPrepareRecord(t, prepareRecordAssertion{requested.Path, "taskfiles/go", "requested path"})
 	assertPrepareRecord(
 		t,
-		prepareRecordAssertion{input.DestByTask[pathA], consts.Go, "dest by task"},
+		&prepareRecordAssertion{requested.Path, "taskfiles/go", "requested path"},
 	)
-	assertPrepareRecord(t, prepareRecordAssertion{
+	assertPrepareRecord(
+		t,
+		&prepareRecordAssertion{input.DestByTask[pathA], consts.Go, "dest by task"},
+	)
+	assertPrepareRecord(t, &prepareRecordAssertion{
 		input.Dependencies[consts.IndexZero].Path, "taskfiles/shellcheck", "dependency path",
 	})
 }
 
-type prepareRecordAssertion struct {
-	got, want string
-	label     string
-}
+type (
+	prepareRecordAssertion struct {
+		got, want string
+		label     string
+	}
+)
 
-func assertPrepareRecord(t *testing.T, assertion prepareRecordAssertion) {
+func assertPrepareRecord(t *testing.T, assertion *prepareRecordAssertion) {
 	t.Helper()
 
 	if assertion.got != assertion.want {

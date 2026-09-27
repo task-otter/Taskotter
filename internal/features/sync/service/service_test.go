@@ -1967,8 +1967,8 @@ func restoreTestSeams(t *testing.T) {
 
 	restores := testSeamRestores[t]
 
-	for _, restore := range slices.Backward(restores) {
-		restore()
+	for i := range slices.Backward(restores) {
+		restores[len(restores)-1-i]()
 	}
 
 	delete(testSeamRestores, t)

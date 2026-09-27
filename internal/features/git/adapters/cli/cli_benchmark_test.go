@@ -52,8 +52,8 @@ func configureClone(b *testing.B, dir, bareDir string) {
 		{gitCmdRemote, gitCmdAdd, consts.GitOrigin, bareDir},
 	}
 
-	for _, args := range commands {
-		benchRunGit(b, dir, args...)
+	for i := range commands {
+		benchRunGit(b, dir, commands[i]...)
 	}
 }
 

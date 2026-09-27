@@ -78,7 +78,8 @@ func printOutputsToStdout(values map[string]string) {
 
 	slices.Sort(keys)
 
-	for _, key := range keys {
+	for i := range keys {
+		key := keys[i]
 		iox.FprintfBestEffortf(os.Stdout, "%s=%s\n", key, values[key])
 	}
 }

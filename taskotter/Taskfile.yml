@@ -8,10 +8,9 @@ vars:
   ADRS_CARGO_CRATE: '{{.ADRS_CARGO_CRATE | default "adrs"}}'
   ADRS_EXTRA_ARGS: '{{.ADRS_EXTRA_ARGS | default ""}}'
   ADRS_NIX_INSTALLABLE: '{{.ADRS_NIX_INSTALLABLE | default "nixpkgs#adrs"}}'
-  GOLANGCI_LINT_FMT_FORMATTER_FLAGS: |-
-    >-
-        {{.GOLANGCI_LINT_FMT_FORMATTER_FLAGS | default "-E gci -E gofmt -E gofumpt
-        -E goimports -E golines"}}
+  GOLANGCI_LINT_FMT_FORMATTER_FLAGS: >-
+    {{.GOLANGCI_LINT_FMT_FORMATTER_FLAGS | default "-E gci -E gofmt -E gofumpt
+    -E goimports -E golines"}}
   GOLANGCI_LINT_NIX_INSTALLABLE: '{{.GOLANGCI_LINT_NIX_INSTALLABLE | default "nixpkgs#go nixpkgs#golangci-lint"}}'
   GOLANGCI_LINT_WINGET_INSTALLABLE: '{{.GOLANGCI_LINT_WINGET_INSTALLABLE | default "GolangCI.golangci-lint"}}'
   GO_FUZZTIME: '{{.GO_FUZZTIME | default ""}}'
@@ -19,16 +18,15 @@ vars:
   GO_JUNIT_REPORT_IN: '{{.GO_JUNIT_REPORT_IN | default ""}}'
   GO_JUNIT_REPORT_NIX_INSTALLABLE: '{{.GO_JUNIT_REPORT_NIX_INSTALLABLE | default "nixpkgs#go-junit-report"}}'
   GO_JUNIT_REPORT_OUT: '{{.GO_JUNIT_REPORT_OUT | default ""}}'
-  GO_LOAD: |-
-    >-
-        {{.GO_LOAD | default `
-        \$u = [Environment]::GetEnvironmentVariable('Path', 'User');
-        if (\$u) { \$env:Path = \$u + ';' + \$env:Path };
-        if (Get-Command go -ErrorAction SilentlyContinue) {
-          \$goBin = Join-Path ((go env GOPATH).Trim()) 'bin';
-          if (Test-Path -LiteralPath \$goBin) { \$env:Path = \$goBin + ';' + \$env:Path }
-        }
-        `}}
+  GO_LOAD: >-
+    {{.GO_LOAD | default `
+    \$u = [Environment]::GetEnvironmentVariable('Path', 'User');
+    if (\$u) { \$env:Path = \$u + ';' + \$env:Path };
+    if (Get-Command go -ErrorAction SilentlyContinue) {
+      \$goBin = Join-Path ((go env GOPATH).Trim()) 'bin';
+      if (Test-Path -LiteralPath \$goBin) { \$env:Path = \$goBin + ';' + \$env:Path }
+    }
+    `}}
   GO_NIX_INSTALLABLE: '{{.GO_NIX_INSTALLABLE | default "nixpkgs#go"}}'
   GO_PKG: '{{.GO_PKG | default ""}}'
   GO_WINGET_INSTALLABLE: '{{.GO_WINGET_INSTALLABLE | default "GoLang.Go"}}'

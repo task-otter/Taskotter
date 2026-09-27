@@ -42,6 +42,14 @@ func TestBuildPRBody(t *testing.T) {
 
 	body := prservice.BuildPRBody(prBodyConfig(), buildPRBodyPlan(), buildPRBodyStoreRef())
 
+	if !strings.Contains(body, "<strong>Taskotter</strong>") {
+		t.Fatalf("missing Taskotter author: %s", body)
+	}
+
+	if !strings.Contains(body, "logo/min.png") {
+		t.Fatalf("missing Taskotter author image: %s", body)
+	}
+
 	if !strings.Contains(body, testEslintChain) {
 		t.Fatalf("missing module info: %s", body)
 	}

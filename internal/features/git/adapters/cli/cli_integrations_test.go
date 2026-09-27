@@ -29,8 +29,9 @@ type (
 	}
 
 	clientFixture struct {
-		t      *testing.T
-		client *cli.Client
+		t        *testing.T
+		cloneDir string
+		client   *cli.Client
 	}
 
 	accessRepo struct {
@@ -55,6 +56,8 @@ const (
 
 	gitCmdConfig = "config"
 
+	gitLog = "log"
+
 	gitCmdAdd  = "add"
 	gitCmdPush = "push"
 
@@ -73,6 +76,8 @@ const (
 	testGitEmail = "test@test.com"
 
 	testGitUserName = "Test"
+
+	taskotterAuthorName = "Taskotter"
 
 	pathRefs = "refs"
 
@@ -635,7 +640,7 @@ func initStageTestRepo(t *testing.T) string {
 func newClientFixture(t *testing.T, cloneDir string) *clientFixture {
 	t.Helper()
 
-	return &clientFixture{t: t, client: cli.NewClient(cloneDir)}
+	return &clientFixture{t: t, cloneDir: cloneDir, client: cli.NewClient(cloneDir)}
 }
 
 func originHEADPath(cloneDir string) string {
@@ -746,9 +751,26 @@ func (fixture *clientFixture) commitAndPush() {
 		fixture.t.Fatal(err)
 	}
 
-	err = fixture.client.Commit(fixture.t.Context(), "nothing to commit")
+	commitPath := filepath.Join(fixture.cloneDir, "taskotter.txt")
+
+	err = os.WriteFile(commitPath, []byte("synced\n"), consts.FilePerm644)
 	if err != nil {
 		fixture.t.Fatal(err)
+	}
+
+	err = fixture.client.Stage(fixture.t.Context(), []string{"taskotter.txt"})
+	if err != nil {
+		fixture.t.Fatal(err)
+	}
+
+	err = fixture.client.Commit(fixture.t.Context(), "sync taskfiles")
+	if err != nil {
+		fixture.t.Fatal(err)
+	}
+
+	gotAuthor := strings.TrimSpace(runGit(fixture.t, fixture.cloneDir, gitLog, "-1", "--format=%an"))
+	if gotAuthor != taskotterAuthorName {
+		fixture.t.Fatalf("commit author = %q, want %q", gotAuthor, taskotterAuthorName)
 	}
 
 	err = fixture.client.PushForceWithLease(fixture.t.Context(), testFeatureBranch)

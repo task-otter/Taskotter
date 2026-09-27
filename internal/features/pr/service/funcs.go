@@ -28,6 +28,7 @@ func StoreRefFrom(ref *storedomain.RefInfo) *domain.StoreRef {
 func BuildPRBody(cfg *config.Config, plan *syncdomain.Plan, ref *domain.StoreRef) string {
 	var body strings.Builder
 
+	writeAuthorSignature(&body)
 	builderWriteString(&body, "## TaskOtter\n\n")
 
 	writeMetadataSection(&body, cfg, ref)
@@ -36,6 +37,16 @@ func BuildPRBody(cfg *config.Config, plan *syncdomain.Plan, ref *domain.StoreRef
 	writeFileChangesSection(&body, plan)
 
 	return body.String()
+}
+
+func writeAuthorSignature(body *strings.Builder) {
+	builderPrintf(
+		body,
+		"<p><img src=\"%s\" alt=\"%s\" width=\"32\" height=\"32\" /> <strong>%s</strong></p>\n\n",
+		taskotterAuthorImageURL,
+		taskotterAuthor,
+		taskotterAuthor,
+	)
 }
 
 // builderWriteString appends text to body. Writes to a [strings.Builder] cannot

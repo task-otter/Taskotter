@@ -8,7 +8,7 @@ const (
 	// SyncCommitMessage is the commit message TaskOtter uses for sync branches.
 	SyncCommitMessage = "chore(taskotter): sync taskfiles"
 
-	commitUserName = "TaskOtter"
+	commitUserName = "Taskotter"
 
 	commitUserEmail = "taskotter@users.noreply.github.com"
 

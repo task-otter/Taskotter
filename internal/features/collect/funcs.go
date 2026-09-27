@@ -4,7 +4,8 @@
 package collect
 
 import (
-	"sort"
+	"slices"
+	"strings"
 
 	"github.com/task-otter/Taskotter/internal/features/plan"
 )
@@ -27,8 +28,8 @@ func (DefaultCollector) Collect(opts Options) ([]File, error) {
 		files = append(files, File{RelativePath: rel, Data: entry.Data, Mode: entry.Mode})
 	}
 
-	sort.Slice(files, func(i, j int) bool {
-		return files[i].RelativePath < files[j].RelativePath
+	slices.SortFunc(files, func(a, b File) int {
+		return strings.Compare(a.RelativePath, b.RelativePath)
 	})
 
 	return files, nil

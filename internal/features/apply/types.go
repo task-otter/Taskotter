@@ -11,12 +11,17 @@ import (
 )
 
 type (
+	// Filesystem is the filesystem dependency used during apply.
 	Filesystem any
-	Applier    struct {
+	// Applier applies a synchronization plan.
+	Applier struct {
 		Filesystem Filesystem
 	}
-	Plan  = plan.Plan
+	// Plan describes the changes to apply.
+	Plan = plan.Plan
+	// Input contains the state needed to apply a plan.
 	Input = input.Input
 )
 
+// ErrMissingInput indicates that a plan does not contain apply input.
 var ErrMissingInput = errors.New("sync plan does not contain apply input")

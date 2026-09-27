@@ -22,7 +22,7 @@ func Generate(input Input, ops Operations) (Result, error) {
 		content = ops.NewRootTemplate()
 	}
 
-	updated, err := ops.UpdateRootTaskfile(content, &RootUpdateInput{
+	updated, err := ops.UpdateRootTaskfile(content, &UpdateInput{
 		Tasks:            input.Tasks,
 		TargetFolder:     input.TargetFolder,
 		RootTaskfileDir:  input.RootTaskfileDir,
@@ -43,6 +43,7 @@ func Generate(input Input, ops Operations) (Result, error) {
 	}, nil
 }
 
+// Generate updates root content using the configured operations.
 func (g DefaultGenerator) Generate(input Input) (Result, error) {
 	ops := g.Ops
 

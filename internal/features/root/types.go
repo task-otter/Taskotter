@@ -9,14 +9,22 @@ import (
 )
 
 type (
-	Operations       = ports.TaskfileOps
+	// Operations groups root Taskfile operations.
+	Operations = ports.TaskfileOps
+	// TemplateProvider creates root Taskfile templates.
 	TemplateProvider = ports.RootTemplateProvider
-	IncludeRewriter  = ports.IncludeRewriter
-	RootUpdater      = ports.RootTaskfileUpdater
-	RootUpdateInput  = ports.RootUpdateInput
-	GeneratedTask    = ports.GeneratedRootTask
-	Ops              = taskfile.Ops
+	// IncludeRewriter rewrites module includes.
+	IncludeRewriter = ports.IncludeRewriter
+	// Updater updates the root Taskfile.
+	Updater = ports.RootTaskfileUpdater
+	// UpdateInput contains root Taskfile update inputs.
+	UpdateInput = ports.RootUpdateInput
+	// GeneratedTask describes a generated root task.
+	GeneratedTask = ports.GeneratedRootTask
+	// Ops groups all root operations.
+	Ops = taskfile.Ops
 
+	// Input contains root generation inputs.
 	Input struct {
 		DestByTask       map[string]string
 		ModuleTaskfiles  map[string][]byte
@@ -30,6 +38,7 @@ type (
 		RootExists       bool
 	}
 
+	// Result contains generated root content.
 	Result struct {
 		Content        []byte
 		GeneratedTasks []GeneratedTask

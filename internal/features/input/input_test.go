@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	resolvesvc "github.com/task-otter/Taskotter/internal/features/resolve/service"
+	"github.com/task-otter/Taskotter/internal/features/state/lockmodel"
 	"github.com/task-otter/Taskotter/internal/shared/config"
 )
 
@@ -36,11 +37,7 @@ func TestBuildMapsResolvedModules(t *testing.T) {
 		t.Fatalf("Build() error = %v", err)
 	}
 
-	requested, ok := input.Requested["lint"]
-
-	if !ok {
-		t.Fatal("Build() did not create requested lint record")
-	}
+	requested := requireRequested(t, &input, "lint")
 
 	if requested.SourceModule != "eslint/node/pnpm" {
 		t.Fatalf("source module = %q", requested.SourceModule)
@@ -53,4 +50,16 @@ func TestBuildMapsResolvedModules(t *testing.T) {
 	if input.DestByTask["lint"] != "eslint" {
 		t.Fatalf("destination by task = %q, want eslint", input.DestByTask["lint"])
 	}
+}
+
+func requireRequested(t *testing.T, input *Input, task string) lockmodel.ModuleRecord {
+	t.Helper()
+
+	requested, ok := input.Requested[task]
+
+	if !ok {
+		t.Fatalf("Build() did not create requested %s record", task)
+	}
+
+	return requested
 }

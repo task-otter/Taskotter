@@ -16,6 +16,6 @@ func Apply(plan *Plan) error {
 
 // Apply applies a plan through the configured applier. Filesystem is reserved
 // for the concrete writer boundary used by the next extraction stage.
-func (a *Applier) Apply(plan *Plan) error {
+func (*Applier) Apply(plan *Plan) error {
 	return Apply(plan)
 }

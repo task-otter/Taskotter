@@ -23,6 +23,7 @@ type (
 		Resolutions []resolvesvc.Resolution
 		DepSources  []string
 	}
+	// SyncInputArgs contains inputs used to build synchronization state.
 	SyncInputArgs struct {
 		Cfg         *config.Config
 		Snapshot    ports.Snapshot

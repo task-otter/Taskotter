@@ -9,20 +9,27 @@ import (
 	"testing"
 )
 
+const (
+	fileMode       = 0o755
+	taskfileName   = "Taskfile.yml"
+	runFileName    = "run.go"
+	readmeFileName = "README.md"
+)
+
 func TestDefaultCollectorAppliesFilePolicy(t *testing.T) {
 	t.Parallel()
 
 	dir := t.TempDir()
 
 	for name, contents := range map[string]string{
-		"Taskfile.yml": "version: '3'\n",
-		"run.go":       "package run\n",
+		taskfileName:   "version: '3'\n",
+		runFileName:    "package run\n",
 		"run_test.go":  "package run\n",
-		"README.md":    "docs\n",
+		readmeFileName: "docs\n",
 	} {
 		path := filepath.Join(dir, name)
 
-		err := os.WriteFile(path, []byte(contents), 0o755)
+		err := os.WriteFile(path, []byte(contents), fileMode)
 		if err != nil {
 			t.Fatalf("write %s: %v", name, err)
 		}
@@ -33,23 +40,31 @@ func TestDefaultCollectorAppliesFilePolicy(t *testing.T) {
 		t.Fatalf("Collect() without docs error = %v", err)
 	}
 
-	if got := fileNames(
-		withoutDocs,
-	); len(got) != 2 || got[0] != "Taskfile.yml" ||
-		got[1] != "run.go" {
+	got := fileNames(withoutDocs)
 
-		t.Fatalf("without docs files = %#v", got)
-	}
+	assertFileNames(t, got, []string{taskfileName, runFileName})
 
 	withDocs, err := (DefaultCollector{}).Collect(Options{SourceDir: dir, IncludeDocs: true})
 	if err != nil {
 		t.Fatalf("Collect() with docs error = %v", err)
 	}
 
-	got := fileNames(withDocs)
+	got = fileNames(withDocs)
 
-	if len(got) != 3 || got[0] != "README.md" || got[1] != "Taskfile.yml" || got[2] != "run.go" {
-		t.Fatalf("with docs files = %#v", got)
+	assertFileNames(t, got, []string{readmeFileName, taskfileName, runFileName})
+}
+
+func assertFileNames(t *testing.T, got, want []string) {
+	t.Helper()
+
+	if len(got) != len(want) {
+		t.Fatalf("files = %#v, want %#v", got, want)
+	}
+
+	for index := range want {
+		if got[index] != want[index] {
+			t.Fatalf("files = %#v, want %#v", got, want)
+		}
 	}
 }
 

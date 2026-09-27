@@ -52,18 +52,13 @@ func LoadLock(workspace, rel string) (*LockFile, error) {
 func LoadPrevious(workspace string, cfg *config.Config) (Previous, error) {
 	metadataPath := config.MetadataPath(cfg)
 
-	metadata, err := LoadMetadata(workspace, metadataPath)
+	metadata, metadataPath, err := loadPreviousMetadata(workspace, metadataPath)
 	if err != nil {
-		metadata, err = LoadMetadata(workspace, config.LegacyMetadataPath)
-		if err != nil {
-			if errors.Is(err, os.ErrNotExist) {
-				return Previous{MetadataPath: metadataPath, LockPath: config.LockFilePath(cfg)}, nil
-			}
-
-			return Previous{}, err
+		if errors.Is(err, os.ErrNotExist) {
+			return Previous{MetadataPath: metadataPath, LockPath: config.LockFilePath(cfg)}, nil
 		}
 
-		metadataPath = config.LegacyMetadataPath
+		return Previous{}, err
 	}
 
 	lockPath := config.LockFilePath(cfg)
@@ -71,11 +66,7 @@ func LoadPrevious(workspace string, cfg *config.Config) (Previous, error) {
 	lock, err := LoadLock(workspace, lockPath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return Previous{
-				Metadata:     metadata,
-				MetadataPath: metadataPath,
-				LockPath:     lockPath,
-			}, nil
+			return previousWithoutLock(metadata, metadataPath, lockPath), nil
 		}
 
 		return Previous{}, err
@@ -90,14 +81,35 @@ func LoadPrevious(workspace string, cfg *config.Config) (Previous, error) {
 	}, nil
 }
 
+func loadPreviousMetadata(workspace, metadataPath string) (*Metadata, string, error) {
+	metadata, err := LoadMetadata(workspace, metadataPath)
+	if err == nil {
+		return metadata, metadataPath, nil
+	}
+
+	legacyMetadata, legacyErr := LoadMetadata(workspace, config.LegacyMetadataPath)
+	if legacyErr != nil {
+		return nil, metadataPath, legacyErr
+	}
+
+	return legacyMetadata, config.LegacyMetadataPath, nil
+}
+
+func previousWithoutLock(metadata *Metadata, metadataPath, lockPath string) Previous {
+	return Previous{Metadata: metadata, MetadataPath: metadataPath, LockPath: lockPath}
+}
+
+// EncodeLock serializes a lock file.
 func EncodeLock(lock *LockFile) ([]byte, error) {
 	return lockmodel.MarshalLock(lock), nil
 }
 
+// EncodeMetadata serializes synchronization metadata.
 func EncodeMetadata(metadata *Metadata) ([]byte, error) {
 	return MarshalMetadata(metadata), nil
 }
 
+// DecodeLock deserializes a lock file.
 func DecodeLock(data []byte) (*LockFile, error) {
 	var lock LockFile
 
@@ -109,6 +121,7 @@ func DecodeLock(data []byte) (*LockFile, error) {
 	return &lock, nil
 }
 
+// DecodeMetadata deserializes synchronization metadata.
 func DecodeMetadata(data []byte) (*Metadata, error) {
 	var metadata Metadata
 

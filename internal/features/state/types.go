@@ -9,18 +9,26 @@ import (
 )
 
 type (
+	// Metadata records the synchronized target configuration.
 	Metadata struct {
 		TargetFolder      string `yaml:"target_folder"`
 		LockFile          string `yaml:"lock_file"`
 		ConfigurationHash string `yaml:"configuration_hash"`
 	}
-	LockFile          = lockmodel.LockFile
-	LockSource        = lockmodel.LockSource
+	// LockFile records managed synchronization state.
+	LockFile = lockmodel.LockFile
+	// LockSource identifies the source store.
+	LockSource = lockmodel.LockSource
+	// LockConfiguration records sync configuration.
 	LockConfiguration = lockmodel.LockConfiguration
-	ModuleRecord      = lockmodel.ModuleRecord
-	OrderedRequested  = lockmodel.OrderedRequested
-	ManagedFile       = managed.File
-	SyncError         string
+	// ModuleRecord records a synchronized module.
+	ModuleRecord = lockmodel.ModuleRecord
+	// OrderedRequested records requested modules in order.
+	OrderedRequested = lockmodel.OrderedRequested
+	// ManagedFile records a managed file.
+	ManagedFile = managed.File
+	// SyncError is a synchronization error message.
+	SyncError string
 
 	yamlDecodeTarget struct {
 		Out any

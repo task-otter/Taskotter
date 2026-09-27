@@ -20,7 +20,7 @@ func (err SyncError) Error() string {
 // MarshalMetadata encodes metadata using stable on-disk keys. Encoding a plain
 // string map cannot fail, so no error is reported.
 func MarshalMetadata(meta *Metadata) []byte {
-	data, err := yamlfmt.Marshal(encodeMetadata(meta))
+	data, err := yamlfmt.Marshal(metadataFields(meta))
 	iox.Discard(err)
 
 	return data
@@ -109,7 +109,7 @@ func decodeYAMLFields(fields map[string]*yaml.Node, targets ...yamlDecodeTarget)
 	return nil
 }
 
-func encodeMetadata(meta *Metadata) map[string]string {
+func metadataFields(meta *Metadata) map[string]string {
 	return map[string]string{
 		yamlKeyTargetFolder:      meta.TargetFolder,
 		yamlKeyLockFile:          meta.LockFile,

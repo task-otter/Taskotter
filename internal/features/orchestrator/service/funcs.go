@@ -152,7 +152,7 @@ func applyChangedPlan(ctx context.Context, deps *Deps, input *changedPlanInput) 
 }
 
 func applySyncChanges(ctx context.Context, deps *Deps, args *branchPlanIn) error {
-	err := copyTaskModules(deps, args.inp.plan, args.inp.syncInput)
+	err := copyTaskModules(deps, args.inp.plan)
 	if err != nil {
 		return fmt.Errorf("copy task modules: %w", err)
 	}
@@ -281,7 +281,7 @@ func compareManagedFiles(deps *Deps, syncInput *syncIn) (*syncPlan, error) {
 	return plan, nil
 }
 
-func copyTaskModules(deps *Deps, plan *syncPlan, syncInput *syncIn) error {
+func copyTaskModules(deps *Deps, plan *syncPlan) error {
 	err := runGroupNoResult(deps.Logger, "Copy task modules", func() error {
 		applyErr := deps.ApplyPlan(plan)
 		if applyErr != nil {
@@ -1003,7 +1003,7 @@ func logResultMetadata(log *logging.Logger, result *rundomain.Result) {
 //nolint:funlen // The complete result schema is easiest to audit in one literal.
 func newResultShell(
 	cfg *config.Config,
-	plan *plan.Plan,
+	resultPlan *plan.Plan,
 	ref *storedomain.RefInfo,
 ) *rundomain.Result {
 	return &rundomain.Result{
@@ -1015,12 +1015,12 @@ func newResultShell(
 			PullRequestNumber: consts.Empty,
 			PullRequestURL:    consts.Empty,
 		},
-		Changed:      plan.Changed,
+		Changed:      resultPlan.Changed,
 		StoreVersion: cfg.StoreVersion,
 		SourceRef:    ref.SourceRef,
 		SourceSHA:    ref.ResolvedCommit,
 		TargetFolder: cfg.TargetFolder,
-		Plan:         plan,
+		Plan:         resultPlan,
 		Ref:          *ref,
 	}
 }

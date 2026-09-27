@@ -13,11 +13,11 @@ import (
 	"testing"
 
 	inputpkg "github.com/task-otter/Taskotter/internal/features/input"
-	snapshot "github.com/task-otter/Taskotter/internal/features/input/adapters/snapshot"
+	"github.com/task-otter/Taskotter/internal/features/input/adapters/snapshot"
 	planpkg "github.com/task-otter/Taskotter/internal/features/plan"
 	plandomain "github.com/task-otter/Taskotter/internal/features/plan/domain"
 	resolvesvc "github.com/task-otter/Taskotter/internal/features/resolve/service"
-	taskfile "github.com/task-otter/Taskotter/internal/features/root/adapters/taskfile"
+	"github.com/task-otter/Taskotter/internal/features/root/adapters/taskfile"
 	"github.com/task-otter/Taskotter/internal/features/state/lockmodel"
 	"github.com/task-otter/Taskotter/internal/features/state/managed"
 	storedomain "github.com/task-otter/Taskotter/internal/features/store/domain"

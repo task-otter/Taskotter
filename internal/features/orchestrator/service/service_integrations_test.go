@@ -475,39 +475,39 @@ func TestOrchestratorRunRequiresConfiguration(t *testing.T) {
 	}
 }
 
-func assertPRCreated(input *assertPRCreatedInput) {
-	input.t.Helper()
+func assertPRCreated(args *assertPRCreatedInput) {
+	args.t.Helper()
 
-	if input.pullReq.createdBase != input.wantBase {
-		input.t.Fatalf("created PR base = %q, want %s", input.pullReq.createdBase, input.wantBase)
+	if args.pullReq.createdBase != args.wantBase {
+		args.t.Fatalf("created PR base = %q, want %s", args.pullReq.createdBase, args.wantBase)
 	}
 
-	if input.gitOps.defaultBranchCalls != input.wantDefaultBranchCalls {
-		input.t.Fatalf(
+	if args.gitOps.defaultBranchCalls != args.wantDefaultBranchCalls {
+		args.t.Fatalf(
 			"DefaultBranch called %d times, want %d",
-			input.gitOps.defaultBranchCalls,
-			input.wantDefaultBranchCalls,
+			args.gitOps.defaultBranchCalls,
+			args.wantDefaultBranchCalls,
 		)
 	}
 }
 
-func assertPRUpdated(input *assertPRUpdatedInput) {
-	input.t.Helper()
+func assertPRUpdated(args *assertPRUpdatedInput) {
+	args.t.Helper()
 
-	if input.pullReq.updated != consts.IndexOne {
-		input.t.Fatalf("expected PR body update, got %d", input.pullReq.updated)
+	if args.pullReq.updated != consts.IndexOne {
+		args.t.Fatalf("expected PR body update, got %d", args.pullReq.updated)
 	}
 
-	if input.pullReq.lastBase != input.wantBase {
-		input.t.Fatalf("PR base = %q, want %s", input.pullReq.lastBase, input.wantBase)
+	if args.pullReq.lastBase != args.wantBase {
+		args.t.Fatalf("PR base = %q, want %s", args.pullReq.lastBase, args.wantBase)
 	}
 
-	if input.gitOps.defaultBranchCalls == consts.IndexZero {
-		input.t.Fatal("expected DefaultBranch before PR")
+	if args.gitOps.defaultBranchCalls == consts.IndexZero {
+		args.t.Fatal("expected DefaultBranch before PR")
 	}
 
-	if input.result.PullRequestNumber != input.wantNum {
-		input.t.Fatalf("got PR number %q", input.result.PullRequestNumber)
+	if args.result.PullRequestNumber != args.wantNum {
+		args.t.Fatalf("got PR number %q", args.result.PullRequestNumber)
 	}
 }
 
@@ -623,21 +623,21 @@ func newTestOrchestrator(
 	return orch
 }
 
-func newTestOrchestratorParts(input *testOrchInput) (*service.Deps, *service.Orchestrator) {
-	input.t.Helper()
+func newTestOrchestratorParts(args *testOrchInput) (*service.Deps, *service.Orchestrator) {
+	args.t.Helper()
 
 	deps := &service.Deps{
 		Logger:       nil,
-		StoreClient:  input.store,
+		StoreClient:  args.store,
 		GitClient:    nil,
-		GitBrancher:  input.gitOps,
-		GitIndexer:   input.gitOps,
-		GitPublisher: input.gitOps,
-		PRClient:     input.pullReq,
+		GitBrancher:  args.gitOps,
+		GitIndexer:   args.gitOps,
+		GitPublisher: args.gitOps,
+		PRClient:     args.pullReq,
 	}
 
-	if input.gitWork != nil {
-		deps.GitClient = input.gitWork
+	if args.gitWork != nil {
+		deps.GitClient = args.gitWork
 	}
 
 	return deps, service.NewOrchestrator(deps)
@@ -655,15 +655,15 @@ func resolveGitRepoConfig(cfg *config.Config, workspace string) *config.Config {
 	return cfg
 }
 
-func runGitRepoOrchestrator(input *gitRepoRunInput) *rundomain.Result {
-	input.t.Helper()
+func runGitRepoOrchestrator(args *gitRepoRunInput) *rundomain.Result {
+	args.t.Helper()
 
-	workspace := workspaceWithRootTaskfile(input.t)
-	cfg := resolveGitRepoConfig(input.cfg, workspace)
+	workspace := workspaceWithRootTaskfile(args.t)
+	cfg := resolveGitRepoConfig(args.cfg, workspace)
 
-	initGitWorkspace(input.t, workspace)
+	initGitWorkspace(args.t, workspace)
 
-	return runOrchestrator(input.t, newTestOrchestrator(input.t, input.gitOps, input.pr), cfg)
+	return runOrchestrator(args.t, newTestOrchestrator(args.t, args.gitOps, args.pr), cfg)
 }
 
 func runOrchestrator(

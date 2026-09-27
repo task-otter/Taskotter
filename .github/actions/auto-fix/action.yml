@@ -1,0 +1,47 @@
+---
+name: Create Fix Pull Request
+description: Create a pull request when the working tree contains changes
+
+inputs:
+  branch:
+    description: Branch for the automated pull request
+    required: false
+    default: automation/auto-fix
+
+runs:
+  using: composite
+  steps:
+    - name: Check for changes
+      id: changes
+      shell: bash
+      run: |
+        if git diff --quiet && \
+           git diff --cached --quiet && \
+           [ -z "$(git ls-files --others --exclude-standard)" ]; then
+          echo "changed=false" >> "$GITHUB_OUTPUT"
+          echo "No changes detected."
+        else
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+          echo "Changes detected."
+        fi
+
+    - name: Create pull request
+      if: steps.changes.outputs.changed == 'true'
+      uses: peter-evans/create-pull-request@v7
+      with:
+        token: ${{ github.token }}
+        branch: ${{ inputs.branch }}
+        delete-branch: true
+        title: "chore: automated fixes"
+        commit-message: "chore: automated fixes"
+        body: |
+          Automated changes were detected by CI.
+
+          Please review and merge this pull request.
+
+    - name: Fail if changes were detected
+      if: steps.changes.outputs.changed == 'true'
+      shell: bash
+      run: |
+        echo "::error::Changes detected. A pull request has been created."
+        exit 1

@@ -9,7 +9,9 @@ runs:
       uses: go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e
     - name: Run CI and fix fixable issues
       shell: bash
-      run: task taskotter:ci
+      run: task taskotter:ci:fix
+    - name: Create fix PR
+      uses: $/.github/actions/auto-fix
     - name: Generate Tests Report
       shell: bash
       run: task taskotter:go-junit-report:report

@@ -19,7 +19,7 @@ jobs:
           persist-credentials: true
       - name: Run TaskOtter
         id: taskotter
-        uses: ./.github/actions/itself
+        uses: $/.github/actions/itself
         with:
           github-token: ${{ github.token }}
           fail-on-changes: true
@@ -60,7 +60,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: true
       - name: Run CI
-        uses: ./.github/actions/ci
+        uses: $/.github/actions/ci
   benchmarks:
     name: Run benchmarks
     runs-on: ubuntu-latest
@@ -75,4 +75,4 @@ jobs:
           fetch-depth: 0
           persist-credentials: true
       - name: Run CodSpeed
-        uses: ./.github/actions/codspeed
+        uses: $/.github/actions/codspeed

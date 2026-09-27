@@ -152,6 +152,7 @@ func BenchmarkUpdateRootTaskfileExisting(b *testing.B) {
 	}
 }
 
+// BenchmarkUpdateRootTaskfile measures performance.
 func BenchmarkUpdateRootTaskfile(b *testing.B) {
 	template := taskfile.NewRootTemplate()
 	input := goOnlyRootInput()
@@ -167,12 +168,11 @@ func BenchmarkUpdateRootTaskfile(b *testing.B) {
 	}
 }
 
+// BenchmarkRewriteIncludesSpans measures performance.
 func BenchmarkRewriteIncludesSpans(b *testing.B) {
-	input := []byte(
-		"version: \"3\"\nincludes:\n  pnpm:\n    taskfile: \"../../../pnpm/Taskfile.yml\"\n  eslint:\n    taskfile: \"../../../eslint/Taskfile.yml\"\n  prettier:\n    taskfile: \"../../prettier/Taskfile.yml\"\n",
-	)
+	input := []byte(rewriteIncludesSpanInput)
 	mapping := map[string]string{
-		"../../../pnpm/Taskfile.yml":   "../pnpm/Taskfile.yml",
+		pathPNPMTaskfile:               "../pnpm/Taskfile.yml",
 		"../../../eslint/Taskfile.yml": "../eslint/Taskfile.yml",
 		"../../prettier/Taskfile.yml":  "../prettier/Taskfile.yml",
 	}
@@ -181,7 +181,7 @@ func BenchmarkRewriteIncludesSpans(b *testing.B) {
 	b.ReportAllocs()
 
 	for b.Loop() {
-		_, err := taskfile.RewriteIncludes(input, mapping, "eslint/node/pnpm")
+		_, err := taskfile.RewriteIncludes(input, mapping, moduleESLintNodePNPM)
 		if err != nil {
 			b.Fatal(err)
 		}

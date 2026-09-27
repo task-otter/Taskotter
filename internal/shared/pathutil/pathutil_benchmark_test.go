@@ -10,6 +10,7 @@ import (
 	"github.com/task-otter/Taskotter/internal/shared/pathutil"
 )
 
+// BenchmarkValidateRelativePath measures performance.
 func BenchmarkValidateRelativePath(b *testing.B) {
 	rel := "taskfiles/eslint/node/pnpm/Taskfile.yml"
 
@@ -23,6 +24,7 @@ func BenchmarkValidateRelativePath(b *testing.B) {
 	}
 }
 
+// BenchmarkNormalizeSlashes measures performance.
 func BenchmarkNormalizeSlashes(b *testing.B) {
 	p := `taskfiles\eslint\node\pnpm\Taskfile.yml`
 
@@ -34,6 +36,7 @@ func BenchmarkNormalizeSlashes(b *testing.B) {
 	}
 }
 
+// BenchmarkValidateTargetFolder measures performance.
 func BenchmarkValidateTargetFolder(b *testing.B) {
 	tmpDir := b.TempDir()
 

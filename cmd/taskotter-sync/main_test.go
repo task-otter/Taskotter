@@ -11,7 +11,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	syncrun "github.com/task-otter/Taskotter/internal/features/syncrun/service"
+	rundomain "github.com/task-otter/Taskotter/internal/features/syncrun/domain"
 	"github.com/task-otter/Taskotter/internal/shared/config"
 	"github.com/task-otter/Taskotter/internal/shared/consts"
 	"github.com/task-otter/Taskotter/internal/shared/iox"
@@ -20,7 +20,7 @@ import (
 
 type (
 	stubOrchestrator struct {
-		result *syncrun.Result
+		result *rundomain.Result
 		err    error
 	}
 )
@@ -225,10 +225,9 @@ func TestReportErrorWritesAnnotation(t *testing.T) {
 func (stub *stubOrchestrator) Run(
 	ctx context.Context,
 	cfg *config.Config,
-) (*syncrun.Result, error) {
+) (*rundomain.Result, error) {
 	iox.Discard2(ctx, cfg)
 
-	//nolint:nilnil // the stub mirrors whatever the test configured
 	return stub.result, stub.err
 }
 
@@ -244,7 +243,7 @@ func swapOrchestrator(t *testing.T, stub *stubOrchestrator) {
 	t.Cleanup(func() { wireRun = original })
 }
 
-func changedResult() *syncrun.Result {
+func changedResult() *rundomain.Result {
 	result := unchangedResult()
 
 	result.Changed = true
@@ -320,9 +319,78 @@ func swapStdout(t *testing.T, writer io.Writer) {
 	t.Cleanup(func() { stdout = original })
 }
 
-func unchangedResult() *syncrun.Result {
-	return &syncrun.Result{ //nolint:exhaustruct_v5 // only these fields are reported
+func unchangedResult() *rundomain.Result {
+	return &rundomain.Result{
 		Changed:   false,
 		SourceSHA: sourceSHAHex,
+	}
+}
+
+// TestWireOrchestratorInvalidRepository verifies an invalid repository coordinate fails construction.
+func TestWireOrchestratorInvalidRepository(t *testing.T) {
+	t.Parallel()
+
+	orch, err := WireOrchestrator(t.Context(), invalidRepoOrchestratorConfig())
+	iox.Discard(orch)
+
+	if err == nil {
+		t.Fatal("expected repository parse error")
+	}
+}
+
+// TestWireOrchestratorWithoutRepository verifies an empty repository wires successfully.
+func TestWireOrchestratorWithoutRepository(t *testing.T) {
+	t.Parallel()
+
+	cfg := invalidRepoOrchestratorConfig()
+
+	cfg.Repository = consts.Empty
+
+	orch, err := WireOrchestrator(t.Context(), cfg)
+	if err != nil {
+		t.Fatalf(consts.UnexpectedErr, err)
+	}
+
+	if orch == nil {
+		t.Fatal(errExpectedOrchestrator)
+	}
+}
+
+// TestWireOrchestratorWithRepository verifies a valid repository wires successfully.
+func TestWireOrchestratorWithRepository(t *testing.T) {
+	t.Parallel()
+
+	cfg := invalidRepoOrchestratorConfig()
+
+	cfg.Repository = testRepository
+
+	orch, err := WireOrchestrator(t.Context(), cfg)
+	if err != nil {
+		t.Fatalf(consts.UnexpectedErr, err)
+	}
+
+	if orch == nil {
+		t.Fatal(errExpectedOrchestrator)
+	}
+}
+
+func invalidRepoOrchestratorConfig() *config.Config {
+	return &config.Config{
+		Tasks:              nil,
+		JSRuntime:          consts.Empty,
+		NodePackageManager: consts.Empty,
+		IncludesDoc:        false,
+		SyncRoot:           false,
+		FailOnChanges:      false,
+		StoreVersion:       consts.Empty,
+		TargetFolder:       consts.Empty,
+		RootTaskfile:       consts.Empty,
+		GitHubToken:        consts.Empty,
+		Workspace:          consts.Empty,
+		Repository:         "not-a-valid-repo",
+		GitHubOutput:       consts.Empty,
+		BaseBranch:         consts.Empty,
+		ConfigurationHash:  consts.Empty,
+		BranchName:         consts.Empty,
 	}
 }

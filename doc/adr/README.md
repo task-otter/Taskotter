@@ -15,3 +15,4 @@ Accepted product and architecture decisions for TaskOtter.
 * [11. Selective file copy](0011-selective-file-copy.md)
 * [12. Fail-on-changes for drift CI](0012-fail-on-changes-for-drift-ci.md)
 * [13. Flattened node variants and public install tasks](0013-flattened-node-variants-and-public-install-tasks.md)
+* [14. Split oversized feature packages by capability](0014-fine-grained-capability-packages.md)

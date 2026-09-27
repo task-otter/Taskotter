@@ -7,11 +7,92 @@ import (
 	"os"
 
 	"github.com/task-otter/Taskotter/internal/features/sync/domain"
+	"github.com/task-otter/Taskotter/internal/features/sync/domain/lockmodel"
+	"github.com/task-otter/Taskotter/internal/features/sync/domain/managed"
 	"github.com/task-otter/Taskotter/internal/features/sync/ports"
 	"github.com/task-otter/Taskotter/internal/shared/config"
 )
 
 type (
+	syncLock          = lockmodel.LockFile
+	moduleRecord      = lockmodel.ModuleRecord
+	managedFile       = managed.File
+	generatedRootTask = ports.GeneratedRootTask
+	rootUpdateInput   = ports.RootUpdateInput
+
+	stagedFile = struct {
+		finalRel string
+		entry    domain.FileEntry
+	}
+
+	removeStaleFileArgs = struct {
+		old          *managedFile
+		current      map[string]struct{}
+		workspace    string
+		targetFolder string
+	}
+
+	// planArtifacts bundles the intermediate outputs produced while planning managed
+	// files and the generated root Taskfile, before they're assembled into a plan.
+	planArtifacts = struct {
+		moduleContents     map[string]map[string]domain.FileEntry
+		plannedFiles       []managedFile
+		rootBytes          []byte
+		newRoot            []byte
+		generatedRootTasks []generatedRootTask
+		rootState          rootState
+	}
+
+	appendManagedArgs = struct {
+		mod        *moduleRecord
+		contents   map[string]domain.FileEntry
+		parentDocs map[string]struct{}
+		destDirRel string
+		planned    []managedFile
+	}
+
+	mergeParentDocsArgs = struct {
+		collect    *collectModuleArgs
+		contents   fMap
+		parentDocs map[string]struct{}
+		destRoot   string
+	}
+
+	fileEntryArgs = struct {
+		ops          ports.TaskfileOps
+		entry        os.DirEntry
+		sourceToDest map[string]string
+		sourceDir    string
+		fromDest     string
+		rel          string
+		absPath      string
+	}
+
+	walkCollectArgs = struct {
+		entry    os.DirEntry
+		walkErr  error
+		opts     *collectOptions
+		contents map[string]domain.FileEntry
+		absPath  string
+	}
+
+	storeTaskMetadata = struct {
+		Schema        string   `yaml:"schema"`
+		Module        string   `yaml:"module"`
+		Taskfile      string   `yaml:"taskfile"`
+		ExportedTasks []string `yaml:"exported_tasks"`
+		Variants      []string `yaml:"variants"`
+	}
+
+	addCommonTasksInput struct {
+		modulesByTask map[string][]string
+		common        map[string]struct{}
+		logicalTask   string
+		exportedTasks []string
+	}
+
+	genRootTask = generatedRootTask
+
 	fileChangeKind int
 
 	docPolicy int
@@ -306,83 +387,3 @@ type (
 		requested        []string
 	}
 )
-
-//nolint:goconst // distinct typed enums intentionally reuse 0/1/2
-const (
-	fileUnchanged fileChangeKind = 0
-
-	fileAdded = 1
-
-	fileUpdated = 2
-
-	docPolicySkip docPolicy = 0
-
-	docPolicyInclude = 1
-
-	// DocPolicySkip excludes README and docs/ paths from collected module files.
-	DocPolicySkip DocPolicy = 0
-
-	// DocPolicyInclude copies documentation paths alongside taskfiles.
-	DocPolicyInclude = 1
-
-	syncRootDisabled syncRootPolicy = 0
-
-	syncRootEnabled = 1
-
-	rootAbsent rootState = 0
-
-	rootPresent = 1
-
-	priorContentEmpty priorContent = 0
-
-	priorContentExists = 1
-
-	metadataNotCandidate metadataScanResult = 0
-
-	metadataIsCandidate = 1
-)
-
-//nolint:decorder,grouper // yamlStagedKind uses a dedicated iota block separate from typed enums above
-const (
-	yamlStagedSkip yamlStagedKind = iota
-
-	yamlStagedRoot
-
-	yamlStagedLock
-
-	yamlStagedMetadata
-)
-
-func collectOptionsFrom(opts *CollectOptions) *collectOptions {
-	return &collectOptions{
-		ops:          opts.TaskfileOps,
-		sourceDir:    opts.SourceDir,
-		fromDest:     opts.FromDest,
-		docPolicy:    docPolicyFromExported(opts.DocPolicy),
-		sourceToDest: opts.SourceToDest,
-	}
-}
-
-func docPolicyFromConfig(cfg *config.Config) docPolicy {
-	if cfg.IncludesDoc {
-		return docPolicyInclude
-	}
-
-	return docPolicySkip
-}
-
-func docPolicyFromExported(policy DocPolicy) docPolicy {
-	if policy == DocPolicyInclude {
-		return docPolicyInclude
-	}
-
-	return docPolicySkip
-}
-
-func syncRootFromConfig(cfg *config.Config) syncRootPolicy {
-	if cfg.SyncRoot {
-		return syncRootEnabled
-	}
-
-	return syncRootDisabled
-}

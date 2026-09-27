@@ -1,7 +1,6 @@
 // Taskotter 2026.
 // SPDX-License-Identifier: Apache-2.0.
 
-// Package domain holds sync plan and input types.
 package domain
 
 import (
@@ -14,6 +13,7 @@ import (
 )
 
 type (
+
 	// Metadata points to the active lock file and configuration hash.
 	Metadata = struct {
 		TargetFolder      string `yaml:"target_folder"`
@@ -60,9 +60,9 @@ type (
 
 	// SyncError reports user-facing sync planning failures.
 	SyncError string
-)
 
-// Error implements the error interface, returning the sync planning failure message.
-func (err SyncError) Error() string {
-	return string(err)
-}
+	yamlDecodeTarget = struct {
+		Out any
+		Key string
+	}
+)

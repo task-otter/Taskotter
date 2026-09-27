@@ -1,12 +1,7 @@
 // Taskotter 2026.
 // SPDX-License-Identifier: Apache-2.0.
 
-// Package domain holds PR-facing DTOs.
 package domain
-
-import (
-	"errors"
-)
 
 type (
 	// PullRequest is a minimal view of a GitHub pull request.
@@ -29,6 +24,3 @@ type (
 		Body   string
 	}
 )
-
-// ErrPullRequestNotFound indicates no open pull request exists for the branch.
-var ErrPullRequestNotFound = errors.New("open pull request not found")

@@ -9,12 +9,13 @@ import (
 	"github.com/task-otter/Taskotter/internal/shared/yamlfmt"
 )
 
+// BenchmarkMarshal measures performance.
 func BenchmarkMarshal(b *testing.B) {
 	data := map[string]any{
-		"version": "3",
-		"vars": map[string]string{
-			"GO_VERSION": "1.26.5",
-			"NODE_ENV":   "production",
+		fixtureVersionKey: fixtureVersion,
+		fixtureVarsKey: map[string]string{
+			fixtureGoVersionKey: fixtureGoVersion,
+			"NODE_ENV":          "production",
 		},
 		"includes": map[string]any{
 			"go":     "taskfiles/go/Taskfile.yml",

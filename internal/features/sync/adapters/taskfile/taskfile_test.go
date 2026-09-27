@@ -1,741 +1,1053 @@
 // Taskotter 2026.
 // SPDX-License-Identifier: Apache-2.0.
 
-package taskfile_test
+package taskfile
 
 import (
 	"bytes"
-	"os"
 	"strings"
 	"testing"
 
-	"github.com/task-otter/Taskotter/internal/features/sync/adapters/taskfile"
 	"github.com/task-otter/Taskotter/internal/features/sync/domain/rootupd"
+	"github.com/task-otter/Taskotter/internal/features/sync/ports"
 	"github.com/task-otter/Taskotter/internal/shared/consts"
 	"github.com/task-otter/Taskotter/internal/shared/iox"
+	yaml "go.yaml.in/yaml/v3"
 )
 
 type (
-	rewriteIncludesAssert struct {
-		mapping  map[string]string
-		fromDest string
-		input    []byte
-		want     []byte
+
+	// TestRewriteIncludesRejectsLiteralBlockPath verifies a literal block include path fails.
+
+	// TestRewriteIncludesRewritesQuotedPath verifies a quoted include path is rewritten in place.
+
+	// TestRewriteIncludesSkipsNonMappingIncludes verifies unusable include sections are left alone.
+
+	// TestRewriteIncludesHandlesDotSlashPrefix verifies "./" prefixed paths are rewritten.
+
+	// TestRelativePathHelpersFallBackOnFailure verifies absolute/relative mismatches fall back.
+
+	// TestUpdateRootTaskfileRejectsNonMappingTasks verifies a non-mapping tasks section fails.
+
+	// TestUpdateRootTaskfileKeepsStillGeneratedTasks verifies regenerated tasks are not pruned.
+
+	// TestIsManagedIncludeFallsBackToManagedTasks verifies aliases without a taskfile key.
+
+	// TestPromotedVarHelpersHandleMissingValues verifies missing module vars are skipped.
+
+	// TestAddMissingPromotedVarSkipsUnknownKey verifies a key without a value is not added.
+
+	// TestMergeIncludeVarsSkipsNonMappingNodes verifies non-mapping vars are left untouched.
+
+	// TestOverridableRootVarSkipsNilAndNonScalar covers early-return branches.
+
+	// TestOverridableRootVarPreservesExistingDefault covers the | default short-circuit.
+
+	// TestOverridableRootVarWrapsScalars covers plain and quote-containing defaults.
+
+	// TestOverridableDefaultArgBranches covers quote vs backtick wrapping.
+
+	// TestOpsDelegatesToPackageHelpers verifies the ports adapter forwards to the helpers.
+
+	// TestOpsReportsFailures verifies malformed YAML surfaces through the ports adapter.
+
+	// TestRewriteIncludesRejectsMalformedYAML verifies parse and empty-document failures.
+
+	// TestUpdateRootTaskfileRejectsMalformedYAML verifies parse and empty-document failures.
+
+	// TestUpdateRootTaskfileRejectsNonMappingSections verifies includes and vars must be mappings.
+
+	// TestUpdateRootTaskfileRejectsMissingDestination verifies a task without a destination fails.
+
+	// TestUpdateRootTaskfileRejectsUnmanagedAlias verifies a foreign include alias fails.
+
+	// TestUpdateRootTaskfileRejectsMalformedModuleTaskfile verifies module parse failures surface.
+
+	// TestUpdateRootTaskfileSkipsModulesWithoutVars verifies missing module vars are not fatal.
+
+	// TestUpdateRootTaskfilePrunesRemovedManagedIncludes verifies stale managed aliases are dropped.
+
+	// TestUpdateRootTaskfileMergesExistingIncludeVars verifies an existing managed entry is updated.
+
+	// TestUpdateRootTaskfileAcceptsScalarManagedInclude verifies a scalar include entry is managed.
+
+	// TestIncludeTaskfileScalarRejectsNonMappingEntries verifies non-mapping include entries are skipped.
+
+	// TestApplyIncludePathReplacementsReportsSpanFailure verifies unresolvable spans fail.
+
+	// TestRewriteIncludePathKeepsUnrelatedPaths verifies non-Taskfile and unmapped paths are kept.
+
+	// TestDestinationIncludePathFallsBackToOriginal verifies an empty fromDest keeps the path.
+
+	// TestFinalizeRelativePrefixRejectsRemainingParent verifies a residual ".." clears the split.
+
+	// TestModuleIncludePathAndDirForNestedRoot verifies nested aggregator paths are relative.
+
+	// TestExtractVarsNodeReportsMissingVars verifies module Taskfiles without vars are reported.
+
+	// TestParseModuleTaskfileNodeRejectsEmptyContent verifies empty and blank documents fail.
+
+	// TestMarshalNodeReportsEncoderFailure verifies an unencodable node is reported.
+
+	// TestCloneYAMLNodeCopiesNestedContent verifies clones are independent of the source.
+
+	closingQuoteCase struct {
+		content []byte
+		want    int
+		quote   byte
+	}
+
+	quoteStyleCase struct {
+		style      yaml.Style
+		wantQuote  byte
+		wantQuoted bool
+	}
+
+	spanCase struct {
+		start     int
+		end       int
+		wantStart int
+	}
+
+	positionCase struct {
+		content []byte
+		line    int
+		column  int
 	}
 )
 
 const (
-	targetFolderTaskfiles = "taskfiles"
-	taskESLint            = "eslint"
-	storeESLintTaskfile   = "../../../../../tests/fixtures/store/taskfiles/eslint/node/pnpm/Taskfile.yml"
+	pnpmModule   = "pnpm"
+	pnpmInclude  = "../../../pnpm/Taskfile.yml"
+	absolutePath = "/abs/dest"
+	varKeyName   = "GO_VERSION"
+	goVersion122 = "1.22"
 
-	wantVersion35           = `version: "3.5"`
-	fmtWantVersion35        = "expected root Taskfile version 3.5: %s"
-	pathTaskfilesGoYML      = "taskfiles/go/Taskfile.yml"
-	destPnpm                = "pnpm"
-	wantPnpmRewrite         = "../pnpm/Taskfile.yml"
-	moduleESLintNodeVariant = "eslint/node"
-	moduleJQ                = "jq"
-	srcBunLatest            = "bun-latest"
-	destBun                 = "bun"
-	pathUnknownTaskfile     = "../unknown/Taskfile.yml"
-	fmtExpectedInRewritten  = "expected %q in rewritten Taskfile: %s"
-	pathTaskfileYML         = "Taskfile.yml"
-	wantGoVersionEmpty      = `GO_VERSION: '{{.GO_VERSION | default ""}}'`
-	wantGoCmdUnixDefault    = `GO_CMD_UNIX: '{{.GO_CMD_UNIX | default "/usr/local/go/bin/go"}}'`
-	wantGoVersionRef        = `GO_VERSION: '{{.GO_VERSION}}'`
-	wantGoCmdUnixRef        = `GO_CMD_UNIX: '{{.GO_CMD_UNIX}}'`
-	wantIncludeDirDot       = "dir: ."
-	wantIncludeDirParent    = "dir: .."
-	foldedGoLoadCollapsed   = `GetEnvironmentVariable('Path', 'User'); if (\$u)`
+	badYAML        = yamlHeader + "\tbad: [\n"
+	goTask         = "go"
+	goDest         = "taskfiles/go/Taskfile.yml"
+	moduleWithVars = yamlHeader + "vars:\n  GO_VERSION: \"1.22\"\n"
+	yamlHeader     = "version: \"3\"\n"
+	fromDestESLint = "eslint"
+	folderTaskfile = "taskfiles"
+	valueText      = "value"
+	plainText      = "plain"
+	lintTask       = "lint"
+	fmtDestInclude = "destinationIncludePath() = %q"
+	fmtModulePath  = "moduleIncludePath() = %q"
+	fmtIncludeDir  = "includeDirForRoot() = %q"
+
+	wantErrText  = "expected error"
+	oldPathValue = "../pnpm/Taskfile.yml"
+	spanFmt      = "span = %d..%d, want %d..%d"
+	twoLines     = "first\nsecond\n"
+	otherLine    = "other\n"
+	taskfileKey  = "taskfile: "
 )
 
-func rewriteIncludesInput() []byte {
-	return []byte(`version: "3"
-includes:
-  pnpm:
-    taskfile: ../../../pnpm/Taskfile.yml
-tasks:
-  lint:
-    cmds:
-      - echo ../../../pnpm/Taskfile.yml
-`)
+// TestRewriteIncludesRejectsLiteralBlockPath verifies the expected behavior.
+func TestRewriteIncludesRejectsLiteralBlockPath(t *testing.T) {
+	t.Parallel()
+
+	content := []byte(yamlHeader + "includes:\n  pnpm:\n    taskfile: |-\n      " +
+		pnpmInclude + "\n")
+
+	out, err := RewriteIncludes(content, pnpmMapping(), fromDestESLint)
+	iox.Discard(out)
+
+	if err == nil {
+		t.Fatal("expected span resolution failure")
+	}
 }
 
-func rewriteNamespacedInput() []byte {
-	return []byte(`version: "3"
-includes:
-  eslintnode:
-    taskfile: ../eslint/node/Taskfile.yml
-  bun:
-    taskfile: ../bun-latest/Taskfile.yml
-  sibling:
-    taskfile: ../../jq/Taskfile.yml
-  unmapped:
-    taskfile: ../unknown/Taskfile.yml
-`)
+// TestRewriteIncludesRewritesQuotedPath verifies the expected behavior.
+func TestRewriteIncludesRewritesQuotedPath(t *testing.T) {
+	t.Parallel()
+
+	content := []byte(yamlHeader + "includes:\n  pnpm:\n    taskfile: \"" + pnpmInclude + "\"\n")
+
+	out, err := RewriteIncludes(content, pnpmMapping(), fromDestESLint)
+	if err != nil {
+		t.Fatalf(consts.UnexpectedErr, err)
+	}
+
+	if !strings.Contains(string(out), "\"../pnpm/Taskfile.yml\"") {
+		t.Fatalf("quoted path not rewritten: %s", out)
+	}
 }
 
-func goModuleTaskfile() []byte {
-	return []byte(`version: "3"
-vars:
-  GO_VERSION: ""
-  GO_CMD_UNIX: /usr/local/go/bin/go
-`)
+// TestRewriteIncludesSkipsNonMappingIncludes verifies the expected behavior.
+func TestRewriteIncludesSkipsNonMappingIncludes(t *testing.T) {
+	t.Parallel()
+
+	assertRewriteNoop(t, []byte(yamlHeader+"includes: []\n"))
+	assertRewriteNoop(t, []byte(yamlHeader+"includes:\n  pnpm: "+pnpmInclude+"\n"))
 }
 
-func rootWithCustomInclude() []byte {
-	return []byte(`version: "3"
-includes:
-  custom:
-    taskfile: custom/Taskfile.yml
-`)
+// TestRewriteIncludesHandlesDotSlashPrefix verifies the expected behavior.
+func TestRewriteIncludesHandlesDotSlashPrefix(t *testing.T) {
+	t.Parallel()
+
+	content := []byte(yamlHeader + "includes:\n  pnpm:\n    taskfile: ./pnpm/Taskfile.yml\n")
+
+	out, err := RewriteIncludes(content, map[string]string{pnpmModule: pnpmModule}, fromDestESLint)
+	if err != nil {
+		t.Fatalf(consts.UnexpectedErr, err)
+	}
+
+	iox.Discard(out)
 }
 
-func rootWithGoInclude() []byte {
-	return []byte(`version: "3"
-includes:
-  go:
-    taskfile: taskfiles/go/Taskfile.yml
-    vars:
-      GO_VERSION: go1.22.0
-`)
+// TestRelativePathHelpersFallBackOnFailure verifies the expected behavior.
+func TestRelativePathHelpersFallBackOnFailure(t *testing.T) {
+	t.Parallel()
+
+	if got := destinationIncludePath("relative", absolutePath, pnpmInclude); got != pnpmInclude {
+		t.Fatalf(fmtDestInclude, got)
+	}
+
+	if got := moduleIncludePath(absolutePath, folderTaskfile, "go"); got != goDest {
+		t.Fatalf(fmtModulePath, got)
+	}
+
+	if got := includeDirForRoot(absolutePath); got != consts.PathDot {
+		t.Fatalf(fmtIncludeDir, got)
+	}
 }
 
-func rootWithHelloTask() []byte {
-	return []byte(`version: "3"
-includes:
-  custom:
-    taskfile: custom/Taskfile.yml
-tasks:
-  hello:
-    cmds:
-      - echo hi
-`)
+// TestUpdateRootTaskfileRejectsNonMappingTasks verifies the expected behavior.
+func TestUpdateRootTaskfileRejectsNonMappingTasks(t *testing.T) {
+	t.Parallel()
+
+	input := goRootInput()
+
+	input.GeneratedTasks = []rootupd.GeneratedRootTask{{Name: lintTask, Modules: []string{goTask}}}
+
+	out, err := UpdateRootTaskfile([]byte(yamlHeader+"tasks: []\n"), input)
+	iox.Discard(out)
+
+	if err == nil {
+		t.Fatal("expected tasks mapping failure")
+	}
 }
 
-func rootWithESLintConflict() []byte {
-	return []byte(`version: "3"
-includes:
-  eslint:
-    taskfile: custom/eslint/Taskfile.yml
-tasks:
-  hello:
-    cmds:
-      - echo hi
-`)
+// TestUpdateRootTaskfileKeepsStillGeneratedTasks verifies the expected behavior.
+func TestUpdateRootTaskfileKeepsStillGeneratedTasks(t *testing.T) {
+	t.Parallel()
+
+	input := goRootInput()
+
+	input.GeneratedTasks = []rootupd.GeneratedRootTask{{Name: lintTask, Modules: []string{goTask}}}
+	input.ManagedRootTasks = []string{lintTask}
+
+	out, err := UpdateRootTaskfile(NewRootTemplate(), input)
+	if err != nil {
+		t.Fatalf(consts.UnexpectedErr, err)
+	}
+
+	if !strings.Contains(string(out), "lint:") {
+		t.Fatalf("generated task missing: %s", out)
+	}
 }
 
-func rootWithGoAliasConflict() []byte {
-	return []byte(`version: "3"
-includes:
-  go:
-    taskfile: legacy/go/Taskfile.yml
-`)
+// TestIsManagedIncludeFallsBackToManagedTasks verifies the expected behavior.
+func TestIsManagedIncludeFallsBackToManagedTasks(t *testing.T) {
+	t.Parallel()
+
+	entry := newYAMLMappingNode()
+	appendMappingPair(entry, yamlScalar(keyDir), yamlScalar(consts.PathDot))
+
+	managed := &managedIncludeParams{
+		entry:        entry,
+		expectedPath: goDest,
+		task:         goTask,
+		managedTasks: []string{goTask},
+	}
+
+	if !isManagedInclude(managed) {
+		t.Fatal("alias listed in managed tasks should be managed")
+	}
 }
 
-func rootWithScalarGoConflict() []byte {
-	return []byte(`version: "3"
-includes:
-  go: legacy/go/Taskfile.yml
-`)
+// TestPromotedVarHelpersHandleMissingValues verifies the expected behavior.
+func TestPromotedVarHelpersHandleMissingValues(t *testing.T) {
+	t.Parallel()
+
+	if varValueIn(nil, varKeyName) != nil {
+		t.Fatal("nil vars node should yield no value")
+	}
+
+	if varValueIn(yamlScalar(plainText), varKeyName) != nil {
+		t.Fatal("scalar vars node should yield no value")
+	}
+
+	if firstVarValue([]string{goTask}, map[string]*yaml.Node{}, varKeyName) != nil {
+		t.Fatal("missing module vars should yield no value")
+	}
 }
 
-func rootUpdateInput(input *rootupd.RootUpdateInput) *rootupd.RootUpdateInput {
-	input.GeneratedTasks = append([]rootupd.GeneratedRootTask{}, input.GeneratedTasks...)
-	input.ManagedRootTasks = append([]string{}, input.ManagedRootTasks...)
+// TestAddMissingPromotedVarSkipsUnknownKey verifies the expected behavior.
+func TestAddMissingPromotedVarSkipsUnknownKey(t *testing.T) {
+	t.Parallel()
 
-	return input
+	rootVars := newYAMLMappingNode()
+
+	addMissingPromotedVar(&addPromotedVarParams{
+		rootVars:   rootVars,
+		moduleVars: map[string]*yaml.Node{},
+		existing:   map[string]struct{}{},
+		key:        varKeyName,
+		tasks:      []string{goTask},
+	})
+
+	if len(rootVars.Content) != consts.IndexZero {
+		t.Fatalf("root vars = %#v", rootVars.Content)
+	}
 }
 
-func goOnlyRootInput() *rootupd.RootUpdateInput {
-	return rootUpdateInput(&rootupd.RootUpdateInput{
-		Tasks:            []string{consts.Go},
-		TargetFolder:     targetFolderTaskfiles,
+// TestMergeIncludeVarsSkipsNonMappingNodes verifies the expected behavior.
+func TestMergeIncludeVarsSkipsNonMappingNodes(t *testing.T) {
+	t.Parallel()
+
+	entry := newYAMLMappingNode()
+	mergeIncludeVars(entry, yamlScalar(plainText))
+
+	if len(entry.Content) != consts.IndexZero {
+		t.Fatalf("entry = %#v", entry.Content)
+	}
+
+	appendMappingPair(entry, yamlScalar(keyVars), yamlScalar(plainText))
+	mergeIncludeVars(entry, moduleVarsNode())
+
+	if entry.Content[consts.IndexOne].Value != plainText {
+		t.Fatalf("entry vars = %#v", entry.Content[consts.IndexOne])
+	}
+}
+
+func assertRewriteNoop(t *testing.T, content []byte) {
+	t.Helper()
+
+	out, err := RewriteIncludes(content, pnpmMapping(), fromDestESLint)
+	if err != nil {
+		t.Fatalf(consts.UnexpectedErr, err)
+	}
+
+	if !bytes.Equal(out, content) {
+		t.Fatalf("content changed: %s", out)
+	}
+}
+
+func moduleVarsNode() *yaml.Node {
+	vars := newYAMLMappingNode()
+	appendMappingPair(vars, yamlScalar(varKeyName), yamlScalar(goVersion122))
+
+	return vars
+}
+
+func pnpmMapping() map[string]string {
+	return map[string]string{pnpmModule: pnpmModule}
+}
+
+// TestOverridableRootVarSkipsNilAndNonScalar verifies the expected behavior.
+func TestOverridableRootVarSkipsNilAndNonScalar(t *testing.T) {
+	t.Parallel()
+
+	if overridableRootVar(varKeyName, nil) != nil {
+		t.Fatal("nil value should pass through")
+	}
+
+	mapping := newYAMLMappingNode()
+
+	if overridableRootVar(varKeyName, mapping) != mapping {
+		t.Fatal("non-scalar should pass through")
+	}
+}
+
+// TestOverridableRootVarPreservesExistingDefault verifies the expected behavior.
+func TestOverridableRootVarPreservesExistingDefault(t *testing.T) {
+	t.Parallel()
+
+	already := yamlScalar(`{{.GO_VERSION | default "` + goVersion122 + `"}}`)
+
+	if overridableRootVar(varKeyName, already) != already {
+		t.Fatal("existing default should pass through")
+	}
+}
+
+// TestOverridableRootVarWrapsScalars verifies the expected behavior.
+func TestOverridableRootVarWrapsScalars(t *testing.T) {
+	t.Parallel()
+
+	plain := overridableRootVar(varKeyName, yamlScalar(goVersion122))
+
+	if plain == nil || !strings.Contains(plain.Value, `| default "`+goVersion122+`"`) {
+		t.Fatalf("plain default = %v", plain)
+	}
+
+	quoted := overridableRootVar(varKeyName, yamlScalar(`say "hi"`))
+
+	if quoted == nil || !strings.Contains(quoted.Value, "`say \"hi\"`") {
+		t.Fatalf("quoted default = %v", quoted)
+	}
+}
+
+// TestOverridableDefaultArgBranches verifies the expected behavior.
+func TestOverridableDefaultArgBranches(t *testing.T) {
+	t.Parallel()
+
+	if got := overridableDefaultArg("plain"); got != `"plain"` {
+		t.Fatalf("plain = %q", got)
+	}
+
+	if got := overridableDefaultArg(`has "quote"`); got != "`has \"quote\"`" {
+		t.Fatalf("quoted = %q", got)
+	}
+}
+
+// TestOpsDelegatesToPackageHelpers verifies the expected behavior.
+func TestOpsDelegatesToPackageHelpers(t *testing.T) {
+	t.Parallel()
+
+	ops := NewOps()
+
+	if len(ops.NewRootTemplate()) == consts.IndexZero {
+		t.Fatal("NewRootTemplate() = empty")
+	}
+
+	out, err := ops.RewriteIncludes(NewRootTemplate(), nil, consts.Empty)
+	failIfErr(t, err)
+	iox.Discard(out)
+
+	out, err = ops.UpdateRootTaskfile(NewRootTemplate(), goRootInput())
+	failIfErr(t, err)
+	iox.Discard(out)
+}
+
+// TestOpsReportsFailures verifies the expected behavior.
+func TestOpsReportsFailures(t *testing.T) {
+	t.Parallel()
+
+	ops := NewOps()
+
+	out, err := ops.RewriteIncludes([]byte(badYAML), nil, consts.Empty)
+	iox.Discard(out)
+	assertFails(t, err)
+
+	out, err = ops.UpdateRootTaskfile([]byte(badYAML), goRootInput())
+	iox.Discard(out)
+	assertFails(t, err)
+}
+
+// TestRewriteIncludesRejectsMalformedYAML verifies the expected behavior.
+func TestRewriteIncludesRejectsMalformedYAML(t *testing.T) {
+	t.Parallel()
+
+	assertRewriteFails(t, []byte(badYAML))
+	assertRewriteFails(t, []byte(consts.Empty))
+}
+
+// TestUpdateRootTaskfileRejectsMalformedYAML verifies the expected behavior.
+func TestUpdateRootTaskfileRejectsMalformedYAML(t *testing.T) {
+	t.Parallel()
+
+	assertRootUpdateFails(t, []byte(badYAML), goRootInput())
+	assertRootUpdateFails(t, []byte(consts.Empty), goRootInput())
+}
+
+// TestUpdateRootTaskfileRejectsNonMappingSections verifies the expected behavior.
+func TestUpdateRootTaskfileRejectsNonMappingSections(t *testing.T) {
+	t.Parallel()
+
+	assertRootUpdateFails(t, []byte(yamlHeader+"includes: []\n"), goRootInput())
+	assertRootUpdateFails(t, []byte(yamlHeader+"vars: []\n"), goRootInput())
+}
+
+// TestUpdateRootTaskfileRejectsMissingDestination verifies the expected behavior.
+func TestUpdateRootTaskfileRejectsMissingDestination(t *testing.T) {
+	t.Parallel()
+
+	input := goRootInput()
+
+	input.DestByTask = map[string]string{}
+
+	assertRootUpdateFails(t, NewRootTemplate(), input)
+}
+
+// TestUpdateRootTaskfileRejectsUnmanagedAlias verifies the expected behavior.
+func TestUpdateRootTaskfileRejectsUnmanagedAlias(t *testing.T) {
+	t.Parallel()
+
+	root := []byte(yamlHeader + "includes:\n  go:\n    taskfile: legacy/go/Taskfile.yml\n")
+	assertRootUpdateFails(t, root, goRootInput())
+}
+
+// TestUpdateRootTaskfileRejectsMalformedModuleTaskfile verifies the expected behavior.
+func TestUpdateRootTaskfileRejectsMalformedModuleTaskfile(t *testing.T) {
+	t.Parallel()
+
+	input := goRootInput()
+
+	input.ModuleTaskfiles = map[string][]byte{goTask: []byte(badYAML)}
+
+	assertRootUpdateFails(t, NewRootTemplate(), input)
+}
+
+// TestUpdateRootTaskfileSkipsModulesWithoutVars verifies the expected behavior.
+func TestUpdateRootTaskfileSkipsModulesWithoutVars(t *testing.T) {
+	t.Parallel()
+
+	cases := [][]byte{nil, []byte(yamlHeader), []byte(yamlHeader + "vars: {}\n")}
+
+	for i := range cases {
+		input := goRootInput()
+
+		input.ModuleTaskfiles = map[string][]byte{goTask: cases[i]}
+
+		out, err := UpdateRootTaskfile(NewRootTemplate(), input)
+		if err != nil {
+			t.Fatalf(consts.UnexpectedErr, err)
+		}
+
+		iox.Discard(out)
+	}
+}
+
+// TestUpdateRootTaskfilePrunesRemovedManagedIncludes verifies the expected behavior.
+func TestUpdateRootTaskfilePrunesRemovedManagedIncludes(t *testing.T) {
+	t.Parallel()
+
+	root := []byte(yamlHeader + "includes:\n  old:\n    taskfile: taskfiles/old/Taskfile.yml\n")
+	input := goRootInput()
+
+	input.ManagedTasks = []string{"old"}
+
+	out, err := UpdateRootTaskfile(root, input)
+	if err != nil {
+		t.Fatalf(consts.UnexpectedErr, err)
+	}
+
+	if bytesContain(out, "old:") {
+		t.Fatalf("stale include retained: %s", out)
+	}
+}
+
+// TestUpdateRootTaskfileMergesExistingIncludeVars verifies the expected behavior.
+func TestUpdateRootTaskfileMergesExistingIncludeVars(t *testing.T) {
+	t.Parallel()
+
+	root := []byte(
+		yamlHeader + "includes:\n  go:\n    taskfile: " + goDest +
+			"\n    vars:\n      GO_VERSION: old\n",
+	)
+	input := goRootInput()
+
+	out, err := UpdateRootTaskfile(root, input)
+	if err != nil {
+		t.Fatalf(consts.UnexpectedErr, err)
+	}
+
+	if !bytesContain(out, "GO_VERSION") {
+		t.Fatalf("promoted var missing: %s", out)
+	}
+}
+
+// TestUpdateRootTaskfileAcceptsScalarManagedInclude verifies the expected behavior.
+func TestUpdateRootTaskfileAcceptsScalarManagedInclude(t *testing.T) {
+	t.Parallel()
+
+	root := []byte(yamlHeader + "includes:\n  go: " + goDest + "\n")
+
+	out, err := UpdateRootTaskfile(root, goRootInput())
+	if err != nil {
+		t.Fatalf(consts.UnexpectedErr, err)
+	}
+
+	iox.Discard(out)
+}
+
+// TestIncludeTaskfileScalarRejectsNonMappingEntries verifies the expected behavior.
+func TestIncludeTaskfileScalarRejectsNonMappingEntries(t *testing.T) {
+	t.Parallel()
+
+	node, ok := includeTaskfileScalar(yamlScalar(valueText))
+	iox.Discard(node)
+
+	if ok {
+		t.Fatal("scalar entry should not yield a taskfile scalar")
+	}
+
+	node, ok = includeTaskfileScalar(mappingWithSequenceTaskfile())
+	iox.Discard(node)
+
+	if ok {
+		t.Fatal("non-scalar taskfile should not yield a taskfile scalar")
+	}
+}
+
+// TestApplyIncludePathReplacementsReportsSpanFailure verifies the expected behavior.
+func TestApplyIncludePathReplacementsReportsSpanFailure(t *testing.T) {
+	t.Parallel()
+
+	replacements := []includePathReplacement{{
+		oldPath: "missing",
+		newPath: "other",
+		line:    consts.Index99,
+		column:  consts.IndexOne,
+		style:   yaml.Style(consts.IndexZero),
+	}}
+
+	out, err := applyIncludePathReplacements([]byte(yamlHeader), replacements)
+	iox.Discard(out)
+	assertFails(t, err)
+}
+
+// TestRewriteIncludePathKeepsUnrelatedPaths verifies the expected behavior.
+func TestRewriteIncludePathKeepsUnrelatedPaths(t *testing.T) {
+	t.Parallel()
+
+	mapping := map[string]string{pnpmModule: pnpmModule}
+
+	assertPathUnchanged(t, "../pnpm/other.yml", mapping)
+	assertPathUnchanged(t, "../../Taskfile.yml", mapping)
+	assertPathUnchanged(t, "../unknown/Taskfile.yml", mapping)
+}
+
+// TestDestinationIncludePathFallsBackToOriginal verifies the expected behavior.
+func TestDestinationIncludePathFallsBackToOriginal(t *testing.T) {
+	t.Parallel()
+
+	got := destinationIncludePath(consts.Empty, pnpmModule, oldPathValue)
+
+	if got != oldPathValue {
+		t.Fatalf(fmtDestInclude, got)
+	}
+}
+
+// TestFinalizeRelativePrefixRejectsRemainingParent verifies the expected behavior.
+func TestFinalizeRelativePrefixRejectsRemainingParent(t *testing.T) {
+	t.Parallel()
+
+	prefix, dir := finalizeRelativePrefix(dotSlash, "a/../b")
+
+	if prefix != consts.Empty || dir != consts.Empty {
+		t.Fatalf("finalizeRelativePrefix() = %q, %q", prefix, dir)
+	}
+}
+
+// TestModuleIncludePathAndDirForNestedRoot verifies the expected behavior.
+func TestModuleIncludePathAndDirForNestedRoot(t *testing.T) {
+	t.Parallel()
+
+	path := moduleIncludePath(folderTaskfile, folderTaskfile, goTask)
+
+	if path != "go/Taskfile.yml" {
+		t.Fatalf("moduleIncludePath() = %q", path)
+	}
+
+	if dir := includeDirForRoot(folderTaskfile); dir != consts.PathParent {
+		t.Fatalf("includeDirForRoot() = %q", dir)
+	}
+}
+
+// TestExtractVarsNodeReportsMissingVars verifies the expected behavior.
+func TestExtractVarsNodeReportsMissingVars(t *testing.T) {
+	t.Parallel()
+
+	node, err := extractVarsNode([]byte(yamlHeader))
+	iox.Discard(node)
+	assertFails(t, err)
+
+	node, err = extractVarsNode([]byte(moduleWithVars))
+	iox.Discard(node)
+
+	if err != nil {
+		t.Fatalf(consts.UnexpectedErr, err)
+	}
+}
+
+// TestParseModuleTaskfileNodeRejectsEmptyContent verifies the expected behavior.
+func TestParseModuleTaskfileNodeRejectsEmptyContent(t *testing.T) {
+	t.Parallel()
+
+	node, err := parseModuleTaskfileNode(nil)
+	iox.Discard(node)
+	assertFails(t, err)
+
+	node, err = parseModuleTaskfileNode([]byte("# comment only\n"))
+	iox.Discard(node)
+	assertFails(t, err)
+}
+
+// TestMarshalNodeReportsEncoderFailure verifies the expected behavior.
+func TestMarshalNodeReportsEncoderFailure(t *testing.T) {
+	t.Parallel()
+
+	out, err := marshalNode(emptyDocumentNode(), "marshal: %v")
+	iox.Discard(out)
+	assertFails(t, err)
+
+	out, err = marshalRootTaskfile(emptyDocumentNode())
+	iox.Discard(out)
+	assertFails(t, err)
+
+	out, err = marshalUpdatedRootTaskfile(
+		emptyDocumentNode(),
+		newYAMLMappingNode(),
+		nil,
+		goRootInput(),
+	)
+	iox.Discard(out)
+	assertFails(t, err)
+}
+
+// TestCloneYAMLNodeCopiesNestedContent verifies the expected behavior.
+func TestCloneYAMLNodeCopiesNestedContent(t *testing.T) {
+	t.Parallel()
+
+	if cloneYAMLNode(nil) != nil {
+		t.Fatal("cloneYAMLNode(nil) should be nil")
+	}
+
+	source := newYAMLMappingNode()
+	appendMappingPair(source, yamlScalar("key"), yamlScalar(valueText))
+
+	clone := cloneYAMLNode(source)
+
+	clone.Content[consts.IndexOne].Value = "changed"
+
+	if source.Content[consts.IndexOne].Value != valueText {
+		t.Fatal("clone shares nodes with the source")
+	}
+}
+
+func assertPathUnchanged(t *testing.T, path string, mapping map[string]string) {
+	t.Helper()
+
+	if got := rewriteIncludePath(path, mapping, fromDestESLint); got != path {
+		t.Fatalf("rewriteIncludePath(%q) = %q", path, got)
+	}
+}
+
+func assertRewriteFails(t *testing.T, content []byte) {
+	t.Helper()
+
+	out, err := RewriteIncludes(content, map[string]string{pnpmModule: pnpmModule}, fromDestESLint)
+	iox.Discard(out)
+	assertFails(t, err)
+}
+
+func assertRootUpdateFails(t *testing.T, content []byte, input *ports.RootUpdateInput) {
+	t.Helper()
+
+	out, err := UpdateRootTaskfile(content, input)
+	iox.Discard(out)
+	assertFails(t, err)
+}
+
+func bytesContain(content []byte, want string) bool {
+	return strings.Contains(string(content), want)
+}
+
+func goRootInput() *ports.RootUpdateInput {
+	return &ports.RootUpdateInput{
+		Tasks:            []string{goTask},
+		TargetFolder:     folderTaskfile,
 		RootTaskfileDir:  consts.Empty,
-		DestByTask:       map[string]string{consts.Go: consts.Go},
+		DestByTask:       map[string]string{goTask: goTask},
 		ManagedTasks:     nil,
-		ModuleTaskfiles:  map[string][]byte{consts.Go: goModuleTaskfile()},
+		ModuleTaskfiles:  map[string][]byte{goTask: []byte(moduleWithVars)},
 		GeneratedTasks:   nil,
 		ManagedRootTasks: nil,
-	})
-}
-
-func rewriteNamespacedSourceToDest() map[string]string {
-	return map[string]string{
-		moduleESLintNodeVariant: moduleESLintNodeVariant,
-		srcBunLatest:            destBun,
-		moduleJQ:                moduleJQ,
 	}
 }
 
-func assertRewriteIncludesOutput(t *testing.T, text string) {
+func mappingWithSequenceTaskfile() *yaml.Node {
+	entry := newYAMLMappingNode()
+	appendMappingPair(entry, yamlScalar(keyTaskfile), newYAMLSequenceNodeForTest())
+
+	return entry
+}
+
+func failIfErr(t *testing.T, err error) {
 	t.Helper()
 
-	if !strings.Contains(text, wantPnpmRewrite) {
-		t.Fatalf("include not rewritten: %s", text)
-	}
-
-	if !strings.Contains(text, "../../../pnpm/Taskfile.yml") {
-		t.Fatalf("command string should remain unchanged: %s", text)
+	if err != nil {
+		t.Fatalf(consts.UnexpectedErr, err)
 	}
 }
 
-// TestRewriteIncludes verifies include taskfile paths are rewritten to destination paths.
-func TestRewriteIncludes(t *testing.T) {
+func emptyDocumentNode() *yaml.Node {
+	return &yaml.Node{Kind: yaml.DocumentNode}
+}
+
+func newYAMLSequenceNodeForTest() *yaml.Node {
+	return &yaml.Node{Kind: yaml.SequenceNode}
+}
+
+// TestQuoteForYAMLStyleMapsQuotedStyles verifies each scalar style maps to its quote byte.
+func TestQuoteForYAMLStyleMapsQuotedStyles(t *testing.T) {
 	t.Parallel()
 
-	out, err := taskfile.RewriteIncludes(
-		rewriteIncludesInput(),
-		map[string]string{destPnpm: destPnpm},
-		taskESLint,
+	cases := []quoteStyleCase{
+		{style: yaml.DoubleQuotedStyle, wantQuote: '"', wantQuoted: true},
+		{style: yaml.SingleQuotedStyle, wantQuote: '\'', wantQuoted: true},
+		{style: yaml.LiteralStyle, wantQuote: byte(consts.IndexZero), wantQuoted: false},
+	}
+
+	for i := range cases {
+		assertQuote(t, &cases[i])
+	}
+}
+
+// TestPlainScalarValueSpanFindsPath verifies the plain scalar span covers the old path.
+func TestPlainScalarValueSpanFindsPath(t *testing.T) {
+	t.Parallel()
+
+	content := []byte(taskfileKey + oldPathValue + "\n")
+	offset := len(taskfileKey)
+
+	start, end, err := plainScalarValueSpan(content, offset, oldPathValue)
+	if err != nil {
+		t.Fatalf(consts.UnexpectedErr, err)
+	}
+
+	assertSpan(t, &spanCase{start: start, end: end, wantStart: offset})
+}
+
+// TestPlainScalarValueSpanReportsMissingPath verifies a mismatched path is reported.
+func TestPlainScalarValueSpanReportsMissingPath(t *testing.T) {
+	t.Parallel()
+
+	start, end, err := plainScalarValueSpan(
+		[]byte(taskfileKey+otherLine),
+		consts.IndexZero,
+		oldPathValue,
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	assertRewriteIncludesOutput(t, string(out))
+	iox.Discard2(start, end)
+	assertFails(t, err)
 }
 
-// TestRewriteIncludesNamespacedModule verifies slashed variant and unmapped includes rewrite correctly.
-func TestRewriteIncludesNamespacedModule(t *testing.T) {
+// TestQuotedScalarValueSpanFindsInterior verifies double and single quoted spans.
+func TestQuotedScalarValueSpanFindsInterior(t *testing.T) {
 	t.Parallel()
 
-	out, err := taskfile.RewriteIncludes(
-		rewriteNamespacedInput(),
-		rewriteNamespacedSourceToDest(),
-		moduleESLintNodeVariant,
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	assertRewriteOutput(t, string(out), []string{
-		"taskfile: " + pathTaskfileYML,
-		"../../bun/Taskfile.yml",
-		"../../jq/Taskfile.yml",
-		pathUnknownTaskfile,
-	})
+	assertQuotedSpan(t, '"')
+	assertQuotedSpan(t, '\'')
 }
 
-// TestRewriteIncludesFlatDestination verifies sibling deps use a single ../ after normalize.
-func TestRewriteIncludesFlatDestination(t *testing.T) {
+// TestQuotedScalarValueSpanRejectsUnquotedScalar verifies a missing opening quote fails.
+func TestQuotedScalarValueSpanRejectsUnquotedScalar(t *testing.T) {
 	t.Parallel()
 
-	out, err := taskfile.RewriteIncludes(
-		rewriteNamespacedInput(),
-		rewriteNamespacedSourceToDest(),
-		taskESLint,
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	assertRewriteOutput(t, string(out), []string{
-		"taskfile: node/Taskfile.yml",
-		"../bun/Taskfile.yml",
-		"../jq/Taskfile.yml",
-		pathUnknownTaskfile,
-	})
+	assertQuotedSpanFails(t, []byte(oldPathValue))
+	assertQuotedSpanFails(t, []byte(consts.Empty))
 }
 
-func assertRewriteOutput(t *testing.T, text string, wants []string) {
+// TestQuotedScalarValueSpanReportsUnterminatedQuote verifies a missing closing quote fails.
+func TestQuotedScalarValueSpanReportsUnterminatedQuote(t *testing.T) {
+	t.Parallel()
+	assertQuotedSpanFails(t, []byte(`"`+oldPathValue))
+}
+
+// TestQuotedScalarValueSpanReportsPathMismatch verifies a different quoted value fails.
+func TestQuotedScalarValueSpanReportsPathMismatch(t *testing.T) {
+	t.Parallel()
+	assertQuotedSpanFails(t, []byte(`"other"`))
+}
+
+// TestFindClosingQuoteSkipsEscapes verifies escaped quotes do not terminate the scalar.
+func TestFindClosingQuoteSkipsEscapes(t *testing.T) {
+	t.Parallel()
+
+	cases := []closingQuoteCase{
+		{content: []byte(`"a\"b"`), quote: '"', want: consts.IndexOne + len(`a\"b`)},
+		{content: []byte(`'a''b'`), quote: '\'', want: consts.IndexOne + len(`a''b`)},
+	}
+
+	for i := range cases {
+		assertClosingQuote(t, &cases[i])
+	}
+}
+
+// TestOffsetAtLineColumnRejectsInvalidPositions verifies out-of-range positions fail.
+func TestOffsetAtLineColumnRejectsInvalidPositions(t *testing.T) {
+	t.Parallel()
+
+	content := []byte(twoLines)
+
+	cases := []positionCase{
+		{content: content, line: consts.IndexZero, column: consts.IndexOne},
+		{content: content, line: consts.IndexOne, column: consts.IndexZero},
+		{content: content, line: consts.Index99, column: consts.IndexOne},
+		{content: content, line: consts.IndexOne, column: consts.Index99},
+	}
+
+	for i := range cases {
+		assertOffsetFails(t, &cases[i])
+	}
+}
+
+// TestOffsetAtLineColumnResolvesPosition verifies a valid position maps to a byte offset.
+func TestOffsetAtLineColumnResolvesPosition(t *testing.T) {
+	t.Parallel()
+
+	offset, err := offsetAtLineColumn(&yamlPosition{
+		content: []byte(twoLines),
+		line:    consts.IndexTwo,
+		column:  consts.IndexOne,
+	})
+	if err != nil {
+		t.Fatalf(consts.UnexpectedErr, err)
+	}
+
+	wantOffset := len(twoLines) - len("second\n")
+
+	if offset != wantOffset {
+		t.Fatalf("offset = %d, want %d", offset, wantOffset)
+	}
+}
+
+// TestLineEndOffsetHandlesMissingNewline verifies content without a trailing newline.
+func TestLineEndOffsetHandlesMissingNewline(t *testing.T) {
+	t.Parallel()
+
+	content := []byte("no newline")
+
+	if got := lineEndOffset(content, consts.IndexZero); got != len(content) {
+		t.Fatalf("lineEndOffset() = %d, want %d", got, len(content))
+	}
+}
+
+// TestScalarValueSpanReportsQuotedFailure verifies quoted span failures propagate.
+func TestScalarValueSpanReportsQuotedFailure(t *testing.T) {
+	t.Parallel()
+
+	start, end, err := scalarValueSpan(&scalarSpanParams{
+		content: []byte(oldPathValue),
+		offset:  consts.IndexZero,
+		oldPath: oldPathValue,
+		style:   yaml.DoubleQuotedStyle,
+	})
+	iox.Discard2(start, end)
+	assertFails(t, err)
+}
+
+// TestSpanFromReplacementReportsFailure verifies span resolution failures propagate.
+func TestSpanFromReplacementReportsFailure(t *testing.T) {
+	t.Parallel()
+
+	span, err := spanFromReplacement([]byte(otherLine), consts.IndexZero, newReplacement())
+	iox.Discard(span)
+	assertFails(t, err)
+}
+
+// TestIncludePathSpanForReplacementReportsFailures verifies offset and span failures propagate.
+func TestIncludePathSpanForReplacementReportsFailures(t *testing.T) {
+	t.Parallel()
+
+	replacement := newReplacement()
+
+	replacement.line = consts.IndexZero
+
+	span, err := includePathSpanForReplacement([]byte(otherLine), replacement)
+	iox.Discard(span)
+	assertFails(t, err)
+
+	span, err = includePathSpanForReplacement([]byte(otherLine), newReplacement())
+	iox.Discard(span)
+	assertFails(t, err)
+}
+
+func assertClosingQuote(t *testing.T, testCase *closingQuoteCase) {
 	t.Helper()
 
-	for i := range wants {
-		if !strings.Contains(text, wants[i]) {
-			t.Fatalf(fmtExpectedInRewritten, wants[i], text)
-		}
-	}
-}
-
-func rewriteIncludesFoldedInput() []byte {
-	return []byte(`version: "3"
-includes:
-  pnpm:
-    taskfile: ../../../pnpm/Taskfile.yml
-tasks:
-  lint:
-    cmds:
-      - >-
-        echo hello
-        world keeps folding
-`)
-}
-
-func wantFoldedIncludeRewrite(input []byte) []byte {
-	return bytes.Replace(
-		input,
-		[]byte("taskfile: ../../../pnpm/Taskfile.yml"),
-		[]byte("taskfile: "+wantPnpmRewrite),
-		consts.IndexOne,
-	)
-}
-
-func assertRewriteIncludesEqual(t *testing.T, params *rewriteIncludesAssert) {
-	t.Helper()
-
-	out, err := taskfile.RewriteIncludes(params.input, params.mapping, params.fromDest)
+	idx, err := findClosingQuote(testCase.content, consts.IndexZero, testCase.quote)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf(consts.UnexpectedErr, err)
 	}
 
-	if !bytes.Equal(out, params.want) {
-		t.Fatalf("unexpected RewriteIncludes output:\ngot:\n%s\nwant:\n%s", out, params.want)
+	if idx != testCase.want {
+		t.Fatalf("closing quote = %d, want %d", idx, testCase.want)
 	}
 }
 
-// TestRewriteIncludesPreservesFoldedBlock verifies folded cmd blocks stay byte-identical aside from the include path.
-func TestRewriteIncludesPreservesFoldedBlock(t *testing.T) {
-	t.Parallel()
-
-	input := rewriteIncludesFoldedInput()
-
-	assertRewriteIncludesEqual(t, &rewriteIncludesAssert{
-		input:    input,
-		want:     wantFoldedIncludeRewrite(input),
-		mapping:  map[string]string{destPnpm: destPnpm},
-		fromDest: taskESLint,
-	})
-}
-
-// TestRewriteIncludesNoopEmptyMap verifies an empty sourceToDest returns the original bytes.
-func TestRewriteIncludesNoopEmptyMap(t *testing.T) {
-	t.Parallel()
-
-	input := rewriteIncludesFoldedInput()
-
-	assertRewriteIncludesEqual(t, &rewriteIncludesAssert{
-		input:    input,
-		want:     input,
-		mapping:  map[string]string{},
-		fromDest: taskESLint,
-	})
-}
-
-// TestRewriteIncludesNoopEmptyFromDest verifies an empty fromDest leaves mapped paths unchanged.
-func TestRewriteIncludesNoopEmptyFromDest(t *testing.T) {
-	t.Parallel()
-
-	input := rewriteIncludesInput()
-
-	assertRewriteIncludesEqual(t, &rewriteIncludesAssert{
-		input:    input,
-		want:     input,
-		mapping:  map[string]string{destPnpm: destPnpm},
-		fromDest: consts.Empty,
-	})
-}
-
-func assertTemplateOutput(t *testing.T, text string) {
+func assertFails(t *testing.T, err error) {
 	t.Helper()
-
-	assertContainsAll(t, text, []string{
-		wantVersion35,
-		pathTaskfilesGoYML,
-		wantIncludeDirDot,
-	})
-	assertGoModulePromotedVars(t, text)
-}
-
-// TestUpdateRootTaskfileFromTemplate verifies a fresh template gains the expected includes and vars.
-func TestUpdateRootTaskfileFromTemplate(t *testing.T) {
-	t.Parallel()
-
-	out, err := taskfile.UpdateRootTaskfile(taskfile.NewRootTemplate(), goOnlyRootInput())
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	assertTemplateOutput(t, string(out))
-}
-
-// TestUpdateRootTaskfileFolderRelativeIncludes verifies includes are folder-relative when nested.
-func TestUpdateRootTaskfileFolderRelativeIncludes(t *testing.T) {
-	t.Parallel()
-
-	input := goOnlyRootInput()
-
-	input.RootTaskfileDir = targetFolderTaskfiles
-	input.ModuleTaskfiles = nil
-
-	out, err := taskfile.UpdateRootTaskfile(taskfile.NewRootTemplate(), input)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	assertFolderRelativeInclude(t, string(out))
-}
-
-func assertFolderRelativeInclude(t *testing.T, text string) {
-	t.Helper()
-
-	assertContainsAll(t, text, []string{
-		"taskfile: go/Taskfile.yml",
-		wantIncludeDirParent,
-	})
-
-	if strings.Contains(text, pathTaskfilesGoYML) {
-		t.Fatalf("include should not repeat the target folder: %s", text)
-	}
-}
-
-// TestUpdateRootTaskfileUpdatesVersion verifies the root Taskfile version is updated to the current version.
-func TestUpdateRootTaskfileUpdatesVersion(t *testing.T) {
-	t.Parallel()
-
-	out, err := taskfile.UpdateRootTaskfile(rootWithCustomInclude(), goOnlyRootInput())
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if !strings.Contains(string(out), wantVersion35) {
-		t.Fatalf(fmtWantVersion35, out)
-	}
-}
-
-// TestUpdateRootTaskfileForcesManagedIncludeVarsToRootRefs verifies include-level
-// literals for managed module keys are rewritten to {{.KEY}} root references.
-func TestUpdateRootTaskfileForcesManagedIncludeVarsToRootRefs(t *testing.T) {
-	t.Parallel()
-
-	input := goOnlyRootInput()
-
-	input.ManagedTasks = []string{consts.Go}
-	input.ModuleTaskfiles = map[string][]byte{consts.Go: goModuleTaskfile()}
-
-	out, err := taskfile.UpdateRootTaskfile(rootWithGoInclude(), input)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	assertForcedIncludeRootRefs(t, string(out))
-}
-
-func assertForcedIncludeRootRefs(t *testing.T, text string) {
-	t.Helper()
-
-	assertGoModulePromotedVars(t, text)
-	assertContainsAll(t, text, []string{wantIncludeDirDot})
-	assertContainsNone(t, text, []string{"go1.22.0"})
-}
-
-func assertGoModulePromotedVars(t *testing.T, text string) {
-	t.Helper()
-
-	assertContainsAll(t, text, []string{
-		wantGoVersionEmpty,
-		wantGoCmdUnixDefault,
-		wantGoVersionRef,
-		wantGoCmdUnixRef,
-	})
-}
-
-// TestUpdateRootTaskfile verifies managed includes are added while user includes are preserved.
-func TestUpdateRootTaskfile(t *testing.T) {
-	t.Parallel()
-
-	input := rootUpdateInput(&rootupd.RootUpdateInput{
-		Tasks:            []string{consts.Go, taskESLint},
-		TargetFolder:     targetFolderTaskfiles,
-		RootTaskfileDir:  consts.Empty,
-		DestByTask:       map[string]string{consts.Go: consts.Go, taskESLint: taskESLint},
-		ManagedTasks:     []string{},
-		ModuleTaskfiles:  nil,
-		GeneratedTasks:   nil,
-		ManagedRootTasks: nil,
-	})
-
-	out, err := taskfile.UpdateRootTaskfile(rootWithHelloTask(), input)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	assertUpdateRootTaskfileOutput(t, string(out))
-}
-
-func assertUpdateRootTaskfileOutput(t *testing.T, text string) {
-	t.Helper()
-
-	assertContainsAll(t, text, []string{
-		pathTaskfilesGoYML,
-		"taskfiles/eslint/Taskfile.yml",
-		"custom/Taskfile.yml",
-		wantIncludeDirDot,
-	})
-}
-
-// TestUpdateRootTaskfileGeneratedTasksAndPromotedVars verifies generated tasks and
-// all module vars are promoted to root with include {{.KEY}} references.
-func TestUpdateRootTaskfileGeneratedTasksAndPromotedVars(t *testing.T) {
-	t.Parallel()
-
-	out, err := taskfile.UpdateRootTaskfile(promotedVarsRootFixture(), generatedTasksInput())
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	assertGeneratedTasksAndPromotedVars(t, string(out))
-}
-
-func generatedTasksInput() *rootupd.RootUpdateInput {
-	return rootUpdateInput(&rootupd.RootUpdateInput{
-		Tasks:           []string{consts.Go, taskESLint},
-		TargetFolder:    targetFolderTaskfiles,
-		RootTaskfileDir: consts.Empty,
-		DestByTask:      map[string]string{consts.Go: consts.Go, taskESLint: taskESLint},
-		ManagedTasks:    []string{consts.Go, taskESLint},
-		ModuleTaskfiles: promotedVarsModuleTaskfiles(),
-		GeneratedTasks: []rootupd.GeneratedRootTask{
-			{Name: "lint", Modules: []string{consts.Go, taskESLint}},
-		},
-		ManagedRootTasks: []string{"test"},
-	})
-}
-
-func assertGeneratedTasksAndPromotedVars(t *testing.T, text string) {
-	t.Helper()
-
-	assertContainsAll(t, text, []string{
-		"VERSION: 1.2.3",
-		"VERSION: '{{.VERSION}}'",
-		wantGoVersionEmpty,
-		wantGoVersionRef,
-		`CONFIG: '{{.CONFIG | default ""}}'`,
-		"CONFIG: '{{.CONFIG}}'",
-		wantIncludeDirDot,
-		"task: go:lint",
-		"task: eslint:lint",
-		"echo custom",
-	})
-
-	assertContainsNone(t, text, []string{"echo user lint", "previously generated"})
-}
-
-// TestUpdateRootTaskfileCopiesFoldedVarsVerbatim verifies folded `>-` module
-// vars keep their original characters when promoted to the root Taskfile.
-func TestUpdateRootTaskfileCopiesFoldedVarsVerbatim(t *testing.T) {
-	t.Parallel()
-
-	out, err := taskfile.UpdateRootTaskfile(taskfile.NewRootTemplate(), foldedGoLoadRootInput())
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if !strings.Contains(string(out), foldedGoLoadValue()) {
-		t.Fatalf("expected folded GO_LOAD copy in root Taskfile:\n%s", out)
-	}
-
-	assertContainsNone(t, string(out), []string{
-		"TASKOTTER_RAW_VAR_GO_LOAD_Z",
-		foldedGoLoadCollapsed,
-	})
-}
-
-// TestUpdateRootTaskfileKeepsFoldedVarsOnResync verifies a second sync does not
-// fold existing root block scalars through the YAML encoder.
-func TestUpdateRootTaskfileKeepsFoldedVarsOnResync(t *testing.T) {
-	t.Parallel()
-
-	assertFoldedGoLoadPreserved(t, resyncFoldedGoLoad(t))
-}
-
-func resyncFoldedGoLoad(t *testing.T) []byte {
-	t.Helper()
-
-	first, err := taskfile.UpdateRootTaskfile(taskfile.NewRootTemplate(), foldedGoLoadRootInput())
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	out, err := taskfile.UpdateRootTaskfile(first, foldedGoLoadRootInput())
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	return out
-}
-
-func assertFoldedGoLoadPreserved(t *testing.T, out []byte) {
-	t.Helper()
-
-	if !strings.Contains(string(out), foldedGoLoadValue()) {
-		t.Fatalf("expected folded GO_LOAD copy after resync:\n%s", out)
-	}
-
-	assertContainsNone(t, string(out), []string{foldedGoLoadCollapsed})
-}
-
-func foldedGoLoadRootInput() *rootupd.RootUpdateInput {
-	input := goOnlyRootInput()
-
-	input.ModuleTaskfiles = map[string][]byte{consts.Go: foldedGoLoadModuleTaskfile()}
-
-	return input
-}
-
-func foldedGoLoadModuleTaskfile() []byte {
-	return []byte(`version: "3"
-vars:
-  GO_LOAD: >-
-    {{.GO_LOAD | default ` + "`" + `
-    \$u = [Environment]::GetEnvironmentVariable('Path', 'User');
-    if (\$u) { \$env:Path = \$u + ';' + \$env:Path };
-    if (Get-Command go -ErrorAction SilentlyContinue) {
-      \$goBin = Join-Path ((go env GOPATH).Trim()) 'bin';
-      if (Test-Path -LiteralPath \$goBin) { \$env:Path = \$goBin + ';' + \$env:Path }
-    }
-    ` + "`" + `}}
-`)
-}
-
-func foldedGoLoadValue() string {
-	return `>-
-    {{.GO_LOAD | default ` + "`" + `
-    \$u = [Environment]::GetEnvironmentVariable('Path', 'User');
-    if (\$u) { \$env:Path = \$u + ';' + \$env:Path };
-    if (Get-Command go -ErrorAction SilentlyContinue) {
-      \$goBin = Join-Path ((go env GOPATH).Trim()) 'bin';
-      if (Test-Path -LiteralPath \$goBin) { \$env:Path = \$goBin + ';' + \$env:Path }
-    }
-    ` + "`" + `}}`
-}
-
-func assertContainsAll(t *testing.T, text string, wants []string) {
-	t.Helper()
-
-	for i := range wants {
-		if !strings.Contains(text, wants[i]) {
-			t.Fatalf("expected %q in root Taskfile:\n%s", wants[i], text)
-		}
-	}
-}
-
-func assertContainsNone(t *testing.T, text string, notWants []string) {
-	t.Helper()
-
-	for i := range notWants {
-		if strings.Contains(text, notWants[i]) {
-			t.Fatalf("did not expect %q in root Taskfile:\n%s", notWants[i], text)
-		}
-	}
-}
-
-func promotedVarsRootFixture() []byte {
-	return []byte(`version: "3"
-vars:
-  VERSION: 1.2.3
-includes:
-  custom:
-    taskfile: custom/Taskfile.yml
-tasks:
-  lint:
-    cmds:
-      - echo user lint
-  test:
-    cmds:
-      - echo previously generated
-  custom:
-    cmds:
-      - echo custom
-`)
-}
-
-func promotedVarsModuleTaskfiles() map[string][]byte {
-	return map[string][]byte{
-		consts.Go: []byte(`version: "3"
-vars:
-  VERSION: ""
-  GO_VERSION: ""
-`),
-		taskESLint: []byte(`version: "3"
-vars:
-  VERSION: latest
-  CONFIG: ""
-`),
-	}
-}
-
-// TestUpdateRootTaskfilePromotesSingleModuleVars verifies a var present in only one
-// module is still promoted to root and referenced from that include.
-func TestUpdateRootTaskfilePromotesSingleModuleVars(t *testing.T) {
-	t.Parallel()
-
-	input := goOnlyRootInput()
-
-	input.ManagedTasks = []string{consts.Go}
-
-	out, err := taskfile.UpdateRootTaskfile(taskfile.NewRootTemplate(), input)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	assertGoModulePromotedVars(t, string(out))
-}
-
-// TestManagedIncludeDifferentPathConflict verifies a managed alias with a mismatched path errors.
-func TestManagedIncludeDifferentPathConflict(t *testing.T) {
-	t.Parallel()
-
-	out, err := taskfile.UpdateRootTaskfile(
-		rootWithESLintConflict(),
-		rootUpdateInput(&rootupd.RootUpdateInput{
-			Tasks:            []string{taskESLint},
-			TargetFolder:     targetFolderTaskfiles,
-			RootTaskfileDir:  consts.Empty,
-			DestByTask:       map[string]string{taskESLint: taskESLint},
-			ManagedTasks:     []string{taskESLint},
-			ModuleTaskfiles:  nil,
-			GeneratedTasks:   nil,
-			ManagedRootTasks: nil,
-		}),
-	)
-	iox.Discard(out)
 
 	if err == nil {
-		t.Fatal("expected conflict when alias path differs from managed path")
+		t.Fatal(wantErrText)
 	}
 }
 
-// TestRootTaskfileAliasConflict verifies a conflicting legacy alias path returns an error.
-func TestRootTaskfileAliasConflict(t *testing.T) {
-	t.Parallel()
+func assertOffsetFails(t *testing.T, testCase *positionCase) {
+	t.Helper()
 
-	out, err := taskfile.UpdateRootTaskfile(rootWithGoAliasConflict(), goOnlyRootInput())
-	iox.Discard(out)
+	offset, err := offsetAtLineColumn(&yamlPosition{
+		content: testCase.content,
+		line:    testCase.line,
+		column:  testCase.column,
+	})
+	iox.Discard(offset)
+	assertFails(t, err)
+}
 
-	if err == nil {
-		t.Fatal("expected alias conflict")
+func assertQuote(t *testing.T, testCase *quoteStyleCase) {
+	t.Helper()
+
+	quote, quoted := quoteForYAMLStyle(testCase.style)
+
+	if quote != testCase.wantQuote || quoted != testCase.wantQuoted {
+		t.Fatalf("quoteForYAMLStyle(%v) = %q, %t", testCase.style, quote, quoted)
 	}
 }
 
-// TestScalarIncludeWrongPathConflict verifies a scalar include with the wrong path returns an error.
-func TestScalarIncludeWrongPathConflict(t *testing.T) {
-	t.Parallel()
+func assertQuotedSpan(t *testing.T, quote byte) {
+	t.Helper()
 
-	out, err := taskfile.UpdateRootTaskfile(rootWithScalarGoConflict(), goOnlyRootInput())
-	iox.Discard(out)
+	content := []byte(string(quote) + oldPathValue + string(quote))
 
-	if err == nil {
-		t.Fatal("expected scalar include path conflict")
-	}
-}
-
-// TestRewriteUsesRealStoreSnippet verifies rewriting works against a real store fixture Taskfile.
-func TestRewriteUsesRealStoreSnippet(t *testing.T) {
-	t.Parallel()
-
-	data, err := os.ReadFile(storeESLintTaskfile)
+	start, end, err := quotedScalarValueSpan(&quotedSpanParams{
+		content: content,
+		offset:  consts.IndexZero,
+		oldPath: oldPathValue,
+		quote:   quote,
+	})
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf(consts.UnexpectedErr, err)
 	}
 
-	out, err := taskfile.RewriteIncludes(data, map[string]string{destPnpm: destPnpm}, taskESLint)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assertSpan(t, &spanCase{start: start, end: end, wantStart: consts.IndexOne})
+}
 
-	if !strings.Contains(string(out), wantPnpmRewrite) {
-		t.Fatalf("rewrite failed: %s", out)
+func assertQuotedSpanFails(t *testing.T, content []byte) {
+	t.Helper()
+
+	start, end, err := quotedScalarValueSpan(&quotedSpanParams{
+		content: content,
+		offset:  consts.IndexZero,
+		oldPath: oldPathValue,
+		quote:   '"',
+	})
+	iox.Discard2(start, end)
+	assertFails(t, err)
+}
+
+func assertSpan(t *testing.T, testCase *spanCase) {
+	t.Helper()
+
+	wantEnd := testCase.wantStart + len(oldPathValue)
+
+	if testCase.start != testCase.wantStart || testCase.end != wantEnd {
+		t.Fatalf(spanFmt, testCase.start, testCase.end, testCase.wantStart, wantEnd)
+	}
+}
+
+func newReplacement() *includePathReplacement {
+	return &includePathReplacement{
+		oldPath: oldPathValue,
+		newPath: "../npm/Taskfile.yml",
+		line:    consts.IndexOne,
+		column:  consts.IndexOne,
+		style:   yaml.Style(consts.IndexZero),
 	}
 }

@@ -44,7 +44,7 @@ Chosen option: "Track state in `<target-folder>/.taskotter-lock.yml` and reject 
 
 ### Confirmation
 
-Lock model under `internal/features/sync/domain/lockmodel`; unmanaged destination tests; README validation table (“Unmanaged existing destination directory”).
+Lock model under `internal/features/state/lockmodel`; unmanaged destination tests; README validation table (“Unmanaged existing destination directory”).
 
 ## Pros and Cons of the Options
 

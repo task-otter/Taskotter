@@ -8,11 +8,11 @@ import (
 	"fmt"
 
 	gitcli "github.com/task-otter/Taskotter/internal/features/git/adapters/cli"
+	rundomain "github.com/task-otter/Taskotter/internal/features/orchestrator/domain"
+	"github.com/task-otter/Taskotter/internal/features/orchestrator/reporting"
+	orchestrator "github.com/task-otter/Taskotter/internal/features/orchestrator/service"
 	prgithub "github.com/task-otter/Taskotter/internal/features/pr/adapters/github"
 	storegithub "github.com/task-otter/Taskotter/internal/features/store/adapters/github"
-	rundomain "github.com/task-otter/Taskotter/internal/features/syncrun/domain"
-	"github.com/task-otter/Taskotter/internal/features/syncrun/reporting"
-	syncrun "github.com/task-otter/Taskotter/internal/features/syncrun/service"
 	"github.com/task-otter/Taskotter/internal/shared/config"
 	"github.com/task-otter/Taskotter/internal/shared/consts"
 	"github.com/task-otter/Taskotter/internal/shared/iox"
@@ -132,7 +132,7 @@ func handleUnchanged(cfg *config.Config, result *rundomain.Result) int {
 }
 
 // WireOrchestrator builds an Orchestrator with concrete adapters from configuration.
-func WireOrchestrator(ctx context.Context, cfg *config.Config) (*syncrun.Orchestrator, error) {
+func WireOrchestrator(ctx context.Context, cfg *config.Config) (*orchestrator.Orchestrator, error) {
 	client := gitcli.NewClient(cfg.Workspace)
 	deps := newWiredDeps(ctx, cfg, client)
 
@@ -141,15 +141,15 @@ func WireOrchestrator(ctx context.Context, cfg *config.Config) (*syncrun.Orchest
 		return nil, fmt.Errorf("wire PR client: %w", err)
 	}
 
-	return syncrun.NewOrchestrator(deps), nil
+	return orchestrator.NewOrchestrator(deps), nil
 }
 
 func newWiredDeps(
 	ctx context.Context,
 	cfg *config.Config,
 	client *gitcli.Client,
-) *syncrun.Deps {
-	return &syncrun.Deps{
+) *orchestrator.Deps {
+	return &orchestrator.Deps{
 		Logger:            logging.New(),
 		StoreClient:       storegithub.NewClient(ctx, cfg.GitHubToken),
 		GitClient:         client,
@@ -165,7 +165,7 @@ func newWiredDeps(
 	}
 }
 
-func wirePRClient(ctx context.Context, cfg *config.Config, deps *syncrun.Deps) error {
+func wirePRClient(ctx context.Context, cfg *config.Config, deps *orchestrator.Deps) error {
 	if cfg.Repository == consts.Empty {
 		return nil
 	}

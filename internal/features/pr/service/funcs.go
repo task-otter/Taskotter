@@ -6,10 +6,10 @@ package service
 import (
 	"strings"
 
+	plandomain "github.com/task-otter/Taskotter/internal/features/plan/domain"
 	"github.com/task-otter/Taskotter/internal/features/pr/domain"
+	"github.com/task-otter/Taskotter/internal/features/state/lockmodel"
 	storedomain "github.com/task-otter/Taskotter/internal/features/store/domain"
-	syncdomain "github.com/task-otter/Taskotter/internal/features/sync/domain"
-	"github.com/task-otter/Taskotter/internal/features/sync/domain/lockmodel"
 	"github.com/task-otter/Taskotter/internal/shared/config"
 	"github.com/task-otter/Taskotter/internal/shared/consts"
 	"github.com/task-otter/Taskotter/internal/shared/iox"
@@ -25,7 +25,7 @@ func StoreRefFrom(ref *storedomain.RefInfo) *domain.StoreRef {
 }
 
 // BuildPRBody renders the markdown body for a sync pull request.
-func BuildPRBody(cfg *config.Config, plan *syncdomain.Plan, ref *domain.StoreRef) string {
+func BuildPRBody(cfg *config.Config, plan *plandomain.Plan, ref *domain.StoreRef) string {
 	var body strings.Builder
 
 	writeAuthorSignature(&body)
@@ -91,7 +91,7 @@ func writeJSRuntimeMetadata(body *strings.Builder, cfg *config.Config) {
 func writeRequestedModulesSection(
 	body *strings.Builder,
 	cfg *config.Config,
-	plan *syncdomain.Plan,
+	plan *plandomain.Plan,
 ) {
 	builderWriteString(body, "### Requested modules\n\n")
 	builderWriteString(body, "| Task | Source module | Destination |\n")
@@ -117,7 +117,7 @@ func writeDependenciesSection(body *strings.Builder, deps []lockmodel.ModuleReco
 	}
 }
 
-func writeFileChangesSection(body *strings.Builder, plan *syncdomain.Plan) {
+func writeFileChangesSection(body *strings.Builder, plan *plandomain.Plan) {
 	builderWriteString(body, "\n### File changes\n\n")
 	writeBulletGroup(body, "Added", plan.Added)
 	writeBulletGroup(body, "Updated", plan.Updated)

@@ -69,7 +69,7 @@ Concretely:
 
 `internal/features/resolve/service/variants.go`; catalog walking in
 `internal/features/store/service/local.go` (the GitHub adapter delegates to it); schema check in
-`internal/features/sync/service/store_metadata.go`; fixtures under `tests/fixtures/store/` and
+`internal/features/plan/store_metadata.go`; fixtures under `tests/fixtures/store/` and
 the contract tests in `internal/features/store/service/local_test.go`.
 
 ## Pros and Cons of the Options

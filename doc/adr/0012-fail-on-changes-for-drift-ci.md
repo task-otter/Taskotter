@@ -38,7 +38,7 @@ Chosen option: "`fail-on-changes` input: non-zero exit and `::error` when a sync
 
 ### Confirmation
 
-`FailOnChanges` in config; `writeSyncRequiredAnnotations` in syncrun result handling; [action.yml](../../action.yml) input; README “CI drift check”; `.github/workflows/test.yml` `itself` job.
+`FailOnChanges` in config; `writeSyncRequiredAnnotations` in orchestrator result handling; [action.yml](../../action.yml) input; README “CI drift check”; `.github/workflows/test.yml` `itself` job.
 
 ## Pros and Cons of the Options
 
@@ -59,5 +59,5 @@ Chosen option: "`fail-on-changes` input: non-zero exit and `::error` when a sync
 
 ## More Information
 
-* Code: `internal/features/syncrun/service/result.go` (`::error title=TaskOtter sync required::`)
+* Code: `internal/features/orchestrator/reporting/funcs.go` (`::error title=TaskOtter sync required::`)
 * Related: deterministic PRs ([0009](0009-deterministic-sync-pr-branches.md))

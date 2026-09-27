@@ -18,7 +18,7 @@ TaskOtter orchestrates store download, resolution, sync planning/apply, git bran
 
 ## Decision Drivers
 
-* Isolate feature domains (sync, resolve, store, git, pr, syncrun)
+* Isolate feature domains (input, state, collect, root, plan, apply, orchestrator, resolve, store, git, pr)
 * Keep I/O and GitHub clients behind interfaces for unit tests
 * Share cross-cutting helpers without circular feature imports
 
@@ -30,7 +30,7 @@ TaskOtter orchestrates store download, resolution, sync planning/apply, git bran
 
 ## Decision Outcome
 
-Chosen option: "Feature packages with `ports/` and `adapters/`, plus `internal/shared/*`, wired in `cmd/taskotter-sync`", because each feature owns domain/service logic and ports; adapters implement ports; [wire.go](../../cmd/taskotter-sync/wire.go) composes git CLI, store GitHub, and PR GitHub clients into the syncrun orchestrator.
+Chosen option: "Feature packages with `ports/` and `adapters/`, plus `internal/shared/*`, wired in `cmd/taskotter-sync`", because each feature owns domain/service logic and ports; adapters implement ports; [wire.go](../../cmd/taskotter-sync/wire.go) composes git CLI, store GitHub, and PR GitHub clients into the orchestrator.
 
 ### Consequences
 
@@ -40,7 +40,7 @@ Chosen option: "Feature packages with `ports/` and `adapters/`, plus `internal/s
 
 ### Confirmation
 
-Layout under `internal/features/{sync,resolve,store,git,pr,syncrun}` and `internal/shared/*`; composition in [cmd/taskotter-sync/wire.go](../../cmd/taskotter-sync/wire.go).
+Layout under `internal/features/{input,state,collect,root,plan,apply,orchestrator,resolve,store,git,pr}` and `internal/shared/*`; composition in [cmd/taskotter-sync/wire.go](../../cmd/taskotter-sync/wire.go).
 
 ## Pros and Cons of the Options
 
@@ -61,6 +61,6 @@ Layout under `internal/features/{sync,resolve,store,git,pr,syncrun}` and `intern
 
 ## More Information
 
-* Features: `internal/features/{sync,resolve,store,git,pr,syncrun}`
+* Features: `internal/features/{input,state,collect,root,plan,apply,orchestrator,resolve,store,git,pr}`
 * Shared: `internal/shared/{config,consts,iox,pathutil,logging,yamlfmt,archive,githubapi,repo}`
 * Wire: [cmd/taskotter-sync/wire.go](../../cmd/taskotter-sync/wire.go)

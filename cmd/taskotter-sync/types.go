@@ -6,7 +6,7 @@ package main
 import (
 	"context"
 
-	rundomain "github.com/task-otter/Taskotter/internal/features/syncrun/domain"
+	rundomain "github.com/task-otter/Taskotter/internal/features/orchestrator/domain"
 	"github.com/task-otter/Taskotter/internal/shared/config"
 )
 

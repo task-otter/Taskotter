@@ -59,5 +59,5 @@ Chosen option: "Skip `*_test.*` and module metadata; copy `README.md`/`docs/` on
 
 ## More Information
 
-* Code: [pathutil.go](../../internal/shared/pathutil/pathutil.go) (`IsTestPath`, docs helpers); sync plan skip in `internal/features/sync/service/plan.go`
+* Code: [pathutil.go](../../internal/shared/pathutil/pathutil.go) (`IsTestPath`, docs helpers); sync plan skip in `internal/features/plan/funcs.go`
 * Related: lockfile-managed inventory ([0008](0008-lockfile-managed-sync.md))

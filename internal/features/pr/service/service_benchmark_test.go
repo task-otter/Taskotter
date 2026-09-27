@@ -7,10 +7,10 @@ import (
 	"strconv"
 	"testing"
 
+	plandomain "github.com/task-otter/Taskotter/internal/features/plan/domain"
 	prdomain "github.com/task-otter/Taskotter/internal/features/pr/domain"
 	prservice "github.com/task-otter/Taskotter/internal/features/pr/service"
-	syncdomain "github.com/task-otter/Taskotter/internal/features/sync/domain"
-	"github.com/task-otter/Taskotter/internal/features/sync/domain/lockmodel"
+	"github.com/task-otter/Taskotter/internal/features/state/lockmodel"
 	"github.com/task-otter/Taskotter/internal/shared/config"
 	"github.com/task-otter/Taskotter/internal/shared/consts"
 	"github.com/task-otter/Taskotter/internal/shared/iox"
@@ -106,8 +106,8 @@ func benchBodyConfig() *config.Config {
 	return cfg
 }
 
-func benchBodyPlan() *syncdomain.Plan {
-	plan := &syncdomain.Plan{}
+func benchBodyPlan() *plandomain.Plan {
+	plan := &plandomain.Plan{}
 
 	plan.Requested = benchRequestedRecords()
 	plan.Dependencies = benchDependencyRecords()

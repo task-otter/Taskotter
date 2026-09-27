@@ -7,11 +7,11 @@ import (
 	"strings"
 	"testing"
 
+	plandomain "github.com/task-otter/Taskotter/internal/features/plan/domain"
 	prdomain "github.com/task-otter/Taskotter/internal/features/pr/domain"
 	prservice "github.com/task-otter/Taskotter/internal/features/pr/service"
+	"github.com/task-otter/Taskotter/internal/features/state/lockmodel"
 	storedomain "github.com/task-otter/Taskotter/internal/features/store/domain"
-	syncdomain "github.com/task-otter/Taskotter/internal/features/sync/domain"
-	"github.com/task-otter/Taskotter/internal/features/sync/domain/lockmodel"
 	"github.com/task-otter/Taskotter/internal/shared/config"
 	"github.com/task-otter/Taskotter/internal/shared/consts"
 	"github.com/task-otter/Taskotter/internal/shared/iox"
@@ -101,8 +101,8 @@ func TestWriteOutputsMultilineJSON(t *testing.T) {
 	}
 }
 
-func buildPRBodyPlan() *syncdomain.Plan {
-	return &syncdomain.Plan{
+func buildPRBodyPlan() *plandomain.Plan {
+	return &plandomain.Plan{
 		OldLock:          nil,
 		CopyFileTo:       nil,
 		ModuleContents:   nil,
@@ -138,8 +138,8 @@ func prBodyDependencyModules() []lockmodel.ModuleRecord {
 	}
 }
 
-func emptyPRBodyMetadata() syncdomain.Metadata {
-	return syncdomain.Metadata{
+func emptyPRBodyMetadata() plandomain.Metadata {
+	return plandomain.Metadata{
 		TargetFolder:      consts.Empty,
 		LockFile:          consts.Empty,
 		ConfigurationHash: consts.Empty,

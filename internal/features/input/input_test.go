@@ -11,44 +11,55 @@ import (
 	"github.com/task-otter/Taskotter/internal/shared/config"
 )
 
-type testSnapshot struct{}
+type (
+	testSnapshot struct{}
+)
 
+const (
+	testDefaultBranch = "main"
+)
+
+func (testSnapshot) DefaultBranch() string   { return testDefaultBranch }
 func (testSnapshot) ModuleDir(string) string { return "" }
-func (testSnapshot) WorkspaceRoot() string   { return "" }
-func (testSnapshot) SourceRef() string       { return "main" }
 func (testSnapshot) ResolvedCommit() string  { return "deadbeef" }
-func (testSnapshot) DefaultBranch() string   { return "main" }
+func (testSnapshot) SourceRef() string       { return testDefaultBranch }
+func (testSnapshot) WorkspaceRoot() string   { return "" }
 
+// TestBuildMapsResolvedModules verifies resolved modules are normalized for planning.
 func TestBuildMapsResolvedModules(t *testing.T) {
 	t.Parallel()
 
-	input, err := Build(&BuildInput{
-		Cfg: &config.Config{
-			TargetFolder: "taskfiles",
-			Tasks:        []string{"lint"},
-		},
-		Snapshot: testSnapshot{},
-		Resolutions: []resolvesvc.Resolution{{
-			LogicalTask:  "lint",
-			SourceModule: "eslint/node/pnpm",
-		}},
-	})
+	input, err := Build(testBuildInput())
 	if err != nil {
 		t.Fatalf("Build() error = %v", err)
 	}
 
-	requested := requireRequested(t, &input, "lint")
+	assertResolvedModule(t, &input)
+}
 
-	if requested.SourceModule != "eslint/node/pnpm" {
-		t.Fatalf("source module = %q", requested.SourceModule)
+func testBuildInput() *SyncInputArgs {
+	return &SyncInputArgs{
+		Cfg:         &config.Config{TargetFolder: "taskfiles", Tasks: []string{pathA}},
+		Snapshot:    testSnapshot{},
+		Resolutions: []resolvesvc.Resolution{{LogicalTask: pathA, SourceModule: eslintNodePNPM}},
+	}
+}
+
+func assertResolvedModule(t *testing.T, input *Input) {
+	t.Helper()
+
+	requested := requireRequested(t, input, pathA)
+
+	if requested.SourceModule != eslintNodePNPM || requested.DestinationModule != eslint {
+		t.Fatalf("requested = %#v", requested)
 	}
 
-	if requested.DestinationModule != "eslint" {
-		t.Fatalf("destination module = %q, want eslint", requested.DestinationModule)
-	}
-
-	if input.DestByTask["lint"] != "eslint" {
-		t.Fatalf("destination by task = %q, want eslint", input.DestByTask["lint"])
+	if input.DestByTask[pathA] != eslint {
+		t.Fatalf(
+			"destination by task = %q, want %s",
+			input.DestByTask[pathA],
+			eslint,
+		)
 	}
 }
 

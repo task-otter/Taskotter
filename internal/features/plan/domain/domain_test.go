@@ -6,6 +6,7 @@ package domain
 import (
 	"testing"
 
+	"github.com/task-otter/Taskotter/internal/features/state"
 	"github.com/task-otter/Taskotter/internal/shared/consts"
 	yaml "go.yaml.in/yaml/v3"
 )
@@ -37,7 +38,7 @@ func TestMarshalMetadataRoundTrip(t *testing.T) {
 	meta := sampleMetadata()
 	data := MarshalMetadata(&meta)
 
-	var got Metadata
+	var got state.Metadata
 
 	unmarshalMetaOK(t, string(data), &got)
 	assertMetadataEqual(t, &meta, &got)
@@ -94,7 +95,7 @@ func assertFails(t *testing.T, err error) {
 	}
 }
 
-func assertMetadataEqual(t *testing.T, want, got *Metadata) {
+func assertMetadataEqual(t *testing.T, want, got *state.Metadata) {
 	t.Helper()
 
 	if *want != *got {
@@ -105,7 +106,7 @@ func assertMetadataEqual(t *testing.T, want, got *Metadata) {
 func assertMetaFailCase(t *testing.T, testCase *metaYAMLCase) {
 	t.Helper()
 
-	var meta Metadata
+	var meta state.Metadata
 
 	assertFails(t, DecodeMetadataYAML([]byte(testCase.payload), &meta))
 }
@@ -113,7 +114,7 @@ func assertMetaFailCase(t *testing.T, testCase *metaYAMLCase) {
 func assertMetaOKCase(t *testing.T, testCase *metaYAMLCase) {
 	t.Helper()
 
-	var meta Metadata
+	var meta state.Metadata
 
 	unmarshalMetaOK(t, testCase.payload, &meta)
 }
@@ -191,15 +192,15 @@ func runMetaOKCases(t *testing.T, cases []metaYAMLCase) {
 	}
 }
 
-func sampleMetadata() Metadata {
-	return Metadata{
+func sampleMetadata() state.Metadata {
+	return state.Metadata{
 		TargetFolder:      "taskfiles",
 		LockFile:          "taskfiles/.taskotter-lock.yml",
 		ConfigurationHash: "deadbeef",
 	}
 }
 
-func unmarshalMetaOK(t *testing.T, payload string, meta *Metadata) {
+func unmarshalMetaOK(t *testing.T, payload string, meta *state.Metadata) {
 	t.Helper()
 	assertNoErr(t, DecodeMetadataYAML([]byte(payload), meta))
 }
@@ -212,7 +213,7 @@ func yamlScalarNode(value string) *yaml.Node {
 func TestDecodeMetadataYAMLRejectsInvalidYAML(t *testing.T) {
 	t.Parallel()
 
-	var meta Metadata
+	var meta state.Metadata
 
 	assertFails(t, DecodeMetadataYAML([]byte(":\t"), &meta))
 

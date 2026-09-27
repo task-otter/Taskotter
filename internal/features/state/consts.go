@@ -3,4 +3,6 @@
 
 package state
 
-const loadMetadataErrorFormat = "load metadata: %w"
+const (
+	loadMetadataErrorFormat = "load metadata: %w"
+)

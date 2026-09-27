@@ -4,118 +4,69 @@
 package state
 
 import (
-	"errors"
 	"fmt"
-	"os"
 
 	"github.com/task-otter/Taskotter/internal/features/state/lockmodel"
-	"github.com/task-otter/Taskotter/internal/shared/config"
 	"github.com/task-otter/Taskotter/internal/shared/pathutil"
 	yaml "go.yaml.in/yaml/v3"
 )
 
+type (
+	loadStateArgs struct {
+		decode func([]byte) error
+		label  string
+		rel    string
+		root   string
+	}
+)
+
 // LoadMetadata reads synchronization metadata from the workspace.
 func LoadMetadata(workspace, rel string) (*Metadata, error) {
-	data, err := pathutil.ReadRelativeFile(workspace, rel)
-	if err != nil {
-		return nil, fmt.Errorf("load metadata: read %q: %w", rel, err)
-	}
-
 	var metadata Metadata
 
-	if err := yaml.Unmarshal(data, &metadata); err != nil {
-		return nil, fmt.Errorf("load metadata: parse %q: %w", rel, err)
+	err := loadStateFile(&loadStateArgs{
+		root: workspace, rel: rel, label: metadataLabel,
+		decode: func(data []byte) error { return yaml.Unmarshal(data, &metadata) },
+	})
+	if err != nil {
+		return nil, fmt.Errorf("load metadata: %w", err)
 	}
 
 	return &metadata, nil
 }
 
 // LoadLock reads synchronization lock state from the workspace.
-func LoadLock(workspace, rel string) (*LockFile, error) {
-	data, err := pathutil.ReadRelativeFile(workspace, rel)
+func LoadLock(workspace, rel string) (*lockmodel.LockFile, error) {
+	var lock lockmodel.LockFile
+
+	err := loadStateFile(&loadStateArgs{
+		root: workspace, rel: rel, label: "lock file",
+		decode: func(data []byte) error { return lockmodel.DecodeLockFileYAML(data, &lock) },
+	})
 	if err != nil {
-		return nil, fmt.Errorf("load lock file: read %q: %w", rel, err)
-	}
-
-	var lock LockFile
-
-	if err := lockmodel.DecodeLockFileYAML(data, &lock); err != nil {
-		return nil, fmt.Errorf("load lock file: parse %q: %w", rel, err)
+		return nil, fmt.Errorf("load lock file: %w", err)
 	}
 
 	return &lock, nil
 }
 
-// LoadPrevious reads the current managed state, with the legacy metadata path
-// as a compatibility fallback. Detailed migration cleanup remains owned by
-// the plan/apply pipeline.
-func LoadPrevious(workspace string, cfg *config.Config) (Previous, error) {
-	metadataPath := config.MetadataPath(cfg)
-
-	metadata, metadataPath, err := loadPreviousMetadata(workspace, metadataPath)
-	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return Previous{MetadataPath: metadataPath, LockPath: config.LockFilePath(cfg)}, nil
-		}
-
-		return Previous{}, err
-	}
-
-	lockPath := config.LockFilePath(cfg)
-
-	lock, err := LoadLock(workspace, lockPath)
-	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return previousWithoutLock(metadata, metadataPath, lockPath), nil
-		}
-
-		return Previous{}, err
-	}
-
-	return Previous{
-		Metadata:        metadata,
-		Lock:            lock,
-		MetadataPath:    metadataPath,
-		LockPath:        lockPath,
-		OldTargetFolder: metadata.TargetFolder,
-	}, nil
-}
-
-func loadPreviousMetadata(workspace, metadataPath string) (*Metadata, string, error) {
-	metadata, err := LoadMetadata(workspace, metadataPath)
-	if err == nil {
-		return metadata, metadataPath, nil
-	}
-
-	legacyMetadata, legacyErr := LoadMetadata(workspace, config.LegacyMetadataPath)
-	if legacyErr != nil {
-		return nil, metadataPath, legacyErr
-	}
-
-	return legacyMetadata, config.LegacyMetadataPath, nil
-}
-
-func previousWithoutLock(metadata *Metadata, metadataPath, lockPath string) Previous {
-	return Previous{Metadata: metadata, MetadataPath: metadataPath, LockPath: lockPath}
-}
-
 // EncodeLock serializes a lock file.
-func EncodeLock(lock *LockFile) ([]byte, error) {
-	return lockmodel.MarshalLock(lock), nil
+func EncodeLock(lock *lockmodel.LockFile) []byte {
+	return lockmodel.MarshalLock(lock)
 }
 
 // EncodeMetadata serializes synchronization metadata.
-func EncodeMetadata(metadata *Metadata) ([]byte, error) {
-	return MarshalMetadata(metadata), nil
+func EncodeMetadata(metadata *Metadata) []byte {
+	return MarshalMetadata(metadata)
 }
 
 // DecodeLock deserializes a lock file.
-func DecodeLock(data []byte) (*LockFile, error) {
-	var lock LockFile
+func DecodeLock(data []byte) (*lockmodel.LockFile, error) {
+	var lock lockmodel.LockFile
 
 	err := lockmodel.DecodeLockFileYAML(data, &lock)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("decode lock: %w", err)
 	}
 
 	return &lock, nil
@@ -127,8 +78,22 @@ func DecodeMetadata(data []byte) (*Metadata, error) {
 
 	err := DecodeMetadataYAML(data, &metadata)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("decode metadata: %w", err)
 	}
 
 	return &metadata, nil
+}
+
+func loadStateFile(args *loadStateArgs) error {
+	data, err := pathutil.ReadRelativeFile(args.root, args.rel)
+	if err != nil {
+		return fmt.Errorf("load %s: read %q: %w", args.label, args.rel, err)
+	}
+
+	err = args.decode(data)
+	if err != nil {
+		return fmt.Errorf("load %s: parse %q: %w", args.label, args.rel, err)
+	}
+
+	return nil
 }

@@ -4,9 +4,10 @@
 package plan
 
 import (
+	"fmt"
+
 	inputpkg "github.com/task-otter/Taskotter/internal/features/input"
 	"github.com/task-otter/Taskotter/internal/features/plan/domain"
-	"github.com/task-otter/Taskotter/internal/features/root"
 )
 
 type (
@@ -14,21 +15,14 @@ type (
 	Plan = domain.Plan
 	// Input is the resolved module set consumed by the planner.
 	Input = inputpkg.Input
-
-	// Builder owns plan construction. Collector and Root are retained as
-	// composition slots while their concrete operations are extracted.
-	Builder struct {
-		Collector any
-		Root      root.Generator
-	}
 )
 
 // Build computes the desired synchronization plan.
 func Build(syncInput *Input) (*Plan, error) {
-	return BuildPlan(syncInput)
-}
+	plan, err := BuildPlan(syncInput)
+	if err != nil {
+		return nil, fmt.Errorf("build plan: %w", err)
+	}
 
-// Build computes a synchronization plan through the feature boundary.
-func (*Builder) Build(syncInput *Input) (*Plan, error) {
-	return Build(syncInput)
+	return plan, nil
 }

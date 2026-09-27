@@ -52,11 +52,10 @@ type (
 	}
 
 	changedPlanInput = struct {
-		cfg       *config.Config
-		plan      *plan.Plan
-		syncInput *input.Input
-		ref       *storedomain.RefInfo
-		result    *rundomain.Result
+		cfg    *config.Config
+		plan   *plan.Plan
+		ref    *storedomain.RefInfo
+		result *rundomain.Result
 	}
 
 	createPRInput = struct {
@@ -67,11 +66,10 @@ type (
 	}
 
 	finishSyncInput = struct {
-		cfg       *config.Config
-		plan      *plan.Plan
-		syncInput *input.Input
-		ref       *storedomain.RefInfo
-		result    *rundomain.Result
+		cfg    *config.Config
+		plan   *plan.Plan
+		ref    *storedomain.RefInfo
+		result *rundomain.Result
 	}
 
 	gitSyncStep struct {
@@ -85,9 +83,12 @@ type (
 	}
 
 	planResult = struct {
-		syncInput *input.Input
-		plan      *plan.Plan
-		result    *rundomain.Result
+		plan   *plan.Plan
+		result *rundomain.Result
+	}
+
+	syncPlanBuild = struct {
+		plan *syncPlan
 	}
 
 	prPhaseInput = struct {
@@ -152,11 +153,11 @@ type (
 	}
 
 	// PrepareSyncInputFn defines the function signature used for this orchestration step.
-	PrepareSyncInputFn func(*input.BuildInput) (input.Input, error)
+	PrepareSyncInputFn func(*input.SyncInputArgs) (input.Input, error)
 	// BuildPlanFn defines the function signature used for this orchestration step.
 	BuildPlanFn func(*input.Input) (*plan.Plan, error)
 	// ApplyPlanFn defines the function signature used for this orchestration step.
-	ApplyPlanFn func(*plan.Plan) error
+	ApplyPlanFn func(*plan.Plan, *input.Input) error
 	// ResolveAllFn defines the function signature used for this orchestration step.
 	ResolveAllFn func(*resolvesvc.ResolveAllInput) ([]resolvesvc.Resolution, error)
 	// ResolveTransitiveFn defines the function signature used for this orchestration step.

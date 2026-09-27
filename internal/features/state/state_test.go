@@ -3,10 +3,26 @@
 
 package state
 
-import "testing"
+import (
+	"testing"
 
+	"github.com/task-otter/Taskotter/internal/features/state/lockmodel"
+)
+
+const (
+	testRequestedLint = "lint"
+)
+
+// TestStateCodecsRoundTrip verifies metadata and lock codecs preserve their values.
 func TestStateCodecsRoundTrip(t *testing.T) {
 	t.Parallel()
+	t.Run(metadataLabel, testMetadataRoundTrip)
+	t.Run("lock", testLockRoundTrip)
+}
+
+func testMetadataRoundTrip(t *testing.T) {
+	t.Parallel()
+	t.Helper()
 
 	metadata := &Metadata{
 		TargetFolder:      "taskfiles",
@@ -14,10 +30,7 @@ func TestStateCodecsRoundTrip(t *testing.T) {
 		ConfigurationHash: "abc123",
 	}
 
-	metadataBytes, err := EncodeMetadata(metadata)
-	if err != nil {
-		t.Fatalf("EncodeMetadata() error = %v", err)
-	}
+	metadataBytes := EncodeMetadata(metadata)
 
 	decodedMetadata, err := DecodeMetadata(metadataBytes)
 	if err != nil {
@@ -27,40 +40,47 @@ func TestStateCodecsRoundTrip(t *testing.T) {
 	if *decodedMetadata != *metadata {
 		t.Fatalf("metadata round trip = %#v, want %#v", decodedMetadata, metadata)
 	}
+}
 
-	lock := &LockFile{
-		Source: LockSource{Repository: "owner/store", ResolvedCommit: "deadbeef"},
-		Requested: OrderedRequested{
-			"lint": ModuleRecord{
-				SourceModule: "eslint/node/pnpm",
-				Path:         "taskfiles/eslint",
-			},
-		},
-	}
+func testLockRoundTrip(t *testing.T) {
+	t.Parallel()
+	t.Helper()
 
-	lockBytes, err := EncodeLock(lock)
-	if err != nil {
-		t.Fatalf("EncodeLock() error = %v", err)
-	}
+	lock := testLock()
+	lockBytes := EncodeLock(lock)
 
 	decodedLock, err := DecodeLock(lockBytes)
 	if err != nil {
 		t.Fatalf("DecodeLock() error = %v", err)
 	}
 
-	if decodedLock.Source.ResolvedCommit != lock.Source.ResolvedCommit {
-		t.Fatalf(
-			"lock commit = %q, want %q",
-			decodedLock.Source.ResolvedCommit,
-			lock.Source.ResolvedCommit,
-		)
+	assertLockRoundTrip(t, decodedLock, lock)
+}
+
+func testLock() *lockmodel.LockFile {
+	return &lockmodel.LockFile{
+		Source: lockmodel.LockSource{Repository: "owner/store", ResolvedCommit: "deadbeef"},
+		Requested: lockmodel.OrderedRequested{
+			testRequestedLint: lockmodel.ModuleRecord{
+				SourceModule: "eslint/node/pnpm",
+				Path:         "taskfiles/eslint",
+			},
+		},
+	}
+}
+
+func assertLockRoundTrip(t *testing.T, got, want *lockmodel.LockFile) {
+	t.Helper()
+
+	if got.Source.ResolvedCommit != want.Source.ResolvedCommit {
+		t.Fatalf("lock commit = %q, want %q", got.Source.ResolvedCommit, want.Source.ResolvedCommit)
 	}
 
-	if decodedLock.Requested["lint"].Path != lock.Requested["lint"].Path {
+	if got.Requested[testRequestedLint].Path != want.Requested[testRequestedLint].Path {
 		t.Fatalf(
 			"lock requested path = %q, want %q",
-			decodedLock.Requested["lint"].Path,
-			lock.Requested["lint"].Path,
+			got.Requested[testRequestedLint].Path,
+			want.Requested[testRequestedLint].Path,
 		)
 	}
 }

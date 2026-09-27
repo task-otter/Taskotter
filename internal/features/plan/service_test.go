@@ -16,6 +16,7 @@ import (
 
 	"github.com/task-otter/Taskotter/internal/features/plan/domain"
 	"github.com/task-otter/Taskotter/internal/features/root/ports"
+	"github.com/task-otter/Taskotter/internal/features/state"
 	"github.com/task-otter/Taskotter/internal/features/state/lockmodel"
 	"github.com/task-otter/Taskotter/internal/shared/config"
 	"github.com/task-otter/Taskotter/internal/shared/consts"
@@ -1650,15 +1651,15 @@ func emptyLockPtr() *syncLock {
 	return &lock
 }
 
-func emptyMetadata(lockFile string) domain.Metadata {
-	var meta domain.Metadata
+func emptyMetadata(lockFile string) state.Metadata {
+	var meta state.Metadata
 
 	meta.LockFile = lockFile
 
 	return meta
 }
 
-func emptyMetadataPtr(lockFile string) *domain.Metadata {
+func emptyMetadataPtr(lockFile string) *state.Metadata {
 	meta := emptyMetadata(lockFile)
 
 	return &meta
@@ -2348,9 +2349,9 @@ func TestMergeParentDocFilesSkipsUnready(t *testing.T) {
 func TestReadRootTaskfileReportsTemplateFailure(t *testing.T) {
 	t.Parallel()
 
-	data, state, err := readRootTaskfile(nil, t.TempDir(), rootTaskfileName)
+	data, rootState, err := readRootTaskfile(nil, t.TempDir(), rootTaskfileName)
 	iox.Discard(data)
-	iox.Discard(state)
+	iox.Discard(rootState)
 	assertFails(t, err)
 }
 

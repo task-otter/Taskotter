@@ -13,7 +13,6 @@ import (
 	"testing"
 
 	inputpkg "github.com/task-otter/Taskotter/internal/features/input"
-	"github.com/task-otter/Taskotter/internal/features/input/adapters/snapshot"
 	planpkg "github.com/task-otter/Taskotter/internal/features/plan"
 	plandomain "github.com/task-otter/Taskotter/internal/features/plan/domain"
 	resolvesvc "github.com/task-otter/Taskotter/internal/features/resolve/service"
@@ -29,6 +28,10 @@ import (
 )
 
 type (
+	testSnapshotAdapter struct {
+		snapshot *storedomain.Snapshot
+	}
+
 	assertRootSkippedInput struct {
 		t           *testing.T
 		workspace   string
@@ -131,6 +134,30 @@ type (
 	}
 )
 
+func newTestSnapshotAdapter(snapshot *storedomain.Snapshot) testSnapshotAdapter {
+	return testSnapshotAdapter{snapshot: snapshot}
+}
+
+func (adapter testSnapshotAdapter) DefaultBranch() string {
+	return storedomain.DefaultBranch(adapter.snapshot)
+}
+
+func (adapter testSnapshotAdapter) ModuleDir(sourceModule string) string {
+	return storedomain.ModuleDir(adapter.snapshot, sourceModule)
+}
+
+func (adapter testSnapshotAdapter) ResolvedCommit() string {
+	return storedomain.ResolvedCommit(adapter.snapshot)
+}
+
+func (adapter testSnapshotAdapter) SourceRef() string {
+	return storedomain.SourceRef(adapter.snapshot)
+}
+
+func (adapter testSnapshotAdapter) WorkspaceRoot() string {
+	return storedomain.WorkspaceRoot(adapter.snapshot)
+}
+
 const (
 	parentDocTool       = "tool"
 	parentDocNode       = "tool/node"
@@ -191,7 +218,7 @@ var errSimulatedPromoteFailure = errors.New("simulated promote failure")
 func buildPlanFromSyncInput(t *testing.T, syncInput *plandomain.SyncInput) *plandomain.Plan {
 	t.Helper()
 
-	plan, err := planpkg.BuildPlan(syncInput)
+	plan, err := planpkg.Build(syncInput)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -219,8 +246,11 @@ func prepareSyncInputForTest(t *testing.T, cfg *config.Config) plandomain.SyncIn
 	resolutions, depSources := resolveModsForTest(&moduleTestInput{t: t, cfg: cfg, snap: snap})
 
 	syncInput, err := inputpkg.SyncInput(&inputpkg.SyncInputArgs{
-		Cfg: cfg, Snapshot: snapshot.New(snap), TaskfileOps: taskfile.NewOps(),
-		Resolutions: resolutions, DepSources: depSources,
+		Cfg:         cfg,
+		Snapshot:    newTestSnapshotAdapter(snap),
+		Resolutions: resolutions,
+		DepSources:  depSources,
+		TaskfileOps: taskfile.NewOps(),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -685,10 +715,10 @@ func buildPlanFrom(input *buildPlanFromInput) *plandomain.Plan {
 
 	syncInput, err := inputpkg.SyncInput(&inputpkg.SyncInputArgs{
 		Cfg:         input.cfg,
-		Snapshot:    snapshot.New(input.snap),
-		TaskfileOps: taskfile.NewOps(),
+		Snapshot:    newTestSnapshotAdapter(input.snap),
 		Resolutions: input.resolutions,
 		DepSources:  input.depSources,
+		TaskfileOps: taskfile.NewOps(),
 	})
 	if err != nil {
 		input.t.Fatal(err)
@@ -1767,7 +1797,7 @@ func variantModuleSyncInput(args *variantModuleSyncArgs) plandomain.SyncInput {
 	return plandomain.SyncInput{
 		Config:      args.cfg,
 		TaskfileOps: taskfile.NewOps(),
-		Snapshot:    snapshot.New(args.snap),
+		Snapshot:    newTestSnapshotAdapter(args.snap),
 		Requested: map[string]lockmodel.ModuleRecord{
 			args.task: {
 				SourceModule:      args.source,

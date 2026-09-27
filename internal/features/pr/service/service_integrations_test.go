@@ -10,6 +10,7 @@ import (
 	plandomain "github.com/task-otter/Taskotter/internal/features/plan/domain"
 	prdomain "github.com/task-otter/Taskotter/internal/features/pr/domain"
 	prservice "github.com/task-otter/Taskotter/internal/features/pr/service"
+	"github.com/task-otter/Taskotter/internal/features/state"
 	"github.com/task-otter/Taskotter/internal/features/state/lockmodel"
 	storedomain "github.com/task-otter/Taskotter/internal/features/store/domain"
 	"github.com/task-otter/Taskotter/internal/shared/config"
@@ -138,8 +139,8 @@ func prBodyDependencyModules() []lockmodel.ModuleRecord {
 	}
 }
 
-func emptyPRBodyMetadata() plandomain.Metadata {
-	return plandomain.Metadata{
+func emptyPRBodyMetadata() state.Metadata {
+	return state.Metadata{
 		TargetFolder:      consts.Empty,
 		LockFile:          consts.Empty,
 		ConfigurationHash: consts.Empty,

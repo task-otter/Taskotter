@@ -8,6 +8,7 @@ import (
 
 	"github.com/task-otter/Taskotter/internal/features/plan/domain"
 	"github.com/task-otter/Taskotter/internal/features/root/ports"
+	"github.com/task-otter/Taskotter/internal/features/state"
 	"github.com/task-otter/Taskotter/internal/features/state/lockmodel"
 	"github.com/task-otter/Taskotter/internal/features/state/managed"
 	"github.com/task-otter/Taskotter/internal/shared/config"
@@ -59,7 +60,7 @@ type (
 	}
 
 	fileEntryArgs = struct {
-		ops          ports.TaskfileOps
+		ops          domain.TaskfileOps
 		entry        os.DirEntry
 		sourceToDest map[string]string
 		sourceDir    string
@@ -165,7 +166,7 @@ type (
 	}
 
 	collectOptions = struct {
-		ops          ports.TaskfileOps
+		ops          domain.TaskfileOps
 		sourceToDest map[string]string
 		sourceDir    string
 		fromDest     string
@@ -174,7 +175,7 @@ type (
 
 	// CollectOptions bundles inputs for CollectModuleFiles.
 	CollectOptions = struct {
-		TaskfileOps  ports.TaskfileOps
+		TaskfileOps  domain.TaskfileOps
 		SourceToDest map[string]string
 		SourceDir    string
 		FromDest     string
@@ -182,7 +183,7 @@ type (
 	}
 
 	moduleCollectArgs = struct {
-		ops          ports.TaskfileOps
+		ops          domain.TaskfileOps
 		entry        os.DirEntry
 		sourceToDest map[string]string
 		contents     map[string]domain.FileEntry
@@ -199,7 +200,7 @@ type (
 
 	finalizePlanArgs = struct {
 		plan         *domain.Plan
-		meta         *domain.Metadata
+		meta         *state.Metadata
 		workspace    string
 		metadataPath string
 		rootBytes    []byte
@@ -291,7 +292,7 @@ type (
 
 	resolveLockArgs = struct {
 		cfg     *config.Config
-		oldMeta *domain.Metadata
+		oldMeta *state.Metadata
 	}
 
 	metadataWalkerArgs = struct {
@@ -336,7 +337,7 @@ type (
 	assemblePlanInput = struct {
 		syncInput *domain.SyncInput
 		artifacts *planArtifacts
-		meta      *domain.Metadata
+		meta      *state.Metadata
 		prev      previousState
 		lock      syncLock
 	}
@@ -344,7 +345,7 @@ type (
 	finalizeBuiltPlanInput = struct {
 		syncInput *domain.SyncInput
 		plan      *domain.Plan
-		meta      *domain.Metadata
+		meta      *state.Metadata
 		artifacts *planArtifacts
 	}
 
@@ -356,7 +357,7 @@ type (
 	}
 
 	rewriteModuleArgs = struct {
-		ops          ports.TaskfileOps
+		ops          domain.TaskfileOps
 		sourceToDest map[string]string
 		sourceDir    string
 		fromDest     string

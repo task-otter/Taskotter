@@ -9,9 +9,19 @@ runs:
       uses: go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e
     - name: Run CI and fix fixable issues
       shell: bash
-      run: task taskotter:ci:fix
+      run: |
+        task taskotter:golangci-lint:ci
+        task taskotter:yamlfix:ci:fix
     - name: Create fix PR
       uses: $/.github/actions/auto-fix
+    - name: Run all CI checks
+      shell: bash
+      run: |
+        task taskotter:golangci-lint:ci
+        task taskotter:yamllint:ci
+        task taskotter:actionlint:ci
+        task taskotter:zizmor:ci
+        task taskotter:hadolint:ci
     - name: Generate Tests Report
       shell: bash
       run: task taskotter:go-junit-report:report

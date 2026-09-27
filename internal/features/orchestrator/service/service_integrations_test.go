@@ -12,10 +12,10 @@ import (
 	"testing"
 
 	gitports "github.com/task-otter/Taskotter/internal/features/git/ports"
-	input "github.com/task-otter/Taskotter/internal/features/input"
+	"github.com/task-otter/Taskotter/internal/features/input"
 	rundomain "github.com/task-otter/Taskotter/internal/features/orchestrator/domain"
 	"github.com/task-otter/Taskotter/internal/features/orchestrator/service"
-	plan "github.com/task-otter/Taskotter/internal/features/plan"
+	"github.com/task-otter/Taskotter/internal/features/plan"
 	prdomain "github.com/task-otter/Taskotter/internal/features/pr/domain"
 	prports "github.com/task-otter/Taskotter/internal/features/pr/ports"
 	resolvesvc "github.com/task-otter/Taskotter/internal/features/resolve/service"
@@ -162,7 +162,7 @@ func TestOrchestratorHookFailures(t *testing.T) {
 }
 
 func applyApplyPlanFail(env *failEnv) {
-	env.deps.ApplyPlan = func(*plan.Plan) error {
+	env.deps.ApplyPlan = func(*plan.Plan, *input.Input) error {
 		return errTestBoom
 	}
 }
@@ -174,7 +174,7 @@ func applyBuildPlanFail(env *failEnv) {
 }
 
 func applyPrepareFail(env *failEnv) {
-	env.deps.PrepareSyncInput = func(*input.BuildInput) (input.Input, error) {
+	env.deps.PrepareSyncInput = func(*input.SyncInputArgs) (input.Input, error) {
 		return input.Input{}, errTestBoom
 	}
 }

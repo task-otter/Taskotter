@@ -10,16 +10,14 @@ import (
 	"fmt"
 	"strconv"
 
-	apply "github.com/task-otter/Taskotter/internal/features/apply"
 	gitports "github.com/task-otter/Taskotter/internal/features/git/ports"
-	input "github.com/task-otter/Taskotter/internal/features/input"
-	snapshot "github.com/task-otter/Taskotter/internal/features/input/adapters/snapshot"
+	inputpkg "github.com/task-otter/Taskotter/internal/features/input"
 	rundomain "github.com/task-otter/Taskotter/internal/features/orchestrator/domain"
-	plan "github.com/task-otter/Taskotter/internal/features/plan"
+	planpkg "github.com/task-otter/Taskotter/internal/features/plan"
 	prdomain "github.com/task-otter/Taskotter/internal/features/pr/domain"
 	prservice "github.com/task-otter/Taskotter/internal/features/pr/service"
 	resolvesvc "github.com/task-otter/Taskotter/internal/features/resolve/service"
-	"github.com/task-otter/Taskotter/internal/features/state"
+	"github.com/task-otter/Taskotter/internal/features/state/lockmodel"
 	storedomain "github.com/task-otter/Taskotter/internal/features/store/domain"
 	"github.com/task-otter/Taskotter/internal/shared/config"
 	"github.com/task-otter/Taskotter/internal/shared/consts"
@@ -28,15 +26,15 @@ import (
 
 func wireSyncHooks(deps *Deps) {
 	if deps.PrepareSyncInput == nil {
-		deps.PrepareSyncInput = input.Build
+		deps.PrepareSyncInput = inputpkg.Build
 	}
 
 	if deps.BuildPlan == nil {
-		deps.BuildPlan = plan.Build
+		deps.BuildPlan = planpkg.Build
 	}
 
 	if deps.ApplyPlan == nil {
-		deps.ApplyPlan = apply.Apply
+		deps.ApplyPlan = planpkg.ApplyPlan
 	}
 
 	wireResolveHooks(deps)
@@ -138,7 +136,11 @@ func (orch *Orchestrator) Run(ctx context.Context, cfg *config.Config) (*rundoma
 }
 
 func applyChangedPlan(ctx context.Context, deps *Deps, input *changedPlanInput) error {
-	defaultBranch, err := maybeDefBranch(ctx, deps, &gitPlanIn{cfg: input.cfg, plan: input.plan})
+	defaultBranch, err := maybeDefBranch(
+		ctx,
+		deps,
+		&gitPlanIn{cfg: input.cfg, plan: input.plan},
+	)
 	if err != nil {
 		return fmt.Errorf("resolve default branch: %w", err)
 	}
@@ -166,36 +168,35 @@ func applySyncChanges(ctx context.Context, deps *Deps, args *branchPlanIn) error
 }
 
 func buildPlanResult(deps *Deps, inp *buildPlanInput, ref *refInfo) (planResult, error) {
-	syncInput, plan, err := buildSyncPlan(deps, inp)
+	built, err := buildSyncPlan(deps, inp)
 	if err != nil {
 		return planResult{}, fmt.Errorf(errFmtBuildSyncPlan, err)
 	}
 
-	result := buildResult(inp.cfg, plan, ref)
+	result := buildResult(inp.cfg, built.plan, ref)
 
-	return planResult{syncInput: syncInput, plan: plan, result: result}, nil
+	return planResult{plan: built.plan, result: result}, nil
 }
 
-//nolint:gocritic // single-line sig for whitespace
-func buildSyncPlan(deps *Deps, inp *buildPlanInput) (*syncIn, *syncPlan, error) {
-	syncInput, err := deps.PrepareSyncInput(&input.BuildInput{
+func buildSyncPlan(deps *Deps, inp *buildPlanInput) (syncPlanBuild, error) {
+	syncInput, err := deps.PrepareSyncInput(&inputpkg.SyncInputArgs{
 		Cfg:         inp.cfg,
-		Snapshot:    snapshot.New(inp.snapshot),
+		Snapshot:    NewSnapshotAdapter(inp.snapshot),
 		Resolutions: inp.resolutions,
 		DepSources:  inp.depSources,
 	})
 	if err != nil {
-		return nil, nil, fmt.Errorf("prepare sync input: %w", err)
+		return syncPlanBuild{}, fmt.Errorf("prepare sync input: %w", err)
 	}
 
 	logDestinationNormalization(deps, &syncInput)
 
 	plan, err := compareManagedFiles(deps, &syncInput)
 	if err != nil {
-		return nil, nil, fmt.Errorf(errFmtBuildSyncPlan, err)
+		return syncPlanBuild{}, fmt.Errorf(errFmtBuildSyncPlan, err)
 	}
 
-	return &syncInput, plan, nil
+	return syncPlanBuild{plan: plan}, nil
 }
 
 func checkUnrelatedChanges(ctx context.Context, deps *Deps, plan *syncPlan) error {
@@ -249,7 +250,7 @@ func closeSnapshotQuietly(deps *Deps, snapshot *storedomain.Snapshot) {
 	}
 }
 
-func logBuiltPlan(logger *logging.Logger, built *plan.Plan) {
+func logBuiltPlan(logger *logging.Logger, built *planpkg.Plan) {
 	logger.Printf("Changed: %t", built.Changed)
 	logger.Printf(
 		"Added: %d Updated: %d Removed: %d",
@@ -260,7 +261,7 @@ func logBuiltPlan(logger *logging.Logger, built *plan.Plan) {
 }
 
 func compareManagedFiles(deps *Deps, syncInput *syncIn) (*syncPlan, error) {
-	var plan *plan.Plan
+	var plan *planpkg.Plan
 
 	err := assignGrouped(deps.Logger, "Compare managed files", func() error {
 		built, planErr := deps.BuildPlan(syncInput)
@@ -283,7 +284,7 @@ func compareManagedFiles(deps *Deps, syncInput *syncIn) (*syncPlan, error) {
 
 func copyTaskModules(deps *Deps, plan *syncPlan) error {
 	err := runGroupNoResult(deps.Logger, "Copy task modules", func() error {
-		applyErr := deps.ApplyPlan(plan)
+		applyErr := deps.ApplyPlan(plan, plan.Input)
 		if applyErr != nil {
 			return fmt.Errorf("apply plan: %w", applyErr)
 		}
@@ -439,11 +440,10 @@ func openPR(ctx context.Context, deps *Deps, branches *branchPair) (*pullReq, er
 
 func finishChangedPlan(ctx context.Context, deps *Deps, input *finishSyncInput) error {
 	err := applyChangedPlan(ctx, deps, &changedPlanInput{
-		cfg:       input.cfg,
-		plan:      input.plan,
-		syncInput: input.syncInput,
-		ref:       input.ref,
-		result:    input.result,
+		cfg:    input.cfg,
+		plan:   input.plan,
+		ref:    input.ref,
+		result: input.result,
 	})
 	if err != nil {
 		return fmt.Errorf("apply changed plan: %w", err)
@@ -614,11 +614,10 @@ func planFinish(ctx context.Context, deps *Deps, inp *planIn) (*rundomain.Result
 	}
 
 	result, err := finishSync(ctx, deps, &finishSyncInput{
-		cfg:       inp.cfg,
-		plan:      planned.plan,
-		syncInput: planned.syncInput,
-		ref:       inp.ref,
-		result:    planned.result,
+		cfg:    inp.cfg,
+		plan:   planned.plan,
+		ref:    inp.ref,
+		result: planned.result,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("finish sync: %w", err)
@@ -896,7 +895,7 @@ func wireDefaults(deps *Deps) {
 	wireSyncHooks(deps)
 }
 
-func buildResolvedDependenciesJSON(deps []state.ModuleRecord) string {
+func buildResolvedDependenciesJSON(deps []lockmodel.ModuleRecord) string {
 	out := make([]rundomain.ResolvedTask, consts.IndexZero, len(deps))
 
 	for i := range deps {
@@ -915,7 +914,7 @@ func buildResolvedDependenciesJSON(deps []state.ModuleRecord) string {
 	return string(data)
 }
 
-func buildResolvedTasksJSON(requested map[string]state.ModuleRecord) string {
+func buildResolvedTasksJSON(requested map[string]lockmodel.ModuleRecord) string {
 	out := make(map[string]rundomain.ResolvedTask, len(requested))
 
 	for task := range requested {
@@ -936,7 +935,7 @@ func buildResolvedTasksJSON(requested map[string]state.ModuleRecord) string {
 
 func buildResult(
 	cfg *config.Config,
-	plan *plan.Plan,
+	plan *planpkg.Plan,
 	ref *storedomain.RefInfo,
 ) *rundomain.Result {
 	result := newResultShell(cfg, plan, ref)
@@ -954,19 +953,19 @@ func empty(v string) string {
 	return v
 }
 
-func fillResolvedJSON(result *rundomain.Result, plan *plan.Plan) {
+func fillResolvedJSON(result *rundomain.Result, plan *planpkg.Plan) {
 	result.ResolvedTasksJSON = buildResolvedTasksJSON(plan.Requested)
 	result.ResolvedDependencies = buildResolvedDependenciesJSON(plan.Dependencies)
 }
 
-func logDependencyModules(log *logging.Logger, plan *plan.Plan) {
+func logDependencyModules(log *logging.Logger, plan *planpkg.Plan) {
 	for i := range plan.Dependencies {
 		dep := &plan.Dependencies[i]
 		log.Printf("Dependency %s -> %s", dep.SourceModule, dep.Path)
 	}
 }
 
-func logFileCounts(log *logging.Logger, plan *plan.Plan) {
+func logFileCounts(log *logging.Logger, plan *planpkg.Plan) {
 	log.Printf("Files added: %d", len(plan.Added))
 	log.Printf("Files updated: %d", len(plan.Updated))
 	log.Printf("Files removed: %d", len(plan.Removed))
@@ -982,7 +981,7 @@ func logPullRequestOutcome(log *logging.Logger, prURL string) {
 	log.Print("Pull request result: none")
 }
 
-func logRequestedTaskModules(log *logging.Logger, cfg *config.Config, plan *plan.Plan) {
+func logRequestedTaskModules(log *logging.Logger, cfg *config.Config, plan *planpkg.Plan) {
 	log.Printf("Requested tasks: %v", cfg.Tasks)
 
 	tasks := cfg.Tasks
@@ -1003,7 +1002,7 @@ func logResultMetadata(log *logging.Logger, result *rundomain.Result) {
 //nolint:funlen // The complete result schema is easiest to audit in one literal.
 func newResultShell(
 	cfg *config.Config,
-	resultPlan *plan.Plan,
+	resultPlan *planpkg.Plan,
 	ref *storedomain.RefInfo,
 ) *rundomain.Result {
 	return &rundomain.Result{

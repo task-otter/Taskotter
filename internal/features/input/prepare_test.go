@@ -9,7 +9,6 @@ import (
 	resolvesvc "github.com/task-otter/Taskotter/internal/features/resolve/service"
 	"github.com/task-otter/Taskotter/internal/shared/config"
 	"github.com/task-otter/Taskotter/internal/shared/consts"
-	"github.com/task-otter/Taskotter/internal/shared/iox"
 )
 
 type (
@@ -24,50 +23,13 @@ const (
 	pathB          = "format"
 	eslintNodePNPM = "eslint/node/pnpm"
 	eslintBun      = "eslint/bun"
+	eslint         = "eslint"
 )
 
 // TestPrepareSyncInputReportsDestinationCollision verifies colliding destinations fail.
 func TestPrepareSyncInputReportsDestinationCollision(t *testing.T) {
 	t.Parallel()
-
-	input, err := SyncInput(&SyncInputArgs{
-		Cfg: &config.Config{
-			TargetFolder: config.DefaultTargetFolder,
-		},
-		Resolutions: []resolvesvc.Resolution{
-			{LogicalTask: pathA, SourceModule: eslintNodePNPM},
-			{LogicalTask: pathB, SourceModule: eslintBun},
-		},
-		DepSources: nil,
-	})
-
-	iox.Discard(input)
-
-	if err == nil {
-		t.Fatal("expected destination collision")
-	}
-}
-
-// TestPrepareSyncInputWrapsAssembleFailure verifies PrepareSyncInput wraps collisions.
-func TestPrepareSyncInputWrapsAssembleFailure(t *testing.T) {
-	t.Parallel()
-
-	input, err := SyncInput(&SyncInputArgs{
-		Snapshot:    nil,
-		TaskfileOps: nil,
-		DepSources:  nil,
-		Cfg:         &config.Config{TargetFolder: config.DefaultTargetFolder},
-		Resolutions: []resolvesvc.Resolution{
-			{LogicalTask: pathA, SourceModule: eslintNodePNPM},
-			{LogicalTask: pathB, SourceModule: eslintBun},
-		},
-	})
-
-	iox.Discard(input)
-
-	if err == nil {
-		t.Fatal("expected wrapped destination collision")
-	}
+	assertDestinationCollision(t)
 }
 
 // TestCollectRequestedSourcesPreservesOrder verifies the expected behavior.
@@ -76,7 +38,7 @@ func TestCollectRequestedSourcesPreservesOrder(t *testing.T) {
 
 	got := collectRequestedSources([]resolvesvc.Resolution{
 		{SourceModule: consts.Go},
-		{SourceModule: "eslint"},
+		{SourceModule: eslint},
 	})
 
 	if len(got) != consts.IndexTwo || got[consts.IndexZero] != consts.Go {
@@ -85,38 +47,59 @@ func TestCollectRequestedSourcesPreservesOrder(t *testing.T) {
 }
 
 // TestPrepareSyncInputBuildsRecords verifies the behavior covered by this test.
-//
-//nolint:funlen,maintidx // The explicit requested/dependency record assertions document the contract.
 func TestPrepareSyncInputBuildsRecords(t *testing.T) {
 	t.Parallel()
 
+	cfg := &config.Config{TargetFolder: config.DefaultTargetFolder}
+	resolutions := []resolvesvc.Resolution{
+		{LogicalTask: pathA, SourceModule: consts.Go},
+	}
+
 	input, err := SyncInput(&SyncInputArgs{
-		Cfg: &config.Config{TargetFolder: config.DefaultTargetFolder},
-		Resolutions: []resolvesvc.Resolution{
-			{LogicalTask: pathA, SourceModule: consts.Go},
-		},
-		DepSources: []string{"shellcheck"},
+		Cfg: cfg, Resolutions: resolutions, DepSources: []string{"shellcheck"},
 	})
 	if err != nil {
 		t.Fatalf("SyncInput() error = %v", err)
 	}
 
-	requested := input.Requested[pathA]
-	assertPrepareRecord(
-		t,
-		&prepareRecordAssertion{requested.SourceModule, consts.Go, "requested source"},
-	)
-	assertPrepareRecord(
-		t,
-		&prepareRecordAssertion{requested.Path, "taskfiles/go", "requested path"},
-	)
-	assertPrepareRecord(
-		t,
-		&prepareRecordAssertion{input.DestByTask[pathA], consts.Go, "dest by task"},
-	)
-	assertPrepareRecord(t, &prepareRecordAssertion{
-		input.Dependencies[consts.IndexZero].Path, "taskfiles/shellcheck", "dependency path",
+	assertPrepareRecords(t, &input)
+}
+
+func assertDestinationCollision(t *testing.T) {
+	t.Helper()
+
+	input, err := SyncInput(&SyncInputArgs{
+		Cfg: &config.Config{TargetFolder: config.DefaultTargetFolder},
+		Resolutions: []resolvesvc.Resolution{
+			{LogicalTask: pathA, SourceModule: eslintNodePNPM},
+			{LogicalTask: pathB, SourceModule: eslintBun},
+		},
 	})
+
+	if input.Config != nil {
+		t.Fatal("collision unexpectedly produced input")
+	}
+
+	if err == nil {
+		t.Fatal("expected destination collision")
+	}
+}
+
+func assertPrepareRecords(t *testing.T, input *Input) {
+	t.Helper()
+
+	requested := input.Requested[pathA]
+
+	assertions := []prepareRecordAssertion{
+		{requested.SourceModule, consts.Go, "requested source"},
+		{requested.Path, "taskfiles/go", "requested path"},
+		{input.DestByTask[pathA], consts.Go, "dest by task"},
+		{input.Dependencies[consts.IndexZero].Path, "taskfiles/shellcheck", "dependency path"},
+	}
+
+	for idx := range assertions {
+		assertPrepareRecord(t, &assertions[idx])
+	}
 }
 
 func assertPrepareRecord(t *testing.T, assertion *prepareRecordAssertion) {

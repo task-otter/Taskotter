@@ -6,6 +6,7 @@ package domain
 import (
 	"fmt"
 
+	"github.com/task-otter/Taskotter/internal/features/state"
 	"github.com/task-otter/Taskotter/internal/shared/consts"
 	"github.com/task-otter/Taskotter/internal/shared/iox"
 	"github.com/task-otter/Taskotter/internal/shared/yamlfmt"
@@ -19,7 +20,7 @@ func (err SyncError) Error() string {
 
 // MarshalMetadata encodes metadata using stable on-disk keys. Encoding a plain
 // string map cannot fail, so no error is reported.
-func MarshalMetadata(meta *Metadata) []byte {
+func MarshalMetadata(meta *state.Metadata) []byte {
 	data, err := yamlfmt.Marshal(encodeMetadata(meta))
 	iox.Discard(err)
 
@@ -43,7 +44,7 @@ func UnmarshalYAMLMapping(value *yaml.Node, label string, outs map[string]any) e
 }
 
 // UnmarshalMetadata decodes TaskOtter metadata from its stable on-disk keys.
-func UnmarshalMetadata(value *yaml.Node, meta *Metadata) error {
+func UnmarshalMetadata(value *yaml.Node, meta *state.Metadata) error {
 	err := UnmarshalYAMLMapping(value, "metadata", map[string]any{
 		yamlKeyTargetFolder:      &meta.TargetFolder,
 		yamlKeyLockFile:          &meta.LockFile,
@@ -57,7 +58,7 @@ func UnmarshalMetadata(value *yaml.Node, meta *Metadata) error {
 }
 
 // DecodeMetadataYAML unmarshals YAML bytes into metadata.
-func DecodeMetadataYAML(data []byte, meta *Metadata) error {
+func DecodeMetadataYAML(data []byte, meta *state.Metadata) error {
 	var node yaml.Node
 
 	err := yaml.Unmarshal(data, &node)
@@ -109,7 +110,7 @@ func decodeYAMLFields(fields map[string]*yaml.Node, targets ...yamlDecodeTarget)
 	return nil
 }
 
-func encodeMetadata(meta *Metadata) map[string]string {
+func encodeMetadata(meta *state.Metadata) map[string]string {
 	return map[string]string{
 		yamlKeyTargetFolder:      meta.TargetFolder,
 		yamlKeyLockFile:          meta.LockFile,

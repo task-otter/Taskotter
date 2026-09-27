@@ -18,7 +18,6 @@ import (
 	"syscall"
 
 	"github.com/task-otter/Taskotter/internal/features/plan/domain"
-	"github.com/task-otter/Taskotter/internal/features/root/ports"
 	statepkg "github.com/task-otter/Taskotter/internal/features/state"
 	"github.com/task-otter/Taskotter/internal/features/state/lockmodel"
 	"github.com/task-otter/Taskotter/internal/shared/config"
@@ -694,7 +693,7 @@ func validateLockFileYAML(data []byte) error {
 }
 
 func validateMetadataYAML(data []byte) error {
-	var meta domain.Metadata
+	var meta statepkg.Metadata
 
 	err := yaml.Unmarshal(data, &meta)
 	if err != nil {
@@ -1364,7 +1363,7 @@ func loadPreviousState(workspace string, cfg *config.Config) (previousState, err
 	return previousState{lock: oldLock, target: oldTarget}, nil
 }
 
-func loadCurrentMetadata(workspace string, cfg *config.Config) (*domain.Metadata, error) {
+func loadCurrentMetadata(workspace string, cfg *config.Config) (*statepkg.Metadata, error) {
 	meta, found, err := loadMetadataIfExists(workspace, config.MetadataPath(cfg))
 
 	if err != nil && !errors.Is(err, errMetadataNotFound) {
@@ -1383,7 +1382,7 @@ func loadCurrentMetadata(workspace string, cfg *config.Config) (*domain.Metadata
 	return meta, nil
 }
 
-func loadMetadataFallbacks(workspace, currentMetadataPath string) (*domain.Metadata, error) {
+func loadMetadataFallbacks(workspace, currentMetadataPath string) (*statepkg.Metadata, error) {
 	meta, found, err := tryLegacyMetadata(workspace, currentMetadataPath)
 
 	if err != nil && !errors.Is(err, errMetadataNotFound) {
@@ -1404,7 +1403,7 @@ func loadMetadataFallbacks(workspace, currentMetadataPath string) (*domain.Metad
 
 func tryLegacyMetadata(
 	workspace, currentMetadataPath string,
-) (meta *domain.Metadata, found bool, err error) {
+) (meta *statepkg.Metadata, found bool, err error) {
 	if currentMetadataPath == config.LegacyMetadataPath {
 		return nil, false, errMetadataNotFound
 	}
@@ -1424,7 +1423,7 @@ func tryLegacyMetadata(
 
 func loadMetadataIfExists(
 	workspace, metadataPath string,
-) (meta *domain.Metadata, found bool, err error) {
+) (meta *statepkg.Metadata, found bool, err error) {
 	meta, err = statepkg.LoadMetadata(workspace, metadataPath)
 
 	if errors.Is(err, os.ErrNotExist) {
@@ -1441,7 +1440,7 @@ func loadMetadataIfExists(
 func loadPreviousLock(
 	workspace string,
 	cfg *config.Config,
-	oldMeta *domain.Metadata,
+	oldMeta *statepkg.Metadata,
 ) (lock *syncLock, target string, err error) {
 	resolved := resolveOldLockPathAndTarget(resolveLockArgs{cfg: cfg, oldMeta: oldMeta})
 
@@ -1474,7 +1473,7 @@ func resolveOldLockPathAndTarget(args resolveLockArgs) lockPathResult {
 	return lockPathResult{lockPath: oldLockPath, target: args.oldMeta.TargetFolder}
 }
 
-func discoverPreviousMetadata(workspace, currentMetadataPath string) (*domain.Metadata, error) {
+func discoverPreviousMetadata(workspace, currentMetadataPath string) (*statepkg.Metadata, error) {
 	candidates, err := collectMetadataCandidates(workspace, currentMetadataPath)
 	if err != nil {
 		return nil, fmt.Errorf(errDiscoverPreviousMetadata, err)
@@ -1547,7 +1546,7 @@ func recordMetadataCandidate(candidates *[]string, rel string, scan metadataScan
 	}
 }
 
-func loadFirstCandidate(workspace string, candidates []string) (*domain.Metadata, error) {
+func loadFirstCandidate(workspace string, candidates []string) (*statepkg.Metadata, error) {
 	meta, err := statepkg.LoadMetadata(workspace, candidates[consts.IndexZero])
 	if err != nil {
 		return nil, fmt.Errorf("load previous metadata %q: %w", candidates[consts.IndexZero], err)
@@ -2214,7 +2213,7 @@ func isDestinationManaged(oldLock *syncLock, mod *moduleRecord) bool {
 	return false
 }
 
-func mustMarshalMetadata(meta *domain.Metadata) []byte {
+func mustMarshalMetadata(meta *statepkg.Metadata) []byte {
 	return domain.MarshalMetadata(meta)
 }
 
@@ -2222,7 +2221,7 @@ func newPlanFromInputs(
 	syncIn *domain.SyncInput,
 	art *planArtifacts,
 	prev *previousState,
-) (plan *domain.Plan, meta *domain.Metadata) {
+) (plan *domain.Plan, meta *statepkg.Metadata) {
 	lock := buildLock(syncIn, art.plannedFiles, art.generatedRootTasks)
 
 	meta = newPlanMetadata(syncIn)
@@ -2238,8 +2237,8 @@ func newPlanFromInputs(
 	return plan, meta
 }
 
-func newPlanMetadata(syncInput *domain.SyncInput) *domain.Metadata {
-	return &domain.Metadata{
+func newPlanMetadata(syncInput *domain.SyncInput) *statepkg.Metadata {
+	return &statepkg.Metadata{
 		TargetFolder:      syncInput.Config.TargetFolder,
 		LockFile:          config.LockFilePath(syncInput.Config),
 		ConfigurationHash: syncInput.Config.ConfigurationHash,
@@ -2416,7 +2415,7 @@ func maybeRewriteRootTaskfile(args *rewriteModuleArgs, data []byte) ([]byte, err
 }
 
 func readRootTaskfile(
-	ops ports.TaskfileOps,
+	ops domain.TaskfileOps,
 	workspace, rootPath string,
 ) ([]byte, rootState, error) {
 	rootBytes, err := pathutil.ReadRelativeFile(workspace, rootPath)
@@ -2436,7 +2435,7 @@ func readRootTaskfile(
 	return template, rootAbsent, nil
 }
 
-func rootTemplateOrError(ops ports.TaskfileOps) ([]byte, error) {
+func rootTemplateOrError(ops domain.TaskfileOps) ([]byte, error) {
 	if ops == nil {
 		return nil, errTaskfileOpsNotConfigured
 	}
@@ -2729,7 +2728,7 @@ func loadOneStoreMetadataFile(root, abs string, out map[string]storeTaskMetadata
 	return nil
 }
 
-func loadStoreTaskMetadata(snapshot ports.Snapshot) (map[string]storeTaskMetadata, error) {
+func loadStoreTaskMetadata(snapshot domain.Snapshot) (map[string]storeTaskMetadata, error) {
 	out := make(map[string]storeTaskMetadata)
 	root := filepath.Join(snapshot.WorkspaceRoot(), taskfilesDirName)
 

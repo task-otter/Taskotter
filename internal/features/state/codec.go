@@ -12,6 +12,10 @@ import (
 	yaml "go.yaml.in/yaml/v3"
 )
 
+const (
+	metadataLabel = "metadata"
+)
+
 // Error implements the error interface, returning the sync planning failure message.
 func (err SyncError) Error() string {
 	return string(err)
@@ -28,10 +32,16 @@ func MarshalMetadata(meta *Metadata) []byte {
 
 // UnmarshalYAMLMapping decodes YAML mapping keys into destinations in outs (key -> pointer).
 func UnmarshalYAMLMapping(value *yaml.Node, label string, outs map[string]any) error {
-	targets := make([]yamlDecodeTarget, consts.IndexZero, len(outs))
+	targets := make([]struct {
+		Out any
+		Key string
+	}, consts.IndexZero, len(outs))
 
 	for key := range outs {
-		targets = append(targets, yamlDecodeTarget{Key: key, Out: outs[key]})
+		targets = append(targets, struct {
+			Out any
+			Key string
+		}{Key: key, Out: outs[key]})
 	}
 
 	err := unmarshalYAMLTargets(value, label, targets...)
@@ -44,7 +54,7 @@ func UnmarshalYAMLMapping(value *yaml.Node, label string, outs map[string]any) e
 
 // UnmarshalMetadata decodes TaskOtter metadata from its stable on-disk keys.
 func UnmarshalMetadata(value *yaml.Node, meta *Metadata) error {
-	err := UnmarshalYAMLMapping(value, "metadata", map[string]any{
+	err := UnmarshalYAMLMapping(value, metadataLabel, map[string]any{
 		yamlKeyTargetFolder:      &meta.TargetFolder,
 		yamlKeyLockFile:          &meta.LockFile,
 		yamlKeyConfigurationHash: &meta.ConfigurationHash,
@@ -96,7 +106,13 @@ func decodeYAMLField(fields map[string]*yaml.Node, key string, out any) error {
 	return nil
 }
 
-func decodeYAMLFields(fields map[string]*yaml.Node, targets ...yamlDecodeTarget) error {
+func decodeYAMLFields(
+	fields map[string]*yaml.Node,
+	targets ...struct {
+		Out any
+		Key string
+	},
+) error {
 	for i := range targets {
 		target := &targets[i]
 
@@ -117,7 +133,14 @@ func metadataFields(meta *Metadata) map[string]string {
 	}
 }
 
-func unmarshalYAMLTargets(value *yaml.Node, label string, targets ...yamlDecodeTarget) error {
+func unmarshalYAMLTargets(
+	value *yaml.Node,
+	label string,
+	targets ...struct {
+		Out any
+		Key string
+	},
+) error {
 	fields, err := yamlFields(value)
 	if err != nil {
 		return fmt.Errorf("decode %s: %w", label, err)

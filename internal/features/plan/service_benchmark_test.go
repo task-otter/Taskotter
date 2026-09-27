@@ -10,7 +10,6 @@ import (
 	"testing"
 
 	inputpkg "github.com/task-otter/Taskotter/internal/features/input"
-	"github.com/task-otter/Taskotter/internal/features/input/adapters/snapshot"
 	planpkg "github.com/task-otter/Taskotter/internal/features/plan"
 	plandomain "github.com/task-otter/Taskotter/internal/features/plan/domain"
 	resolvesvc "github.com/task-otter/Taskotter/internal/features/resolve/service"
@@ -163,10 +162,9 @@ func benchSyncInput(b *testing.B) plandomain.SyncInput {
 
 	input, err := inputpkg.SyncInput(&inputpkg.SyncInputArgs{
 		Cfg:         cfg,
-		Snapshot:    snapshot.New(snap),
-		TaskfileOps: taskfile.NewOps(),
+		Snapshot:    newTestSnapshotAdapter(snap),
 		Resolutions: benchResolutions(b, cfg, snap),
-		DepSources:  nil,
+		TaskfileOps: taskfile.NewOps(),
 	})
 	if err != nil {
 		b.Fatal(err)
@@ -194,10 +192,10 @@ func prepareSyncInputBench(
 
 	input, err := inputpkg.SyncInput(&inputpkg.SyncInputArgs{
 		Cfg:         cfg,
-		Snapshot:    snapshot.New(snap),
-		TaskfileOps: taskfile.NewOps(),
+		Snapshot:    newTestSnapshotAdapter(snap),
 		Resolutions: resolutions,
 		DepSources:  []string{"pnpm"},
+		TaskfileOps: taskfile.NewOps(),
 	})
 	if err != nil {
 		b.Fatal(err)

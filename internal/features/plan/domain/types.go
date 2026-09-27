@@ -6,7 +6,6 @@ package domain
 import (
 	"os"
 
-	"github.com/task-otter/Taskotter/internal/features/root/ports"
 	"github.com/task-otter/Taskotter/internal/features/state"
 	"github.com/task-otter/Taskotter/internal/features/state/lockmodel"
 	"github.com/task-otter/Taskotter/internal/features/state/managed"
@@ -15,8 +14,43 @@ import (
 
 type (
 
-	// Metadata points to the active lock file and configuration hash.
-	Metadata = state.Metadata
+	// Snapshot provides module paths and store ref metadata needed for planning.
+	Snapshot interface {
+		ModuleDir(sourceModule string) string
+		WorkspaceRoot() string
+		SourceRef() string
+		ResolvedCommit() string
+		DefaultBranch() string
+	}
+
+	// TaskfileOps provides Taskfile operations needed to build a plan.
+	TaskfileOps interface {
+		NewRootTemplate() []byte
+		RewriteIncludes(
+			content []byte,
+			destinations map[string]string,
+			targetFolder string,
+		) ([]byte, error)
+		UpdateRootTaskfile(content []byte, input *RootUpdateInput) ([]byte, error)
+	}
+
+	// RootUpdateInput carries data for updating a root Taskfile.
+	RootUpdateInput = struct {
+		Tasks            []string
+		TargetFolder     string
+		RootTaskfileDir  string
+		DestByTask       map[string]string
+		ManagedTasks     []string
+		ModuleTaskfiles  map[string][]byte
+		GeneratedTasks   []GeneratedRootTask
+		ManagedRootTasks []string
+	}
+
+	// GeneratedRootTask describes a TaskOtter-managed root task.
+	GeneratedRootTask = struct {
+		Name    string
+		Modules []string
+	}
 
 	// FileEntry holds staged file bytes and permissions.
 	FileEntry = struct {
@@ -31,7 +65,7 @@ type (
 		CopyFileTo       func(string, *FileEntry) error
 		ModuleContents   map[string]map[string]FileEntry
 		Requested        map[string]lockmodel.ModuleRecord
-		Metadata         Metadata
+		Metadata         state.Metadata
 		OldTargetFolder  string
 		RootTaskfilePath string
 		RootTaskfile     []byte
@@ -48,8 +82,8 @@ type (
 	// SyncInput is the resolved store snapshot and module mapping for BuildPlan.
 	SyncInput = struct {
 		Config       *config.Config
-		Snapshot     ports.Snapshot
-		TaskfileOps  ports.TaskfileOps
+		Snapshot     Snapshot
+		TaskfileOps  TaskfileOps
 		Requested    map[string]lockmodel.ModuleRecord
 		SourceToDest map[string]string
 		DestByTask   map[string]string

@@ -4,7 +4,7 @@
 package domain
 
 import (
-	plan "github.com/task-otter/Taskotter/internal/features/plan"
+	"github.com/task-otter/Taskotter/internal/features/plan"
 	storedomain "github.com/task-otter/Taskotter/internal/features/store/domain"
 )
 

@@ -8,6 +8,12 @@ import (
 	"testing"
 )
 
+type (
+	jsonFieldAssertion struct {
+		name, want string
+	}
+)
+
 // TestResolvedTaskMarshalJSONUsesOutputKeys verifies the behavior covered by this test.
 func TestResolvedTaskMarshalJSONUsesOutputKeys(t *testing.T) {
 	t.Parallel()
@@ -40,12 +46,6 @@ func marshalTask(t *testing.T, task *ResolvedTask) map[string]string {
 
 	return got
 }
-
-type (
-	jsonFieldAssertion struct {
-		name, want string
-	}
-)
 
 func assertJSONField(t *testing.T, got map[string]string, assertion *jsonFieldAssertion) {
 	t.Helper()

@@ -20,6 +20,7 @@ type (
 	}
 
 	// Logger emits GitHub Actions log commands.
+	//nolint:reusability // Logger intentionally owns its output and failure sink.
 	Logger struct {
 		output zerolog.Logger
 		sink   logWriter
@@ -30,6 +31,7 @@ type (
 		Err() error
 	}
 
+	//nolint:reusability // The sink is a private adapter for zerolog's writer contract.
 	failureSink struct {
 		destination io.Writer
 		firstError  error

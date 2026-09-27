@@ -10,7 +10,9 @@ import (
 	storedomain "github.com/task-otter/Taskotter/internal/features/store/domain"
 )
 
-const snapshotLintModule = "lint"
+const (
+	snapshotLintModule = "lint"
+)
 
 // TestAdapterReturnsSnapshotValues verifies the behavior covered by this test.
 func TestAdapterReturnsSnapshotValues(t *testing.T) {

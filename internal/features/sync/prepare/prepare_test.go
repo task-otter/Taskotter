@@ -12,6 +12,13 @@ import (
 	"github.com/task-otter/Taskotter/internal/shared/iox"
 )
 
+type (
+	prepareRecordAssertion struct {
+		got, want string
+		label     string
+	}
+)
+
 const (
 	pathA          = "lint"
 	pathB          = "format"
@@ -109,13 +116,6 @@ func TestPrepareSyncInputBuildsRecords(t *testing.T) {
 		input.Dependencies[consts.IndexZero].Path, "taskfiles/shellcheck", "dependency path",
 	})
 }
-
-type (
-	prepareRecordAssertion struct {
-		got, want string
-		label     string
-	}
-)
 
 func assertPrepareRecord(t *testing.T, assertion *prepareRecordAssertion) {
 	t.Helper()

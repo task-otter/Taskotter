@@ -68,13 +68,18 @@ func UnmarshalLockFile(value *yaml.Node, lock *LockFile) error {
 
 // DecodeLockFileYAML unmarshals YAML bytes into a lock file.
 func DecodeLockFileYAML(data []byte, lock *LockFile) error {
-	return decodeYAMLDocumentWithContext(
+	err := decodeYAMLDocumentWithContext(
 		data,
 		"lock file",
 		func(node *yaml.Node) error {
 			return UnmarshalLockFile(node, lock)
 		},
 	)
+	if err != nil {
+		return fmt.Errorf("decode lock file YAML: %w", err)
+	}
+
+	return nil
 }
 
 // UnmarshalModuleRecord decodes a module record from the lock file's snake_case keys.
@@ -94,13 +99,18 @@ func UnmarshalModuleRecord(value *yaml.Node, record *ModuleRecord) error {
 
 // DecodeModuleRecordYAML unmarshals YAML bytes into a module record.
 func DecodeModuleRecordYAML(data []byte, record *ModuleRecord) error {
-	return decodeYAMLDocumentWithContext(
+	err := decodeYAMLDocumentWithContext(
 		data,
 		yamlLabelModuleRecord,
 		func(node *yaml.Node) error {
 			return UnmarshalModuleRecord(node, record)
 		},
 	)
+	if err != nil {
+		return fmt.Errorf("decode module record YAML: %w", err)
+	}
+
+	return nil
 }
 
 // UnmarshalOrderedRequested decodes ordered requested modules from the lock file.
@@ -119,13 +129,18 @@ func UnmarshalOrderedRequested(value *yaml.Node, requested *OrderedRequested) er
 
 // DecodeOrderedRequestedYAML unmarshals YAML bytes into ordered requested modules.
 func DecodeOrderedRequestedYAML(data []byte, requested *OrderedRequested) error {
-	return decodeYAMLDocumentWithContext(
+	err := decodeYAMLDocumentWithContext(
 		data,
 		"ordered requested",
 		func(node *yaml.Node) error {
 			return UnmarshalOrderedRequested(node, requested)
 		},
 	)
+	if err != nil {
+		return fmt.Errorf("decode ordered requested YAML: %w", err)
+	}
+
+	return nil
 }
 
 func decodeYAMLDocumentWithContext(

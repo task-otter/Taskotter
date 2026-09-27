@@ -10,6 +10,7 @@ import (
 
 type (
 	// Result describes the result.
+	//nolint:reusability // The action's public result is intentionally tailored to its output contract.
 	Result struct {
 		ResolvedOutput
 		PullRequestOutput

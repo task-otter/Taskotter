@@ -134,8 +134,6 @@ const (
 
 	testPRURLSeven = "https://example/pr/7"
 
-	testSourceSHA = "abc123"
-
 	emptyJSONArray = "[]"
 
 	wantErrText = "expected error"

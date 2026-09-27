@@ -228,7 +228,11 @@ func (stub *stubOrchestrator) Run(
 ) (*rundomain.Result, error) {
 	iox.Discard2(ctx, cfg)
 
-	return stub.result, stub.err
+	if stub.err != nil {
+		return nil, stub.err
+	}
+
+	return stub.result, nil
 }
 
 func swapOrchestrator(t *testing.T, stub *stubOrchestrator) {

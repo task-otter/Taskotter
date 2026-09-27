@@ -1,6 +1,7 @@
 // Taskotter 2026.
 // SPDX-License-Identifier: Apache-2.0.
 
+//nolint:distance // This parser package deliberately exposes only configuration primitives.
 package jsconfig
 
 import (

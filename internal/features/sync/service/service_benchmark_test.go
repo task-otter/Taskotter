@@ -322,22 +322,3 @@ func BenchmarkRewriteIncludes(b *testing.B) {
 		}
 	}
 }
-
-func mustResolveTaskBench(
-	b *testing.B,
-	cfg *config.Config,
-	snap *storedomain.Snapshot,
-) resolvesvc.Resolution {
-	b.Helper()
-
-	res, err := resolvesvc.Resolve(&resolvesvc.ResolveInput{
-		Task:           testModuleEslint,
-		Catalog:        snap.Catalog,
-		PackageManager: cfg.NodePackageManager,
-	})
-	if err != nil {
-		b.Fatal(err)
-	}
-
-	return res
-}

@@ -132,6 +132,14 @@ func TestDoGetReportsInvalidURL(t *testing.T) {
 	client := NewClientWithHTTP(t.Context(), "token", &stubDoer{err: errStub}).WithBaseURL("://bad")
 
 	resp, err := doGet(t.Context(), client, "\n")
+	if resp != nil && resp.Body != nil {
+		t.Cleanup(func() {
+			if closeErr := resp.Body.Close(); closeErr != nil {
+				t.Errorf("close response body: %v", closeErr)
+			}
+		})
+	}
+
 	iox.Discard(resp)
 	assertFails(t, err)
 }
@@ -192,16 +200,12 @@ func TestSnapshotCleanupReportsRemoveFailure(t *testing.T) {
 }
 
 // TestDrainResponseBodyReportsReadFailure verifies unreadable bodies are reported.
-//
-//nolint:bodyclose // the stub responses are drained by the function under test
 func TestDrainResponseBodyReportsReadFailure(t *testing.T) {
 	t.Parallel()
 	assertFails(t, drainResponseBody(failingResponse()))
 }
 
 // TestDrainArchiveBodyReportsFailures verifies read and close failures are reported.
-//
-//nolint:bodyclose // the stub responses are drained by the function under test
 func TestDrainArchiveBodyReportsFailures(t *testing.T) {
 	t.Parallel()
 
@@ -210,8 +214,6 @@ func TestDrainArchiveBodyReportsFailures(t *testing.T) {
 }
 
 // TestCloseOnArchiveStatusErrorReportsCleanupFailures verifies drain and close failures join.
-//
-//nolint:bodyclose // the stub responses are drained by the function under test
 func TestCloseOnArchiveStatusErrorReportsCleanupFailures(t *testing.T) {
 	t.Parallel()
 

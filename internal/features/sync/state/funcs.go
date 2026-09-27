@@ -34,21 +34,22 @@ func LoadLock(workspace, rel string) (*lockmodel.LockFile, error) {
 	)
 }
 
-func loadStateFile[T any](
+//nolint:revive // Workspace, path, label, and decoder are distinct state-loading concerns.
+func loadStateFile[value any](
 	workspace, rel, label string,
-	decode func([]byte, *T) error,
-) (*T, error) {
+	decode func([]byte, *value) error,
+) (*value, error) {
 	data, err := pathutil.ReadRelativeFile(workspace, rel)
 	if err != nil {
 		return nil, fmt.Errorf("read %s %q: %w", label, rel, err)
 	}
 
-	var value T
+	var result value
 
-	err = decode(data, &value)
+	err = decode(data, &result)
 	if err != nil {
 		return nil, fmt.Errorf("parse %s %q: %w", label, rel, err)
 	}
 
-	return &value, nil
+	return &result, nil
 }

@@ -1,6 +1,7 @@
 // Taskotter 2026.
 // SPDX-License-Identifier: Apache-2.0.
 
+//nolint:revive // Ports intentionally expose each independent composition capability.
 package ports
 
 type (

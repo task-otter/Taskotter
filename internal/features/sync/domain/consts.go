@@ -1,6 +1,7 @@
 // Taskotter 2026.
 // SPDX-License-Identifier: Apache-2.0.
 
+//nolint:distance // The domain's cohesive API is intentionally small and stable.
 package domain
 
 import (

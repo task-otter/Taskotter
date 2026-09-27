@@ -1516,13 +1516,13 @@ func advanceBlockLine(content []byte, idx, keyColumn int) (int, bool) {
 }
 
 func nextLineStart(content []byte, idx int) (int, bool) {
-	nl := bytes.IndexByte(content[idx:], '\n')
+	newline := bytes.IndexByte(content[idx:], '\n')
 
-	if nl < consts.IndexZero {
+	if newline < consts.IndexZero {
 		return consts.IndexZero, false
 	}
 
-	return idx + nl + consts.IndexOne, true
+	return idx + newline + consts.IndexOne, true
 }
 
 func isBlockEndLine(line []byte, keyColumn int) bool {
@@ -1536,9 +1536,10 @@ func isBlockEndLine(line []byte, keyColumn int) bool {
 }
 
 func linePrefix(line []byte) []byte {
-	before, _, ok := bytes.Cut(line, []byte{'\n'})
+	before, after, found := bytes.Cut(line, []byte{'\n'})
+	iox.Discard(after)
 
-	if !ok {
+	if !found {
 		return line
 	}
 

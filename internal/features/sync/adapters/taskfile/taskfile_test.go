@@ -39,6 +39,12 @@ type (
 		line    int
 		column  int
 	}
+
+	intAssertion struct {
+		label string
+		got   int
+		want  int
+	}
 )
 
 const (
@@ -1088,17 +1094,10 @@ func assertRawBlockLineTraversal(t *testing.T) {
 		consts.IndexZero,
 	); next != consts.IndexZero ||
 		ok {
+
 		t.Fatalf("nextLineStart() = %d, %t", next, ok)
 	}
 }
-
-type (
-	intAssertion struct {
-		label string
-		got   int
-		want  int
-	}
-)
 
 func assertInt(t *testing.T, assertion *intAssertion) {
 	t.Helper()

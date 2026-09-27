@@ -35,6 +35,7 @@ func (logger *Logger) Err() error {
 		return nil
 	}
 
+	//nolint:wrapcheck // Err exposes the original write failure for callers to compare.
 	return logger.sink.Err()
 }
 

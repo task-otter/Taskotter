@@ -394,6 +394,7 @@ func (client *Client) CheckoutBranch(ctx context.Context, branch string) error {
 }
 
 func checkoutBranch(ctx context.Context, client *Client, branch string) error {
+	//nolint:wrapcheck // runValidatedBranchCommand receives the static operation-specific context.
 	return runValidatedBranchCommand(ctx, client, branch, fmtCheckoutBranchErr, gitCheckout, branch)
 }
 
@@ -489,6 +490,7 @@ func (client *Client) CreateOrResetBranch(ctx context.Context, branch string) er
 }
 
 func createOrResetBranch(ctx context.Context, client *Client, branch string) error {
+	//nolint:wrapcheck // runValidatedBranchCommand receives the static operation-specific context.
 	return runValidatedBranchCommand(
 		ctx,
 		client,
@@ -593,6 +595,7 @@ func (client *Client) Push(ctx context.Context, branch string) error {
 }
 
 func push(ctx context.Context, client *Client, branch string) error {
+	//nolint:wrapcheck // runValidatedBranchCommand receives the static operation-specific context.
 	return runValidatedBranchCommand(
 		ctx,
 		client,
@@ -617,11 +620,13 @@ func (client *Client) PushForceWithLease(ctx context.Context, branch string) err
 }
 
 func pushForceWithLease(ctx context.Context, client *Client, branch string) error {
+	//nolint:wrapcheck // runValidatedBranchCommand receives the static operation-specific context.
 	return runValidatedBranchCommand(
 		ctx, client, branch, fmtGitPushErr, gitPush, "--force-with-lease", consts.GitOrigin, branch,
 	)
 }
 
+//nolint:revive // The helper keeps branch validation and command construction coupled.
 func runValidatedBranchCommand(
 	ctx context.Context,
 	client *Client,
@@ -637,6 +642,7 @@ func runValidatedBranchCommand(
 
 	err = run(ctx, client, append([]string{command}, args...)...)
 	if err != nil {
+		//nolint:err113 // each caller supplies a package-owned static error format.
 		return fmt.Errorf(errFmt, err)
 	}
 

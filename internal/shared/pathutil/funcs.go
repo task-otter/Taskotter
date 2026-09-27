@@ -504,6 +504,7 @@ func OpenRelativeFile(root, rel string) (*os.File, error) {
 // openDirFSFile opens safeRel under absRoot. safeRel has already been validated
 // to stay inside absRoot by resolveValidatedRoot.
 func openDirFSFile(absRoot, safeRel, rel string) (*os.File, error) {
+	//nolint:gosec // safeRel is validated by resolveValidatedRoot before this call.
 	file, err := os.Open(filepath.Join(absRoot, filepath.FromSlash(safeRel)))
 	if err != nil {
 		return nil, fmt.Errorf(errFmtOpenFile, rel, err)

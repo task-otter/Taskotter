@@ -1,6 +1,7 @@
 // Taskotter 2026.
 // SPDX-License-Identifier: Apache-2.0.
 
+//nolint:revive // Orchestration dependencies are intentionally explicit at the composition boundary.
 package service
 
 import (
@@ -164,5 +165,6 @@ type (
 	// RunFn defines the function signature used for this orchestration step.
 	RunFn func(context.Context, *config.Config) (*rundomain.Result, error)
 	// Orchestrator describes the orchestrator.
+	//nolint:reusability // This named function type defines the single orchestration entry point.
 	Orchestrator RunFn
 )

@@ -964,11 +964,14 @@ func diffManagedFilePaths(current map[string]managedFile, workspace string) (dif
 
 func applyFileChange(lists *diffLists, path string, change fileChangeKind) *diffLists {
 	switch change {
+	case fileUnchanged:
+		return lists
 	case fileAdded:
 		lists.added = append(lists.added, path)
 	case fileUpdated:
 		lists.updated = append(lists.updated, path)
 	default:
+		// Unknown kinds are ignored to keep plan construction forward-compatible.
 	}
 
 	return lists
@@ -1553,6 +1556,7 @@ func loadFirstCandidate(workspace string, candidates []string) (*domain.Metadata
 	return meta, nil
 }
 
+//nolint:nestif // Directory handling must preserve WalkDir's SkipDir sentinel unchanged.
 func previousMetadataCandidate(args *metadataCandidateArgs) (string, metadataScanResult, error) {
 	if args.entry.IsDir() {
 		rel, scan, err := handleDirEntry(args.entry)
@@ -1600,6 +1604,7 @@ func relMetadataPath(workspace, abs string) (string, error) {
 	return filepath.ToSlash(rel), nil
 }
 
+//nolint:unparam // WalkDir's callback contract carries scan state for future directory classifications.
 func handleDirEntry(entry os.DirEntry) (string, metadataScanResult, error) {
 	if entry.Name() == ".git" {
 		return consts.Empty, metadataNotCandidate, filepath.SkipDir

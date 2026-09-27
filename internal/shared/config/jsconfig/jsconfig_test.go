@@ -119,9 +119,12 @@ func assertValidationError(t *testing.T, raw, wantField string) {
 func parseValidationError(t *testing.T, raw string) *ValidationError {
 	t.Helper()
 
-	_, err := Parse(raw)
+	parsed, err := Parse(raw)
 	if err == nil {
 		t.Fatal("expected validation error")
+	}
+	if parsed != nil {
+		t.Fatalf("Parse() config = %#v, want nil", parsed)
 	}
 
 	var validationErr *ValidationError

@@ -462,6 +462,7 @@ func finishChangedPlan(ctx context.Context, deps *Deps, input *finishSyncInput) 
 	return nil
 }
 
+//nolint:funlen // The changed and unchanged terminal paths must remain adjacent for auditability.
 func finishSync(
 	ctx context.Context,
 	deps *Deps,
@@ -910,6 +911,7 @@ func buildResolvedDependenciesJSON(deps []lockmodel.ModuleRecord) string {
 		})
 	}
 
+	//nolint:dogsled,errcheck,gosec // out consists only of strings and is therefore safe to encode.
 	data, _ := json.MarshalIndent(out, consts.Empty, jsonIndent)
 
 	return string(data)
@@ -928,6 +930,7 @@ func buildResolvedTasksJSON(requested map[string]lockmodel.ModuleRecord) string 
 		}
 	}
 
+	//nolint:dogsled,errcheck,gosec // out consists only of strings and is therefore safe to encode.
 	data, _ := json.MarshalIndent(out, consts.Empty, jsonIndent)
 
 	return string(data)
@@ -999,6 +1002,7 @@ func logResultMetadata(log *logging.Logger, result *rundomain.Result) {
 	log.Printf(fmtTargetFolder, result.TargetFolder)
 }
 
+//nolint:funlen // The complete result schema is easiest to audit in one literal.
 func newResultShell(
 	cfg *config.Config,
 	plan *syncdomain.Plan,

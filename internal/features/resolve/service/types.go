@@ -1,6 +1,7 @@
 // Taskotter 2026.
 // SPDX-License-Identifier: Apache-2.0.
 
+//nolint:revive // These public domain types form the resolver's explicit API.
 package service
 
 import (

@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"sync"
 	"syscall"
 	"testing"
 
@@ -99,6 +100,7 @@ const (
 var (
 	errStub          = errors.New("stub failure")
 	testSeamRestores = make(map[*testing.T][]func())
+	testSeamMu       sync.Mutex
 )
 
 // TestApplyFileChangeDefaultIsNoOp verifies the expected behavior.
@@ -1954,6 +1956,11 @@ func succeedThenFail() func(string) error {
 func swapSeam[T any](t *testing.T, target *T, stub T) {
 	t.Helper()
 
+	if len(testSeamRestores[t]) == consts.IndexZero {
+		testSeamMu.Lock()
+		t.Cleanup(func() { restoreTestSeams(t) })
+	}
+
 	original := *target
 	restore := func() {
 		*target = original
@@ -1962,19 +1969,22 @@ func swapSeam[T any](t *testing.T, target *T, stub T) {
 	*target = stub
 
 	testSeamRestores[t] = append(testSeamRestores[t], restore)
-	t.Cleanup(restore)
 }
 
 func restoreTestSeams(t *testing.T) {
 	t.Helper()
 
 	restores := testSeamRestores[t]
+	if len(restores) == consts.IndexZero {
+		return
+	}
 
-	for i := range slices.Backward(restores) {
-		restores[len(restores)-1-i]()
+	for _, restore := range slices.Backward(restores) {
+		restore()
 	}
 
 	delete(testSeamRestores, t)
+	testSeamMu.Unlock()
 }
 
 func swapChmodFile(t *testing.T, stub func(*os.File, os.FileMode) error) {
@@ -2748,6 +2758,7 @@ func TestModuleNameForReportsRelFailure(t *testing.T) {
 	name, err := moduleNameFor(rootDir, rootMetaPath)
 	iox.Discard(name)
 	assertFails(t, err)
+	restoreTestSeams(t)
 }
 
 // TestParseStoreTaskMetadataRejectsBadSchema verifies unsupported schemas fail.

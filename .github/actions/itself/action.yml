@@ -59,7 +59,7 @@ runs:
         persist-credentials: true
     - name: TaskOtter
       id: taskotter
-      uses: $/
+      uses: ./  # zizmor: ignore[self-repository] root action
       with:
         github-token: ${{ inputs.github-token }}
         fail-on-changes: ${{ inputs.fail-on-changes }}

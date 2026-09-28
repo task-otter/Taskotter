@@ -3,3 +3,10 @@
 # Declared ahead of switching the benchmark job over to them.
 self-hosted-runner:
   labels: [codspeed-macro]
+
+# GitHub supports $/ self-repository action references, but actionlint has not
+# implemented the syntax yet: https://github.com/rhysd/actionlint/issues/711
+paths:
+  .github/workflows/**/*.{yaml,yml}:
+    ignore:
+      - 'specifying action "\$/.+" in invalid format because ref is missing'

@@ -158,6 +158,7 @@ func (adapter testSnapshotAdapter) WorkspaceRoot() string {
 	return storedomain.WorkspaceRoot(adapter.snapshot)
 }
 
+//nolint:decorder // These integration fixtures are grouped next to their setup helpers.
 const (
 	parentDocTool       = "tool"
 	parentDocNode       = "tool/node"
@@ -213,6 +214,7 @@ const (
 	testEmptyTaskfileYAML      = "version: \"3\"\ntasks: {}\n"
 )
 
+//nolint:decorder // Keep this injected failure beside the integration fixtures.
 var errSimulatedPromoteFailure = errors.New("simulated promote failure")
 
 func buildPlanFromSyncInput(t *testing.T, syncInput *plandomain.SyncInput) *plandomain.Plan {

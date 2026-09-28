@@ -12,6 +12,7 @@ import (
 
 type (
 	// SyncInputArgs contains inputs used to build synchronization state.
+	//nolint:reusability // This public input groups the independent sync dependencies.
 	SyncInputArgs struct {
 		Cfg         *config.Config
 		Snapshot    Snapshot

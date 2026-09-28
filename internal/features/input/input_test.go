@@ -37,6 +37,28 @@ func TestBuildMapsResolvedModules(t *testing.T) {
 	assertResolvedModule(t, &input)
 }
 
+// TestBuildReportsInputAssemblyFailure verifies Build wraps input errors.
+func TestBuildReportsInputAssemblyFailure(t *testing.T) {
+	t.Parallel()
+
+	input, err := Build(&SyncInputArgs{
+		Cfg:      &config.Config{TargetFolder: config.DefaultTargetFolder},
+		Snapshot: testSnapshot{},
+		Resolutions: []resolvesvc.Resolution{
+			{LogicalTask: pathA, SourceModule: eslintNodePNPM},
+			{LogicalTask: pathB, SourceModule: eslintBun},
+		},
+	})
+
+	if input.Config != nil {
+		t.Fatal("Build() returned input after destination collision")
+	}
+
+	if err == nil {
+		t.Fatal("Build() error = nil, want destination collision")
+	}
+}
+
 func testBuildInput() *SyncInputArgs {
 	return &SyncInputArgs{
 		Cfg:         &config.Config{TargetFolder: "taskfiles", Tasks: []string{pathA}},

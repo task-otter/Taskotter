@@ -1,15 +1,12 @@
 // Taskotter 2026.
 // SPDX-License-Identifier: Apache-2.0.
 
+//nolint:distance // Metadata constants are intentionally kept in the planner domain.
 package domain
-
-import (
-	"github.com/task-otter/Taskotter/internal/shared/consts"
-)
 
 const (
 	// YAMLMappingPairKeyValue is the YAML key used by the synchronization metadata.
-	YAMLMappingPairKeyValue = consts.IndexTwo
+	YAMLMappingPairKeyValue = 2
 
 	errDecode                = "decode %q: %w"
 	errUnmarshalMetadataFmt  = "unmarshal metadata: %w"

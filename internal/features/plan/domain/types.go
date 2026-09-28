@@ -1,6 +1,7 @@
 // Taskotter 2026.
 // SPDX-License-Identifier: Apache-2.0.
 
+//nolint:revive // The planner domain intentionally exposes its public data contracts.
 package domain
 
 import (

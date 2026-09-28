@@ -92,10 +92,11 @@ const (
 
 	unknownFileChange = 99
 
-	subDirName  = "sub"
-	goSubOldRel = "taskfiles/go/sub/old.txt"
-	gotFmt      = "got = %v"
-	modXName    = "mod-x"
+	subDirName   = "sub"
+	goSubOldRel  = "taskfiles/go/sub/old.txt"
+	gotFmt       = "got = %v"
+	modXName     = "mod-x"
+	testFileMode = 0o600
 )
 
 //nolint:gochecknoglobals // Test seam restoration is shared across helpers and guarded by testSeamMu.
@@ -2349,10 +2350,29 @@ func TestMergeParentDocFilesSkipsUnready(t *testing.T) {
 func TestReadRootTaskfileReportsTemplateFailure(t *testing.T) {
 	t.Parallel()
 
-	data, rootState, err := readRootTaskfile(nil, t.TempDir(), rootTaskfileName)
+	data, rootStateFromRead, err := readRootTaskfile(nil, t.TempDir(), rootTaskfileName)
 	iox.Discard(data)
-	iox.Discard(rootState)
+	iox.Discard(rootStateFromRead)
 	assertFails(t, err)
+}
+
+// TestBuildReportsPreviousStateFailure verifies Build wraps state loading errors.
+func TestBuildReportsPreviousStateFailure(t *testing.T) {
+	t.Parallel()
+
+	workspace := filepath.Join(t.TempDir(), "workspace-file")
+	assertNoErr(t, os.WriteFile(workspace, []byte("not a directory"), testFileMode))
+
+	plan, err := Build(&domain.SyncInput{
+		Config: &config.Config{Workspace: workspace, TargetFolder: "taskfiles"},
+	})
+	if err == nil {
+		t.Fatal("Build() error = nil, want previous-state failure")
+	}
+
+	if plan != nil {
+		t.Fatal("Build() returned a plan after previous-state failure")
+	}
 }
 
 // TestRelSlashPathReportsFailure verifies the expected behavior.

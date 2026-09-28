@@ -19,17 +19,17 @@ const (
 func TestSnapshotAdapterReturnsSnapshotValues(t *testing.T) {
 	t.Parallel()
 
-	root, snapshot := testSnapshot(t)
+	snapshot := testSnapshot(t)
 	adapter := service.NewSnapshotAdapter(snapshot)
-	assertSnapshotValues(t, adapter, snapshot, root)
+	assertSnapshotValues(t, adapter, snapshot)
 }
 
-func testSnapshot(t *testing.T) (root string, snapshot *storedomain.Snapshot) {
+func testSnapshot(t *testing.T) *storedomain.Snapshot {
 	t.Helper()
 
-	root = t.TempDir()
+	root := t.TempDir()
 
-	return root, &storedomain.Snapshot{RootDir: root, Ref: storedomain.RefInfo{
+	return &storedomain.Snapshot{RootDir: root, Ref: storedomain.RefInfo{
 		DefaultBranch: "main", ResolvedCommit: "abc123", SourceRef: "refs/heads/main",
 	}}
 }
@@ -38,11 +38,10 @@ func assertSnapshotValues(
 	t *testing.T,
 	adapter *service.SnapshotAdapter,
 	snapshot *storedomain.Snapshot,
-	root string,
 ) {
 	t.Helper()
 
-	testCases := snapshotCases(adapter, snapshot, root)
+	testCases := snapshotCases(adapter, snapshot, snapshot.RootDir)
 	assertSnapshotCases(t, testCases)
 }
 

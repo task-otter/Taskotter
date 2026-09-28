@@ -20,7 +20,7 @@ runs:
         # they are still checked by actionlint, zizmor, and yamllint below.
         YAMLFIX_EXTRA_ARGS='--exclude .github/workflows/**' task taskotter:yamlfix:ci:fix
     - name: Create fix PR
-      uses: $/.github/actions/auto-fix
+      uses: ./.github/actions/auto-fix
       with:
         token: ${{ inputs.github-token }}
     - name: Run all CI checks

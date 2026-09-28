@@ -19,7 +19,7 @@ jobs:
           persist-credentials: true
       - name: Run TaskOtter
         id: taskotter
-        uses: $/.github/actions/itself
+        uses: ./.github/actions/itself
         with:
           github-token: ${{ github.token }}
           fail-on-changes: true
@@ -48,8 +48,8 @@ jobs:
           echo "Source SHA: ${TASKOTTER_SOURCE_SHA}"
           echo "Pull request: ${TASKOTTER_PULL_REQUEST_URL}"
       - name: Run CI
-        uses: $/.github/actions/ci
+        uses: ./.github/actions/ci
         with:
           github-token: ${{ github.token }}
       - name: Run CodSpeed
-        uses: $/.github/actions/codspeed
+        uses: ./.github/actions/codspeed

@@ -51,6 +51,8 @@ jobs:
 
       - name: Run CI
         uses: ./.github/actions/ci
+        with:
+          github-token: ${{ github.token }}
 
       - name: Run CodSpeed
         uses: ./.github/actions/codspeed

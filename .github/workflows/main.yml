@@ -36,7 +36,6 @@ jobs:
             hadolint
           includes-doc: true
           target-folder: taskotter
-
       - name: Print result
         if: always()
         shell: bash
@@ -48,11 +47,9 @@ jobs:
           echo "Changed: ${TASKOTTER_CHANGED}"
           echo "Source SHA: ${TASKOTTER_SOURCE_SHA}"
           echo "Pull request: ${TASKOTTER_PULL_REQUEST_URL}"
-
       - name: Run CI
         uses: ./.github/actions/ci
         with:
           github-token: ${{ github.token }}
-
       - name: Run CodSpeed
         uses: ./.github/actions/codspeed

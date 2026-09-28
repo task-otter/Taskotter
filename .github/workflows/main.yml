@@ -6,7 +6,7 @@ on:
 permissions:
   contents: read
 jobs:
-  itself:
+  ci:
     runs-on: ubuntu-latest
     permissions:
       contents: write

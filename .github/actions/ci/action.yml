@@ -1,19 +1,30 @@
 ---
 name: Go CI
-description: Run Task-based CI, autofix issues, generate test reports, and upload
-  coverage/results to Codecov
+description: Run Task-based CI, autofix issues, generate test reports, and upload coverage/results to Codecov
+
+inputs:
+  github-token:
+    description: GitHub token used for automated fixes
+    required: true
+
 runs:
   using: composite
+
   steps:
     - name: Install Task
       uses: go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e
+
     - name: Run CI and fix fixable issues
       shell: bash
       run: |
         task taskotter:golangci-lint:ci
         task taskotter:yamlfix:ci:fix
+
     - name: Create fix PR
       uses: ./.github/actions/auto-fix
+      with:
+        token: ${{ inputs.github-token }}
+
     - name: Run all CI checks
       shell: bash
       run: |
@@ -22,11 +33,13 @@ runs:
         task taskotter:actionlint:ci
         task taskotter:zizmor:ci
         task taskotter:hadolint:ci
+
     - name: Generate Tests Report
       shell: bash
       run: task taskotter:go-junit-report:report
+
     - name: Upload Coverage Report To Codecov
-      uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f  # v7.0.0
+      uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
       with:
         use_oidc: true
         files: ./coverage.out
@@ -35,8 +48,9 @@ runs:
         disable_search: false
         fail_ci_if_error: true
         verbose: true
+
     - name: Upload Test Report to Codecov
-      uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f  # v7.0.0
+      uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
       with:
         use_oidc: true
         report_type: test_results

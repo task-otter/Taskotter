@@ -13,7 +13,7 @@ runs:
         task taskotter:golangci-lint:ci
         task taskotter:yamlfix:ci:fix
     - name: Create fix PR
-      uses: $/.github/actions/auto-fix
+      uses: ${{ github.repository }}/.github/actions/auto-fix@${{ github.sha }}
     - name: Run all CI checks
       shell: bash
       run: |

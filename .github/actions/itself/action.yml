@@ -59,7 +59,7 @@ runs:
         persist-credentials: true
     - name: TaskOtter
       id: taskotter
-      uses: $/
+      uses: ${{ github.repository }}@${{ github.sha }}
       with:
         github-token: ${{ inputs.github-token }}
         fail-on-changes: ${{ inputs.fail-on-changes }}

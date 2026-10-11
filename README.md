@@ -5,6 +5,7 @@
 # TaskOtter
 
 [![LICENSE](https://img.shields.io/github/license/task-otter/Taskotter)](/LICENSE) [![codecov](https://codecov.io/gh/task-otter/Taskotter/graph/badge.svg)](https://codecov.io/gh/task-otter/Taskotter) [![CodSpeed](https://img.shields.io/endpoint?url=https://codspeed.io/badge.json)](https://app.codspeed.io/task-otter/Taskotter?utm_source=badge)
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Ftask-otter%2FTaskotter.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Ftask-otter%2FTaskotter?ref=badge_shield)
 
 Docker-based GitHub Action that synchronizes task modules from the [TaskOtter store](https://github.com/task-otter/store) into your repository, resolves transitive dependencies, normalizes destination folder names, optionally updates your root `Taskfile.yml`, and opens or updates a deterministic pull request when changes exist.
 
@@ -289,3 +290,6 @@ codspeed run --mode walltime -- go test -bench=. ./...
 ## License
 
 MIT
+
+
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Ftask-otter%2FTaskotter.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2Ftask-otter%2FTaskotter?ref=badge_large)

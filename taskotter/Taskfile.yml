@@ -1,5 +1,6 @@
 ---
-version: "3.5"
+version: '3.5'
+
 vars:
   ACTIONLINT_EXTRA_ARGS: '{{.ACTIONLINT_EXTRA_ARGS | default ""}}'
   ACTIONLINT_NIX_INSTALLABLE: '{{.ACTIONLINT_NIX_INSTALLABLE | default "nixpkgs#actionlint"}}'
@@ -70,6 +71,7 @@ vars:
   TRIVY_NIX_INSTALLABLE: '{{.TRIVY_NIX_INSTALLABLE | default "nixpkgs#trivy"}}'
   TRIVY_SCANNERS: '{{.TRIVY_SCANNERS | default "vuln,misconfig,secret,license"}}'
   TRIVY_WINGET_INSTALLABLE: '{{.TRIVY_WINGET_INSTALLABLE | default "AquaSecurity.Trivy"}}'
+
 includes:
   go:
     taskfile: go/Taskfile.yml
@@ -172,6 +174,7 @@ includes:
       RUMDL_EXTRA_ARGS: '{{.RUMDL_EXTRA_ARGS}}'
       RUMDL_NIX_INSTALLABLE: '{{.RUMDL_NIX_INSTALLABLE}}'
       RUMDL_WINGET_INSTALLABLE: '{{.RUMDL_WINGET_INSTALLABLE}}'
+
 tasks:
   ci:
     desc: Run ci for synced TaskOtter modules

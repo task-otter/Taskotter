@@ -16,6 +16,7 @@ configuration:
     - hadolint
     - trivy
     - rumdl
+
 generated_root_tasks:
   - ci
   - ci:fix
@@ -23,6 +24,7 @@ generated_root_tasks:
   - verify
   - version
   - which
+
 managed_files:
   - destination_module: actionlint
     path: taskotter/actionlint/README.md
@@ -174,6 +176,7 @@ managed_files:
     sha256: de72568a1a4eba12f12b643917c2b212f11ba672821b6e97f2b9cf8dc4119835
     source_module: zizmor
     source_path: taskfiles/zizmor/Taskfile.yml
+
 resolved_modules:
   dependencies:
     - destination_module: cargo
@@ -233,6 +236,7 @@ resolved_modules:
       destination_module: zizmor
       path: taskotter/zizmor
       source_module: zizmor
+
 source:
   default_branch: main
   repository: task-otter/store

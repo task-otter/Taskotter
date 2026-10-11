@@ -14,6 +14,8 @@ const (
 
 	gitObjectTypeTag = "tag"
 
+	tagsPerPage = 100
+
 	httpClientTimeout = 60 * time.Second
 
 	defaultBaseURL = "https://api.github.com"

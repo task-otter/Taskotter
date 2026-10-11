@@ -73,6 +73,7 @@ func TestClientRequestsReportTransportFailures(t *testing.T) {
 	assertFails(t, secondOf(resolveTag(ctx, client, testTag)))
 	assertFails(t, secondOf(peelAnnotatedTag(ctx, client, testSHA)))
 	assertFails(t, secondOf(client.ResolveRef(ctx, consts.Empty)))
+	assertFails(t, secondOf(client.LatestStableVersion(ctx)))
 	assertFails(t, secondOf(client.DownloadSnapshot(ctx, newRefInfoForTest())))
 }
 

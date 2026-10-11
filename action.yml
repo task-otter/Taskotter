@@ -31,7 +31,9 @@ inputs:
     required: false
     default: 'true'
   store-version:
-    description: Specific Git tag from the store. Empty uses the default branch HEAD.
+    description: |
+      Specific Git tag from the store. Empty uses the default branch HEAD.
+      Warns when a newer stable version tag exists; continues syncing the pinned tag.
     required: false
     default: ''
   target-folder:

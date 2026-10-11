@@ -764,6 +764,10 @@ func (loc *localStore) DownloadSnapshot(_ context.Context, ref *refInfo) (*snap,
 	return out, nil
 }
 
+func (*localStore) LatestStableVersion(context.Context) (string, error) {
+	return consts.Empty, nil
+}
+
 func (loc *localStore) ResolveRef(
 	_ context.Context,
 	requestedVersion string,

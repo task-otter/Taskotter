@@ -805,6 +805,10 @@ func storeRefGrp(ctx context.Context, deps *Deps, cfg *config.Config) (refInfo, 
 	deps.Logger.Printf("Source ref: %s", resolved.SourceRef)
 	deps.Logger.Printf("Resolved commit: %s", resolved.ResolvedCommit)
 
+	if cfg.StoreVersion != consts.Empty {
+		warnOutdatedStoreVersion(ctx, deps, cfg.StoreVersion)
+	}
+
 	return resolved, nil
 }
 

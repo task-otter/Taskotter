@@ -155,6 +155,10 @@ jobs:
 
 ### Pinned Store Tag
 
+When a newer stable semantic version tag exists in the store, TaskOtter emits a GitHub Actions warning with the pinned and newest versions, then continues syncing the pinned tag. Tags with or without a `v` prefix are compared by semantic version; prerelease tags are excluded from the newest stable version.
+
+If GitHub cannot complete the version check, TaskOtter warns and continues. Non-semantic pins remain supported and log that freshness cannot be compared. An empty `store-version` uses default branch HEAD and skips this check.
+
 ```yaml
 - uses: task-otter/Taskotter@v1
   with:

@@ -6,6 +6,9 @@ package domain
 import (
 	"fmt"
 	"path/filepath"
+	"strings"
+
+	"golang.org/x/mod/semver"
 )
 
 // Close removes temporary snapshot files when present.
@@ -35,6 +38,15 @@ func ModuleDir(s *Snapshot, sourceModule string) string {
 // ResolvedCommit returns the resolved commit SHA from Ref.
 func ResolvedCommit(s *Snapshot) string {
 	return s.Ref.ResolvedCommit
+}
+
+// SemanticVersion normalizes a version tag for comparison, or returns empty for a non-version tag.
+func SemanticVersion(tag string) string {
+	if !strings.HasPrefix(tag, "v") {
+		tag = "v" + tag
+	}
+
+	return semver.Canonical(tag)
 }
 
 // SourceRef returns the resolved source ref label from Ref.

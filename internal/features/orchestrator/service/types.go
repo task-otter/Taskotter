@@ -22,6 +22,7 @@ import (
 type (
 	storeClient interface {
 		ResolveRef(ctx context.Context, requestedVersion string) (storedomain.RefInfo, error)
+		LatestStableVersion(ctx context.Context) (string, error)
 		DownloadSnapshot(
 			ctx context.Context,
 			ref *storedomain.RefInfo,

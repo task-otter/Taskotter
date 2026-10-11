@@ -67,6 +67,10 @@ type (
 		SHA string `json:"sha"`
 	}
 
+	tagPayload = struct {
+		Name string `json:"name"`
+	}
+
 	extractedStore = struct {
 		catalog map[string]struct{}
 		deps    map[string][]string

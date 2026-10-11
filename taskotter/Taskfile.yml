@@ -1,5 +1,5 @@
 ---
-version: "3.5"
+version: '3.5'
 vars:
   ACTIONLINT_EXTRA_ARGS: '{{.ACTIONLINT_EXTRA_ARGS | default ""}}'
   ACTIONLINT_NIX_INSTALLABLE: '{{.ACTIONLINT_NIX_INSTALLABLE | default "nixpkgs#actionlint"}}'
@@ -24,7 +24,8 @@ vars:
     if (\$u) { \$env:Path = \$u + ';' + \$env:Path };
     if (Get-Command go -ErrorAction SilentlyContinue) {
       \$goBin = Join-Path ((go env GOPATH).Trim()) 'bin';
-      if (Test-Path -LiteralPath \$goBin) { \$env:Path = \$goBin + ';' + \$env:Path }
+      if (Test-Path -LiteralPath \$goBin) { \$env:Path = \$goBin + ';' + \$env:Path
+    }
     }
     `}}
   GO_NIX_INSTALLABLE: '{{.GO_NIX_INSTALLABLE | default "nixpkgs#go"}}'

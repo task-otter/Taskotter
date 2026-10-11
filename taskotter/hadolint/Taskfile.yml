@@ -1,34 +1,29 @@
 ---
 version: '3.5'
-
 output:
   group:
     begin: ::group::{{.TASK}}
     end: '::endgroup::'
     error_only: false
-
 silent: true
-
 includes:
   nix:
     taskfile: ../nix/Taskfile.yml
   winget:
     taskfile: ../winget/Taskfile.yml
-
 vars:
   HADOLINT_CONFIG: '{{.HADOLINT_CONFIG | default ""}}'
   HADOLINT_DOCKERFILE: '{{.HADOLINT_DOCKERFILE | default "Dockerfile"}}'
   HADOLINT_EXTRA_ARGS: '{{.HADOLINT_EXTRA_ARGS | default ""}}'
   HADOLINT_NIX_INSTALLABLE: '{{.HADOLINT_NIX_INSTALLABLE | default "nixpkgs#hadolint"}}'
   HADOLINT_WINGET_INSTALLABLE: '{{.HADOLINT_WINGET_INSTALLABLE | default "hadolint.hadolint"}}'
-
 tasks:
   default:
     run: once
     desc: Show available hadolint automation tasks
-    summary: Display the list of available hadolint-related tasks defined in this Taskfile.
-    cmds:
-      - task --list
+    summary: Display the list of available hadolint-related tasks defined in this
+      Taskfile.
+    cmds: [task --list]
   install:
     run: once
     desc: Install hadolint via Nix (Unix) or WinGet (Windows)
@@ -42,19 +37,15 @@ tasks:
       - task: _install:windows
   _install:unix:
     internal: true
-    platforms:
-      - linux
-      - darwin
-    status:
-      - command -v hadolint >/dev/null 2>&1
+    platforms: [linux, darwin]
+    status: [command -v hadolint >/dev/null 2>&1]
     cmds:
       - task: nix:install:profile
         vars:
           NIX_INSTALLABLE: '{{.HADOLINT_NIX_INSTALLABLE}}'
   _install:windows:
     internal: true
-    platforms:
-      - windows
+    platforms: [windows]
     status:
       - >-
         powershell -NoProfile -ExecutionPolicy Bypass -Command
@@ -91,9 +82,7 @@ tasks:
   _ci:unix:
     run: once
     internal: true
-    platforms:
-      - linux
-      - darwin
+    platforms: [linux, darwin]
     dir: '{{.USER_WORKING_DIR}}'
     cmds:
       - |
@@ -107,8 +96,7 @@ tasks:
   _ci:windows:
     run: once
     internal: true
-    platforms:
-      - windows
+    platforms: [windows]
     dir: '{{.USER_WORKING_DIR}}'
     preconditions:
       - sh: >-
@@ -128,18 +116,14 @@ tasks:
     internal: true
     desc: Show hadolint version on macOS or Linux
     summary: Print the hadolint version on macOS or Linux.
-    platforms:
-      - linux
-      - darwin
-    cmds:
-      - bash -lc '{{.NIX_LOAD}}; hadolint --version'
+    platforms: [linux, darwin]
+    cmds: ["bash -lc '{{.NIX_LOAD}}; hadolint --version'"]
   _version:windows:
     run: once
     internal: true
     desc: Show hadolint version on Windows
     summary: Print the hadolint version on Windows.
-    platforms:
-      - windows
+    platforms: [windows]
     preconditions:
       - sh: >-
           powershell -NoProfile -ExecutionPolicy Bypass -Command

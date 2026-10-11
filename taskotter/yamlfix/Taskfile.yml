@@ -1,14 +1,11 @@
 ---
 version: '3.5'
-
 output:
   group:
     begin: ::group::{{.TASK}}
     end: '::endgroup::'
     error_only: false
-
 silent: true
-
 includes:
   nix:
     taskfile: ../nix/Taskfile.yml
@@ -16,20 +13,17 @@ includes:
     taskfile: ../uv/Taskfile.yml
   winget:
     taskfile: ../winget/Taskfile.yml
-
 vars:
   YAMLFIX_NIX_INSTALLABLE: '{{.YAMLFIX_NIX_INSTALLABLE | default "nixpkgs#yamlfix"}}'
   YAMLFIX_UV_TOOL: '{{.YAMLFIX_UV_TOOL | default "yamlfix"}}'
   YAMLFIX_TARGETS: '{{.YAMLFIX_TARGETS | default "."}}'
   YAMLFIX_EXTRA_ARGS: '{{.YAMLFIX_EXTRA_ARGS | default ""}}'
-
 tasks:
   default:
     run: once
     desc: Show available yamlfix automation tasks
     summary: Display the list of available yamlfix-related tasks defined in this Taskfile.
-    cmds:
-      - task --list
+    cmds: [task --list]
   install:
     run: once
     desc: Install yamlfix via Nix (Unix) or uv tool (Windows)
@@ -43,19 +37,15 @@ tasks:
       - task: _install:windows
   _install:unix:
     internal: true
-    platforms:
-      - linux
-      - darwin
-    status:
-      - command -v yamlfix >/dev/null 2>&1
+    platforms: [linux, darwin]
+    status: [command -v yamlfix >/dev/null 2>&1]
     cmds:
       - task: nix:install:profile
         vars:
           NIX_INSTALLABLE: '{{.YAMLFIX_NIX_INSTALLABLE}}'
   _install:windows:
     internal: true
-    platforms:
-      - windows
+    platforms: [windows]
     status:
       - >-
         powershell -NoProfile -ExecutionPolicy Bypass -Command
@@ -89,33 +79,26 @@ tasks:
       - task: install
     cmds:
       - cmd: bash -lc '{{.NIX_LOAD}}; yamlfix {{.YAMLFIX_TARGETS}} {{.YAMLFIX_EXTRA_ARGS}}'
-        platforms:
-          - linux
-          - darwin
+        platforms: [linux, darwin]
       - cmd: >-
           powershell -NoProfile -ExecutionPolicy Bypass -Command
           "{{.WINGET_LOAD}}; {{.UV_LOAD}};
           yamlfix {{.YAMLFIX_TARGETS}} {{.YAMLFIX_EXTRA_ARGS}};
           exit \$LASTEXITCODE"
-        platforms:
-          - windows
+        platforms: [windows]
   _version:unix:
     run: once
     internal: true
     desc: Show yamlfix version on macOS or Linux
     summary: Print the yamlfix version on macOS or Linux.
-    platforms:
-      - linux
-      - darwin
-    cmds:
-      - bash -lc '{{.NIX_LOAD}}; yamlfix --version'
+    platforms: [linux, darwin]
+    cmds: ["bash -lc '{{.NIX_LOAD}}; yamlfix --version'"]
   _version:windows:
     run: once
     internal: true
     desc: Show yamlfix version on Windows
     summary: Print the yamlfix version on Windows.
-    platforms:
-      - windows
+    platforms: [windows]
     preconditions:
       - sh: >-
           powershell -NoProfile -ExecutionPolicy Bypass -Command

@@ -1,19 +1,15 @@
 ---
-version: "3.5"
-
+version: '3.5'
 env:
- GOTOOLCHAIN: go1.27.2
-
+  GOTOOLCHAIN: go1.27.2
 includes:
   taskotter:
     taskfile: taskotter/Taskfile.yml
     vars:
       GO_JUNIT_REPORT_IN: test-result.txt
       GO_JUNIT_REPORT_OUT: junit.xml
-
 tasks:
   default:
     run: once
     desc: Show all available TaskOtter tasks
-    cmds:
-      - task --list-all
+    cmds: [task --list-all]

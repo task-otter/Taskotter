@@ -1,33 +1,27 @@
 ---
 version: '3.5'
-
 output:
   group:
     begin: ::group::{{.TASK}}
     end: '::endgroup::'
     error_only: false
-
 silent: true
-
 includes:
   nix:
     taskfile: ../nix/Taskfile.yml
   winget:
     taskfile: ../winget/Taskfile.yml
-
 vars:
   ZIZMOR_EXTRA_ARGS: '{{.ZIZMOR_EXTRA_ARGS | default "--offline"}}'
   ZIZMOR_TARGETS: '{{.ZIZMOR_TARGETS | default ".github"}}'
   ZIZMOR_NIX_INSTALLABLE: '{{.ZIZMOR_NIX_INSTALLABLE | default "nixpkgs#zizmor"}}'
   ZIZMOR_WINGET_INSTALLABLE: '{{.ZIZMOR_WINGET_INSTALLABLE | default "zizmor.zizmor"}}'
-
 tasks:
   default:
     run: once
     desc: Show available zizmor automation tasks
     summary: Display the list of available zizmor-related tasks defined in this Taskfile.
-    cmds:
-      - task --list
+    cmds: [task --list]
   install:
     run: once
     desc: Install zizmor via Nix (Unix) or WinGet (Windows)
@@ -36,24 +30,20 @@ tasks:
       Windows via WinGet, when it is not already on PATH. Override
       ZIZMOR_NIX_INSTALLABLE or ZIZMOR_WINGET_INSTALLABLE to pin a
       different package or version.
-    status:
-      - command -v zizmor >/dev/null 2>&1
+    status: [command -v zizmor >/dev/null 2>&1]
     cmds:
       - task: _install:unix
       - task: _install:windows
   _install:unix:
     internal: true
-    platforms:
-      - linux
-      - darwin
+    platforms: [linux, darwin]
     cmds:
       - task: nix:install:profile
         vars:
           NIX_INSTALLABLE: '{{.ZIZMOR_NIX_INSTALLABLE}}'
   _install:windows:
     internal: true
-    platforms:
-      - windows
+    platforms: [windows]
     cmds:
       - task: winget:install:package
         vars:
@@ -92,9 +82,7 @@ tasks:
             {{else}}{{.ZIZMOR_EXTRA_ARGS}} \
             {{.ZIZMOR_TARGETS}}{{end}} \
             && echo "✅ zizmor audit passed" || { echo "❌ zizmor audit found issues"; exit 1; }'
-        platforms:
-          - linux
-          - darwin
+        platforms: [linux, darwin]
       - cmd: >-
           powershell -NoProfile -ExecutionPolicy Bypass -Command
           "{{.WINGET_LOAD}};
@@ -104,25 +92,20 @@ tasks:
           [System.StringSplitOptions]::RemoveEmptyEntries);
           & zizmor @zArgs;
           exit \$LASTEXITCODE"
-        platforms:
-          - windows
+        platforms: [windows]
   _version:unix:
     run: once
     internal: true
     desc: Show zizmor version on macOS or Linux
     summary: Print the zizmor version on macOS or Linux.
-    platforms:
-      - linux
-      - darwin
-    cmds:
-      - bash -lc '{{.NIX_LOAD}}; zizmor --version'
+    platforms: [linux, darwin]
+    cmds: ["bash -lc '{{.NIX_LOAD}}; zizmor --version'"]
   _version:windows:
     run: once
     internal: true
     desc: Show zizmor version on Windows
     summary: Print the zizmor version on Windows.
-    platforms:
-      - windows
+    platforms: [windows]
     preconditions:
       - sh: >-
           powershell -NoProfile -ExecutionPolicy Bypass -Command

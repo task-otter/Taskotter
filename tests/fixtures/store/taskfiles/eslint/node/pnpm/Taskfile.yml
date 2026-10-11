@@ -1,20 +1,17 @@
 ---
-version: "3"
+version: '3'
 includes:
   pnpm:
     taskfile: ../../../pnpm/Taskfile.yml
 vars:
-  NODE_VERSION: "24"
+  NODE_VERSION: '24'
 tasks:
   install:
     cmds:
       - task: pnpm:install
   lint:
-    cmds:
-      - pnpm exec eslint .
+    cmds: [pnpm exec eslint .]
   lint:fix:
-    cmds:
-      - pnpm exec eslint . --fix
+    cmds: [pnpm exec eslint . --fix]
   version:
-    cmds:
-      - pnpm exec eslint --version
+    cmds: [pnpm exec eslint --version]

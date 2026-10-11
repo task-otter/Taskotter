@@ -1,14 +1,11 @@
 ---
 version: '3.5'
-
 output:
   group:
     begin: ::group::{{.TASK}}
     end: '::endgroup::'
     error_only: false
-
 silent: true
-
 includes:
   go:
     taskfile: ../go/Taskfile.yml
@@ -16,20 +13,18 @@ includes:
     taskfile: ../nix/Taskfile.yml
   winget:
     taskfile: ../winget/Taskfile.yml
-
 vars:
   GO_JUNIT_REPORT_NIX_INSTALLABLE: '{{.GO_JUNIT_REPORT_NIX_INSTALLABLE | default "nixpkgs#go-junit-report"}}'
   GO_JUNIT_REPORT_GO_PKG: '{{.GO_JUNIT_REPORT_GO_PKG | default "github.com/jstemmer/go-junit-report/v2@latest"}}'
   GO_JUNIT_REPORT_IN: '{{.GO_JUNIT_REPORT_IN | default ""}}'
   GO_JUNIT_REPORT_OUT: '{{.GO_JUNIT_REPORT_OUT | default ""}}'
-
 tasks:
   default:
     run: once
     desc: Show available go-junit-report automation tasks
-    summary: Display the list of available go-junit-report-related tasks defined in this Taskfile.
-    cmds:
-      - task --list
+    summary: Display the list of available go-junit-report-related tasks defined in
+      this Taskfile.
+    cmds: [task --list]
   install:
     run: once
     desc: Install go-junit-report via Nix (Unix) or go install (Windows)
@@ -45,24 +40,21 @@ tasks:
       - task: _install:windows
   _install:unix:
     internal: true
-    platforms:
-      - linux
-      - darwin
-    status:
-      - command -v go-junit-report >/dev/null 2>&1
+    platforms: [linux, darwin]
+    status: [command -v go-junit-report >/dev/null 2>&1]
     cmds:
       - task: nix:install:profile
         vars:
           NIX_INSTALLABLE: '{{.GO_JUNIT_REPORT_NIX_INSTALLABLE}}'
   _install:windows:
     internal: true
-    platforms:
-      - windows
+    platforms: [windows]
     status:
       - >-
         powershell -NoProfile -ExecutionPolicy Bypass -Command
         "{{.WINGET_LOAD}}; {{.GO_LOAD}};
-        if (-not (Get-Command go-junit-report -ErrorAction SilentlyContinue)) { exit 1 };
+        if (-not (Get-Command go-junit-report -ErrorAction SilentlyContinue)) { exit
+        1 };
         go-junit-report -version; exit \$LASTEXITCODE"
     cmds:
       - task: go:install:pkg
@@ -114,14 +106,14 @@ tasks:
       GO_JUNIT_REPORT_INPUT: '{{.GO_JUNIT_REPORT_IN}}'
       GO_JUNIT_REPORT_OUTPUT: '{{.GO_JUNIT_REPORT_OUT}}'
     requires:
-      vars:
-        - GO_JUNIT_REPORT_IN
-        - GO_JUNIT_REPORT_OUT
+      vars: [GO_JUNIT_REPORT_IN, GO_JUNIT_REPORT_OUT]
     preconditions:
       - sh: test -n "$GO_JUNIT_REPORT_INPUT"
-        msg: GO_JUNIT_REPORT_IN is required. Pass GO_JUNIT_REPORT_IN=path/to/gotest.log when running this task.
+        msg: GO_JUNIT_REPORT_IN is required. Pass GO_JUNIT_REPORT_IN=path/to/gotest.log
+          when running this task.
       - sh: test -n "$GO_JUNIT_REPORT_OUTPUT"
-        msg: GO_JUNIT_REPORT_OUT is required. Pass GO_JUNIT_REPORT_OUT=path/to/junit.xml when running this task.
+        msg: GO_JUNIT_REPORT_OUT is required. Pass GO_JUNIT_REPORT_OUT=path/to/junit.xml
+          when running this task.
       - sh: test -f "$GO_JUNIT_REPORT_INPUT" && test -r "$GO_JUNIT_REPORT_INPUT"
         msg: GO_JUNIT_REPORT_IN must point to a readable log file.
       - sh: test "$GO_JUNIT_REPORT_INPUT" != "$GO_JUNIT_REPORT_OUTPUT"
@@ -130,7 +122,8 @@ tasks:
         msg: GO_JUNIT_REPORT_OUT must have an existing writable parent directory.
       - sh: >-
           test ! -e "$GO_JUNIT_REPORT_OUTPUT" ||
-          { test -f "$GO_JUNIT_REPORT_OUTPUT" && test -w "$GO_JUNIT_REPORT_OUTPUT"; }
+          { test -f "$GO_JUNIT_REPORT_OUTPUT" && test -w "$GO_JUNIT_REPORT_OUTPUT";
+          }
         msg: Existing GO_JUNIT_REPORT_OUT must be a writable regular file.
     cmds:
       - task: install
@@ -147,30 +140,27 @@ tasks:
           & go-junit-report -in \$env:GO_JUNIT_REPORT_INPUT
           -out \$env:GO_JUNIT_REPORT_OUTPUT -set-exit-code;
           exit \$LASTEXITCODE"
-        platforms:
-          - windows
+        platforms: [windows]
   _which:unix:
     run: once
     internal: true
     desc: Show go-junit-report binary path on macOS or Linux
-    summary: Print the go-junit-report binary path resolved by the current PATH on macOS or Linux.
-    platforms:
-      - linux
-      - darwin
-    cmds:
-      - bash -lc '{{.NIX_LOAD}}; command -v go-junit-report'
+    summary: Print the go-junit-report binary path resolved by the current PATH on
+      macOS or Linux.
+    platforms: [linux, darwin]
+    cmds: ["bash -lc '{{.NIX_LOAD}}; command -v go-junit-report'"]
   _which:windows:
     run: once
     internal: true
     desc: Show go-junit-report binary path on Windows
     summary: Print the go-junit-report binary path resolved by PowerShell on Windows.
-    platforms:
-      - windows
+    platforms: [windows]
     preconditions:
       - sh: >-
           powershell -NoProfile -ExecutionPolicy Bypass -Command
           "{{.WINGET_LOAD}}; {{.GO_LOAD}};
-          if (-not (Get-Command go-junit-report -ErrorAction SilentlyContinue)) { exit 1 };
+          if (-not (Get-Command go-junit-report -ErrorAction SilentlyContinue)) {
+          exit 1 };
           go-junit-report -version; exit \$LASTEXITCODE"
         msg: go-junit-report is not installed or not available in PATH.
     cmds:
@@ -182,23 +172,20 @@ tasks:
     internal: true
     desc: Verify go-junit-report on macOS or Linux
     summary: Print go-junit-report version on macOS or Linux.
-    platforms:
-      - linux
-      - darwin
-    cmds:
-      - bash -lc '{{.NIX_LOAD}}; go-junit-report -version'
+    platforms: [linux, darwin]
+    cmds: ["bash -lc '{{.NIX_LOAD}}; go-junit-report -version'"]
   _verify:windows:
     run: once
     internal: true
     desc: Verify go-junit-report on Windows
     summary: Print go-junit-report version on Windows.
-    platforms:
-      - windows
+    platforms: [windows]
     preconditions:
       - sh: >-
           powershell -NoProfile -ExecutionPolicy Bypass -Command
           "{{.WINGET_LOAD}}; {{.GO_LOAD}};
-          if (-not (Get-Command go-junit-report -ErrorAction SilentlyContinue)) { exit 1 };
+          if (-not (Get-Command go-junit-report -ErrorAction SilentlyContinue)) {
+          exit 1 };
           go-junit-report -version; exit \$LASTEXITCODE"
         msg: go-junit-report is not installed or not available in PATH.
     cmds:
@@ -210,23 +197,20 @@ tasks:
     internal: true
     desc: Show go-junit-report version on macOS or Linux
     summary: Print the go-junit-report version on macOS or Linux.
-    platforms:
-      - linux
-      - darwin
-    cmds:
-      - bash -lc '{{.NIX_LOAD}}; go-junit-report -version'
+    platforms: [linux, darwin]
+    cmds: ["bash -lc '{{.NIX_LOAD}}; go-junit-report -version'"]
   _version:windows:
     run: once
     internal: true
     desc: Show go-junit-report version on Windows
     summary: Print the go-junit-report version on Windows.
-    platforms:
-      - windows
+    platforms: [windows]
     preconditions:
       - sh: >-
           powershell -NoProfile -ExecutionPolicy Bypass -Command
           "{{.WINGET_LOAD}}; {{.GO_LOAD}};
-          if (-not (Get-Command go-junit-report -ErrorAction SilentlyContinue)) { exit 1 };
+          if (-not (Get-Command go-junit-report -ErrorAction SilentlyContinue)) {
+          exit 1 };
           go-junit-report -version; exit \$LASTEXITCODE"
         msg: go-junit-report is not installed or not available in PATH.
     cmds:

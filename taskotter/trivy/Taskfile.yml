@@ -1,20 +1,16 @@
 ---
 version: '3.5'
-
 output:
   group:
     begin: ::group::{{.TASK}}
     end: '::endgroup::'
     error_only: false
-
 silent: true
-
 includes:
   nix:
     taskfile: ../nix/Taskfile.yml
   winget:
     taskfile: ../winget/Taskfile.yml
-
 vars:
   TRIVY_IMAGE: '{{.TRIVY_IMAGE | default ""}}'
   TRIVY_FS_TARGET: '{{.TRIVY_FS_TARGET | default "."}}'
@@ -34,14 +30,12 @@ vars:
   TRIVY_FS_EXTRA_ARGS: '{{.TRIVY_FS_EXTRA_ARGS | default ""}}'
   TRIVY_NIX_INSTALLABLE: '{{.TRIVY_NIX_INSTALLABLE | default "nixpkgs#trivy"}}'
   TRIVY_WINGET_INSTALLABLE: '{{.TRIVY_WINGET_INSTALLABLE | default "AquaSecurity.Trivy"}}'
-
 tasks:
   default:
     run: once
     desc: Show available Trivy automation tasks
     summary: Display the list of available Trivy-related tasks defined in this Taskfile.
-    cmds:
-      - task --list
+    cmds: [task --list]
   install:
     run: once
     desc: Install Trivy via Nix (Unix) or WinGet (Windows)
@@ -56,24 +50,21 @@ tasks:
       - task: _install:windows
   _install:unix:
     internal: true
-    platforms:
-      - linux
-      - darwin
-    status:
-      - bash -lc '{{.NIX_LOAD}}; command -v trivy >/dev/null 2>&1'
+    platforms: [linux, darwin]
+    status: ["bash -lc '{{.NIX_LOAD}}; command -v trivy >/dev/null 2>&1'"]
     cmds:
       - task: nix:install:profile
         vars:
           NIX_INSTALLABLE: '{{.TRIVY_NIX_INSTALLABLE}}'
   _install:windows:
     internal: true
-    platforms:
-      - windows
+    platforms: [windows]
     status:
       - >-
         powershell -NoProfile -ExecutionPolicy Bypass -Command
         "{{.WINGET_LOAD}};
-        if (Get-Command trivy -ErrorAction SilentlyContinue) { exit 0 } else { exit 1 }"
+        if (Get-Command trivy -ErrorAction SilentlyContinue) { exit 0 } else { exit
+        1 }"
     cmds:
       - task: winget:install:package
         vars:
@@ -110,16 +101,13 @@ tasks:
       - cmd: >-
           bash -lc '{{.NIX_LOAD}};
           trivy image {{.TRIVY_IMAGE_ARGS}} {{.TRIVY_IMAGE_EXTRA_ARGS}} "$TRIVY_SCAN_TARGET"'
-        platforms:
-          - linux
-          - darwin
+        platforms: [linux, darwin]
       - cmd: >-
           powershell -NoProfile -ExecutionPolicy Bypass -Command
           "{{.WINGET_LOAD}};
           trivy image {{.TRIVY_IMAGE_ARGS}} {{.TRIVY_IMAGE_EXTRA_ARGS}} \$env:TRIVY_SCAN_TARGET;
           exit \$LASTEXITCODE"
-        platforms:
-          - windows
+        platforms: [windows]
   ci:fs:
     desc: Scan a filesystem with strict Trivy checks (TRIVY_FS_TARGET=path)
     summary: |
@@ -138,34 +126,28 @@ tasks:
       - cmd: >-
           bash -lc '{{.NIX_LOAD}};
           trivy fs {{.TRIVY_FS_ARGS}} {{.TRIVY_FS_EXTRA_ARGS}} "$TRIVY_SCAN_TARGET"'
-        platforms:
-          - linux
-          - darwin
+        platforms: [linux, darwin]
       - cmd: >-
           powershell -NoProfile -ExecutionPolicy Bypass -Command
           "{{.WINGET_LOAD}};
           trivy fs {{.TRIVY_FS_ARGS}} {{.TRIVY_FS_EXTRA_ARGS}} \$env:TRIVY_SCAN_TARGET;
           exit \$LASTEXITCODE"
-        platforms:
-          - windows
+        platforms: [windows]
   _version:unix:
     run: once
     internal: true
-    platforms:
-      - linux
-      - darwin
-    cmds:
-      - bash -lc '{{.NIX_LOAD}}; trivy --version'
+    platforms: [linux, darwin]
+    cmds: ["bash -lc '{{.NIX_LOAD}}; trivy --version'"]
   _version:windows:
     run: once
     internal: true
-    platforms:
-      - windows
+    platforms: [windows]
     preconditions:
       - sh: >-
           powershell -NoProfile -ExecutionPolicy Bypass -Command
           "{{.WINGET_LOAD}};
-          if (Get-Command trivy -ErrorAction SilentlyContinue) { exit 0 } else { exit 1 }"
+          if (Get-Command trivy -ErrorAction SilentlyContinue) { exit 0 } else { exit
+          1 }"
         msg: Trivy is not installed or not available in PATH.
     cmds:
       - >-

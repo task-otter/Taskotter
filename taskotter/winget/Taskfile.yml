@@ -1,14 +1,11 @@
 ---
 version: '3.5'
-
 output:
   group:
     begin: ::group::{{.TASK}}
     end: '::endgroup::'
     error_only: false
-
 silent: true
-
 vars:
   WINGET_INSTALLABLE: '{{.WINGET_INSTALLABLE | default ""}}'
   WINGET_VERSION: '{{.WINGET_VERSION | default ""}}'
@@ -27,18 +24,17 @@ vars:
     if (\$m) { \$env:Path = \$m + ';' + \$env:Path };
     if (\$u) { \$env:Path = \$u + ';' + \$env:Path };
     \$links = Join-Path \$env:LOCALAPPDATA 'Microsoft\WinGet\Links';
-    if (Test-Path -LiteralPath \$links) { \$env:Path = \$links + ';' + \$env:Path };
+    if (Test-Path -LiteralPath \$links) { \$env:Path = \$links + ';' + \$env:Path
+    };
     \$wa = Join-Path \$env:LOCALAPPDATA 'Microsoft\WindowsApps';
     if (Test-Path -LiteralPath \$wa) { \$env:Path = \$env:Path + ';' + \$wa }
     `}}
-
 tasks:
   default:
     run: once
     desc: Show available WinGet automation tasks
     summary: Display the list of available WinGet-related tasks defined in this Taskfile.
-    cmds:
-      - task --list
+    cmds: [task --list]
   install:
     run: once
     desc: Install WinGet on the current operating system
@@ -64,8 +60,7 @@ tasks:
     deps:
       - task: install
     requires:
-      vars:
-        - WINGET_INSTALLABLE
+      vars: [WINGET_INSTALLABLE]
     preconditions:
       - sh: test -n "{{.WINGET_INSTALLABLE}}"
         msg: WINGET_INSTALLABLE is required. Pass WINGET_INSTALLABLE=Git.Git.
@@ -98,8 +93,7 @@ tasks:
     deps:
       - task: install
     requires:
-      vars:
-        - WINGET_INSTALLABLE
+      vars: [WINGET_INSTALLABLE]
     preconditions:
       - sh: test -n "{{.WINGET_INSTALLABLE}}"
         msg: WINGET_INSTALLABLE is required. Pass WINGET_INSTALLABLE=Git.Git.
@@ -121,8 +115,7 @@ tasks:
     deps:
       - task: install
     requires:
-      vars:
-        - WINGET_INSTALLABLE
+      vars: [WINGET_INSTALLABLE]
     preconditions:
       - sh: test -n "{{.WINGET_INSTALLABLE}}"
         msg: WINGET_INSTALLABLE is required. Pass WINGET_INSTALLABLE=Git.Git.
@@ -139,7 +132,8 @@ tasks:
   version:
     run: once
     desc: Show the installed WinGet version
-    summary: Print the active WinGet version via winget --version. Auto-installs WinGet if missing.
+    summary: Print the active WinGet version via winget --version. Auto-installs WinGet
+      if missing.
     deps:
       - task: install
     cmds:
@@ -152,13 +146,13 @@ tasks:
     summary: |
       Register App Installer when it is already on the machine, then bootstrap
       WinGet with Repair-WinGetPackageManager if the client is still missing.
-    platforms:
-      - windows
+    platforms: [windows]
     status:
       - >-
         powershell -NoProfile -ExecutionPolicy Bypass -Command
         "{{.WINGET_LOAD}};
-        if (Get-Command winget -ErrorAction SilentlyContinue) { exit 0 } else { exit 1 }"
+        if (Get-Command winget -ErrorAction SilentlyContinue) { exit 0 } else { exit
+        1 }"
     cmds:
       - echo Installing WinGet...
       - >-
@@ -176,23 +170,23 @@ tasks:
         Repair-WinGetPackageManager;
         {{.WINGET_LOAD}};
         if (Get-Command winget -ErrorAction SilentlyContinue) { exit 0 };
-        Write-Error 'WinGet is not available. Install App Installer from the Microsoft Store.';
+        Write-Error 'WinGet is not available. Install App Installer from the Microsoft
+        Store.';
         exit 1"
       - echo WinGet installed. Restart your terminal if winget is not yet on PATH.
   _winget:pkg:windows:
     internal: true
-    platforms:
-      - windows
+    platforms: [windows]
     requires:
-      vars:
-        - WINGET_SUBCMD
+      vars: [WINGET_SUBCMD]
     preconditions:
       - sh: test -n "{{.WINGET_INSTALLABLE}}"
         msg: WINGET_INSTALLABLE is required. Pass WINGET_INSTALLABLE=Git.Git.
       - sh: >-
           powershell -NoProfile -ExecutionPolicy Bypass -Command
           "{{.WINGET_LOAD}};
-          if (Get-Command winget -ErrorAction SilentlyContinue) { exit 0 } else { exit 1 }"
+          if (Get-Command winget -ErrorAction SilentlyContinue) { exit 0 } else {
+          exit 1 }"
         msg: WinGet is not installed. Run task install first.
     cmds:
       - >-
@@ -218,22 +212,24 @@ tasks:
         & winget @wingetArgs;
         \$code = \$LASTEXITCODE;
         if (\$code -eq 0) { exit 0 };
-        if (\$sub -eq 'install' -and (\$code -eq -1978335135 -or \$code -eq -1978334963)) { exit 0 };
+        if (\$sub -eq 'install' -and (\$code -eq -1978335135 -or \$code -eq -1978334963))
+        { exit 0 };
         if (\$sub -eq 'upgrade' -and \$code -eq -1978335189) { exit 0 };
-        if (\$sub -eq 'uninstall' -and (\$code -eq -1978335212 -or \$code -eq -1978335185)) { exit 0 };
+        if (\$sub -eq 'uninstall' -and (\$code -eq -1978335212 -or \$code -eq -1978335185))
+        { exit 0 };
         exit \$code"
   _version:windows:
     run: once
     internal: true
     desc: Show WinGet version on Windows
     summary: Print winget --version after reloading Machine/User Path and WinGet Links.
-    platforms:
-      - windows
+    platforms: [windows]
     preconditions:
       - sh: >-
           powershell -NoProfile -ExecutionPolicy Bypass -Command
           "{{.WINGET_LOAD}};
-          if (Get-Command winget -ErrorAction SilentlyContinue) { exit 0 } else { exit 1 }"
+          if (Get-Command winget -ErrorAction SilentlyContinue) { exit 0 } else {
+          exit 1 }"
         msg: WinGet is not installed. Run task install first.
     cmds:
       - >-
@@ -242,9 +238,7 @@ tasks:
   _unix:unsupported:
     run: once
     internal: true
-    platforms:
-      - linux
-      - darwin
+    platforms: [linux, darwin]
     cmds:
       - >-
         bash -lc 'echo "WinGet is not supported on Linux or macOS.

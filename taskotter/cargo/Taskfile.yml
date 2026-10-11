@@ -1,20 +1,16 @@
 ---
 version: '3.5'
-
 output:
   group:
     begin: ::group::{{.TASK}}
     end: '::endgroup::'
     error_only: false
-
 silent: true
-
 includes:
   nix:
     taskfile: ../nix/Taskfile.yml
   winget:
     taskfile: ../winget/Taskfile.yml
-
 vars:
   CARGO_NIX_INSTALLABLE: '{{.CARGO_NIX_INSTALLABLE | default "nixpkgs#cargo"}}'
   CARGO_WINGET_INSTALLABLE: '{{.CARGO_WINGET_INSTALLABLE | default "Rustlang.Rustup"}}'
@@ -26,19 +22,18 @@ vars:
     \$u = [Environment]::GetEnvironmentVariable('Path', 'User');
     if (\$u) { \$env:Path = \$u + ';' + \$env:Path };
     \$cargoBin = Join-Path \$env:USERPROFILE '.cargo\bin';
-    if (Test-Path -LiteralPath \$cargoBin) { \$env:Path = \$cargoBin + ';' + \$env:Path }
+    if (Test-Path -LiteralPath \$cargoBin) { \$env:Path = \$cargoBin + ';' + \$env:Path
+    }
     `}}
   RUST_TOOLCHAIN: '{{.RUST_TOOLCHAIN | default ""}}'
   CARGO_EXTRA_ARGS: '{{.CARGO_EXTRA_ARGS | default ""}}'
   CARGO_CRATE: '{{.CARGO_CRATE | default ""}}'
-
 tasks:
   default:
     run: once
     desc: Show available Cargo automation tasks
     summary: Display the list of available Cargo-related tasks defined in this Taskfile.
-    cmds:
-      - task --list
+    cmds: [task --list]
   install:
     run: once
     desc: Install cargo via Nix (Unix) or WinGet (Windows)
@@ -47,24 +42,20 @@ tasks:
       Windows via WinGet, when it is not already on PATH. Override
       CARGO_NIX_INSTALLABLE or CARGO_WINGET_INSTALLABLE to pin a
       different package or version.
-    status:
-      - command -v cargo >/dev/null 2>&1
+    status: [command -v cargo >/dev/null 2>&1]
     cmds:
       - task: _install:unix
       - task: _install:windows
   _install:unix:
     internal: true
-    platforms:
-      - linux
-      - darwin
+    platforms: [linux, darwin]
     cmds:
       - task: nix:install:profile
         vars:
           NIX_INSTALLABLE: '{{.CARGO_NIX_INSTALLABLE}}'
   _install:windows:
     internal: true
-    platforms:
-      - windows
+    platforms: [windows]
     cmds:
       - task: winget:install:package
         vars:
@@ -91,8 +82,7 @@ tasks:
     deps:
       - task: install
     requires:
-      vars:
-        - CARGO_CRATE
+      vars: [CARGO_CRATE]
     preconditions:
       - sh: test -n "{{.CARGO_CRATE}}"
         msg: CARGO_CRATE is required. Pass CARGO_CRATE=name when running this task.
@@ -232,7 +222,8 @@ tasks:
   which:
     run: once
     desc: Show the path to the cargo binary
-    summary: Print the cargo binary resolved from PATH. Auto-installs the Rust toolchain if missing.
+    summary: Print the cargo binary resolved from PATH. Auto-installs the Rust toolchain
+      if missing.
     deps:
       - task: install
     cmds:
@@ -252,16 +243,12 @@ tasks:
   _which:unix:
     run: once
     internal: true
-    platforms:
-      - linux
-      - darwin
-    cmds:
-      - bash -lc '{{.NIX_LOAD}}; command -v cargo'
+    platforms: [linux, darwin]
+    cmds: ["bash -lc '{{.NIX_LOAD}}; command -v cargo'"]
   _which:windows:
     run: once
     internal: true
-    platforms:
-      - windows
+    platforms: [windows]
     cmds:
       - >-
         powershell -NoProfile -ExecutionPolicy Bypass -Command
@@ -269,16 +256,12 @@ tasks:
   _verify:unix:
     run: once
     internal: true
-    platforms:
-      - linux
-      - darwin
-    cmds:
-      - bash -lc '{{.NIX_LOAD}}; cargo --version; rustc --version'
+    platforms: [linux, darwin]
+    cmds: ["bash -lc '{{.NIX_LOAD}}; cargo --version; rustc --version'"]
   _verify:windows:
     run: once
     internal: true
-    platforms:
-      - windows
+    platforms: [windows]
     cmds:
       - >-
         powershell -NoProfile -ExecutionPolicy Bypass -Command
@@ -286,9 +269,7 @@ tasks:
         cargo --version; rustc --version; exit \$LASTEXITCODE"
   _cargo:unix:
     internal: true
-    platforms:
-      - linux
-      - darwin
+    platforms: [linux, darwin]
     dir: '{{.USER_WORKING_DIR}}'
     cmds:
       - |
@@ -297,8 +278,7 @@ tasks:
           {{.CARGO_EXTRA_ARGS}}'
   _cargo:windows:
     internal: true
-    platforms:
-      - windows
+    platforms: [windows]
     dir: '{{.USER_WORKING_DIR}}'
     cmds:
       - >-
@@ -314,18 +294,14 @@ tasks:
     internal: true
     desc: Show Cargo version on macOS or Linux
     summary: Print the cargo version on macOS or Linux.
-    platforms:
-      - linux
-      - darwin
-    cmds:
-      - bash -lc '{{.NIX_LOAD}}; cargo --version'
+    platforms: [linux, darwin]
+    cmds: ["bash -lc '{{.NIX_LOAD}}; cargo --version'"]
   _version:windows:
     run: once
     internal: true
     desc: Show Cargo version on Windows
     summary: Print the cargo version on Windows.
-    platforms:
-      - windows
+    platforms: [windows]
     preconditions:
       - sh: >-
           powershell -NoProfile -ExecutionPolicy Bypass -Command

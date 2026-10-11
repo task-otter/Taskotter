@@ -1,33 +1,27 @@
 ---
 version: '3.5'
-
 output:
   group:
     begin: ::group::{{.TASK}}
     end: '::endgroup::'
     error_only: false
-
 silent: true
-
 includes:
   nix:
     taskfile: ../nix/Taskfile.yml
   winget:
     taskfile: ../winget/Taskfile.yml
-
 vars:
   RUMDL_TARGETS: '{{.RUMDL_TARGETS | default "."}}'
   RUMDL_EXTRA_ARGS: '{{.RUMDL_EXTRA_ARGS | default ""}}'
   RUMDL_NIX_INSTALLABLE: '{{.RUMDL_NIX_INSTALLABLE | default "nixpkgs#rumdl"}}'
   RUMDL_WINGET_INSTALLABLE: '{{.RUMDL_WINGET_INSTALLABLE | default "rvben.rumdl"}}'
-
 tasks:
   default:
     run: once
     desc: Show available rumdl automation tasks
     summary: Display the list of available rumdl-related tasks defined in this Taskfile.
-    cmds:
-      - task --list
+    cmds: [task --list]
   install:
     run: once
     desc: Install rumdl via Nix (Unix) or WinGet (Windows)
@@ -36,24 +30,20 @@ tasks:
       is not already on PATH. On Windows, WinGet installs rumdl
       (RUMDL_WINGET_INSTALLABLE). Override RUMDL_NIX_INSTALLABLE or
       RUMDL_WINGET_INSTALLABLE to pin a different package or version.
-    status:
-      - command -v rumdl >/dev/null 2>&1
+    status: [command -v rumdl >/dev/null 2>&1]
     cmds:
       - task: _install:unix
       - task: _install:windows
   _install:unix:
     internal: true
-    platforms:
-      - linux
-      - darwin
+    platforms: [linux, darwin]
     cmds:
       - task: nix:install:profile
         vars:
           NIX_INSTALLABLE: '{{.RUMDL_NIX_INSTALLABLE}}'
   _install:windows:
     internal: true
-    platforms:
-      - windows
+    platforms: [windows]
     cmds:
       - task: winget:install:package
         vars:
@@ -74,18 +64,14 @@ tasks:
     internal: true
     desc: Show rumdl version on macOS or Linux
     summary: Print the rumdl version on macOS or Linux.
-    platforms:
-      - linux
-      - darwin
-    cmds:
-      - bash -lc '{{.NIX_LOAD}}; rumdl --version'
+    platforms: [linux, darwin]
+    cmds: ["bash -lc '{{.NIX_LOAD}}; rumdl --version'"]
   _version:windows:
     run: once
     internal: true
     desc: Show rumdl version on Windows
     summary: Print the rumdl version on Windows.
-    platforms:
-      - windows
+    platforms: [windows]
     preconditions:
       - sh: >-
           powershell -NoProfile -ExecutionPolicy Bypass -Command
@@ -114,16 +100,13 @@ tasks:
           bash -lc '{{.NIX_LOAD}};
           rumdl {{.SUBCMD}}
           {{.PATHS}}{{if .EXTRA}} {{.EXTRA}}{{end}}{{.TAIL}}'
-        platforms:
-          - linux
-          - darwin
+        platforms: [linux, darwin]
       - cmd: >-
           powershell -NoProfile -ExecutionPolicy Bypass -Command
           "{{.WINGET_LOAD}};
           rumdl {{.SUBCMD}} {{.PATHS}}{{if .EXTRA}} {{.EXTRA}}{{end}};
           exit \$LASTEXITCODE"
-        platforms:
-          - windows
+        platforms: [windows]
   ci:
     run: once
     desc: Lint Markdown files with rumdl (RUMDL_TARGETS=path)

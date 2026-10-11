@@ -1,14 +1,11 @@
 ---
 version: '3.5'
-
 output:
   group:
     begin: ::group::{{.TASK}}
     end: '::endgroup::'
     error_only: false
-
 silent: true
-
 includes:
   nix:
     taskfile: ../nix/Taskfile.yml
@@ -16,21 +13,19 @@ includes:
     taskfile: ../uv/Taskfile.yml
   winget:
     taskfile: ../winget/Taskfile.yml
-
 vars:
   YAMLLINT_NIX_INSTALLABLE: '{{.YAMLLINT_NIX_INSTALLABLE | default "nixpkgs#yamllint"}}'
   YAMLLINT_UV_TOOL: '{{.YAMLLINT_UV_TOOL | default "yamllint"}}'
   YAMLLINT_TARGETS: '{{.YAMLLINT_TARGETS | default "."}}'
   YAMLLINT_CONFIG: '{{.YAMLLINT_CONFIG | default ""}}'
   YAMLLINT_EXTRA_ARGS: '{{.YAMLLINT_EXTRA_ARGS | default ""}}'
-
 tasks:
   default:
     run: once
     desc: Show available yamllint automation tasks
-    summary: Display the list of available yamllint-related tasks defined in this Taskfile.
-    cmds:
-      - task --list
+    summary: Display the list of available yamllint-related tasks defined in this
+      Taskfile.
+    cmds: [task --list]
   install:
     run: once
     desc: Install yamllint via Nix (Unix) or uv tool (Windows)
@@ -44,19 +39,15 @@ tasks:
       - task: _install:windows
   _install:unix:
     internal: true
-    platforms:
-      - linux
-      - darwin
-    status:
-      - command -v yamllint >/dev/null 2>&1
+    platforms: [linux, darwin]
+    status: [command -v yamllint >/dev/null 2>&1]
     cmds:
       - task: nix:install:profile
         vars:
           NIX_INSTALLABLE: '{{.YAMLLINT_NIX_INSTALLABLE}}'
   _install:windows:
     internal: true
-    platforms:
-      - windows
+    platforms: [windows]
     status:
       - >-
         powershell -NoProfile -ExecutionPolicy Bypass -Command
@@ -92,9 +83,7 @@ tasks:
           "{{.YAMLLINT_CONFIG}}" {{end}} {{if .YAMLLINT_TARGETS}}{{.YAMLLINT_TARGETS}}
           {{else}}.{{end}} {{.YAMLLINT_EXTRA_ARGS}}
           && echo "✅ yamllint passed" || { echo "❌ yamllint failed"; exit 1; }'
-        platforms:
-          - linux
-          - darwin
+        platforms: [linux, darwin]
       - cmd: >-
           powershell -NoProfile -ExecutionPolicy Bypass -Command
           "{{.WINGET_LOAD}}; {{.UV_LOAD}};
@@ -103,8 +92,7 @@ tasks:
           {{if .YAMLLINT_TARGETS}}{{.YAMLLINT_TARGETS}}{{else}}.{{end}}
           {{.YAMLLINT_EXTRA_ARGS}};
           exit \$LASTEXITCODE"
-        platforms:
-          - windows
+        platforms: [windows]
   config:init:
     run: once
     dir: '{{.USER_WORKING_DIR}}'
@@ -113,8 +101,7 @@ tasks:
       Write a sensible default .yamllint file in the current directory.
       Extends yamllint defaults with a relaxed line-length limit and explicit
       truthy values. Skipped if .yamllint already exists.
-    status:
-      - test -f .yamllint
+    status: [test -f .yamllint]
     cmds:
       - printf '---\n' > .yamllint
       - "printf 'extends: default\\n' >> .yamllint"
@@ -129,18 +116,14 @@ tasks:
     internal: true
     desc: Show yamllint version on macOS or Linux
     summary: Print the yamllint version on macOS or Linux.
-    platforms:
-      - linux
-      - darwin
-    cmds:
-      - bash -lc '{{.NIX_LOAD}}; yamllint --version'
+    platforms: [linux, darwin]
+    cmds: ["bash -lc '{{.NIX_LOAD}}; yamllint --version'"]
   _version:windows:
     run: once
     internal: true
     desc: Show yamllint version on Windows
     summary: Print the yamllint version on Windows.
-    platforms:
-      - windows
+    platforms: [windows]
     preconditions:
       - sh: >-
           powershell -NoProfile -ExecutionPolicy Bypass -Command

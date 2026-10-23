@@ -2,7 +2,7 @@
 version: '3.5'
 
 env:
-  GOTOOLCHAIN: go1.27.2
+  GOTOOLCHAIN: go1.27.3
 
 includes:
   taskotter:

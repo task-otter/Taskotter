@@ -279,7 +279,7 @@ linters:
       toolchain-pattern: a^
       tool-forbidden: true
       go-debug-forbidden: true
-      go-version-pattern: ^1\.27\.2$
+      go-version-pattern: ^1\.27\.3$
       check-module-path: true
     gomodguard_v2:
       local-replace-directives: true
@@ -798,7 +798,7 @@ run:
   enable-build-vcs: true
   allow-parallel-runners: false
   allow-serial-runners: false
-  go: 1.27.2
+  go: 1.27.3
   concurrency: 0
 
 severity:
